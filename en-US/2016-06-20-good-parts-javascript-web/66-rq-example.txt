@@ -1,0 +1,101 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:04]
+>> Douglas Crockford: So this is an example of an RQ program. You can write RQ in the form of nested arrays which describe the work that you wanna do with the calls to RQ acting as annotations as to what happens in parallel, what happens in serial. So here we've got one request, that's gonna do stuff in parallel.
+
+[00:00:27]
+In parallel, it's gonna do a couple of sequences and then one standalone thing and a race and a fallback. And simultaneously, it will also do this optional set, just a similar sort of stuff. And when it's all done, we will then call this function that's the continuation which will show the result.
+
+[00:00:46]
+So this is an actual JavaScript program, so let me execute it so you can see what it does.
+>> Douglas Crockford: So each of these widgets represents some service which is being accessed by that program. So those are the ones that start immediately. And I get to decide which of these are going to succeed and which are going to fail.
+
+[00:01:09]
+For example, if I have that one fail, then the entire request failed and you can see I cancelled everything else because we don't need it if the whole job's not gonna work. So let me reset and we'll try it again. So let's say this time that one succeeded, okay, we're still running, things are good.
+
+[00:01:30]
+This one is optional, let's say it fails. Okay, it failed but no problem, it's optional so we're still running. Let's say this sequence starts, here it's successful, good, so then A2 started. We got the request A1 finished so A2 starts. You do a similar thing with B1, that succeeded, so B2 is now running.
+
+[00:01:52]
+We've got a race with D1, D2, D3, which one should win?
+>> Speaker 2: 2.
+>> Douglas Crockford: 2. So race 2 wins. And we canceled D1 and D3 because we don't need those results any more. Let's say our fallback fails, not a problem. The next step in the fallback succeeds. And I can finish these in any order.
+
+[00:02:14]
+So let's say that goes and maybe that succeeds and that succeeds, that succeeds and we're now good. So at that point the whole thing finished. All of the optional things that were still pending, those got canceled and we're done. Any questions about that?
+>> Speaker 3: Yeah, could you give us a real world example of where you'd use this?
+
+[00:02:38]
+
+>> Douglas Crockford: Yeah, I will, and I've been sort of doing that. So I gave examples that we get the nav and we get the ads and all of those. Those are real world things. Those are the sorts of flows that you would have in a web application.
+>> Speaker 3: They want 3 ads but any of 12 could load there, it'll just take the first 3?
+
+[00:02:59]
+
+>> Douglas Crockford: Sure, you can do those sorts of things, whatever you need.
+>> Douglas Crockford: So this again is the program that accomplished that. All of that behavior happened just in the RQ functions handling that stuff. So and you can compose these things in lots of ways. For example, this is a sequence in which we'll do one thing and we'll take its result and we'll pass that to three different things, and they will accumulate all of their results into an array and pass that array to the last one.
+
+[00:03:36]
+So you can get lots of workflows. So for a real world example, this is the most recent thing that I've been working on. I'm working on an encyclopedia. And I'm writing in a authoring language and this is the process that I run in node for building the book.
+
+[00:03:53]
+So I first read the file and I pass that result to the include processor which handles the stuff with all the include files. And then I pass it to a thing which will then compile it and produce the HTML. And then I have another thing which will then write it out to the file system.
+
+[00:04:15]
+So this is a sequence, one thing happens to another. But it's not being written as nested event handlers, it's written as a list of things that happen one thing after another. So it looks more like a program.
+>> Speaker 3: What's the callback? The callback's, is the callback the next function, or-
+
+[00:04:31]
+
+>> Douglas Crockford: The callback is similar to the thing that we did with continue wise this morning. It's the thing that will receive the result.
+>> Douglas Crockford: So this is a special case of continuation passing style where at each step, we don't return the result, instead we pass the result to a function that's provided to us.
+
+[00:04:52]
+
+>> Speaker 4: [COUGH] And final callback is essentially a console log?
+>> Douglas Crockford: Yeah, the last one will send it to the console.
+>> Speaker 3: Anyway, this is your program, right?
+>> Douglas Crockford: Yep.
+>> Speaker 3: So this first function to sequence, first it's gonna call the first function and it's gonna call the second function and then the third and the fourth.
+
+[00:05:16]
+
+>> Douglas Crockford: Right.
+>> Speaker 3: Where's the first, the value of callback that gets passed into the first function, where's that come from?
+>> Douglas Crockford: It'll be called by, so what I didn't show here is that RQ.sequence returns a function. When we call that function, it will then call the first in this list providing a callback function to it.
+
+[00:05:41]
+
+>> Speaker 3: And that's the hook that makes it call the second one.
+>> Douglas Crockford: Right.
+>> Speaker 3: Sort of RQ.sequence kind of always passes itself into each of the functions that it calls?
+>> Douglas Crockford: Sort of, yeah.
+>> Speaker 3: Okay.
+>> Speaker 5: It passes the value from the previous [INAUDIBLE].
+>> Douglas Crockford: Yeah, so-
+>> Speaker 3: That, okay, you mentioned that earlier, yeah.
+
+[00:06:02]
+
+>> Douglas Crockford: Right, so you can think of it. It's sort of like a pipe that's passing the stuff through so each gets the thing from the previous one.
+>> Speaker 3: And this is not node. This is just pure JS.
+>> Douglas Crockford: Right, this is pure JS. You could run this on a browser as well if you've got asynchronous things to do there.
+
+[00:06:20]
+It would run as well.
+>> Speaker 3: Yeah, it's not a module, it's just a global. RS would be a global or wherever you declare it.
+>> Douglas Crockford: It's just a JS file, you can load it however you want.
+>> Speaker 3: It's just a JS. It creates global, though, called RS in the namespace.
+
+[00:06:43]
+
+>> Douglas Crockford: In a browser it creates a global namespace and in node it will add something. Yeah, it'll export as a model. So RQ can also deal with timeouts. So each of those functions will also take a time in milliseconds which says, this needs to complete successfully in this much time or we will fail it.
+
+[00:07:09]
+In the case of the parallel, you can also specify untiliseconds, which gives the optional set. You got this much time until you get cancelled, so just in case that the main ones finish early.
+>> Douglas Crockford: Then we can also deal with cancellation. So any requestor function can optionally return a cancel function, and that cancel function when it is called will attempt to cancel the request.
+
+[00:07:35]
+There's no guarantee that the cancellation will happen before the request completes, because they can be network races and other things going on. So it's intended to stop unnecessary work. It's not an undo, it's not a rollback. And also if you're trying to cancel a transaction, for example, this is not the cancellation that you want to do.
+

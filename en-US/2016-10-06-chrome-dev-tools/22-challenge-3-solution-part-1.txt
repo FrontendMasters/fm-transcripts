@@ -1,0 +1,106 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:03]
+>> Speaker 1: A couple questions from Dylan. How do you add the no CPU throttling button in the timeline tab?
+>> Jon: Okay, so that one is, that's like a very, very brand new feature. So it's only on Canary, and it's likely only on the latest minor version of Canary. So maybe just checking to see if you're eligible for an update on Chrome Canary.
+
+[00:00:28]
+Actually I lied, cut that, it's an experiment. Even in Canary I think, I wanna cover experiments later but for now you can go to the three dots and settings and then I think we're gonna cover this in a bit if you have this, it is totally an experiment.
+
+[00:00:44]
+Can we hold off maybe on that and I'll we're gonna cover experiments in the end you have to like turn him on and stuff like that? Sorry about that. So that's an experimental feature even in Canary.
+>> Speaker 1: And then the next question is from Juan, who would like to ask if there's any way to find the corresponding function in sources from the main call stack on the Timeline tab.
+
+[00:01:06]
+
+>> Jon: Yeah, so [COUGH] if you're in here in the main call stack, and you get down to whatever function you want like this anonymous function and you click on it. It'll change what's in the summary this JS frame, you scroll down to the bottom of the summary and you'll be able to click on the exact line.
+
+[00:01:26]
+Keep in mind like some of these are just externally loaded resources. Like YouTube and beds or whatever will actually take you to the YouTube code. So it's gonna take a second but you can do it that way.
+>> Speaker 1: Okay, and the next question is from John. Some scripts are green and some are purple.
+
+[00:01:43]
+Does it color the scripts depending on the domain or the file?
+>> Jon: Yeah, well, that's a really good question. I don't know how it colors the scripts. It's really interesting. You see like that the colors for all the other section are labeled but I'm really not sure it's got this whole like pastel colors scheme here.
+
+[00:02:05]
+I'm not sure how colors than I do I do see like kinda immediately that like native abends being triggered showing up in yellow. But I have no idea how it does if the difference between the pastel blue and purple and green. I'm not sure. It's a good question.
+
+[00:02:22]
+Cool, and I also saw on the chat that some people were, it was crashing when they were doing this. I played around with it. I think some of the crashes, something experimental in Canary because it's not It's not that slow for me in stable Chrome. But also I just had a lot of really bad practices going on on this site.
+
+[00:02:41]
+So that's probably when I went a little bit overboard on that. What I ended up kinda doing is I just went through and I just deleted some of these images. And this is from profiling.pug. So you could do that too, if you needed to speed it up. Cool, so I guess the first thing I would do, just to kind of walk through it, is do a full audit and reload the page.
+
+[00:03:02]
+So it's gonna reload the page in the background, and when that's done take a look at what the audit says. I'd also, if the site were online, I would run it through Google page feed insights, like I mentioned before, just to get some more in-depth information. So some of the stuff like you know those things that we covered.
+
+[00:03:20]
+I'm serving to many JavaScript file so any any kind of teak manger to bundle all of those together would be help. G.Z compression. Again, it depends on your platform but for node and Express which is what my app is there's a MPM module called compression. So you can just add him install and then app use compression and will reduce it for you.
+
+[00:03:42]
+Browser caching, this is a little tricky. So you can specify like time, freshness lifetime whatever on your files. Sometimes you're gonna get this though with files that are not yours,like so if you're using like the YouTube and video and bad's or SoundCloud or Facebook, any of that. You don't always have control over that.
+
+[00:04:00]
+But some of these, we could. Cookie size. A lot of cookies. Again, I'm not setting these cookies manually. They're just like YouTube trackers and stuff like that. So again, it's like if you need a YouTube embed, you take the good with the bad, basically. And then, we've got a ton of CSS rules, again I'm using boot strap and I only have like five elements on this page.
+
+[00:04:23]
+So it's like an image and some paragraphs, so there's a lot of unnecessary CSS is coming over the wire. So it started there, and so get a bundler, get the gzip compression going, crop down bootstrap to just the CSS that I need, those are probably your biggest wins.
+
+[00:04:42]
+And then, kinda going over timeline. I'll hit a refresh, see if it crashes for me. This one's real slow. [LAUGH] I went overboard on making it as not performant as possible. So basically, I mean even while this is loading, if it's loading. We can see that the images taken a noticeably long time to load in.
+
+[00:05:06]
+I'm getting getting the crash I think. We might hop over to Chrome, and see if I can do it in Chrome stable, just so I can at least show everybody what's going on with it.
+>> Jon: And also that run.
+>> Jon: So this looks mostly the same as what we're looking at a few things I think have been minor redesigns So we see right off the bat this huge chunk of yellow.
+
+[00:05:46]
+Like the whole CPU is basically executing JavaScript the whole time. Nothing really looks bad as far as the memory stuff goes, so I'm gonna hide that one for now. Again, we don't see that jigsaw pattern that we are watching out for. So that's fine. The screen paints are a little bit bad.
+
+[00:06:05]
+So the cool thing about doing these profiles is you start getting really comfortable with like the patterns that you'll see here. So we see like you always see the green bump at the beginning because you have to run to the page like I said. And I'm almost 100% sure that all of these green bumps and all this page junk here is from YouTube stuff.
+
+[00:06:25]
+I'd imagine that it's like loading in the YouTube UI and Chrome and stuff like that. So we can check that out. And just kinda see you. So another thing I think I didn't mention but you can like drag it to select any area as opposed to like trying to scroll in on it.
+
+[00:06:41]
+But so then we can kinda like come over here and see, so these are all like all of that stuff is like calling all these embed players and then this gets into YouTube the minified code. Another good note with this is like, if you're, concatenating is really important but a lot of people minified their code to their JavaScript which like turns all the variables in the single letter variable names and things like that.
+
+[00:07:02]
+If at all possible make sure your development build is does not minifying so that when you look at something like the callStack you're not seeing h calls an anonymous function, calls e, calls m but you see something that's like more meaningful than that. So either way, basically the all those YouTube videos are causing a bunch of screen junk that's like my first take away right here.
+
+[00:07:24]
+So I project a low those in asynchronously if I could just like render the page and then load those iFrames in. There's a ton of JavaScript going on. So there's kinda two approaches that we could take care. We can pick a section that's like very JavaScript heavy and then we can see what it is that it's doing, what's taking so long.
+
+[00:07:45]
+Is like this base.js and we could kind of go in here click on it and then we could pre-print it, so now we're back in the sources area it's gonna take a minute and it's YouTube player. So it's like the iFrame call out, there are calling this base thing and it's like this YouTube boot strapping process.
+
+[00:08:02]
+So again, a lot of that JavaScript could be not resolved, cuz it's okay to do a lot of work in the main thread, but it could be done after the whole page is loaded. If you use JavaScript to load these in asynchronously.
+>> Speaker 3: Yeah. So speaking of the YouTube I'm betting on, so earlier you had talked about how when you were trying to do a page on it it will not necessarily pick up on CSS rules that are being applied to other pages in your site and to anything that is potentially interactive.
+
+[00:08:38]
+On the audit results some of the removed unused CSS rules tab, it picks up no CSS rules being used in the CSS files for the YouTube embeds. Is that the primary reason why it's not picking up any used style rules or is that another reason?
+>> Jon: So let me make sure I understand.
+
+[00:08:58]
+So we're in the audits tab. I think I've got it open. I got multiple dev tools going on here. So when we ran the audit, there was the unused CSS rules?
+>> Speaker 3: Right.
+>> Jon: And it wasn't picking up things that are applying to the YouTube?
+>> Speaker 3: Right, it was saying that 100% of the CSS rules in each YouTube embed CSS file is not being used on the current page.
+
+[00:09:26]
+
+>> Jon: Got you.
+>> [CROSSTALK]
+>> Speaker 3: What you were talking about is the primary reason why that's the case.
+>> Jon: Yes. I think there's like two different things going on there. Like one, all those YouTube embeds are iFrames, so their page source is going to be different, but the resource still comes through to your page.
+
+[00:09:40]
+Like you're downloading the CSS but you're not responsible for that markup. The other thing that is definitely, like what I was talking about before is that, YouTube loads these multi level. So it's like that image comes in. And so, this audit is only as good as when DOM content loaded event fires.
+
+[00:09:58]
+So all the like Chrome that starts coming in afterwards and all that staff isn't gonna be present when DOM content loaded fire. So like a lot of it is just markup that's coming in asynchronously.
+

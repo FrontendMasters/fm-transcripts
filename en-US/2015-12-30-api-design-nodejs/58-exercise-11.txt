@@ -1,0 +1,120 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:04]
+>> Scott Moss: So what you all are going to be doing, you've got three functions that we have to build out. One is partially built out and the other two not at all. But this one is the d code token, so it's going to be the middleware that we are going to use when we want to check the incoming request token.
+
+[00:00:22]
+Its job is to do exactly what it says, is to decode the token. Is to take the token with the secret, turn it back to what it was originally. Or at least attempt to. If it can't, it should let us know so we can send an error back.
+
+[00:00:36]
+A lot is happening here. You can read the comments here. But in short, remember I was saying earlier, the token should be on the authorization header, but optionally, it could also be on the query string. This is what this check is doing. It's like, okay, if we have req.query, and req.query has an access_token property, they probably put the token on there.
+
+[00:00:56]
+So let's grab the token off of that, and let's attach it to req.headers.authorization. Now the weird thing that's going on here is you see this word, Bearer. We didn't talk about this. And then I'm adding the token to that. So, in the spec, what's happening here is that, or at least this check token thing, at least, is looking for the token string with a word called Bearer, just like this.
+
+[00:01:22]
+Bearer, with a space after it, followed by the token. That's actually in the spec. If you go read the JWT spec, most of these libraries are expecting to see Bearer space the token, so that's why that's there. If you got rid of this, or just did that, it wouldn't work.
+
+[00:01:39]
+Even if this was a valid token, it won't work. So this is, I guess, a way of name-spacing that this is a json web token. Cuz there are so many other tokens you could put out there on an authorization header I guess. So Bearer maybe is a way to name-space it.
+
+[00:01:55]
+But it is expecting that. So we attach it to the authorization header, and then checkToken takes in the request, the response and next, and because the authorization header is on the request. checkToken will do one of a few things, it will either called next if the token is valid, so it's like cool this token is valid I'm gonna call next and it will go to the next middleware.
+
+[00:02:19]
+If it's not valid, it will call next with an error. So, it'll still call next but a passing error like unauthorized.
+>> Scott Moss: If it is successful, it will grab whatever is spit back from the decoding of the token, and attach it to rec.user. What's in our case, will only ever be an ID, will only ever signing an ID.
+
+[00:02:44]
+So the ID's going to be a task to direct.user. So you'll use direct.user._.id and you'll get the ID and then it'll call next. So all this, you don't have to work with this, this is good. What you will have to do is these two things down here, so getFreshUser is exactly what it sounds like.
+
+[00:03:05]
+So now that we got the token, we got the ID back, now we want to clear the database and get the user with the ID. So by the time it gets to our controllers, the controller can just say, req.user and it has the user object on the request.
+
+[00:03:16]
+That's what this is going to do. Again, I said up here it does attach the ID to req.user, but that's just a ID. We can now use that ID to get the full user from the database and replace right that user with the actual user document. So by time it gets to the control event that the controller can just say right that user, it knows everything about the incoming user.
+
+[00:03:35]
+So that's what you gotta do inside this function, tell it, have it so you can just redraw it. But really, you are gonna do is create the database, you have access to req.user inside of here. Because this getFresh middleware is always gonna run after decode token, because we're gonna use it that way.
+
+[00:03:53]
+So just assume that you have req.user here and it's an object within underscore id property. Given that, you can create a database and find the appropriate user and direct to that user. If you don't find the user, one or two things happen. We get into those edge cases where either they figured out your secret, they made adjacent web token, they sent it in, it decoded perfectly and then it came here and you then you looked in your database for a req.user.id and there was nothing in there.
+
+[00:04:20]
+Then one of two things happened. That's not a real requests from one of your users, or the time between they got that signed token and this time, the user doesn't exist anymore in the database somehow, maybe you deleted it, I don't know.
+>> Scott Moss: So do that and be sure to call Next.
+
+[00:04:40]
+Because this is a middleware function. So you have to call Next. That also means if you have an error in your database you call Next and pass them the error. And I'll leave it up to you to decide what to do if the database goes to the database, does not return an error, but doesn't find a user either.
+
+[00:04:55]
+So I'll leave it up to you to decide what you wanna do there. And then exports.verify user. This is going to do something similar but a little bit different. So this is going to, actually checking, like, the passwords. This is where we're doing the sign in. So, this is giving the username and pass Is gonna look up the user by the username, grab a task password, and check to see if this password, after it's hatched, is matching with a safe hash password.
+
+[00:05:32]
+So as far as hashing the passwords, you don't have to do that. I have a method for that, you don't have to do that. We haven't gotten there, but it's in there. You will not be hashing the passwords yourself, cuz we're calling a function that are already there.
+
+[00:05:43]
+So you'll be doing those two functions and off that JS. And if you follow me into API user model, we get into that stuff that I was talking about. The middleware with Mongoose and then teaching Mongoose new methods. So we have this one middleware pair that says UserSchema.pre save, so this happens anytime before we create a new user, this function will run.
+
+[00:06:04]
+So what's happening here is it's converting the password to an encrypted password. It's encrypting the password, that's what it's doing. That's all it's doing, it's like give me the password, I'm going to encrypt it so we also added a password field up here to. There's type, there's string and also required.
+
+[00:06:23]
+So it's overriding the plain text password with an encrypted password and then it's called a next. So then it you go down and look at these methods, we have authenticate, which takes a plain text password and will return true or false if this user's saved past password matches the has plain text password.
+
+[00:06:43]
+So this is perfect for sign-up. So this is what you would use and verify user. It even says it right here. Use the authenticated method on the user document. So this is the authenticated method that it's talking about. And then encrypt password just takes a password and it generates a salt and it encrypts it synchronously, which is probably not the recommended approach, but I wanted to keep this as simple as possible.
+
+[00:07:11]
+You'd probably wanna do this synchronously to avoid time attacks. But, we're gonna do this synchronously.
+>> Scott Moss: So, that's what's going on here. Any questions on this stuff? You don't need to touch anything here, but I wanted you to some context in what's happening. All of the stuff you're going to be touching is off.js.
+
+[00:07:40]
+
+>> Speaker 2: And for how long?
+>> Scott Moss: Hold up I still got a little bit more to show them and then we'll start. So off.js is where you're gonna be touching. If you also go look in the other files like off.controller, or I'm sorry controller.js and routes, some other stuff going on in here.
+
+[00:08:01]
+Inside the controller, there's a sign in method. You'll also be doing this one. This one is just going to, you can assume req.user will be there from the middleware that we're gonna assign. So we can just create a token and send it back to the client. So that's all this is going to do.
+
+[00:08:20]
+It's going to go like, okay, get the req.user. Get the ID from that, and create a token and send it back to the client. If you're looking off that JS, we have this signed token thing here that will sign the token. We just need to send it back.
+
+[00:08:38]
+The way we want to send it back is we want to send back an object that has a token property and its value is the token. That's what we wanna send back, so it'll be something like that. So this would be two lines. So if you go look at the routes, this is the route that is happening.
+
+[00:09:00]
+We have a new router. On sign-in, we're gonna do controller.signin, but we need to do something before this happens. We need to verify the user, because they're trying to sign in. So that's where that method verifyUser comes in right here. That's a middleware function. So complete that, add that middleware here, and make sure we're signing the token and sending it back.
+
+[00:09:25]
+And then complete these two functions. So one more thing. So that's all you're gonna have to do. And you can do this without the thing I'm about to show you. But to make it easier, if you want to, or you can wait until the next step. On GitHub, there's another repo on the Frontend Masters.
+
+[00:09:45]
+Github.com. That we did during the two-day course earlier this week. And it is angular components on the, where is it at? There should be a Blog branch. I need to push it up actually. Yeah, we'll wait till the next step for this. And then we'll push it up.
+
+[00:10:08]
+So I have a client app for you guys so you can actually play with the blog and see the API and all that stuff work. But I'll push it up after lunch so you guys can see it. It's on a different branch. So knowing that, let's get started.
+
+[00:10:20]
+We've got 30 minutes, and that'll bring us, yes?
+>> Speaker 2: Just a quick couple questions. Somebody is asking if they need Python to run NPM for this step.
+>> Scott Moss: No, they should not need Python.
+>> Speaker 2: They're getting an error. I'll try to follow up with them on chat. And then somebody else said, could you speak briefly to placing encryption, decryption methods on a model versus putting them in something like Passport?
+
+[00:10:44]
+
+>> Scott Moss: So, I guess when we talk a Passport, cuz Passport's job is to authenticate, I guess you might think it does make sense to do that. But, now you're putting the logic, as far as authentication, as far as hashing and stuff that the database needs to work. You're putting that in something like Passport.
+
+[00:11:10]
+Which, I guess is safe, but maybe you want to switch out Passport tomorrow, right? And then, now you have to move that logic. Or maybe, you were doing so many different types of authentication schemes in Passport, and you have to write the same thing over and over and over and over again in different schemes, or you have to build an abstraction around password so you don't write it over and over and over again.
+
+[00:11:28]
+I still wouldn't put it in Passport, Passport's more like, Passport's more like I wouldn't give the sign in of my tokens to password. Password's more like, I'm gonna handle oauth for you, or I'm gonna handle a local sign in. Password's gonna do what we did, as far as allowing us to get access to the incoming password or username and email, but as far as the signing and checking of it, you can do it in Passport, but the thing that's calling that method should still be your document, in my opinion.
+
+[00:12:00]
+Although there is no wrong or right way. You can still do it in Passport. That's the beauty of having it on the model here, our user model because it's on an instance of user, we'll have access to user inside a password. In Passport, you'll query and you'll get the user and you can just call user.authenticate or user.encrypt password inside a Passport.
+
+[00:12:21]
+So there's really no loss there, I think it's all about where you define it not where you use it
+

@@ -1,0 +1,117 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:04]
+>> Jafar Husain: And now, here we come to the central question that we have to deal with when we move from arrays to observable. Almost everything else is the same. You still keep mapping, you figure out how deep you are, and you flatten. But here's where the extra level of complexity comes in, when you have the dimension of time.
+
+[00:00:21]
+Instead of figuring out how many flattens I need, you need to ask yourself one extra question, which is how many flattens do I need and which flattens should I use? Remember there's only one way to flatten an array of arrays, what is it? ConcatAll. There's no time, so all the data's there at the same time.
+
+[00:00:38]
+The only logical strategy is to go top to bottom, left to right, and just go the first array, slurp up all the data, go to the second array, slurp up all the data. But now we actually have a collection of collections over time. So there's more than one way to skin a cat here, right?
+
+[00:00:51]
+What are the three strategies?
+>> Speaker 2: MergeAll, concatAll, switchLatest.
+>> Jafar Husain: SwitchLatest. All right, so what'll happen if I use mergeAll here? What would I get? A merged all observable.
+>> Speaker 3: You get all of the search results, even the ones that should be defunct by later keypresses.
+>> Jafar Husain: Right, I'll write this out, just so we're all clear on it.
+
+[00:01:21]
+Right, I would get in exactly the order in which they arrive.
+>> Jafar Husain: Like lanes merging on a highway. Does that make sense? That's what I would get if we just [SOUND]. MergeAll is just like lanes merging on a highway. So let's see what we would get with concat.
+
+[00:01:43]
+Anybody tell me?
+>> Speaker 4: It would be the same but with the advantage that the former could not possibly overwrite the latter, even in the case of the latter happening faster.
+>> Jafar Husain: Well, it'll be definitely be the same order but something will change, something will change. And remember what concatAll does.
+
+[00:02:07]
+It has an observable of observables, and concatAll forEachs over the outer observable and then it starts receiving inner observables, right? That's what these are, inner observables. And once it receives an inner observable it forEachs over that, but it will if it receives another inner observable while it's listening to the first, to an existing inner observable, all it does it puts it away.
+
+[00:02:30]
+It caches it, like remember when she was piling up the cakes, right? It caches it, it doesn't forEach over it. Which means this time, right here, doesn't start going yet. So until this observable is complete it's not even gonna call forEach on this observable, which means this time isn't gonna start moving.
+
+[00:02:48]
+What do I mean when I say this time isn't gonna start moving? Why wouldn't the network request start as soon as the inner observable arrived? Well, what happens if you create an observable and don't call forEach?
+>> Speaker 2: Nothing.
+>> Jafar Husain: Nothing. So concatAll is gonna get to the end of this observable and then it's already got this observable.
+
+[00:03:07]
+It's just holding it in memory somewhere, piling it up, and then it's gonna call forEach on it. Which means this time will only start counting once this finishes. So instead of like mergeAll, where these things are so close together, you will actually take all this time and you will concatenate it onto the end of this.
+
+[00:03:25]
+And we will get the same results over a much longer piece of time. Is this starting to make sense now that we're visualizing it, right, and we're making it more concrete? So that's probably not what we want, right? Probably don't want, imagine queuing up every single time they type a key, queuing up the network request and they've gotta wait for all the search results to come back before they even make next network request.
+
+[00:03:46]
+Probably not the flatten we want, right? So let's take a look at the last flattening strategy, help me out here, what is it?
+>> Speaker 2: SwitchLatest.
+>> Jafar Husain: SwitchLatest. What's gonna happen with switchLatest? What are we gonna get?
+>> Jafar Husain: What do you guys think?
+>> Speaker 2: You're only gonna get the last request.
+
+[00:04:06]
+
+>> Jafar Husain: When is it gonna arrive? When is the data gonna arrive? Dot, dot, dot, dot, dot. When is it gonna arrive?
+>> Speaker 2: As soon as it gets there.
+>> Jafar Husain: Yep.
+>> Jafar Husain: Why is that?
+>> Speaker 3: When the second request was sent, we switched to favoring that request and we threw away the first one.
+
+[00:04:29]
+
+>> Jafar Husain: Right, so as soon as, right, so the switchLatest forEached over this inner observable. But while it was waiting for the onNext and the onCompleted, another one came along and it immediately,
+>> Jafar Husain: Subscription disposed and it stopped listening, excuse me, dispose. And it stopped listening for these results.
+
+[00:04:50]
+And so it never got this result, and instead it started listening to this one. SwitchLatest only listens to one inner absorbable at a time. So with switchLatest we get what we want. Now why is it so important to you switchLatest here? Because if you look at it, I mean merge gives us actually more results doesn't it?
+
+[00:05:11]
+I mean isn't merge better? I mean merge actually gives us both results. Maybe it's better to show something on screen earlier, even if they've already typed a key. Now in the case of an autocomplete box, I generally don't think it is better. Why? Because let's say you show somebody a result.
+
+[00:05:23]
+Anybody ever have this happen to them with an auto complete box, where you show results and then the user moves their mouse to click something and the results disappear and some more results come in. Probably not good usability, very frustrating, right? So that's why we probably want switchLatest.
+
+[00:05:36]
+But there's an even better reason why we want switchLatest, and that's because this can easily happen,
+>> Jafar Husain: Right? Just cuz I issue a network request first and then another network request, doesn't mean the results from the first one are gonna come back before the results of the second one.
+
+[00:05:58]
+
+>> Speaker 3: Especially if you're doing search like this, where there's gonna be a lot of words that have a in them, and much fewer that have ab in them.
+>> Jafar Husain: Well, maybe this search, maybe it'll take a longer time to execute the query on the server, for example, right.
+
+[00:06:10]
+So ab will be a much shorter result to execute the query, and the result comes back earlier. That's possible, right? But now let's see what happens if we use merge. Nothing good happens if we use merge now.
+>> Jafar Husain: That we definitely don't want, right? And we certainly don't want the concatAll case, where the data is, it'll actually just elongate time even further.
+
+[00:06:43]
+
+>> Jafar Husain: We don't want that. Hopefully now it's clear why we want switchLatest, and why we almost always want switchLatest in user interfaces. We just wanna cancel the old thing and focus on the new thing they asked us to do. Make sense? So now we know that if I apply switchLatest,
+
+[00:07:02]
+
+>> Jafar Husain: I'm gonna get,
+>> Jafar Husain: This.
+>> Jafar Husain: So it's always nice to help out your fellow programmers, by adding comments like this, right, which help them understand what the stream looks like after these intermediary steps. I'm not sure if that bracket's needed or not. Okay, should we see if that works?
+
+[00:07:34]
+I'm kind of excited. Let's try it out, let's try search results. So now that we've created this stream of data that we want, right, notice that this is actually what we originally wanted. We wanted something like this. Now we've actually built that stream. Now it's time to call forEach.
+
+[00:07:54]
+Now it's time to consume that data and do something with it.
+>> Jafar Husain: And each one of these will be an array. That's why I call it a result set, oops.
+>> Jafar Husain: And for now, I'm just gonna, well alert will be annoying, so I'm gonna try and put it into the inner text of the search results, which I believe we created.
+
+[00:08:32]
+So it's textarea.value, right? So textarea.
+>> Jafar Husain: Okay, yeah, question?
+>> Speaker 5: Do you have to change text box to result? Did we define text box?
+>> Jafar Husain: I think we defined text box up here. And then we got the keypresses collection by converting the keypress event on the text box to that keypresses stream observable.
+
+[00:09:38]
+So let's see if this works, ladies and gents. I don't see my HTML bar, here we go. So rarely do these things work on the first time, so this'll be an opportunity for us to do some debugging. We've still got our alert there, hey. Well, we're not 100% sure everything worked correctly yet, so we'll take a few more keypresses.
+
+[00:10:05]
+But let's run it again. Now that we got our environment situation all set up I have a feeling things are gonna be much smoother. So I'm gonna run this, and T-E rminator. Hey, all right. Not too shabby for an autocomplete box, right? Not a lot of code.
+

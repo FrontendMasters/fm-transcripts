@@ -1,0 +1,81 @@
+[00:00:04]
+>> [MUSIC]
+
+[00:00:04]
+>> Aaron Frost: Proper tail calls. So this is a quote by Dave Herman. Does anyone, Dave Herman? Super smart guy, architect, no, principal researcher, I think that's better than architect, I don't know, at Mozilla. He's super wicked smart, and he's as nice as he is smart. He wrote the, why am I drawing a blank, Effective JavaScript, he wrote the book called Effective JavaScript, which for me is like, when someone's like, hey, I'm gonna learn JavaScript, what book should I read?
+
+[00:00:33]
+Effective JavaScript by Dave Herman. So he says, proper tail recursion is a property of the asymptotic space complexity of a language's runtime behavior. That is, in improperly tail recursive languages, control can consume unbounded amounts of space for programs that, when run in properly tail recursive languages, only require a constant amount of space.
+
+[00:00:56]
+So that's it. You guys got it? So this is how he talks, though. And it makes perfect sense to Dave. But I read that, I got to read like 40 times cuz I don't even know what he's talking about. So this is what I think Dave meant. In an improperly tail recursive languages.
+
+[00:01:17]
+And I'll explain tail recursion in a second. But when your language has implemented improper tail recursion, as time goes on, as the number of recursive calls increases, your memory usage also increases without a bound, it's unbounded, okay. And in a language that properly implements tail calls, with each number of recursive calls into that function, you're not gonna increase your memory usage over time.
+
+[00:01:50]
+Like, it will maintain a constant level of memory usage. So that's what Dave's trying to say. So clearly we've got this, right. If you try and do recursion in JavaScript, and we'll do an example here in a second just to kind of show how far we can get, this is why it doesn't work.
+
+[00:02:07]
+Because when it makes the new call, it doesn't drop the old stack, it keeps a hold of that, which is gonna consume memory. And in a language where recursion was meant to happen, if it doesn't need that whole stack, like if it doesn't need anything from up there, it will just drop it and it can go on to the next thing.
+
+[00:02:26]
+So here we've got a foo method, it's a recursive method. It's just gonna sit here and call itself until it dies, essentially, and then it will return whatever number that it died on, okay. So I'm gonna go ahead and run this real quick just so we can kind of see it.
+
+[00:02:51]
+
+>> Aaron Frost: So if we go here. Can everyone see this okay? So we're gonna run this, and it's gonna return the number of times it called before it just blew the stack. So we get about 10,460, that's pretty constant. And those are pretty shallow frames, right, there's not a lot happening frame to frame, they're just saving a value for a number.
+
+[00:03:17]
+So in Firefox, this was awesome. In Firefox. No, dude, no.
+>> Aaron Frost: I'm actually gonna refresh the page. Okay, let's paste this in there. So Firefox actually gets way more, like than almost five times more, right? So Firefox has figured out a way to make the current implementation not suck as bad, but it still kind of sucks.
+
+[00:03:53]
+But anyway, so that's how far you're going to get before you die. So if you have a recursive method that you can guarantee that n is less than 10,000. And IE is actually lower. I don't have an IE, though, so I can't run it. But if you can guarantee it's going to run less than 10,000 times, then you could possibly use recursion in JavaScript, but you wouldn't.
+
+[00:04:19]
+And so this PTC functionality is to get proper tail recursion. So I wanted to explain what it takes to have a proper tail call. So here's a diagram of what's happening for those that aren't grokking it. So when we make the first call, it puts one stack in the memory, right.
+
+[00:04:36]
+And then when it makes a second call into the method, it's gonna put a second stack. And then we got a third one with a new context, and those new contexts take up memory. And then by the time you get N deep into here, every single one of them is putting a new stack into memory, right.
+
+[00:04:51]
+And it's consuming more memory. So this is why the graph just kinda showed the memory take off up into outer space, because it's taking more memory every single time it makes that call. And it's not releasing those current stacks like it could do if we had a proper tail recursion, so.
+
+[00:05:09]
+ES6 brings proper tail calls. So that's one of the new features. And if you if you use your tail calls correctly, you'll be able to get that proper tail call functionality and you'll be able to get recursion. So let me explain how you're going to be able to get a proper tail call.
+
+[00:05:30]
+And in a proper tail call, those previous stacks are gonna get GCed or reused, so it will release that stuff. So there's some vocab around this. Let me explain tail position. So tail position is the last instruction before the return statement, okay? So in this little function right here, in tail position, we've got a string, okay?
+
+[00:05:56]
+So it's gonna eval that string. That's the last instruction before return. So that string is in tail position, okay. And some functions are going to have.
+>> Aaron Frost: Some functions have multiple tail positions, right. Have you guys ever seen a function with two return statements? Two return statements, like if, return this, else, return that?
+
+[00:06:22]
+Yeah. Not return return, but in two different lines of code, yeah. So we understand what tail position is, it's the last thing that's gonna happen before the tail call. Before the return statement, okay. But then we have this tail call. So here's two different functions. So, PTC stands for proper tail calls, sorry.
+
+[00:06:49]
+So here we've got two tail positions. We've got our function here, again, where we've got hello in the tail position. We've also got a call to getSalutation, and that's in tail position as well, right? So this is actually a call to another method, though. And it doesn't need to hold on any of the variables up inside this block right here.
+
+[00:07:12]
+So that's actually in, that's a tail call, and it's proper, because it doesn't need any, when you make that call to getSalutation, it doesn't need to maintain any variables from the current stack. So that's what a proper tail call looks like. But for vocab sakes, anything that's in the tail position that's a call to a method, that's a tail call, okay.
+
+[00:07:33]
+So when that last instruction is a call to another function, that's a tail call. So we know what tail position and tail calls are.
+>> Aaron Frost: So let's talk about, and we've seen these all over, right. Like, anyone who's done some Node, and I don't know why I put script tags on this slide, but anyone who's done Node has seen a results handler like this, right.
+
+[00:07:56]
+Like if you call the database, you're like, hey, I'm gonna get an error or a result set back. And if I have an error, I freak out and pass the error back. Otherwise, I call the callback with whatever the results were. So we have two tail positions and two tail calls on this thing.
+
+[00:08:13]
+And this is common. We've all seen this. And we've probably seen worse. So a close call. Which isn't, this isn't a tail call even though it looks like a tail call, okay. So what's the last thing that's gonna happen before the return statement?
+>> Speaker 2: [INAUDIBLE]
+>> Aaron Frost: It's gonna add 1 to whatever bar returns, right?
+
+[00:08:41]
+So even though bar is on that line, and you're like, hey, I'm doing recursion the right way, this is proper, it's still not proper, cuz it has to return back to this stack in order to finish execution. It's gonna call bar, but then it has to come back to this stack and add the result of it to 1, right.
+
+[00:08:59]
+So it needs to maintain this stack, still. So that's a close call, that's not a tail call, though. Even though it's trying to disguise itself as a tail call.
+

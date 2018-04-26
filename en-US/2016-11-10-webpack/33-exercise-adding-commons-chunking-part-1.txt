@@ -1,0 +1,104 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:03]
+>> Kent C Dodds: Go ahead and check out the next branch, it's 5.1-code-splitting. And this will get us all up to speed together. Probably yeah, so what I'm gonna do is I'm gonna go through and do some of this stuff and you can follow along. Or I'll give you time after to try to make it work or just play around with what we have.
+
+[00:00:37]
+So the first couple of things that we're going to need to do to get like commons chunking working is let's identify the thing that probably won't change very frequently. In our case we'll go to our WebPack config. In our case the one thing that we're going to specifically call out is if we go, sorry, to app.js.
+
+[00:01:01]
+It's this the CSS file, this is a like a vendor file. We don't update our dependencies as frequently as we update our code and so vendor files are a really good candidate for having a common string. So we don't have multiple apps like I had in that graph, but we do have code that doesn't change as frequently and so this is a good candidate for a common chunk.
+
+[00:01:23]
+And so the way that you implement like the commons chunk plugin, I wish was simpler but it's not like super. There are a couple of things you have to do and it doesn't altogether make sense. So we're going to actually change the entry from a string to an object.
+
+[00:01:42]
+And we're going to set our original entry as app on that object.
+>> Kent C Dodds: And then we're going to make another entry called vendor. And this is going to be an array of all of the vendor modules that we want to have chunked into this vendor entry.
+>> Kent C Dodds: And for us that's just going to be a todomvc-app-css/index.css, so that module.
+
+[00:02:15]
+And with that, you should be able to actually run npm run build:dev or probably you can just do the build, as well. Oops, right, yeah, then you're gonna get this error, that's right. And I will show you how to get around that. Anybody seeing this error right now?
+
+[00:02:37]
+Okay, let me make this smaller.
+>> Kent C Dodds: One other thing that we inherited when we chunked one of these branches was we actually added a plug ins array here. Where we added a new progress bar plug in. I added that because our app is quite a bit bigger now that we have react and D3 in it.
+
+[00:03:11]
+And so as as you run the build you'll see this build percentage thing. And if your screen is wide enough it'll actually have a little ticker thing. And you notice that sometimes it goes really far up, and then it jumps back down. It's almost like Windows telling you what time it's going to be done with something.
+
+[00:03:29]
+So the reason that happens is the progress isn't always 100% certain. It's reporting progress as it finds modules. So it might find a module that actually imports a whole bunch of other modules and that's when progress goes down. So, it's kind of interesting, but it's nice to have something to look at while it's building.
+
+[00:03:45]
+[LAUGH] So, it's just mostly aesthetically. Okay, you should probably have, yeah, let's silence the npn output here. So you should have this error that says bundle, Conflict: Multiple assets emit to the same file name 'bundle.js'. That's something that web pack validator could probably give a nicer error message to for us.
+
+[00:04:10]
+But basically, what the problem is is now we have multiple entries. And so webpack is gonna say, okay for each one of the entries in here, I'm going to webpackify them, no pun intended with browserfy, and create a bundle for it. And then with each one of those it's going to look at this output object, and determine what the name should be.
+
+[00:04:33]
+Well, the filename for both of these is going to be bundle so you're going to overwrite things. So that was nice of them at least to throw us an error rather than just like overwriting the file. So what we need to do is make this bundle, or this filename dynamic.
+
+[00:04:47]
+And the way that you do that is each file has a unique hash. Or actually, let's just use the name for right now, we'll use hash later. And so now if you rerun it, you'll get in your disk directory two bundles. Well, actually you'll get three, one is for the code splitting that we had earlier.
+
+[00:05:13]
+
+>> Kent C Dodds: Anybody have those bundles yet? Awesome. Martin S is asking with different apps do you mean just different pages? Martin, it kinda depends if you have a single page app, then like that's one app. If you have like multiple pages that each have their own entry and webpack, and so this is actually a good case for that.
+
+[00:05:38]
+In my app at work I actually kind of share code base with a couple other teams who are working on different apps. And they're totally separate pages, have different index HTMLs and everything, but we're using the same webpack config with the entry for each one of our apps.
+
+[00:05:57]
+And so then we can share code between the apps. And so like our low dash and our J query, and our react is all shared between us. So as users navigate between these different apps, they don't have to redownload all that stuff. Good question, Martin. Okay, so, yeah, so now we're generating these things.
+
+[00:06:20]
+But if you if you run NPM start what it should do is it should load the app. But it's not all it's loading like garbage. This is just our index HTML it's failing to load bundle.js. That's because it's no longer called bundle.js it's now called bundle.app.js. So one thing we could do is say okay let's just update that to bundle.app.js and then also add bundle.vendor.js.
+
+[00:06:50]
+Yeah, we could do that, but we're going to do something a little bit different. Because things are about to change with the way that we name these files. Sorry, Martin is asking, so it doesn't make sense on one PSA? It actually does or SPA, yeah. So it actually does make sense to do this still on a single page app because now you're separating your app code from vendor code.
+
+[00:07:16]
+And you update your app code more often than vendor code and so the browser can cache the vendor code. So yeah you definitely, I can't think of a situation where you wouldn't want to do this. And Daniel, he was asking do you need the same top level or subdomains for this.
+
+[00:07:33]
+I'm not sure I understand the question but as far as static assets, they can be served from anywhere, doesn't matter what their their domain is. As far as like making requests to servers and stuff, if you're gonna do cross domain then you need like cross origin sharing course across origin resource sharing.
+
+[00:07:53]
+Cool, so, what we're going to do next is.
+>> Kent C Dodds: Okay, we're going to add the commons chunk plugin now. So, if we go up here to the top we're going to require webpack. So it actually does have a node API that we're going to use. So I'll say webpack = require webpack.
+
+[00:08:28]
+And the webpack has several plugins on it that we can use. Lots of those are on a property called optimize. And with plugins you create new instances of plugins. And so we'll go down here to our plugins array. And we'll add an item called newwebpack.optimize.CommonsChunkPlugin. And will configure it to use the vendor entry.
+
+[00:09:04]
+Like I said I kinda wish that this was a little bit more straight forward than it is, yeah, it's unfortunate. So actually, I should back up and explain why this is even necessary. So right now, sorry I should leave that right there. So right now we have two entries and so we have one for apps that's taking all the requires for app and making that into a bundle.
+
+[00:09:30]
+And we have another one for vendor and that's taking all the vendor stuff. Well we haven't told webpack until just now that we don't want app to contain all the vendor stuff. It still has a require for it or an import for it, and it should because it actually explicitly does depend on that and we want that explicitness still.
+
+[00:09:50]
+So what we're saying here is hey commons chunk plugin, take that everything from the vendor entry everything that's in that vendor entry like all the modules that are in there. I want you to make a commons chunk out of that. So app doesn't have all that code in it.
+
+[00:10:09]
+Like I said it's probably not the clearest API in the world but now you know. So you go teach people that would be a good thing. Yeah, so now actually if, well here, let's just kind of explore for a second. Let's look before we rerun the build, I'll just show you that in bundle app we do still have all the code for it to do NVC app, css.
+
+[00:10:38]
+If we save this and then re-run with our new CommonsChunkPlugin, whoops, I just re-ran the server. We're gonna blow away that disk directory and create it a new with an app that, if everything works, no longer actually has the code, it just has a require for it. And so then we can take care of loading that module.
+
+[00:11:12]
+Or providing that module for webpack to resolve and everything is great. So we do still have to provide that module for webpack. So like I said this is kind of a longer, more stuff. And one way that we could do that and actually why don't we go ahead and do that right now as as an exercise.
+
+[00:11:34]
+So go into your index HTML and you're going to want to have the bundle.app in here and the bundle.vendor. That comes before it because app depends on vendor. So remember how we were like sweet, we're removing script tags in our HTML, well yeah we're adding them back right now.
+
+[00:11:56]
+Just for now though, don't worry, it will be gone soon. But now if you run npn start, you should be able to load the app without any trouble.
+>> Kent C Dodds: Whoops.
+>> Speaker 2: Somebody's asking does the order of the plugins matter?
+>> Kent C Dodds: Order of the plugins does sometimes matter. I think, I'm pretty sure, [LAUGH] I've actually never run into a problem with it.
+
+[00:12:28]
+But people have told me that it does.
+

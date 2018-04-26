@@ -1,0 +1,126 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:03]
+>> Kevin Whinnery: The first bit I'm gonna show you is this tool, Locust. Which we're gonna use to beat up on that Elastic Beanstalk instance that we created yesterday with our TodoMVC application. So the first bit that you're gonna want to note about using Locust is if you're on a if you're on a Mac or if you're on an operating system that limits the number of open files that any process can have at any given time.
+
+[00:00:36]
+You are going to need to raise that limit to use to use Locust. Because it does open a file on the file system for every simulated user that it throws against your system. On a Mac, the command to do that is ulimit -n 1000. And that, in the context of this terminal session, will raise the possible open files to you, in this case, 1000.
+
+[00:01:03]
+You can raise it up a little bit more from there. But it has to be more than however many concurrent users you want to test in your application. If you haven't installed Locust, the easiest way to do it is to pip install locust. I think it might be actually locustio, one of those two.
+
+[00:01:25]
+And it'll be installed using the pip package manager. And once you have it installed on your system, you'll have this command called locust, to which you will pass a host that you want to test against. And it'll run a simulated load against the server that you pass in this command.
+
+[00:01:48]
+But before you do that, you have to create something called a locust file. And I have a very simple one here that's going to generate a whole bunch of requests. And push a whole bunch of fake data into our todo's database. So at the core of this is a user behavior, something, a Python class called a UserBehavior.
+
+[00:02:16]
+And that class has a set of tasks that it can execute against your website. So with each of these Python functions, they are passed an instance of the of the Locust object. And each Locust object has a HTTP client, which you can use to send a POST request or a GET request to the host your choosing.
+
+[00:02:48]
+And you can also pass in parameters, like in this case, I'm generating some fake text to put into the TODO items. It's another package called faker which generates some fake data, some lorem ipsum text it'll insert into a TODO list item. Then will set the completed for each of these items to false.
+
+[00:03:12]
+And then the other action we have is a read against our API. Which will, by default, grab the last 1,000 TODO items from the database. In our behavior, we define that for every 1 create operation, we wanna execute 5 reads. And you can, in your Python code, kind of tweak this to be as close to an actual usage scenario for a user of your site as you possibly can.
+
+[00:03:43]
+
+>> Speaker 2: Question?
+>> Kevin Whinnery: Yeah?
+>> Speaker 2: Do they,
+>> Speaker 2: Have any safeguards in the tool to prevent you from doing nefarious things with this? It seems like you could-
+>> Kevin Whinnery: Like denial of service? [LAUGH]
+>> Speaker 2: Right. [LAUGH]
+>> Kevin Whinnery: Not in the tool, no. I mean, I think most applications probably will blacklist an IP eventually, like if it seems to be involved in some evil-doing.
+
+[00:04:08]
+But generally, yeah, I guess it's not a Locust problem. It's more of our problem as application developers. But that's its job, its job is to simulate high amounts of load against an application. So,
+>> Kevin Whinnery: So here we have, in the WebsiteUser class, we set our task to be some kind of UserBehavior.
+
+[00:04:40]
+And then we specify a min and a max wait time. Which will, in milliseconds, determine a lower bound and an upper bound between requests from this simulated user in the application. And there's a ton more that you can do. You can send login requests. You can,
+>> Kevin Whinnery: Excuse me, [INAUDIBLE] shut these down here.
+
+[00:05:06]
+You can send login requests so you can get authentication cookies back and execute authenticated requests. There's lots of different ways you can configure this simulated session. So once we have our Locust file generated, we're going to use the locust command to target this this todomvc-plusplus instance running on elasticbeanstalk in the us-west-2 region.
+
+[00:05:36]
+So when we start that up, that's going to start a local web server that can open up here in my browser,
+>> Kevin Whinnery: On port 8089,
+>> Kevin Whinnery: And it's gonna ask us for two things. It's gonna be the number of users to simulate. And the hatch rate, which is how often users are added to the list of users that are gonna be spamming our application.
+
+[00:06:04]
+So for starters, maybe we'll start with something relatively small. For 100 users hatching at a rate of 10 /second. We're going to launch that load at our website and see how we're doing. So as we are executing the test, and we can execute it for as long as we like, we see the number of requests going into our GET and our POST endpoints.
+
+[00:06:31]
+It starts to mount slowly over time. And with 100 users on prior tests, I think it tops out, with these settings, it'll be around 20, 25 requests/second. And we can see the min and the max time for a response, and that time is in milliseconds. And then we can look at the average and the median response times from the server, as well.
+
+[00:06:59]
+So for a load like this one, our server is usually able to respond in a reasonable amount of time. The POSTed TODOS, where you create a new one, is quite a bit faster, returning in an average of about 127 milliseconds. But that read because I have been spamming this quite a bit, there are quite a few records in the database.
+
+[00:07:20]
+It's a little bit slower, at about 400 milliseconds on average. And it's creeping up a little bit already as we're starting to tax our Elastic Beanstalk instances a little bit more. But our instances do stay up. We haven't seen any failures or 500s yet, so that is a good thing.
+
+[00:07:50]
+Now to see what's kind of happening on the other end of this. Let's go into the Elastic Beanstalk administrative interface. If we look at the Health section, here, we can take a look at what's actually going on with the EC2 instances that are serving this traffic. So right now, with our scaling rules as they are, we only have a single instance which is serving all of this traffic.
+
+[00:08:14]
+And its CPU utilization is hovering at right around 50%. So at the moment, this single instance is not having too much trouble keeping up with the load. Although, our average response times do keep creeping up. So that's probably something that we could investigate. And if we turn up the heat a little bit, then we can start to see where our application is going to break down.
+
+[00:08:46]
+So I'll stop this test,
+>> Kevin Whinnery: And I'll create a new one. And this time, we'll simulate 900 concurrent users, maybe hatching at a rate of about 25 /second. Which is going to really start taxing our poor little t2.micro instance running on Elastic Beanstalk right now. So we can already see the average response times going way up as our single instance struggles to keep up with what is a pretty heavy load for its current configuration.
+
+[00:09:27]
+And if we go back over here to our Health check, we can see, yeah. It's already starting to blow up a little bit. Our CPU usage has crept up to about 92%. So it's starting to be taxed a little more. But what we should see, in a minute or so, is Elastic Beanstalk reacting to this situation.
+
+[00:09:52]
+And our auto scaling group is actually gonna provision another instance of our application to start serving this traffic. It does take a minute, but we can configure those preferences. I've actually been messing around with this a little bit. And this is something that you can do as your load testing your application to see like what kind of scaling criteria you can bring to bear to ensure a consistent response times.
+
+[00:10:23]
+So if I look at the scaling configuration, I can take a look at my auto scaling,
+>> Kevin Whinnery: My auto scaling options. I fiddled with these a little bit from the default. The default was having a minimum of 1 instance available and a maximum of 4. I tuned up the maximum instances to 6, and I also tuned down the scaling cooldown.
+
+[00:10:47]
+60 seconds is gonna be far too short. But I wanted to make sure we saw some more instances getting provisioned during the test here. So this is basically the delay time. So after some condition is reached where it's decided that another instance needs to be provisioned, this is the cooldown in seconds that Amazon will for sure wait until it provisions another instance to start serving traffic.
+
+[00:11:16]
+In the Scaling Triggers, these you'll want to tune based on what you're able to discover about your application. The default settings look at the amount of data that you're pushing out over the network. But there's other bits here, as well. The one that we might take a look at using, instead, for this application is maybe CPU utilization.
+
+[00:11:44]
+Where we could take a look at the upper threshold which would be maybe like 90. We can change the unit of measurement to percent. So if the CPU threshold reaches 90 or 80%, that's when we'd actually start looking at spinning up another instance. And then we can also set the lower threshold for when it's time to rotate an instance out.
+
+[00:12:13]
+So I'll cancel that for now, head back to the dashboard. And what we should see,
+>> Kevin Whinnery: Our environment is okay, but as more instances are being available, Locust is going to continue to suck up the ability to pepper them with requests. And we can see their average response time is now up to about 17 seconds on average, which is not awesome.
+
+[00:12:41]
+But to help spread the load a little bit, we do have another instance that was just brought brought on line two minutes ago. And it looks like it hasn't started serving very much traffic, yet. Must have been provisioned recently, but now it is up to 92% utilization, as well.
+
+[00:13:01]
+So we're gonna probably, at this level of load, max out each of these tiny little servers pretty quick. But the good news is we're not falling over. We have, well, it looks like we have had some failures. Quite at quite a few, actually, at this level. At the lower levels I was testing, I wasn't actually seeing any failures.
+
+[00:13:21]
+But that's what you want to start to check and see like at what level your application is gonna start to break down. And what we can look at, when we have the failures over here, is the error that we're getting from the HTTP client which is running the request.
+
+[00:13:38]
+Here we can see, we have a 504 error against our Elastic Beanstalk instance. Which is probably related to just not having the, time-outs are happening because we've just lack the capacity to service the number of requests that are coming up against the service.
+>> Kevin Whinnery: So based on our criteria, we'll probably continue to provision instances up until 6.
+
+[00:14:08]
+But the primary thing I wanted to show here was the ability to use this tool to at least understand how much traffic your website can take before it is completely brought to its knees.
+>> Kevin Whinnery: There are a few random statistics out there that you can find. Like OpenStreetMap serves about 10 to 20 requests/second.
+
+[00:14:35]
+There are a lot of sites which serve actually quite a bit more across many thousands of servers. But based on your site's traffic, you can ensure that, at certain levels of concurrent users, you're gonna remain available at that level.
+>> Kevin Whinnery: So that is Locust. I will let my poor Elastic Beanstalk instance relax a little bit.
+
+[00:15:02]
+But after a test like this, we see that with the size of the instances we have, we definitely become CPU-bound really fast at those high levels of traffic.
+>> Kevin Whinnery: So that is Locust. It's, again, my favorite tool that I found for doing this kind of load testing stuff.
+
+[00:15:23]
+Definitely recommend that you check it out.
+

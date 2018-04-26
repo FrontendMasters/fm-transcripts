@@ -1,0 +1,94 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:03]
+>> Douglas: So let's talk about testing, so testing in asynchronous systems is tricky because most test frameworks come with stuff like this right. You've got some assertion and you've got a descriptive message and something you'll have an expected value in an actual value and if they match, then it's good.
+
+[00:00:23]
+And if they don't match, it's bad. Except this doesn't work in asynchronous systems, right? Because you can't wait for the actual value. The actual value might not happen until many turns into the future and this just doesn't work. More than that though, I have a problem with the way we do testing in general.
+
+[00:00:42]
+In that, we're trying to guess what the expected value is which is going to identify the bug. But most of our errors happen in the interactions of things. And finding where a bunch of things are going to come together and interact at the one point that fails. It's virtually impossible to find that one point.
+
+[00:01:03]
+So what you really want is to have a grid, a dragnet where you're gonna have a much larger array of spaces that's distributed randomly over the possibility space. And you pick them all out and hopefully then you'll improve the likelihood that you're gonna find the error. Except you don't wanna do that, right?
+
+[00:01:22]
+You wanna have to write a thousand times more test cases, most of which are unlikely to succeed in finding anything anyway. That's a huge amount of effort, no one's gonna wanna do that. Plus if there's a model change, it means you now have to update thousands more tests and nobody is gonna do that.
+
+[00:01:40]
+And it was kind of despairing about that, when I saw a talk by John Hughes of Chalmers University about something called QuickCheck which I thought was brilliant. So to give you the context about that, QuickCheck was developed in Haskell. Haskell is a language that was developed at the University of Edinburgh and it is a pure functional programming language.
+
+[00:02:04]
+That they say pure in that it's a language without side effects and that's good and bad but there's good things about it. The other thing about Haskell is, it's got maybe the best type system of any language in the world. Instead of having something like in Java where you specify the type of every little thing, you specify the types of almost nothing.
+
+[00:02:28]
+And instead there is an inference engine that runs as part of the compiler which goes through looking up everything in the program trying to determine everything is. If you're one of those, if you want to act without then you must be one of those and so on and keep doing that trying to solve the entire program.
+
+[00:02:45]
+And if it gets to a point where it finds an inconsistency, it can stop and something's wrong here. And the difficulty with that is that where it finds its inconsistency may be miles away from where you actually made your mistake. And so getting a program to compile can be really challenging, but the theory is that once you get a program to compile it's guaranteed to run.
+
+[00:03:12]
+Except it's not because it turns out the class of potential errors is infinitely bigger than the class of errors that could be found even by the world's best type system. So you still have to test and these guys came up with a really nice way of doing tests.
+
+[00:03:28]
+Instead of writing specific compare actual versus expected, instead you write a function which will be true if the system is working correctly. So in that they call those properties that the system will be true is working correctly if these properties hold. And so and then QuickCheck will generate random data and throw them at your functions and try to disprove your assertion.
+
+[00:03:59]
+And so they can get tremendous coverage there, even able to debug real time systems which is something that is really, really hard to do. So I thought, wow, we should get one of those for JavaScript. So I wrote one, it's called JSCheck. JSCheck provides two nice things, one is case generation.
+
+[00:04:17]
+So it'll generate random test cases for you and it also supports testing over turns. So you can use it to test stuff in node, you can use it to test things in browsers, you can use it to test synchronous and asynchronous functions. So it's a small library that comes with some functions, these are a few of the interesting ones.
+
+[00:04:40]
+The most important one is claim, we'll talk more about that in a minute. That's where you make a claim about how about the system. If it's working through, working correctly then this would be true. You can then tell to check all of the claims that you've made so far and you can also put a time limit on it.
+
+[00:04:59]
+So it will start all the test simultaneously and they all have to finish by a certain amount of time, if they don't then you can record that. And that's really important because, the way our systems work now getting the right answer but taking too long is indistinguishable from the wrong answer.
+
+[00:05:19]
+And so, we need to be able to test performance as well and that's something that the synchronous testing frameworks don't do. Then we can get a callback when the thing is done and we'll get a full report about everything that happened. We can also get a callback on each error as the errors occur and you can program that callback to take you into the debugger.
+
+[00:05:39]
+So as you're finding bugs, you're in the context where you can fix it immediately. So this is the claim function, it takes a descriptive name, it takes a predicate function as a Boolean which will be true if your system is working correctly. And it takes a signature which is an array of type descriptors which describes the parameters to the predicate function.
+
+[00:06:07]
+So here's an example, we're going to compare the old code with the new code. Our predicate will take a verdict function and an argument and we will then determine that the old code for that argument does the same thing as the new code. And we tell it that that argument is an integer.
+
+[00:06:27]
+So when we tell this thing to check. It will generate random integers and throw them at that function, trying to disprove our assertion and you can set as many as you want. So all of the effort in using the system is in writing these predicates and there are lots of ways you could do it.
+
+[00:06:47]
+One is, in this case we're comparing the old code against the new code. So as we're migrating the system, we can make sure that we haven't changed the behavior of anything. Another way you could do it is if you have symmetrical operations, for example, if you're writing an encoder and a decoder.
+
+[00:07:04]
+It's usually the case that the decode of the encode should be equal the original things, so we can test that that's actually true for a large class of trials. We can generate symmetric pairs of things like we can generate a credit and a debit, you know both using random values make sure everything balances.
+
+[00:07:24]
+And in some cases you just might throw a lot of random transactions at something. And after each one, run a deep diagnostic of all your data structures, make sure everything is still consistent.
+>> Speaker 2: So what would this look like implemented? I don't understand what verdict is.
+>> Douglas: We'll look at the vertical in a minute.
+
+[00:07:44]
+So verdict is the callback that is being used in the cases.
+>> Speaker 2: Okay.
+>> Douglas: So it comes with a small library of specifiers. You can put each of these in the descriptor array of what types we want to throw to our predicate and it'll try, it'll generate values random values of each of these types.
+
+[00:08:08]
+So if you need Booleans, if you need integers, numbers, objects, whatever. It'll make random things and pass them out. If it turns, and these are also compostable in interesting ways. For example, if you want random social security numbers. I can say I want to strengthen with three digits and then a dash and two digits in a dash and so on.
+
+[00:08:31]
+Or if I need an array containing three elements where the first element is an integer and the second is a number between zero and 100 and the third is a character string I can get that. Or I need an object where with the left property a top property and a color selected from a list.
+
+[00:08:52]
+Or I need an object with a variable number of properties where each property is a four letter name and each value is a Boolean, I can do that. There are lots of ways to compose these and if it turns out there is some particular test data that you need that's not easily composed from these, you can write your own.
+
+[00:09:13]
+And it's a generator, exactly like the generators you've been writing. So you have a function that returns a function that when, each time you call it, you'll get the next value. You can write one of those to generate all the random test data that you need. The reason this works asynchronously is because of the verdict function.
+
+[00:09:33]
+Every check when it begins, is passed a verdict function that it is used to return its result and the verdict is just a continuation. It's just a call back which allows the trials to be extended over many turns. And because we can also put time limits on this, we now have three possible outcomes for every trial.
+
+[00:09:53]
+We can see a pass, we can see a fail or we can see a lost. Lost means we did not get a report before the time expired. And those are sometimes as important, as the passes and fails.
+

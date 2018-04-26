@@ -1,0 +1,85 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:03]
+>> Kyle Simpson: A generator is a new exotic form of function introduced in ES6. And we're going to look at the actual mechanism first, understanding some of how it works and that kind of thing. And at first as we're looking at it, it's not gonna look like this has anything at all to do with asynchronous programming.
+
+[00:00:24]
+It's going to seem a bit strange and out of place. I promise there's a reason why we're going through it. This is a fundamental part of the whole picture. If promises were about solving the inversion of control issue in callback hell, generators are about solving the non-local, non-sequential reasonability problem.
+
+[00:00:44]
+So they are gonna provide us a really powerful pattern for that. But we need to understand, we need to kinda walk through the plumbing of the stuff to understand how it's working. One of the things that you may not have ever realized about your assumptions with JavaScript. Is that all functions, all normal functions have a characteristic of them which the fancy way of saying it is that they have a run-to-completion semantic.
+
+[00:01:11]
+What that means is that when a function starts running, it will always run to the end of that function and finish before any other function has an opportunity to come in and start running. At any given moment, only one function is actively executing. And that doesn't mean it can't call to other functions.
+
+[00:01:27]
+But it means that nobody can come in and pre-emptively interrupt this function to run something else. It's a run-to-completion semantic. And that may seem very academic in nature, but it's actually one of the most important characteristics of JavaScript. It's what allows us to reason about things in a single threaded fashion.
+
+[00:01:46]
+Never having to worry about two functions, one interrupting the other one and corrupting our shared memory in ways that we don't understand. All the problems that you have to deal with in threaded programming get introduced when you don't have that run-to-completion semantic, okay? So it's one of the most fundamental things that we've built all of our understanding on JavaScript over.
+
+[00:02:08]
+So that might raise a few warning flags in here when I tell you generators do not have a run-to-completion semantic. They're a different kind of function altogether. It's a very different kind of beast. Now that's not designed to introduce chaos into your program. It's designed to introduce a behavior that we previously had to go to a lot of work to simulate.
+
+[00:02:35]
+So it's adding a syntactic sugar, if you will, on top of a behavior that we would have had to spend quite a bit of time and effort to try to emulate, okay? So, the thing that we are attempting to create with the syntax of a generator, by the way JavaScript didn't invent generators, they come from other languages like Python.
+
+[00:02:55]
+But the thing that we're trying to create with the JavaScript generator, is a syntactic form of declaring a state machine. State machines are, for those of you that aren't aware, a way of having a patterned series of flow from one state to another state to another state. And declaratively listing all those states and those transitions out.
+
+[00:03:20]
+So we can implement state machines without generators. And I've done that many times. Some of you may have implemented your own state machines. But you have to go to a lot of work, and you have to end up using closure around a function to remember the state as it gets recalled over and over again.
+
+[00:03:36]
+And each time it's recalled it remembers its previous state, and it does this transition. So it's possible but it's harder, and it's a lot less clear what's going on. A generator is a syntactic form of a state machine. And while that won't seem like that has anything to do with asynchronous programming.
+
+[00:03:52]
+It's actually a magical key that will unlock one of our really important characteristics that we're going for. So to get there, we wanna start looking right at the very beginning at generators. And what we're gonna see is that there's this new special keyword called yield. The yield keyword is kind of like the Pause button on an old school VCR.
+
+[00:04:11]
+You're watching a movie and you click the Pause button, literally pauses right in mid-frame, nothing changes and you can wait as long as you want to. And then you can come along later and press the Play button and resume. So you can think of a generator as a pausable function.
+
+[00:04:30]
+A function that when it's running, would run across a yield keyword and at that moment, where ever the yield keyword shows up, even right in the middle of an expression. Everything just literally freezes, it pauses. And the generator enters this paused state. And it will wait for that pause state indefinitely until some other actor comes along and says it's time to resume, and they press the Play button again.
+
+[00:04:57]
+So you can think about a generator as a function that can pause and resume, pause and resume, as many times as necessary. While a generator is paused, on the inside of the generator, everything is completely blocked. Nothing is happening. But that's not blocking the overall program. It's a localized blocking.
+
+[00:05:19]
+Only inside of the generator. That's a really key issue, so even though what I'm about to show you will look like we're creating a blocking sort of a thing, it's extremely localized. It's not blocking the entire program. So, here's an example of a generator. You notice on line 1, we have that little star symbol there because we need to introduce a different kind of function with a different set of behavior to it.
+
+[00:05:42]
+So there needs to be a syntactic clue to the engine. This is a different sort of a thing. So its function*, that's how we indicate that it's a generator. [COUGH] You'll notice on line 3 that we have the yield keyword there. And that yield keyword is the pause button.
+
+[00:05:58]
+So it's like the generator gets to decide when it wants to pause. Nobody on the outside gets to tell the generator when to pause, so it cannot be pre-emptively interrupted. This is what we call cooperative concurrency, rather than preemptive concurrency. So preemptive means somebody else on the outside, some outside force can come in and interrupt you at any given moment.
+
+[00:06:24]
+That's the thing that causes chaos and havoc in threaded languages. We don't have that. What we have is that the generator gets to decide by virtue of calling a yield keyword, when and where and in what manner it wants to yield itself, when it wants to pause itself.
+
+[00:06:38]
+Now, another thing that's different about a generator from the esthetic usage perspective. On line 7, when I call gen, I'm calling what normally looks like just executing a function. And we typically would expect for it to execute the whole thing, but actually none of the generator runs at that point.
+
+[00:06:55]
+Executing a generator does not actually run any of its code, instead it produces an iterator.
+>> Kyle Simpson: Some of you hopefully have heard about iterators. Iterators are a patterned way of stepping through, typically stepping through a set of data. For example, the results from a database query, you would step through them one result at a time.
+
+[00:07:16]
+You'd call .next, .next, .next, and keep getting value results from a list until there were no results to come back. That's the iterator pattern. And iterators are something that we've been able to do ourselves in JavaScript for a long time. But they've now been added directly as first class citizens to the language.
+
+[00:07:32]
+We can create our own, and we can use generators that are produced by other mechanisms. In this case, calling a generator produces an iterator. And the purpose of the iterator in this case is not to step through data, but rather to step through the control of our generator from the outside.
+
+[00:07:51]
+So again, we can't pause the generator, but we can ask the generator to run until it wants to pause. And then when we call .next again, we can resume it and then it'll pause again, and we can call .next and it'll resume, and then it'll pause again. So here on line 7 when I called gen, none of the codes run.
+
+[00:08:07]
+But on line 8 when I call the first .next call, I started up on line 2 and I start running the generator. So I'm gonna print out the Hello that you see there. And when it gets to the yield keyword on line 3, it's going to pause and return control back to line 8.
+
+[00:08:24]
+Line 8 could then proceed immediately to line 9 and call .next again and resume it. So you can synchronously step through it. But of course, there could be a break, there could be a gap, there could be a delay in time between lines 8 and 9. And in that period of time, the overall program continues to run without change.
+
+[00:08:42]
+But what's different is that inside of this generator, it's in this paused state. It's blocking, it's waiting for somebody to come along and call the .next method again to resume.
+

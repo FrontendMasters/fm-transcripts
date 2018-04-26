@@ -1,0 +1,135 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:03]
+>> Brian Holt: Now we have a little bit of a problem that we have to deal with our router though. So go to client app.jsx. Our router has to understand what it called asynchronous routes. All these routes are very synchronous right now. It says hey, if index route matches, give it landing, like I already have landing to give to you.
+
+[00:00:22]
+So it's synchronous, this happened then this happens. Well if we're going to do chunking, that landing routes not going to be available until I ask for it. So I have to introduce this concept of being asynchronous to our router. So what we're gonna do is we're going to require note require.ensure to say, hey when I asked for this index route, run this function that that's going to go request my route and then wait for it.
+
+[00:00:52]
+That's the basic idea here. So first thing here, we have required that web pack uses and we have require that node uses and while generally you can treat them the same, they're not actually the same, and we have to kind of mitigate that right now. So if (typeof module != 'undefined' && module require), so if module is not undefined and it actually does exist with module, then you have to ask another, if (typeof require.ensure triple === 'undefined') { require.ensure = require ('node-ensure')}.
+
+[00:01:55]
+And so this is a shim for Node.js. So Webpack has the idea of require.ensure but Node doesn't because asynchronous requiring makes zero sense for Node. Node has everything available to it already. And so having our asynchronous code doesn't make any sense on the server, but it does make sense in the client.
+
+[00:02:17]
+So that's what node ensure does, it makes these Node ensure calls synchronous. Okay,
+>> Brian Holt: So now we have to do, we have to replace the myRoutes stuff with some pretty crazy stuff, so buckle up.
+>> Speaker 2: Can you explain really quickly one more time what you are doing with the required.
+
+[00:02:48]
+
+>> Brian Holt: Let's get through it and then if it still doesn't make sense, ask me again. Yeah, let's do that. So I'm gonna change this to be called root route. And so you can configure React router two ways. We can do it with components, which is what we saw up here, but you can also do it with a config object, and the only way to do asynchronous routing is with config object.
+
+[00:03:15]
+So let's just kind of emulate what we had before using a config object.
+>> Brian Holt: If you compare the two, they're relatively similar. Just this one's done with code instead of components.
+>> Brian Holt: Location callback.
+>> Brian Holt: Require.ensure.
+>> Brian Holt: This is the call. Empty array and error. So let me type all this out and I'll explain it in one go.
+
+[00:04:07]
+If error, actually no, ignore that part, if you were following my notes ignore the if error part because that breaks. So just state its callback, (null, require ('./Landing')).
+>> Brian Holt: Okay, and this will be childRoutes. So what's actually happening here? So again this looks really similar to what we were doing before, right?
+
+[00:04:38]
+But the difference is that, instead of just giving it a component say, hey here's my landing, what it's actually doing is saying, hey whenever you wanna get my index route call getComponent and then I will asynchronously go grab that for you and bring it to you. Okay, so that's what inquired.ensure is doing, it's saying, don't grab this now, but I want the ability to grab this later.
+
+[00:04:59]
+Require.ensure does other things I don't want to talk about especially since I'm like almost out of time. But if you wanna look it up, just go look up what inquire.ensure means. But so, we're getting this callback from get Component, and then we're calling that component back with require ('./Landing').
+
+[00:05:22]
+This is signaling to web pack. It's like, hey it's time. Go out and grab me this bundle, right. That's what's happening here, and it won't grab it until you call this require ('./Landing'). So we actually even wanna get rid of Landing up here. Otherwise, it's gonna pull it in, defeat our entire purpose.
+
+[00:05:37]
+So get rid of landing, get rid of search, get rid of details, but leave layout.
+>> Brian Holt: Because we want to make all those calls asynchronous. Okay, so go to childRoutes, and now we have to go do the rest of our children routes.
+>> Brian Holt: So path: 'search',
+>> Brian Holt: getComponent (location, call back)
+
+[00:06:24]
+
+>> Brian Holt: And then you're gonna say cb (null, require('/search').
+>> Speaker 3: Do we not need to use require.ensure on the-
+>> Brian Holt: You do, sorry, require.ensure.
+>> Brian Holt: (error)
+>> Brian Holt: Move that inside of there.
+>> Brian Holt: I'm going to do the same for detail. It looks relatively the same so I'm just going to go ahead and copy and paste.
+
+[00:07:08]
+This is gonna be 'details/:id' and this is gonna be Details right there.
+>> Brian Holt: Okay, so now we've made all of our routes asynchronous. We've set it up so that we don't actually just give it a component. We give it the ability to call for a component, which means that later we can go download these bundles.
+
+[00:07:45]
+
+>> Brian Holt: So come down here to your router.
+>> Brian Holt: And rather than doing my routes like this, what we're gonna do is just make router just a self-closing component and we're just gonna pass in the routes using rootRoute like that.
+>> Brian Holt: Okay, now what else we need to do, Instead of myRoutes this is now called rootRoute.
+
+[00:08:26]
+And we're also gonna have to share history with browser entries. So App.History = browserHistory. So I'll just do that as well.
+>> Brian Holt: And you have one more bit to fix browser entry as well.
+>> Brian Holt: All right, I'm gonna answer your questions in a second. I know, some of my friends here have to leave right at five.
+
+[00:08:59]
+So I want the big payoff moment before everyone has to take off, and then I'll answer all your questions at the end. This is the very last section so [SOUND] you can breathe a little bit. Not too much, just a little bit. Okay, go to browserEntry.jsx. So unfortunately you have to make browser entry a little bit more complicated because we have to tell when it renders for the first time, that it needs to be able to wait.
+
+[00:09:32]
+Because otherwise it's going to try and synchronously go do something, and that's going to mess up our server side rendering. Remember that React gets unhappy if it doesn't look the same on the server as it does on the client. We have to tell it, please wait before you get unhappy, otherwise it's just gonna say instantly, I'm unhappy, I'm gonna blow everything away, and we've just lost all the benefit of server-side rendering.
+
+[00:09:52]
+
+>> Brian Holt: Okay, so bring in reactRouter here. And we're going to use that same match API that were using on the server. OK, so we're just going to comment that out for a second, we're gonna say match({ history: App.History, routes: Apps.Routes}).
+>> Brian Holt: And then we have to get it that callback (error, redirectLocation, renderProps).
+
+[00:10:50]
+
+>> Brian Holt: And then I'm just going to say if (error) {console.error}. Actually need to return. Return console.error('BrowserEntry require.ensure') error actually is not required ensure browser entry error. Error, always useful to have good errors. Otherwise we're just gonna move this business up into here. Back on render and we're also gonna pass down ...renderProps.
+
+[00:11:38]
+
+>> Brian Holt: And document, yeah, everything like that.
+>> Brian Holt: All right, so something pretty magical is about to happen. Wait, we have to go to app first.
+>> Brian Holt: No, I think I already fixed that, that should be okay. No it's not. Okay, go to app.js real quick, and Routes right here in app.js.
+
+[00:12:09]
+This is now an object, and no longer a function. So just take off the parentheses like that. So there were parenthesis there. I just took them off because this will move from being a function to a configuration object. That's the reason.
+>> Brian Holt: Okay.
+>> Brian Holt: So go look at your, wow, that's some fun stuff going on here.
+
+[00:12:38]
+
+>> Brian Holt: ClientApp route is not defined.
+>> Brian Holt: So let's go fix these real quick.
+>> Brian Holt: Line 3 in route. Route is defined but never used. So go to clientApp, giveit a route, righ, because we're actually not using route anymore we're using a config object. That makes sense. Also is the same as nextRoute, thank you.
+
+[00:13:05]
+Expected error to be handled no callback, jeez. Okay, well sorry, I don't care. I'm not gonna take care of the errors right now. And actually here's how you get rid of those, just pretend there's no errors.
+>> Students: [LAUGH]
+>> Brian Holt: Okay? Hashtag done, nailed it.
+>> Students: [LAUGH]
+>> Brian Holt: Give me a break.
+
+[00:13:27]
+It's the end of the day. Extra space before our childRoutes. Line 23. Too many spaces there, and unexpected trailing comma, my gosh. Okay, whatever, I don't care. 39, get rid of that too.
+>> [INAUDIBLE]
+>> Brian Holt: I know. Thank you standard.
+>> Brian Holt: Okay, so now we did a modifier web pack config, so stop it and start it and we should see something pretty different, hopefully.
+
+[00:14:10]
+
+>> Brian Holt: So now you start seeing that there's a bundle. But now there's bundle one, and bundle two, and bundle three. So now webpack is being smart enough. Like I think it's magical, right? Because I didn't, we didn't really do anything to say, please separate this into this and this into this and this into this, right?
+
+[00:14:27]
+We just said these things can be included separately. I promise it's okay. And when Pax is like okay, I'll do that for you and it just does it. So now, hopefully if you go into, if I just refresh the page here and let just the JS, notice I'm getting bundle, bundle is with the thing that everyone's gonna to get, every single time a hundred percent and that now contains magical logic within it.
+
+[00:14:54]
+Let's say when I move from page to page. This is all from YouTube, so let's actually just go to. Okay, so now we have bundle and bundle one.js right and that's it. Now as soon as I click browse all, notice I get bundle two. And when I go to details, I get bundle three.
+
+[00:15:17]
+That's so cool in my opinion. We didn't have to do anything. it was just for free. Now let's be totally realistic about what we just did here. We went from 985K to 907 and this one's 3K, this one's 4K, and this one's 35K. So it's not actually super compelling right now, but I hope you can imagine in a large app.
+
+[00:15:38]
+This actually could make a whole world of difference. Instead of three megs of JavaScript, you'd be getting maybe a meg or a meg and a half or something like that.
+

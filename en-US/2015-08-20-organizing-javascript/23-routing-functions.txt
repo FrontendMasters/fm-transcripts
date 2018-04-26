@@ -1,0 +1,81 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:03]
+>> Kyle Simpson: The next thing I wanna talk about in terms of how this code's working, is not so much about the reusability. But how can I express things in a simple way without needing some kind of framework. Essentially, I have that routes array that I was talking about. So I'm pushing functions into my routes array.
+
+[00:00:22]
+Almost identically to how you push middleware functions into an express app. If any of you done express work and you app.use or app.get. This is the exact same concept, but I'm just using an array rather than a framework. So basically, I've replaced the express framework with an array and my API is the array.push rather than app.push.
+
+[00:00:47]
+The concept is the same that I have a function that's gonna receive a record request in response stream. And it's gonna decide if it should do something with it or not. So I have this series of routes that I define wanted to time. This first one sends out the server header for all inbound requests.
+
+[00:01:04]
+This one sends out a set of security headers, so my content security policy and my strict transport security. If you don't know what those are, you should definitely do some reading up on them. Becuse they're really important for modern production apps. And then I have this route and this route is waiting until the entire request has come in if it's more than one chunk.
+
+[00:01:29]
+And it's putting all of that into the body. So I'm essentially setting up that data listener. Though you've probably been familiar and know it. I'm setting up a data listener and listening for it, and then moving on.
+>> Kyle Simpson: Once it's complete. And then, see if there are questions here.
+
+[00:01:51]
+
+>> Speaker 2: No, I'm just chatting.
+>> Kyle Simpson: Okay. Then I have route setup to handle my favicon. I don't know about you, but I'm constantly annoyed. And I do service a program. I'm constantly annoyed by the fact that my Chrome browser, for example, is always asking for a favicon. And, most of my apps don't have one.
+
+[00:02:11]
+So I just set myself up a little route that listens for the favicon request. And just does a cacheable 204 response to try to get the browser to stop asking for a favicon over and over again. So that's just a simple route. There's nothing non-node here or magical or special.
+
+[00:02:31]
+
+>> Kyle Simpson: This is a route that I set up to recognize a request for one of these static resources, like a JavaScript file, a CSS file, images, the robots, txt, whatever. Those static file requests if being handled, I use this static file server. Which is almost identical to the static file server that comes with Express, but I just have it in stand alone form.
+
+[00:02:58]
+And then I have another route and this is the one for if none of the other ones have taken over. This is the one that says they're asking for a full load or we're gonna check to see if they're asking for a full load page. So the first thing I do is to see if the request was a GET.
+
+[00:03:14]
+And if it's one of the pages that I recognize as one of my internal templates that I can handle. So if it's a request that I know how to handle and render, then I go ahead and call view.getPageHTML. I render out the response. And finally, my routes array has a default route that if none of the other ones match or handle anything.
+
+[00:03:38]
+It just gives a 404 response.
+>> Kyle Simpson: So how do I make these functions in this routes array actually process through and run everytime a request comes in? Well, there's lots of different ways to do that. Express does an internal for loop every time it comes across. But I basically replaced all of Express and maybe all of Koa with this one function that I wrote called router.
+
+[00:04:10]
+Let me zoom out just so you see how big it is because it's not actually that big. So it's this one function here called router and it's a special kind of function called a generator. So that little star, let me zoom back in, so you can see that little star means.
+
+[00:04:27]
+This is a special kind of ES6 feature called a generator. The only reason I'm using a generator here is because it has a really nice syntax for me to be able to pause local stack inside of the function, using the yield keyword. So this is basically saying if I have a route,
+
+[00:04:48]
+
+>> Kyle Simpson: Basically, I'm gonna loop through my list of routes and call that function. And if that function returns me, in this case this is kind of like a promise, but it's asynchronous version of a promise. If it returns me something that I need to wait on, that I'm just gonna simply call the yield and wait for that thing to finish.
+
+[00:05:05]
+So that's the way I do an asynchronous route as opposed to I'm ready to finish the route right away. That's a way to pause the generator by simply yielding out of problems. And then if any one of those routing functions returns true, then I break out. Because I know there's no more news no more routes that need to be consulted.
+
+[00:05:25]
+If any error happens, the try catch works. The cool part about generators is that try catch works even across asynchronous calls because it has synchronous semantics inside of it. So it's a really nice way to simply express error handling with a try catch. And finally, the last thing I do is I see if there was an error.
+
+[00:05:46]
+I throw back an error that has a little bit of extra data and it has the reason, but it also has the request in the response stream. So this generator doesn't run all by itself. It needs something to run it to be able to handle the yielding of promises and whatever.
+
+[00:06:05]
+And if you've ever read anything about generators, I've got a book about it, I've got a blog post about it you can read lots more about generators. But there's a lots of frameworks out there that are able to take a generator and automatically run them to completion. Asynchronous also has one.
+
+[00:06:21]
+So because I'm using the library, why not just keep using the same tool. And so essentially, we go to the magic, if you will, of how all this HTTP routing is happening.
+>> Speaker 3: Getting a little dizzy here [LAUGH].
+>> Kyle Simpson: Sorry, I was getting lost in my own line.
+
+[00:06:42]
+So this is the magic, these few lines of code. This is the magic that actually makes my handling of incoming requests work. Let me skip over the react part for a moment because that might be confusing. I mean, just look here and say, every time an incoming request happens.
+
+[00:06:56]
+I'm gonna spin up the generator and run it until it's found a usable route. And if any usable route happens, then that's just the end of it. If there's any error that happens, It actually bubbles out and I have a responseError function. So if we look at the responseError function.
+
+[00:07:19]
+
+>> Kyle Simpson: Looks more complicated than it really is. It's basically just saying, if you've made an AJAX request, I'm going to respond with JSON. Otherwise, I'm just going to log the error to my server log. So if any error happens anywhere in any of the machinery, no matter how deep.
+
+[00:07:40]
+If everything's using asynchronous the way I've set it up, that error will bubble all the way out and get handled in one event handler. So I don't have to leak that logic all over.
+

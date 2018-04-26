@@ -1,0 +1,76 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:39]
+>> Jafar: Today the topic is asynchronous programming in JavaScript. First a little bit about myself. I'm the Cross-Team Technical Lead for the UIs at Netflix. I'm the architect of Netflix's UI Data Platform, FalcorJS. And I'm a member of the TC39. Netflix technically is a member, and I'm a representative there on the TC39, which is the JavaScript standards committee.
+
+[00:00:56]
+Who's heard of that by the way? I'm just curious. Okay, a few folks. Okay, they're the standards body that designs the JavaScript language. And I've been about 16 years in the industry. I formerly worked for Microsoft and GE. Today I'm gonna teach how to solve big asynchronous problems, hard problems.
+
+[00:01:12]
+The time that you run into when you build very, very large JavaScript code bases. But we're gonna do it just by thinking differently about events. Probably everybody in this room has worked with events, DOM events. I'm gonna show you a different way of thinking about events. Really a fundamentally different way of thinking about events.
+
+[00:01:28]
+It's gonna make asynchronous programming problems that seem really, really hard suddenly seem a lot easier. So asynchronous programming seems hard. I'm sure a lot of us have heard of callback hell or we've tried to structure large JavaScript programs asynchronously, and it certainly seems to introduce a lot of complexity doesn't it.
+
+[00:01:47]
+To take a look at some examples here of the types of complexity you can run into when you start building asynchronous programs, you have race conditions, right? I start two actions, they're running concurrently. And I'm sort of hoping that one finishes before the other or I want to at least enforce that one finishes before the other, right?
+
+[00:02:02]
+Memory Leaks, anybody ever hooked up to a DOM event before and then forgotten to unhook their event and if the app runs for long enough you slowly start to see the memory go away? Complex state machines, this is one that I don't think as many JavaScript developers think explicitly about.
+
+[00:02:15]
+But this is actually the source of a tremendous amount of complexity when you start building asynchronous programs. And uncaught asynchronous errors, how do you deal with error handling? I mean, when we're in JavaScript we've got try catch for synchronous errors, but as soon as we start doing asynchronous programming, try catch doesn't help us at all.
+
+[00:02:30]
+And so JavaScript provides no facilities to deal to with asynchronous error handling and so if you find it hard, you're not crazy, it is hard, right? So let's take a look at a concrete example of some of the things I just talked about here. Here at Netflix, we used to write code like this.
+
+[00:02:44]
+This is sort of very similar to the code that we used to write in order to play a movie. When you started playing a movie you would, for example, this function here would accept the movie ID. It would accept the cancel button, and it would have a callback, which would invoke when that movie was successfully playing.
+
+[00:03:00]
+So I want to call your attention first and foremost to the state. So really what's going on is two concurrent things. The player in Netflix is asynchronous. And so when you would ask it to play a movie, first we've got to start loading up the player and that's an asynchronous process.
+
+[00:03:14]
+Another asynchronous process that takes place is going to the server and authorizing you to play that movie. So we have to confirm that you're logged in and you're who we think you are and you're able to play that movie. So here we've got two asynchronous actions, and we don't want to do them one after the other cuz that would be slow.
+
+[00:03:28]
+So we wanna kick them both off at the same time. So this is the race condition concurrency issue we talked about before. In order to figure out, every single time one of these operation finishes, we need to check if the other one's finished and if they both finish, we wanna do something, in this case play the movie.
+
+[00:03:43]
+What I've had to introduce here, I want you to notice, is variables to track, in this case whether the player's initialized, so player.initialized, that's a Boolean variable hanging off the property, off the player, excuse me. We have to check that whenever the movie ticket is successfully retrieved from the server.
+
+[00:03:58]
+And so I've got these two variables. One's tracking whether the movie ticket's been authorized, the other tracking whether the player's been initialized. And every single time one of the actions completes I have to check the other one. So over time if you try and do this, if you use this approach to tracking whether asynchronous programs are done by introducing state into your program, you'll find that over time you've got all these variables and all these moving pieces, and it's really difficult to keep them set to the right values, right?
+
+[00:04:20]
+And what happens if something goes wrong? God forbid, then you have to reset them to the previous values. This is actually the real source of complexity, I think, in most large asynchronous programs. If you start using state to track your async programs, you're gonna find it doesn't scale very well as your JavaScript code base scales.
+
+[00:04:36]
+The other issue here is error handling. Now because an error can happen in either of those two actions, initializing the player or authorizing the movie, I have to make sure to clean up after myself, and make sure that I forward that error along, but also, if possible, cancel any asynchronous actions that are happening.
+
+[00:04:54]
+I don't want to send a requirement, I don't want to keep request sent off if there's no reason for it to be sent off, because one of those two actions of which was errored. For example I couldn't authorize your movie ticket, or I couldn't for whatever reason initialize the player.
+
+[00:05:06]
+Now I deliberately left a bug in this particular program. If you notice here, I'm hooking up to the cancel button, an event listener as soon as you try and start playing. Because what if you decide you wanna hit back or you wanna cancel playing? Well, we'd like to stop this action of playing and then sort of cancel the whole thing.
+
+[00:05:22]
+Notice right here, this line? Can anybody spot the bug in this program?
+>> Speaker 2: You're missing your close param right?
+>> Jafar: Sorry?
+>> Speaker 2: Are you just missing a close param?
+>> Jafar: [LAUGH] that's an entirely different bug. [LAUGH] But yeah, I'm missing a close parameter so this will not compile.
+
+[00:05:42]
+However, the actual bug I'm trying to get at is I'm forgetting anywhere to unhook from that event handler. So I've hooked up an event handler and then you hit cancel and then I just stop the function. And so the next time you try and play it, I'll hook up another event handler and so on and so forth, until gradually the program starts to lose memory.
+
+[00:05:59]
+And so, that's another thing. Remember if I hit an error, I also need to remember to unhook any event handlers out there. It's a very complicated thing to do, to clean up after yourself when you have an error. But when we're doing synchronous programming, try catch does all that for us, right?
+
+[00:06:11]
+It unwinds the stack, and any variables we've allocated are all cleaned up. In asynchronous programming we're on our own. So I'm gonna show you guys today a pretty radically different way of building asynchronous programs, and it's actually gonna involve not much more than a few flexible functions that you guys are gonna use again and again.
+
+[00:06:30]
+In fact these may be actually some of the most flexible functions you will ever learn, the ones I'm teaching you today. And you're gonna to be able to use them for asynchronous programming as well as other things.
+

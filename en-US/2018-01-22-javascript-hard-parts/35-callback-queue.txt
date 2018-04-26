@@ -1,0 +1,156 @@
+[00:00:00]
+>> Will: But now we are interacting with these web browser APIs. In other words, features with a world outside of JavaScript, outside of JavaScript. We need a way of predictably understanding how this outside world will interact with our JavaScript execution model. So we saw this almost come up when, was it Griffin or Dave, or someone said, what if I ran 20 console logs, it was Dave, ran 20 console logs in a row here?
+
+[00:00:33]
+When would my print hello jump back in and start running? I need a way of predictively figuring that out, right? Or what if I had a function that blocked the thread here for a while, maybe a whole second? It's got inside of it a while loop or a for loop, something really computationally taxing.
+
+[00:00:54]
+This function blocked for one second, blocks when it's called the whole main thread for one second. What if that happens, when does this print hello function get to come back to the call stack?
+>> Will: We need something else. We need some other pieces of our asynchronous JavaScript world to explain these pieces happening.
+
+[00:01:20]
+All right, we're gonna walk through this all. Precisely line by line and see exactly how this is going to play out. So we will start walking through this, lovely. All right, line one, what is happening in line one of our code?
+>> Ott: We are declaring function print.
+>> Will: Really slowly for me, because obviously I'm getting ahead of myself here.
+
+[00:01:50]
+
+>> Ott: We're gonna declare print hello.
+>> Will: Perfect, there it is, print hello is in that global memory. Excellent, thank you Ott, what's the next line, tell us.
+>> Ott: We're gonna declare block for one second.
+>> Will: Declare block for one second, and we're not gonna figure out how that's implemented.
+
+[00:02:08]
+But the way you would implement it would just be something like a while loop or a for loop. That takes, for each value of i and appends something to an array. That just starts taking time, and so that could block the thread, if it were run for a bunch of time.
+
+[00:02:27]
+We're declaring it, block for one second. We know that if this function gets executed, we're not gonna move out of its execution context for a second. Because it does a bunch of computationally tough stuff. That's all happening in JavaScript land and that's all gonna take time, so it can't move on if we were to run this function.
+
+[00:02:49]
+Okay, now we hit our special built-in function, setTimeout, that doesn't do much in JavaScript, it talks to our web browser API land. So talk me through what happens, Andrea, when I hit the setTimeout statement here.
+>> Andrea: So it creates a new execution context?
+>> Will: Not in the conventional sense.
+
+[00:03:17]
+It's actually going to instead, so we pass in print hello as our function definition. Just a definition, we're not running it, we're not running it at all. And we pass in the value zero. And this setTimeout doesn't do the conventional thing we used to, create an execution context in JavaScript.
+
+[00:03:34]
+It instead speaks to-
+>> Andrea: The web browser API.
+>> Will: The web browser APIs, exactly. Our web browser APIs, otherwise known as features of the web browser. And it says, create, so web browser API, which one? Andrea, which one's it gonna say to create?
+>> Andrea: setTimeout.
+>> Will: Yeah, well, so it's gonna create a timer.
+
+[00:04:01]
+
+>> Andrea: Timer set.
+>> Will: Not in JavaScript, but down here in the web browser API. So it's gonna speak to the web browser APIs or features. Where, yes, we create a timer, perfect. Now this timer has what property? How many milliseconds is it gonna wait?
+>> Andrea: One second, sorry, zero seconds.
+
+[00:04:25]
+
+>> Will: Zero seconds, exactly, zero milliseconds, and associated with it is our?
+>> Andrea: Our entire function.
+>> Will: Exactly, our entire function definition, and that's zero. So there's the zero milliseconds, and then here is our reference to our print hello function, and is it complete? Well, it's gonna be complete in a second, but for now, it's not complete.
+
+[00:04:50]
+But it's gonna be complete instantaneously, so in a sense, I guess it's instantaneously complete.
+>> Will: What happens at this point, we'll set timeout, has done its work, it's spoken to the web browser APIs. And we then hit what line of code, Katie?
+>> Andrea: We execute block for one second?
+
+[00:05:18]
+
+>> Will: We execute block a second, we push it to the call stack.
+>> Andrea: Create a new execution context.
+>> Will: Block for one second, exactly, a new execution context, here it is. Block for one second, a new execution context. Now we're not gonna say what it does. We just know sort of while loop, or just something that just takes a second before.
+
+[00:05:44]
+So we're gonna use green to just show it's plus 1,000 milliseconds is how long it's gonna take before we go back to global. Before this execution context closes, I just have thumbs on that notion. I don't wanna assume that people understand what we're doing there. We're doing something here that just happens to take time.
+
+[00:06:08]
+Like for example, counting to 1 billion, but for each count, adding an element to an array. That just takes time for the computer to do, but it's being done in JavaScript. That's a very core JavaScript thing, is you're counting and then add stuff to an array. So it ends up taking 1,000 milliseconds before we come out of this function.
+
+[00:06:26]
+Let's have thumbs on that, don't know what that means, clarification, I get that notion, okay, everyone gets that, good. All right, so it's taking 1000 milliseconds before we exit our global execution context, we go back into our global execution context. But hold on, during that time, block for one second is on our call stack, we ain't going back to global.
+
+[00:06:49]
+But during that time, our timer has finished, right, it's finished after what, zero milliseconds. So our time is finished at, it's complete at, let's say one millisecond. Let's be generous and say one millisecond from when it was first sent to be set up, it's completed itself. So what do we say when our timer completes?
+
+[00:07:09]
+Dave, what shall we do when our timer completes? What should we do in theory, Lindsay?
+>> Lindsay: We should call the print hello-
+>> Will: Exactly, we should call the print hello function. So let's imagine we did that, are we going to push it on top of our call stack?
+
+[00:07:27]
+If we do that, that means instantly, the moment we do that, we're gonna jump out of calling block for one sec, and start running print hello. Does that seem likely as a good practice for how to think about interacting with the outside world of JavaScript? That whenever this function completes, it pushes the call stack even if we're doing something else?
+
+[00:07:47]
+That doesn't seem like a good approach, I don't think. So what are we gonna do? Actually, let's definitely, immediately erase this, we're definitely gonna do that. So what could we do as a reasonable, so Lindsay's suggestion was, we wanna call that print hello function on completion, we push it on top of the call stack.
+
+[00:08:12]
+But we know that that's not gonna make sense cuz we're, right now, only one millisecond into running block for one second, and who knows when this will finish? Well, we know that it's gonna finish in 1,000 milliseconds, we can't just suddenly start executing print hello, so we've got a conundrum.
+
+[00:08:30]
+Again, our current setup of our web browser APIs and then our JavaScript execution doesn't work, we need something more. We need some other tool to explain how our call to print hello does end up being executed. Anyone got any idea what those other tools might be?
+>> Will: All right, there's two final pieces of the execution of JavaScript that explains how we get our core to print hello back into the call stack.
+
+[00:09:07]
+This was Katie's question as well, how do I get these back? There's two other pieces to explain it.
+>> Will: One is called the callback, message, or task queue. We can call any three of those, we'll call it the callback queue, they all mean the same thing. The callback queue, we're gonna put it over here.
+
+[00:09:34]
+
+>> Will: So it may seem fairly reasonable to say.
+>> Will: If a function here completes, we're not gonna put it instantly on the call stack, we're not gonna instantly start running. Sorry, if the timer here completes, we're not going to instantly start running the function, I misspoke. If the timer completes, we're not gonna instantly start running the function in JavaScript, because what if some other functionality in JavaScript is still running?
+
+[00:09:58]
+You can't insert and start running immediately, that's just not gonna work. So what if instead, we had a queue? A queue into which we pass this function when it completes. There it is, the function definition is added to a queue. And that queue is waiting for some condition to take place on this call stack.
+
+[00:10:22]
+And what would be a useful way of saying, okay, now I feel it's safe to run this print hello function? Arturo, what would be a sort of reasonable rule? Here's my print hello function, I know I can't run it yet because I've still got, I'm in the middle of running block for one second.
+
+[00:10:39]
+
+>> Ott: You have to be on the global call stack.
+>> Will: I have to be in global, that might be enough. But what if I'm in global and I've still got a console log ready to go next? Actually, the fundamental rule is, I will not add anything from my callback queue that came in from my web browser APIs.
+
+[00:11:00]
+I will not add anything from my callback queue to my call stack in JavaScript until one condition has been met. Until my call stack is empty, and the execution context in which I'm running in global has finished all its work. I need to have an empty call stack before I can call this callback queue function.
+
+[00:11:23]
+Let's see that, I need to finish running block for one second, and at 1,000 milliseconds later, I'm gonna go back to global. And what am I going to do in global first, what it's say I'm gonna do in global first?
+>> Ott: You're gonna console.log.
+>> Will: I'm gonna console.log.
+
+[00:11:43]
+
+>> Will: Me first, me first.
+>> Will: There it is, I've blocked for one second. I'm now at about, I think it's something like 1,001 milliseconds. There it is, where I console logged me first, and block for one second is already off the call stack at this point. I do my console log me first, and then at this point, I can add my call to print hello at last, I can add it to the call stack.
+
+[00:12:26]
+
+>> Will: It's on top of the call stack, and so if I'm calling it, Lindsay, what happens? What do I do when I start calling a function?
+>> Lindsay: Create a new execution context.
+>> Will: Yes, and it's for print hello being called, little execution context. And what does it tell the JavaScript to do?
+
+[00:12:43]
+
+>> Lindsay: Console log hello.
+>> Will: Hello, and let's just write in our timings of this. So me first happened, I don't know, in 2 milliseconds, and hello happened at, my goodness, 1,002 milliseconds. But we said that our timer for our set timeout should only take 0 milliseconds. We set our timer to complete after 0 milliseconds, but it didn't end up running the callback function that was passed to set timer until 1,002 milliseconds.
+
+[00:13:20]
+When finally print hello got to run, finally Print Hello got to be allowed back into JavaScript land. Because our blocking for one second function waited, left us waiting in the main JavaScript thread, for 1,000 milliseconds. Before we could even get back to global, run the console log at the bottom, and print hello.
+
+[00:13:40]
+Sorry, that's a mistake, our me first was also blocked by our blocking function, our me first is also blocked.
+>> Will: We had to wait all that time, and so this tells us that our asynchronous world takes a second sort of status to all other stuff happening in our synchronous land.
+
+[00:14:06]
+Meaning that even though our timer says, take 0 milliseconds before you run my function, even though that's the case, it still waits, in the end, over 1,000 milliseconds. In the land of the web browser API, yeah, it completed instantly, zero milliseconds come by when this function completed. But it didn't enter the land of JavaScript for a whole another 1,000 milliseconds.
+
+[00:14:36]
+So all our set timeout can tell us is, at a very minimum, our set timeout will delay the running of that function for 0 milliseconds, or 10 milliseconds, or 100, or 1,000, whatever it might be, at a very minimum. But only at a minimum, and it could end up being as long as, for example, 1,002 milliseconds.
+
+[00:15:02]
+If we have in JavaScript synchronous land, in the main JavaScript thread, if we have code that is blocking the return to our global execution context. Where finally print hello is allowed to be passed to the call stack
+

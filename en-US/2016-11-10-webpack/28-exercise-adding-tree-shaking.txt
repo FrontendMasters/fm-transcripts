@@ -1,0 +1,119 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:03]
+>> Kent C Dodds: Let's take a look at what our bundle looks while we're developing our code. And you all can follow along, and see what this looks like in your own browsers too. So if we say npm run dev. Pull up our dev server, where did my app go. So here I'm going to go into sources and I'm gonna move this guy over.
+
+[00:00:30]
+We're going to helpers, there are a bunch of helpers in here that we're using, module.exports for, yeah. So, and this is actually transpiled code, because actually in this source code we go to helpers.js, this is module exports equals. Actually I didn't check out the next branch.
+>> Kent C Dodds: Hold on.
+
+[00:01:04]
+Yeah. Okay, so now it's an export, an ES6 export. Fun stuff. So now it is transpiled code. Well it was before, but it's even more now somehow. And Babel is going to turn it into something more like this, it's effectively the same thing. Babel transpiles the ES6 modules down to CommonJS, and then webpack after that transpolation happens, webpack resolves all the dependencies for us.
+
+[00:01:32]
+And so it's exporting all these functions, but what if I told you that there are two of these functions that aren't in use anywhere in the code base? Would you be able to find them? Just raise your hand, how would you find functions that aren't in use in the code base?
+
+[00:01:49]
+
+>> Speaker 2: Google search.
+>> Kent C Dodds: Yeah like find and replace or do a grip. Yeah, it's not easy to do that with JavaScript. Maybe with TypeScript, but yeah, with JavaScript, that's a difficult thing to do. So the cool thing with the ES6 modules is that they're totally static, and so what that means is I can't dynamically add things to the export and I can't dynamically make modifications to what's being exported.
+
+[00:02:17]
+It all has to happen in the text. What that means is you don't have to run the application to know what's going to be exported. And so webpack is gonna look at this and say okay, I see that this helpers module exports leftPad and remove and all these other utility functions.
+
+[00:02:35]
+And everywhere else in the application, I'm gonna find, okay helpers is being used here and it's using log, and it will go into here, helpers is being used here and it's using those things. And so it can determine by itself that, so let's see helpers, nowhere is anyone using remove or leftPad.
+
+[00:02:58]
+Which I think is appropriate. So we can actually remove that from our code base but we'd have to ourselves find that and remove it manually. Because there's no way for anyone to be sure because of JavaScript's dynamic nature. And so webpack can't do this yet though, because webpack is using, or because we're using Babel to transpile our ES6 module so it works in the browser.
+
+[00:03:26]
+And so we're using the Babel ES2015 plugin, or preset, which includes a plugin to transpile these modules to CommonJS. And so what we want to do is we want to not have it transpile those modules just transpile everything else except for the modules. And then webpack can take those modules and resolve them just like it would with CommonJS, but it can do some extra fancy things.
+
+[00:03:50]
+And so if you've got your editor open, this is a pretty simple change. If you go to .babelrc, and I'm just gonna format this a little bit differently. So, to provide options to presets, or plugins, you take the item of the array that you want to modify. So, we want to say hey ES2015, I don't care about modules.
+
+[00:04:16]
+So, we're gonna take that and turn that into an array itself. And the first item of the array is the name of the preset that you wanna use, the second item in the array are the options that are passed to that preset. And this literally just happened last week they added this, used to be you have to install a different preset all together.
+
+[00:04:36]
+But yeah so we'll say modules is false. And you can also say modules is UMD. Or modules is AMD or CommonJS, I'm pretty sure those are the only options. But by doing that if you restart your webpacks server cuz you've changed some configuration here, then you go into your source files, you're gonna see something quite different.
+
+[00:05:01]
+The way that it has been implemented, or transpiled, is very different and the way that it's being transpiled is from webpack. And one cool thing here is you'll see that you have something for QS and QSA, and all these are the ones. But then you'll see this comment that says unused harmony export remove and unused harmony export leftPad.
+
+[00:05:27]
+So those two modules aren't being used anywhere in the code base, it was able to statically analyze our code base to know. And that those aren't being in use, but one thing that it didn't do that you might expect it would. Is it did not remove the code for those functions from our module.
+
+[00:05:44]
+The reason that it did that is because that's not webpack's responsibility, it's just managing or transpiling the imports and exports. And it leaves removing this code to UglifyJS. Does everybody, or who knows what UglifyJS is, and what its purpose is? Okay so, UglifyJS it's pretty much the defacto minifier for JavaScript and it goes through your JavaScript and it changes variable names.
+
+[00:06:15]
+And it makes everything as small as it possibly can. And its purpose is to make it optimized for delivery to the browser. Because the JavaScript engine doesn't care that this variable name is called array. It just cares that all of the instances of this variable name are the same.
+
+[00:06:33]
+And so you can change that to A and that saves on characters which saves on bytes which saves on time for the browser to load it. One of the other cool things optimization that Uglify does is it identifies code that's not being used anywhere. And so because webpack is saying okay this module isn't being used.
+
+[00:06:51]
+So I'm not going to add a webpack require line for it. It's being exported but it's not being used anywhere so I don't need to add that line. Then Uglify is gonna look through this file and it's going to say, it's not in use anywhere so I can safely delete this code and the program will be exactly the same as if it were there, except it will be faster, less memory and less bytes for the user.
+
+[00:07:17]
+Same thing will happen to leftPad. So yeah that's fun. Anybody have any questions about how true shaking works or how to leverage it.
+>> Speaker 3: There was a question if there is something similar for ES5.
+>> Kent C Dodds: Yeah, so it is only possible to do this with ES6. However you don't have to author all of your code using ES6.
+
+[00:07:42]
+Webpack understands the ES6 module syntax. Webpack 2 does, this is not a webpack 1 feature, I should've mentioned that. And so you could author the rest of your code base in ES5 and just do modules with ES6 and webpack will transpile that for you. So with TypeScript I'm not certain of the way to tell it to not transpile modules.
+
+[00:08:06]
+I think with TypeScript 2 that's possible, but I've not used TypeScript. So you'd have to look, any other questions? Martin asked should I gzip Uglified code, does that have measurable effects? Absolutely it does, depending on the size of your program. But it's likely that even if it's not enormous, you're still probably gonna save space.
+
+[00:08:31]
+And it will, it'll still be smaller. And browsers are extremely fast at uncompressing gzipped files so, you generally don't need to worry about that. Yeah?
+>> Speaker 3: The removal of code from Uglify, is that a standard feature of Uglify, or is that an option you turn on? Cuz I've never seen that happen.
+
+[00:08:52]
+
+>> Kent C Dodds: I was under the impression that it was a standard feature. We don't have to configure anything for it to do it for us. All we have is that -p for webpack. And you can actually, I should should mention also that with webpack all that it's doing is it's adding plugins to your config for you.
+
+[00:09:09]
+And so you could leave off the -p and add those plugins yourself. And kind of tweaking a little bit yourself, and you can look at the docs for those plugins.
+>> Speaker 3: Was the output telling you that it was removing that code though? Because wouldn't it make more sense to see that once and then go and remove it yourself?
+
+[00:09:27]
+
+>> Kent C Dodds: Yeah good question. So, yeah generally if it's in your own code yeah you'd want to see. Okay yeah there's no reason for this code to exist anymore. And if I want it back, I have get so I can find it, so yeah. As far as it logging out maybe you could do that.
+
+[00:09:48]
+I'm sure they'd love a pull request [LAUGH]. So yeah question.
+>> Speaker 4: [INAUDIBLE]
+>> Kent C Dodds: Okay.
+>> Kent C Dodds: Yeah, so Uglify will recognize that okay, yeah, so, Scott is asking about effectively whether tree shaking works with require statements. It does not so the fact of the matter is it has to be ES6 modules for this to work.
+
+[00:10:26]
+You can't use, because with require you can do all kinds of really interesting things with your exports object to monkey patch things onto it. So it's pretty much impossible to statically analyze that stuff. Effectively or safely you might be able to get, have fun. You could probably get a little ways there, but yeah so it's gotta be ES6.
+
+[00:10:49]
+I would actually be really impressed, yeah. So you could probably get a little ways there, but it'd be a little dangerous I think. Okay cool, so that's tree shaking. Was a little underwhelming? For me when I did it I was like yeah that's a lot easier than I thought it was, yeah.
+
+[00:11:07]
+So I thought it was this big dangerous scary thing, but no that's pretty much it. Let me just take a look at. Okay, yeah so we are actually in the dif here you can see. I'm actually removing log from helpers. Just to illustrate yet another thing that can be removed.
+
+[00:11:34]
+But yeah, then we end up removing log and leftPad. But I leave remove in there because we're gonna use it in one or two more steps. So we'll use it here in a little bit.
+>> Speaker 5: But you didn't have to do that because for the tree shake.
+>> Kent C Dodds: Yeah exactly.
+
+[00:11:52]
+So I can I can fill my coat up with all the garbage that I want to and my co-workers will hate me and will all have a hard time maintaining it. But at least my users won't have a problem with that. So yeah, good question. Okay, cool, any last minute questions from anybody before we talk about code splitting?
+
+[00:12:14]
+This one's fun. So, actually, does anybody wanna venture a guess at what code splitting is and why you need it? Or where'd it be useful. Is there a question? Okay, that's fine. What happens when you don't set modules to false? Well if you leave off modules false then it's going to by default transpile it to CommonJS and hence webpack won't be able to statically analyze it.
+
+[00:12:43]
+So you don't get tree shaking, effectively. You can set it to UMD, which is universal module definition. I can't actually think of any use case you do that in an application. Well I don't even need to explain it. You can look it up later, it's great. And then you can also set it to AMD and I can't imagine why you'd ever wanna do that either, so yeah, pretty much just leave it alone or set it to false.
+
+[00:13:10]
+If you're bundling with webpack just take advantage of the native transpolation.
+

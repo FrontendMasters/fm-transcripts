@@ -1,0 +1,1116 @@
+WEBVTT
+
+1
+00:00:00.420 --> 00:00:04.443
+&gt;&gt; Will: But now we are interacting
+with these web browser APIs.
+
+2
+00:00:04.443 --> 00:00:09.201
+In other words, features with
+a world outside of JavaScript,
+
+3
+00:00:09.201 --> 00:00:11.210
+outside of JavaScript.
+
+4
+00:00:11.210 --> 00:00:15.943
+We need a way of predictably
+understanding how this outside world will
+
+5
+00:00:15.943 --> 00:00:19.243
+interact with our
+JavaScript execution model.
+
+6
+00:00:19.243 --> 00:00:23.744
+So we saw this almost come up when,
+was it Griffin or
+
+7
+00:00:23.744 --> 00:00:28.768
+Dave, or someone said,
+what if I ran 20 console logs,
+
+8
+00:00:28.768 --> 00:00:33.084
+it was Dave,
+ran 20 console logs in a row here?
+
+9
+00:00:33.084 --> 00:00:36.311
+When would my print hello jump back in and
+start running?
+
+10
+00:00:36.311 --> 00:00:39.910
+I need a way of predictively
+figuring that out, right?
+
+11
+00:00:39.910 --> 00:00:45.965
+Or what if I had a function that
+blocked the thread here for
+
+12
+00:00:45.965 --> 00:00:49.840
+a while, maybe a whole second?
+
+13
+00:00:49.840 --> 00:00:51.800
+It's got inside of it a while loop or
+a for loop,
+
+14
+00:00:51.800 --> 00:00:54.290
+something really computationally taxing.
+
+15
+00:00:54.290 --> 00:00:56.435
+This function blocked for one second,
+
+16
+00:00:56.435 --> 00:00:59.887
+blocks when it's called the whole
+main thread for one second.
+
+17
+00:00:59.887 --> 00:01:04.827
+What if that happens, when does this
+print hello function get to come back to
+
+18
+00:01:04.827 --> 00:01:12.452
+the call stack?
+&gt;&gt; Will: We need something else.
+
+19
+00:01:12.452 --> 00:01:17.194
+We need some other pieces of our
+asynchronous JavaScript world
+
+20
+00:01:17.194 --> 00:01:20.490
+to explain these pieces happening.
+
+21
+00:01:20.490 --> 00:01:22.870
+All right,
+we're gonna walk through this all.
+
+22
+00:01:22.870 --> 00:01:28.411
+Precisely line by line and
+see exactly how this is going to play out.
+
+23
+00:01:28.411 --> 00:01:36.608
+So we will start walking through this,
+lovely.
+
+24
+00:01:36.608 --> 00:01:42.072
+All right, line one, what is happening
+
+25
+00:01:42.072 --> 00:01:47.312
+in line one of our code?
+&gt;&gt; Ott: We are declaring function print.
+
+26
+00:01:47.312 --> 00:01:48.314
+&gt;&gt; Will: Really slowly for me,
+
+27
+00:01:48.314 --> 00:01:50.750
+because obviously I'm
+getting ahead of myself here.
+
+28
+00:01:50.750 --> 00:01:54.512
+&gt;&gt; Ott: We're gonna declare print hello.
+
+29
+00:01:54.512 --> 00:01:55.743
+&gt;&gt; Will: Perfect, there it is,
+
+30
+00:01:55.743 --> 00:01:57.716
+print hello is in that global memory.
+
+31
+00:01:57.716 --> 00:02:01.419
+Excellent, thank you Ott,
+what's the next line, tell us.
+
+32
+00:02:01.419 --> 00:02:03.603
+&gt;&gt; Ott: We're gonna declare block for
+
+33
+00:02:03.603 --> 00:02:06.197
+one second.
+&gt;&gt; Will: Declare block for one second, and
+
+34
+00:02:06.197 --> 00:02:08.850
+we're not gonna figure out
+how that's implemented.
+
+35
+00:02:08.850 --> 00:02:14.615
+But the way you would implement it would
+just be something like a while loop or
+
+36
+00:02:14.615 --> 00:02:15.526
+a for loop.
+
+37
+00:02:15.526 --> 00:02:20.680
+That takes, for each value of i and
+appends something to an array.
+
+38
+00:02:20.680 --> 00:02:24.880
+That just starts taking time, and
+so that could block the thread,
+
+39
+00:02:24.880 --> 00:02:27.200
+if it were run for a bunch of time.
+
+40
+00:02:27.200 --> 00:02:30.880
+We're declaring it, block for one second.
+
+41
+00:02:32.030 --> 00:02:34.692
+We know that if this
+function gets executed,
+
+42
+00:02:34.692 --> 00:02:38.484
+we're not gonna move out of its
+execution context for a second.
+
+43
+00:02:38.484 --> 00:02:42.513
+Because it does a bunch of
+computationally tough stuff.
+
+44
+00:02:42.513 --> 00:02:46.464
+That's all happening in JavaScript land
+and that's all gonna take time, so
+
+45
+00:02:46.464 --> 00:02:49.610
+it can't move on if we
+were to run this function.
+
+46
+00:02:49.610 --> 00:02:55.004
+Okay, now we hit our special
+built-in function, setTimeout,
+
+47
+00:02:55.004 --> 00:03:01.194
+that doesn't do much in JavaScript,
+it talks to our web browser API land.
+
+48
+00:03:01.194 --> 00:03:05.666
+So talk me through what happens, Andrea,
+
+49
+00:03:05.666 --> 00:03:10.442
+when I hit the setTimeout statement here.
+&gt;&gt; Andrea: So
+
+50
+00:03:10.442 --> 00:03:17.430
+it creates a new execution context?
+&gt;&gt; Will: Not in the conventional sense.
+
+51
+00:03:17.430 --> 00:03:23.869
+It's actually going to instead, so we pass
+in print hello as our function definition.
+
+52
+00:03:23.869 --> 00:03:26.400
+Just a definition, we're not running it,
+we're not running it at all.
+
+53
+00:03:26.400 --> 00:03:29.130
+And we pass in the value zero.
+
+54
+00:03:29.130 --> 00:03:32.279
+And this setTimeout doesn't do
+the conventional thing we used to,
+
+55
+00:03:32.279 --> 00:03:34.388
+create an execution context in JavaScript.
+
+56
+00:03:34.388 --> 00:03:38.148
+It instead speaks to-
+&gt;&gt; Andrea: The web browser API.
+
+57
+00:03:38.148 --> 00:03:40.250
+&gt;&gt; Will: The web browser APIs, exactly.
+
+58
+00:03:40.250 --> 00:03:47.506
+Our web browser APIs, otherwise known
+as features of the web browser.
+
+59
+00:03:47.506 --> 00:03:54.493
+And it says, create, so
+web browser API, which one?
+
+60
+00:03:54.493 --> 00:03:57.581
+Andrea, which one's it
+gonna say to create?
+
+61
+00:03:57.581 --> 00:03:58.847
+&gt;&gt; Andrea: setTimeout.
+
+62
+00:03:58.847 --> 00:03:59.820
+&gt;&gt; Will: Yeah, well, so
+
+63
+00:03:59.820 --> 00:04:02.759
+it's gonna create a timer.
+&gt;&gt; Andrea: Timer set.
+
+64
+00:04:02.759 --> 00:04:04.228
+&gt;&gt; Will: Not in JavaScript, but
+
+65
+00:04:04.228 --> 00:04:06.290
+down here in the web browser API.
+
+66
+00:04:06.290 --> 00:04:11.468
+So it's gonna speak to the web
+browser APIs or features.
+
+67
+00:04:11.468 --> 00:04:17.631
+Where, yes, we create a timer, perfect.
+
+68
+00:04:17.631 --> 00:04:20.050
+Now this timer has what property?
+
+69
+00:04:20.050 --> 00:04:23.728
+How many milliseconds is it gonna wait?
+&gt;&gt; Andrea: One second, sorry,
+
+70
+00:04:23.728 --> 00:04:26.598
+zero seconds.
+&gt;&gt; Will: Zero seconds,
+
+71
+00:04:26.598 --> 00:04:31.422
+exactly, zero milliseconds,
+and associated with it is our?
+
+72
+00:04:31.422 --> 00:04:33.083
+&gt;&gt; Andrea: Our entire function.
+
+73
+00:04:33.083 --> 00:04:33.696
+&gt;&gt; Will: Exactly,
+
+74
+00:04:33.696 --> 00:04:36.770
+our entire function definition,
+and that's zero.
+
+75
+00:04:36.770 --> 00:04:41.705
+So there's the zero milliseconds,
+and then here is our
+
+76
+00:04:41.705 --> 00:04:47.061
+reference to our print hello function,
+and is it complete?
+
+77
+00:04:47.061 --> 00:04:50.790
+Well, it's gonna be complete in a second,
+but for now, it's not complete.
+
+78
+00:04:50.790 --> 00:04:54.407
+But it's gonna be complete
+instantaneously, so in a sense,
+
+79
+00:04:54.407 --> 00:05:02.108
+I guess it's instantaneously complete.
+&gt;&gt; Will: What happens at this point,
+
+80
+00:05:02.108 --> 00:05:07.166
+we'll set timeout, has done its work,
+it's spoken to the web browser APIs.
+
+81
+00:05:07.166 --> 00:05:12.710
+And we then hit what line of code,
+
+82
+00:05:12.710 --> 00:05:16.523
+Katie?
+&gt;&gt; Andrea: We execute block for
+
+83
+00:05:16.523 --> 00:05:19.823
+one second?
+&gt;&gt; Will: We execute block a second,
+
+84
+00:05:19.823 --> 00:05:23.923
+we push it to the call stack.
+&gt;&gt; Andrea: Create a new execution context.
+
+85
+00:05:23.923 --> 00:05:26.508
+&gt;&gt; Will: Block for one second, exactly,
+
+86
+00:05:26.508 --> 00:05:29.580
+a new execution context, here it is.
+
+87
+00:05:29.580 --> 00:05:33.274
+Block for one second,
+
+88
+00:05:33.274 --> 00:05:37.556
+a new execution context.
+
+89
+00:05:37.556 --> 00:05:39.576
+Now we're not gonna say what it does.
+
+90
+00:05:39.576 --> 00:05:44.159
+We just know sort of while loop, or just
+something that just takes a second before.
+
+91
+00:05:44.159 --> 00:05:49.482
+So we're gonna use green to
+just show it's plus 1,000
+
+92
+00:05:49.482 --> 00:05:55.777
+milliseconds is how long it's gonna
+take before we go back to global.
+
+93
+00:05:55.777 --> 00:06:00.910
+Before this execution context closes,
+I just have thumbs on that notion.
+
+94
+00:06:00.910 --> 00:06:05.430
+I don't wanna assume that people
+understand what we're doing there.
+
+95
+00:06:05.430 --> 00:06:08.079
+We're doing something here that
+just happens to take time.
+
+96
+00:06:08.079 --> 00:06:11.395
+Like for example,
+counting to 1 billion, but for
+
+97
+00:06:11.395 --> 00:06:14.470
+each count, adding an element to an array.
+
+98
+00:06:14.470 --> 00:06:18.481
+That just takes time for the computer to
+do, but it's being done in JavaScript.
+
+99
+00:06:18.481 --> 00:06:21.597
+That's a very core JavaScript thing,
+is you're counting and
+
+100
+00:06:21.597 --> 00:06:23.550
+then add stuff to an array.
+
+101
+00:06:23.550 --> 00:06:26.877
+So it ends up taking 1,000 milliseconds
+before we come out of this function.
+
+102
+00:06:26.877 --> 00:06:30.077
+Let's have thumbs on that,
+don't know what that means, clarification,
+
+103
+00:06:30.077 --> 00:06:32.377
+I get that notion, okay,
+everyone gets that, good.
+
+104
+00:06:32.377 --> 00:06:37.370
+All right, so it's taking 1000
+milliseconds before we exit our global
+
+105
+00:06:37.370 --> 00:06:41.830
+execution context, we go back into
+our global execution context.
+
+106
+00:06:41.830 --> 00:06:44.898
+But hold on, during that time, block for
+
+107
+00:06:44.898 --> 00:06:49.640
+one second is on our call stack,
+we ain't going back to global.
+
+108
+00:06:49.640 --> 00:06:54.025
+But during that time, our timer has
+finished, right, it's finished after what,
+
+109
+00:06:54.025 --> 00:06:55.157
+zero milliseconds.
+
+110
+00:06:55.157 --> 00:06:59.885
+So our time is finished at, it's
+complete at, let's say one millisecond.
+
+111
+00:06:59.885 --> 00:07:05.248
+Let's be generous and say one millisecond
+from when it was first sent to be set up,
+
+112
+00:07:05.248 --> 00:07:06.973
+it's completed itself.
+
+113
+00:07:06.973 --> 00:07:09.365
+So what do we say when
+our timer completes?
+
+114
+00:07:09.365 --> 00:07:11.954
+Dave, what shall we do
+when our timer completes?
+
+115
+00:07:11.954 --> 00:07:16.281
+What should we do in theory, Lindsay?
+&gt;&gt; Lindsay: We should call the print
+
+116
+00:07:16.281 --> 00:07:17.630
+hello-
+&gt;&gt; Will: Exactly,
+
+117
+00:07:17.630 --> 00:07:19.838
+we should call the print hello function.
+
+118
+00:07:19.838 --> 00:07:27.070
+So let's imagine we did that, are we going
+to push it on top of our call stack?
+
+119
+00:07:27.070 --> 00:07:29.842
+If we do that, that means instantly,
+the moment we do that,
+
+120
+00:07:29.842 --> 00:07:35.010
+we're gonna jump out of calling block for
+one sec, and start running print hello.
+
+121
+00:07:35.010 --> 00:07:38.470
+Does that seem likely
+as a good practice for
+
+122
+00:07:38.470 --> 00:07:42.390
+how to think about interacting with
+the outside world of JavaScript?
+
+123
+00:07:42.390 --> 00:07:44.253
+That whenever this function completes,
+
+124
+00:07:44.253 --> 00:07:47.029
+it pushes the call stack even
+if we're doing something else?
+
+125
+00:07:47.029 --> 00:07:53.096
+That doesn't seem like a good approach,
+I don't think.
+
+126
+00:07:53.096 --> 00:07:54.872
+So what are we gonna do?
+
+127
+00:07:54.872 --> 00:07:57.797
+Actually, let's definitely,
+immediately erase this,
+
+128
+00:07:57.797 --> 00:08:00.330
+we're definitely gonna do that.
+
+129
+00:08:00.330 --> 00:08:05.552
+So what could we do as a reasonable,
+so Lindsay's suggestion was,
+
+130
+00:08:05.552 --> 00:08:09.857
+we wanna call that print
+hello function on completion,
+
+131
+00:08:09.857 --> 00:08:12.528
+we push it on top of the call stack.
+
+132
+00:08:12.528 --> 00:08:16.646
+But we know that that's not gonna
+make sense cuz we're, right now,
+
+133
+00:08:16.646 --> 00:08:20.055
+only one millisecond into
+running block for one second,
+
+134
+00:08:20.055 --> 00:08:22.271
+and who knows when this will finish?
+
+135
+00:08:22.271 --> 00:08:25.667
+Well, we know that it's gonna
+finish in 1,000 milliseconds,
+
+136
+00:08:25.667 --> 00:08:30.560
+we can't just suddenly start executing
+print hello, so we've got a conundrum.
+
+137
+00:08:30.560 --> 00:08:33.904
+Again, our current setup
+of our web browser APIs and
+
+138
+00:08:33.904 --> 00:08:38.552
+then our JavaScript execution doesn't
+work, we need something more.
+
+139
+00:08:38.552 --> 00:08:43.684
+We need some other tool
+to explain how our call
+
+140
+00:08:43.684 --> 00:08:48.560
+to print hello does end up being executed.
+
+141
+00:08:48.560 --> 00:08:52.357
+Anyone got any idea what
+those other tools might be?
+
+142
+00:08:54.785 --> 00:08:57.456
+&gt;&gt; Will: All right, there's two final
+
+143
+00:08:57.456 --> 00:09:02.284
+pieces of the execution of
+JavaScript that explains how
+
+144
+00:09:02.284 --> 00:09:07.022
+we get our core to print hello
+back into the call stack.
+
+145
+00:09:07.022 --> 00:09:10.271
+This was Katie's question as well,
+how do I get these back?
+
+146
+00:09:10.271 --> 00:09:15.102
+There's two other pieces to explain it.
+
+147
+00:09:17.608 --> 00:09:20.803
+&gt;&gt; Will: One is called the callback,
+
+148
+00:09:20.803 --> 00:09:23.740
+message, or task queue.
+
+149
+00:09:23.740 --> 00:09:26.329
+We can call any three of those,
+we'll call it the callback queue,
+
+150
+00:09:26.329 --> 00:09:27.498
+they all mean the same thing.
+
+151
+00:09:27.498 --> 00:09:29.046
+The callback queue,
+
+152
+00:09:29.046 --> 00:09:34.561
+we're gonna put it over here.
+&gt;&gt; Will: So
+
+153
+00:09:34.561 --> 00:09:40.064
+it may seem fairly reasonable to say.
+&gt;&gt; Will: If
+
+154
+00:09:40.064 --> 00:09:44.980
+a function here completes, we're not
+gonna put it instantly on the call stack,
+
+155
+00:09:44.980 --> 00:09:48.000
+we're not gonna instantly start running.
+
+156
+00:09:48.000 --> 00:09:49.062
+Sorry, if the timer here completes,
+
+157
+00:09:49.062 --> 00:09:52.230
+we're not going to instantly start
+running the function, I misspoke.
+
+158
+00:09:52.230 --> 00:09:53.340
+If the timer completes,
+
+159
+00:09:53.340 --> 00:09:55.600
+we're not gonna instantly start
+running the function in JavaScript,
+
+160
+00:09:55.600 --> 00:09:58.690
+because what if some other functionality
+in JavaScript is still running?
+
+161
+00:09:58.690 --> 00:10:02.030
+You can't insert and start running
+immediately, that's just not gonna work.
+
+162
+00:10:03.090 --> 00:10:06.819
+So what if instead, we had a queue?
+
+163
+00:10:06.819 --> 00:10:13.124
+A queue into which we pass this
+function when it completes.
+
+164
+00:10:13.124 --> 00:10:16.979
+There it is, the function
+definition is added to a queue.
+
+165
+00:10:16.979 --> 00:10:18.779
+And that queue is waiting for
+
+166
+00:10:18.779 --> 00:10:22.570
+some condition to take
+place on this call stack.
+
+167
+00:10:22.570 --> 00:10:25.490
+And what would be a useful way of saying,
+okay,
+
+168
+00:10:25.490 --> 00:10:29.060
+now I feel it's safe to run
+this print hello function?
+
+169
+00:10:29.060 --> 00:10:32.578
+Arturo, what would be
+a sort of reasonable rule?
+
+170
+00:10:32.578 --> 00:10:35.427
+Here's my print hello function,
+I know I can't run it yet
+
+171
+00:10:35.427 --> 00:10:38.101
+because I've still got,
+I'm in the middle of running
+
+172
+00:10:38.101 --> 00:10:40.687
+block for one second.
+&gt;&gt; Ott: You have to be on the global call
+
+173
+00:10:40.687 --> 00:10:42.635
+stack.
+&gt;&gt; Will: I have to be in global,
+
+174
+00:10:42.635 --> 00:10:44.187
+that might be enough.
+
+175
+00:10:44.187 --> 00:10:49.160
+But what if I'm in global and I've still
+got a console log ready to go next?
+
+176
+00:10:49.160 --> 00:10:54.330
+Actually, the fundamental rule is,
+I will not add
+
+177
+00:10:54.330 --> 00:11:00.230
+anything from my callback queue that
+came in from my web browser APIs.
+
+178
+00:11:00.230 --> 00:11:04.500
+I will not add anything from my callback
+queue to my call stack in JavaScript
+
+179
+00:11:04.500 --> 00:11:05.840
+until one condition has been met.
+
+180
+00:11:07.160 --> 00:11:11.200
+Until my call stack is empty, and
+
+181
+00:11:11.200 --> 00:11:16.600
+the execution context in which I'm running
+in global has finished all its work.
+
+182
+00:11:16.600 --> 00:11:23.319
+I need to have an empty call stack before
+I can call this callback queue function.
+
+183
+00:11:23.319 --> 00:11:27.837
+Let's see that, I need to finish
+running block for one second, and
+
+184
+00:11:27.837 --> 00:11:33.010
+at 1,000 milliseconds later,
+I'm gonna go back to global.
+
+185
+00:11:33.010 --> 00:11:36.436
+And what am I going to do in global first,
+what it's say I'm gonna do in global
+
+186
+00:11:36.436 --> 00:11:39.101
+first?
+&gt;&gt; Ott: You're gonna console.log.
+
+187
+00:11:39.101 --> 00:11:39.959
+&gt;&gt; Will: I'm gonna console.log.
+
+188
+00:11:43.698 --> 00:11:46.101
+&gt;&gt; Will: Me first,
+
+189
+00:11:46.101 --> 00:11:52.146
+me first.
+&gt;&gt; Will: There it is,
+
+190
+00:11:52.146 --> 00:11:54.089
+I've blocked for one second.
+
+191
+00:11:54.089 --> 00:12:00.820
+I'm now at about, I think it's
+something like 1,001 milliseconds.
+
+192
+00:12:00.820 --> 00:12:05.506
+There it is, where I console
+logged me first, and block for
+
+193
+00:12:05.506 --> 00:12:09.842
+one second is already off
+the call stack at this point.
+
+194
+00:12:09.842 --> 00:12:15.317
+I do my console log me first,
+and then at this point,
+
+195
+00:12:15.317 --> 00:12:19.423
+I can add my call to print hello at last,
+
+196
+00:12:19.423 --> 00:12:26.727
+I can add it to the call stack.
+&gt;&gt; Will: It's
+
+197
+00:12:26.727 --> 00:12:31.472
+on top of the call stack, and so
+if I'm calling it, Lindsay, what happens?
+
+198
+00:12:31.472 --> 00:12:33.330
+What do I do when I start
+calling a function?
+
+199
+00:12:33.330 --> 00:12:34.273
+&gt;&gt; Lindsay: Create a new execution
+
+200
+00:12:34.273 --> 00:12:36.243
+context.
+&gt;&gt; Will: Yes, and it's for
+
+201
+00:12:36.243 --> 00:12:40.713
+print hello being called,
+little execution context.
+
+202
+00:12:40.713 --> 00:12:43.047
+And what does it tell
+the JavaScript to do?
+
+203
+00:12:43.047 --> 00:12:46.890
+&gt;&gt; Lindsay: Console log hello.
+
+204
+00:12:46.890 --> 00:12:47.905
+&gt;&gt; Will: Hello, and
+
+205
+00:12:47.905 --> 00:12:51.464
+let's just write in our timings of this.
+
+206
+00:12:51.464 --> 00:12:56.522
+So me first happened,
+I don't know, in 2 milliseconds,
+
+207
+00:12:56.522 --> 00:13:02.399
+and hello happened at,
+my goodness, 1,002 milliseconds.
+
+208
+00:13:02.399 --> 00:13:05.166
+But we said that our timer for
+
+209
+00:13:05.166 --> 00:13:10.131
+our set timeout should
+only take 0 milliseconds.
+
+210
+00:13:10.131 --> 00:13:15.247
+We set our timer to complete after 0
+milliseconds, but it didn't end up running
+
+211
+00:13:15.247 --> 00:13:20.603
+the callback function that was passed
+to set timer until 1,002 milliseconds.
+
+212
+00:13:20.603 --> 00:13:23.097
+When finally print hello got to run,
+
+213
+00:13:23.097 --> 00:13:27.534
+finally Print Hello got to be
+allowed back into JavaScript land.
+
+214
+00:13:27.534 --> 00:13:30.294
+Because our blocking for
+one second function waited,
+
+215
+00:13:30.294 --> 00:13:34.328
+left us waiting in the main JavaScript
+thread, for 1,000 milliseconds.
+
+216
+00:13:34.328 --> 00:13:39.194
+Before we could even get back to global,
+run the console log at the bottom, and
+
+217
+00:13:39.194 --> 00:13:40.559
+print hello.
+
+218
+00:13:40.559 --> 00:13:43.355
+Sorry, that's a mistake,
+
+219
+00:13:43.355 --> 00:13:48.829
+our me first was also blocked
+by our blocking function,
+
+220
+00:13:48.829 --> 00:13:56.066
+our me first is also blocked.
+&gt;&gt; Will: We had to wait all that time,
+
+221
+00:13:56.066 --> 00:14:01.616
+and so this tells us that our
+asynchronous world takes a second sort
+
+222
+00:14:01.616 --> 00:14:06.987
+of status to all other stuff
+happening in our synchronous land.
+
+223
+00:14:06.987 --> 00:14:11.995
+Meaning that even though our timer says,
+take 0 milliseconds
+
+224
+00:14:11.995 --> 00:14:16.719
+before you run my function,
+even though that's the case,
+
+225
+00:14:16.719 --> 00:14:21.660
+it still waits, in the end,
+over 1,000 milliseconds.
+
+226
+00:14:21.660 --> 00:14:26.049
+In the land of the web browser API,
+yeah, it completed instantly,
+
+227
+00:14:26.049 --> 00:14:29.833
+zero milliseconds come by
+when this function completed.
+
+228
+00:14:29.833 --> 00:14:36.555
+But it didn't enter the land of JavaScript
+for a whole another 1,000 milliseconds.
+
+229
+00:14:36.555 --> 00:14:40.789
+So all our set timeout can tell us is,
+at a very minimum,
+
+230
+00:14:40.789 --> 00:14:45.206
+our set timeout will delay
+the running of that function for
+
+231
+00:14:45.206 --> 00:14:49.534
+0 milliseconds, or
+10 milliseconds, or 100, or
+
+232
+00:14:49.534 --> 00:14:53.799
+1,000, whatever it might be,
+at a very minimum.
+
+233
+00:14:53.799 --> 00:14:58.808
+But only at a minimum, and
+it could end up being as long as,
+
+234
+00:14:58.808 --> 00:15:02.503
+for example, 1,002 milliseconds.
+
+235
+00:15:02.503 --> 00:15:07.849
+If we have in JavaScript synchronous land,
+in the main JavaScript thread,
+
+236
+00:15:07.849 --> 00:15:13.207
+if we have code that is blocking the
+return to our global execution context.
+
+237
+00:15:13.207 --> 00:15:17.540
+Where finally print hello is allowed
+to be passed to the call stack
+

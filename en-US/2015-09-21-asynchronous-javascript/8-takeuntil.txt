@@ -1,0 +1,137 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:03]
+>> Jafar Husain: Another metaphor of thinking about what happens with flattening strategies, and I love using this metaphor, because we all hate traffic, is to imagine you're on the highway, and we've got three lanes open. And then there's some accident or some construction, and they have to close two of the lanes.
+
+[00:00:19]
+The concatAll strategy, which isn't very good to use for traffic for obvious reasons, because each one of those lanes is an infinite observable, would say, okay, everybody on the left lane go through first and then everybody in the right lane and then everybody on those two lanes open.
+
+[00:00:33]
+You never use that in traffic because, well, there's never gonna stop being traffic on the left lane, they're both two infinite observables. You wouldn't use concatAll as a traffic managing strategy, however, this next function I'm gonna show you guys is merge all. Wait, I lied. Sorry, we're gonna come back to that.
+
+[00:00:52]
+I wanna show you all the functions you need to know in order to understand the drag and drop example I showed you earlier. And so I've showed you concatAll in the drag and drop example, but I also showed you this takeUntil function, which I didn't explain very clearly, right.
+
+[00:01:03]
+What a takeUntil function does is it takes an observable that's a source observable, and it takes an observable that's a stop observable, and every single time the source observable emits something, it forwards that on. But as soon as the stop observable emits a single value, whether it's on next, on error, or on, well, on next or on completed, it completes the overall observable that's taking these two observables and putting them together.
+
+[00:01:30]
+So takeUntil creates a new observable, just like map and filter. And it doesn't change any observables. It takes a source observable and a stop observable, creates a new observable with all of the data from the source observable, and completes that observable as soon as the stop observable fires a value.
+
+[00:01:47]
+And under the hood, unsubscribes by calling dispose on both the source and stop. Does that make sense? So that's how we can take two infinite observables and combine them together to create an observable that ends. And this is the use case that the Gang of Four weren't really thinking about.
+
+[00:02:00]
+They were like, well, you've got these infinite observables, I mean, what can you do with that? You can really just listen to it until you're not interested anymore, until you call dispose. This function right here is why I haven't unsubscribed from an event in five years. I have not typed the words, remove event listener in five years, cuz I don't need to.
+
+[00:02:21]
+This is, it's really important you understand this function, because this is the first big mental step we're gonna make, to thinking about asynchronous programming very differently. With a DOM event listener, all you can do is, you can say, whoa, whoa, whoa, unsubscribe, right. That's what you have to do.
+
+[00:02:35]
+You have to say look, I don't want any more data, unsubscribe. Another way of thinking about that, a different way of thinking about it is, well, I'm gonna take the stream of data that I want, and under some condition, I'm gonna create another observable that's gonna fire when some other asynchronous condition.
+
+[00:02:51]
+Sorry, let me rewind. Here's how you usually do with events. So you add an event listener to an event, and then you'll start consuming the data. But then at some point, when some event happens, cuz that's how everything happens in JavaScript. Some event happens. You'll decide that you don't want the data in that event anymore.
+
+[00:03:06]
+And then you'll call removeEventListener. That's how we code today. But notice that we're gonna call removeEventListener when some event happens, cuz that's how things happen in JavaScript. Somebody mouse clicks, a timer fires, some asynchronous entry happens, and then under certain condition, we're going to decide we want to unhook from that event and stop listening to it anymore.
+
+[00:03:26]
+Well, why don't we just take the source event, the thing we're interested in, and use takeUntil and combine it together with the stop collection. And then we don't have to add a bunch of handlers and state to track whether we're listening to something anymore. We can just declaratively take these two streams, combine them together, and cause the source to end when we want it to end.
+
+[00:03:46]
+That's different than unsubscribing, right. When I call subscription.dispose, I'm saying, I don't want the data anymore. But if I take my source collection and I use takeUntil to combine it together with whatever event happens when I'm supposed to stop listening, well, then I've created an observable that completes when I want it to.
+
+[00:04:04]
+Don't unsubscribe from events. Create streams of data that complete when you want them to. That's the big mental leap we're going to make today. We're not going to bother to write state machines, like, if this happened, then unhook my event listener, and then if that happened, hook my event listener up.
+
+[00:04:22]
+We're not going to do that anymore. We are going to create new events from existing events, and we're going to create those events such that they end when we want them to. Got a question in the back.
+>> Speaker 2: Yeah, we got a few, here that are piling up.
+
+[00:04:35]
+Will on completion even trigger when observable is running in time asynchronously?
+>> Jafar Husain: Yes. On completion can always fire, and that just indicates that no more data will arrive.
+>> Speaker 2: You kinda clarified, we will not know when the stream will complete as it's waiting in time?
+>> Jafar Husain: Yeah, you have no idea when observable's going to end.
+
+[00:04:55]
+If you're the consumer, and you're getting information pushed to you, if I'm pushing information to her, she has no inkling of when I'm going to stop throwing cakes at her, she has no idea. It's only when she receives an explicit message, I'm done, no more cake, that she knows for certain.
+
+[00:05:09]
+Any other questions?
+>> Speaker 2: The takeUntil emit on complete as soon as the stop collection emits the first item, or will it wait until the stop collection emits on complete?
+>> Jafar Husain: At the very first item, good question. So the question is, will the on complete happen on the observable that comes out takeUntil as soon as as the stop collection calls on next, or will it wait till the stop collection calls on complete?
+
+[00:05:32]
+And the answer is, on next. As soon as anything comes out of that stop collection, on next or on complete, it will complete the overall value. Now, if the stop collection threw an error, the overall observable would end with that error. We always forward errors along, we never swallow errors.
+
+[00:05:47]
+So if either the source collection or stop collection, like, errored, called on error, then the observable that we've created will on error. Yep?
+>> Speaker 3: Would the source collection keep feeding data that's now just kind of being ignored, or will it know to stop feeding data, or don't we care?
+
+[00:06:04]
+
+>> Jafar Husain: Well, what happens is, as soon as the takeUntil operator, which has got these two observables that's combining together for somebody else. Think of it that way, each of these functions are like one step along the chain. Think of it as a guy who's got an observable and he's pulling items out and translating them and handing them off like a hot potato, right.
+
+[00:06:20]
+So takeUntil has got two observables. And it's listening, every time a source item comes through, it just hands that along. But then as soon as a stop item comes along, what does it do? Well, it calls on completed to the next guy and says, no more data is arriving.
+
+[00:06:33]
+But then it takes the subscription objects it's got from the source collection and the stop collection, and it calls dispose. Well, in the case of where the source collection sends a value, it'll call dispose on the stop collection. Because there's no need to call dispose on the source collection, because it's just said on completed.
+
+[00:06:47]
+No need to say, hey, I don't want anymore data, if I just told you I'm not gonna give you anymore data. So stop collection, because it hasn't said, I'm done, we would turn around and we would call dispose on that, cuz we're not interested in the data anymore.
+
+[00:06:58]
+Cuz we just told the guy down the line, we're never going to give you anymore data. Does that make sense?
+>> Speaker 2: Yeah, that's great.
+>> Jafar Husain: Another question?
+>> Speaker 2: I think you just covered this here. The stop collection value is irrelevant? It'll just trigger a done for the source observable?
+
+[00:07:11]
+
+>> Jafar Husain: Yes, totally irrelevant. Totally gets lost. Doesn't get forwarded along the stop collection value. So again, I want to put an exclamation point on this. We're going to learn today how to declaratively create event streams that end when we want them to end. Not have to build state machines where in certain conditions, we unhook explicitly using our event listener.
+
+[00:07:33]
+And we're going to get code that's a lot simpler with very few moving pieces, okay. So just like the mouse drag example we saw earlier. Yeah, another question?
+>> Speaker 2: Yeah, could you hook up an auto complete box that might listen for return from the server until a new keypress event occurs?
+
+[00:07:51]
+
+>> Jafar Husain: Absolutely. Yes, you could, what he's talking about is an auto complete, is he asking me to do it or is he asking whether can be done?
+>> Speaker 2: Yeah, asking if it could be done.
+>> Jafar Husain: Absolutely. So let's say we're feeding an auto complete box with results from the server, and maybe it's like arriving over a web socket.
+
+[00:08:05]
+And a web socket is a great example of something that we can adapt to an observable interface, right? As information is coming over the web socket, we're going to call on next, on next, on next. And we might fill up the list, but then as soon as somebody presses a key, we could just stop and close the web socket.
+
+[00:08:17]
+Does that make sense? Because I'm the producer. As soon as she says to me explicitly, I don't want any more data, that's an opportunity for me as the producer to potentially cancel anything that I'm doing to produce data for her. Let's say I've got an order out for more cakes.
+
+[00:08:32]
+I'm relentless, I'm ordering more cakes for her and she's like whoa, whoa. Well, I'm just going to pick up the phone and cancel that order. And that turns out to be a very useful thing. Because a lot of the times, the operations that we execute in order to produce asynchronous data can be very expensive, particularly when you're talking about IO operations.
+
+[00:08:51]
+Let's say I've got an open web socket. That's not cheap. Web sockets aren't free. They take resources. If she says she doesn't want any more cake, I'm going to close that web socket, because I might be getting the cake from some other entirely different web server. Mixing my metaphors, but you get the point.
+
+[00:09:05]
+Yeah?
+>> Speaker 2: Can you use concatAll on the stop collection?
+>> Jafar Husain: concatAll on this stop collection or concatAll-
+>> Speaker 2: For the stop collection.
+>> Jafar Husain: It's a little bit of a confusing question, because concatAll only works on an observable of observables. And in this case, we don't have an observable of observables, we just have two observables.
+
+[00:09:29]
+That's not the same as an observable of observables. With an observable of observables, you have a stream of observables arriving over time. Here, I just got two observables in my hot little hands. And I'm listening to one, well, I'm listening to both. And as soon as the source collection sends data, I move it along.
+
+[00:09:42]
+But if he's asking if you can use concatAll on the result of a takeUntil, yes cuz you can use concatAll on every observable. It's safe to use concatAll on the result of a takeUntil, cuz the whole point of a takeUntil is that that observable might at least end.
+
+[00:09:57]
+So because that observable might at least end, we never know for certain if an observable is going to end. But in this case, we're using TakeUntil. So presumably, we expect under certain circumstances, it might end. Then it's totally safe to use that in a concatAll. Does that makes sense?
+
+[00:10:10]
+But you would never want to use an infinite observable in a concatAll, because you'll never get to the observables down the line.
+

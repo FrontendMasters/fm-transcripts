@@ -1,0 +1,111 @@
+[00:00:00]
+>> Brian Holt: So we have another problem. So go to Babble RC. So we need Babble to be running on the server now, which is kind of a heavy handed thing to do but necessary nonetheless. Because we're gonna be trying import this code into a node environment. And unfortunately as of right now, well, Node doesn't speak jsx, Node doesn't speak import statements.
+
+[00:00:26]
+Node doesn't speak all of ES6 yet, so we need Babble to take care of that stuff for us. We need Babble to transpile our codes so that Node can understand it. So the only one that we're using right now that we need to definitely enforce, that we're not already enforcing is that this transform-es20150-modules-commonjs, we need that to also happen on the server.
+
+[00:00:51]
+So just like we did for tests, we're just going to copy and paste that, but change this to be server. And so on the server, it'll run the es2015 transformation in addition to the es2015 suite and the react suite. Right, but we need to transpile those modules as well
+
+[00:01:20]
+
+>> Brian Holt: Yup.
+>> Brian Holt: Okay, now we're ready to start server side rendering. So go to server.js. And unfortunately, this is just a lot of code all at once. It either works or it doesn't, so let's make it work. First thing we're going to do is we're going to do require ('babel-register').
+
+[00:01:48]
+This is going to make is so our require statements are going to be transpiled through Babel. A necessary evil. It's gonna slow down our server but nonetheless, we still have to do it. The other thing to keep in mind while you're writing this, this file server.js itself is not transpiled so you have to write it in such a way that you don't require Babel.
+
+[00:02:10]
+You can ge around that if you really feel like you need to. The one that people are tempted to use is Babel node. And don't use Babel node in production, ever, period, end of sentence. It's the worst. It's super slow. It's amazing for testing stuff, but it's bad for production.
+
+[00:02:26]
+So don't use Babel node in production.
+>> Brian Holt: I'm going to pull an express. I point express because most people already know it. It's a pretty simple web server. I don't care which one you use. You can use Happy, Happy is amazing. You can use Restify that's what we use at Netflix,.
+
+[00:02:48]
+Whatever works for you and here we just gonna do a tonne of imports cuz we need a lot of stuff. ReactDOMServer = require('react-dom/server'). So instead of doing react-dom.render, we're gonna do react-dom/server to render to string. So it's gonna render our entire app out to a long string. And we're gonna ship that down as HTML.
+
+[00:03:21]
+
+>> Brian Holt: Okay, we're gonna get ReactRouter = require('react-router'). And then we're gonna pull out.
+>> Brian Holt: The server router.
+>> Brian Holt: We're going to bring in lodash, just for it's templeting function. We are going to bring in fs, which is going to read from the file system. It's build into node.
+
+[00:04:07]
+We're going to define a port. I'm gonna use 5050, you can use whatever one you want. const baseTemplate is going to be = fs.readFileSync. This is gonna read something from our file system and it's gonna block until it finishes. This is fine when you're doing a start up for your server.
+
+[00:04:32]
+Obviously, you don't wanna block the thread very often.
+>> Brian Holt: const template = _.template. Again, I'm not particularly interested in the internals of how lodash template works. You can look at it on the docs if you're interested. But suffice to say, it's just a templating function. That's all it does.
+
+[00:04:56]
+So it's going to read in base template, which we imported right here, and it's going to create a templating function. So that's what this template function is right here. Lastly, we're going to bring in app.
+>> Brian Holt: Which is './js/App' which is the one that we just broke out.
+
+[00:05:17]
+But because we're now in, that one is written in ES6 modules and we're doing common js here with require. You have to say .default. Right, because we export the fault. It's weird, but that's how you inner operate between the two. Okay, we're gonna start a server.
+>> Brian Holt: We're gonna do some, /public.
+
+[00:05:51]
+
+>> Brian Holt: server.use/public. This is going to do some static file serving.
+>> Brian Holt: ./public. So that's just saying, If anyone requests something from public just serve it to them with the proper headers.
+>> Brian Holt: And then we're going to say server.use((req, res)) request response. If you're interested in learning more about node, take Kyle Simpsons phenomenal note course.
+
+[00:06:28]
+I feel like I'm just an advertisement for Kyle. That's okay. I'm okay feeling like that.
+>> Speaker 2: Well, actually, the API design in Node course by Scott Moss is a little bit-
+>> Brian Holt: More updated?
+>> Speaker 2: Well, no, it's just like more beginner friendly. I mean, Kyle's is great too.
+
+[00:06:45]
+But, yeah. It's a little bit.
+>> Brian Holt: I haven't watched Scott's, but if you say it's good, then watch.
+>> Speaker 2: Watch Scott's.
+>> Brian Holt: Watch both, okay? Just watch both.
+>> Speaker 2: [CROSSTALK] Is great. Yeah, no, they're both great courses. But I don't know. Scott's is a great intro.
+>> Brian Holt: Okay.
+
+[00:06:58]
+
+>> Speaker 2: If you wanna build APIs.
+>> Brian Holt: Cool.
+>> Brian Holt: Okay, so. We're telling it for every request that what we're gonna do is we are gonna use this particular function. Then here are ReactRouter we are gonna do something called a createServerRenderContext(). So this is the way that V4 ReactRouter does it's server side rendering, it has a two pass system.
+
+[00:07:34]
+What it's gonna do is it's gonna try and render once. If any one side of that you render a Redirect or you render a miss, it's going to return to this in this context, hey I had a redirect, or hey I had a miss. It's then up to you to say okay, one of those two things happened, I'm gonna render again either to that redirected page or to the 405 page, right?
+
+[00:08:04]
+If there's no redirect and there's no 404, then you just worked on the first time and you just serve whatever was rendered. Since we are not doing redirects and we are not doing misses, we don't actually have to do the second pass, but that's how you would do it, is you would check to say createServerRenderContext().
+
+[00:08:23]
+Did you have a redirect? Did you have a 404? Yes or no? If you did, go do the right thing. If not, then just render the correct page. Does that make sense? It's all really well documented in ReactRouter before docs, so just check if you're interested in seeing that.
+
+[00:08:41]
+
+>> Brian Holt: But since we don't have to worry about that concern, we're just going to say let body = reactDOMServer. Oops renderToString.
+>> Brian Holt: And here, we're gonna do some plain old JavaScript react, which we already know how to do because we did it yesterday. Which is gonna feel burdensome after writing JSX.
+
+[00:09:14]
+React.createElement(ServerRouter, {location: req.url, context: context}).
+>> Brian Holt: Okay, and then inside of that server router we're gonna do a React.createElement(App).
+>> Brian Holt: I guess I don't even need to do let. I can just say const right there, so const. Does this look familiar? Do you remember doing this, right? So this is the old way that we were writing Reacts, the way that we first did it before we did JSX.
+
+[00:10:09]
+It feels burdensome now, doesn't it? Like you get used to reading that JSX, and then you look at that as, I don't like that anymore. [LAUGH] At least that's how I feel about it.
+>> Brian Holt: So the way that would look if this was JSX, it would be like ServerRouter location= {req.url} context= {context}.
+
+[00:10:43]
+
+>> Brian Holt: <app></app>, right? That's how that would look. But we just wrote it in the other way. Good, does that make sense? Okay, cool. Okay, so, now body is going to be a long string of the html output of our app after its first render. Now what we need to do is tamper that inside of our index.html and send it down the wire.
+
+[00:11:23]
+So we're gonna do res.write, then we're gonna say (template).
+>> Brian Holt: {body: body}).
+>> Brian Holt: So template is that function that we determined up here. And base template is index.html. And all that body colon body stuff is it says take my body variable and stick it right there. Yeah, good, cool.
+
+[00:11:58]
+
+>> Brian Holt: And then all you have to do is say is res.end, which is gonna actually send it down. And at the very bottom, you're gonna say console.log ('listening on port,PORT). And server.listen (PORT).
+>> Brian Holt: Okay, and that is it. That's how you server side render right there.
+

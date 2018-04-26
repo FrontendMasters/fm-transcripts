@@ -1,0 +1,102 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:03]
+>> Kent C Dodds: Right now, we have this chunk cache that looks to be unique. Unfortunately, when I change the code for one module, it actually changes the chunk cache, for all of my bundles. Which is really frustrating, and there's a reason for that, and it's that all of these. Every single one of these bundles, actually shares code that gets changed, because the chunk cache ID's change.
+
+[00:00:32]
+And so for these bundles to be able to talk to each other, they need to know the ID's of one another. And so it breaks everything. And so you need to extract to that shared piece of logic, to something else and that's what we're gonna do in this next section.
+
+[00:00:47]
+This used to take like. This used to be really hard and now, it's quite easy to do. So we'll look at that next, then we also have extract CSS. So if you want to cache your CSS file, then you can, because right now. Remember we have it being and injected, dynamically into the DOM, if you wanted to have an actual CSS file.
+
+[00:01:09]
+This actually will solve our thrashing issue, that we have. And the reason why we have to load stuff, into the head. So we can actually solve that problem. Now we're gonna talk about offline, with the offline plug, and that's pretty short, and it's pretty amazing. It's really, really cool.
+
+[00:01:27]
+That was pretty quick and then we're gonna deploy. So this is the and then we have resources. So we're pretty close to being there, let's just actually get an example of this, if I go and run an npm run build:dev.
+>> Kent C Dodds: And, actually sorry, let's get everybody on the same page.
+
+[00:01:54]
+This is the branch I want to check out, to get on the same page as us. It's FEM/06.0-commons-chunk.
+>> Kent C Dodds: It looks like, somehow I have diverged. I probably forgot to force push, something for y'all. So might be a little different. I'm not sure what that might be but, here let me just see something really quick.
+
+[00:02:29]
+
+>> Kent C Dodds: So this is the diff, of our most recent command. I'm not sure what changed, so sorry, but I'm sure it doesn't matter. [LAUGH]
+>> Speaker 2: [LAUGH]
+>> Kent C Dodds: Okay, I'll make sure that I look at it later and if it is important, then I'll make sure to push it ,so you all can look at it later.
+
+[00:02:48]
+So, let's take a look at this problem. So we have our, in our disk directory. Hold it, mpm run build:dev. And dev, it doesn't actually use the chunk cache, so we need to do the actual build to show the problem. Unfortunately that takes a couple seconds, but I'm gonna go ahead and open up.
+
+[00:03:07]
+The app folder and in here, let's say. I want to console.log ('foo') right here, we'll go to the directory tree and look at that. So just remember this in your mind, that app js, is 4234. That's just how it starts and vendor is, 21E33, so then if I saved app js and rerun the build.
+
+[00:03:34]
+
+>> Kent C Dodds: [SOUND] Jokes, [LAUGH] then we open this up, different number both of them are different. So it's good, the app is different,vendor is different. That is not what we want it all. And again it's because, these things all of these things are actually sharing code between each other, so that they know the different ID's.
+
+[00:04:00]
+And so we need to take that idea to Montreal mapping and put it in a separate place, that's totally outside of all of the bundles. So that they can all just reference that. So basically what this mapping is, what we're about to do. Is it's going to take the mapping it's just an object that has all of the references to the modules.
+
+[00:04:22]
+And it's, we're going to inline it into our HTML. And so this is yet another reason why it's awesome to have this HTML, Webpack plugin, because it'll take care of this. Problem for us and it's so much, easier than it used to be. So the first thing that we're gonna need is a plugin, that is called, we'll put it somewhere in here.
+
+[00:04:48]
+Like I said, normally you'd install this just with npm install. But it's the inline manifest.
+>> Speaker 2: [LAUGH]
+>> Kent C Dodds: Inline-manifest-webpack-plug in. And it's 3.0.1, is the plug in that we're gonna use.
+>> Kent C Dodds: Or the version of the plugin and then. And then we just use it in our Webpack config, so lemme hide that thing.
+
+[00:05:24]
+So I'll go to the top of our config here, const and it's InLineManifestWebpackPlugin require ( 'inLine- manifest-webpack plugin').
+>> Kent C Dodds: One of my favorite Adam plugins you're asking, other, somebody is the one that auto completes my packages for me. Yeah, that one's awesome. And it does more than that and also like, I will do other files as well.
+
+[00:05:54]
+So what? Snap. Love it. So then we're gonna take that plug-in and this is one, that we actually only want in prod as well. So we're gonna say ifProd. We're gonna take a (new LineManifestWebpackPlugin()). And then we're gonna do something fancy with, this CommonsChunksPlugin, because. This is going to create a chunk for us, called manifest.
+
+[00:06:26]
+And so we're going to turn this into an array of entries or chunks, that we want to have separate and we're gonna add manifest to that. And then actually the InlineManifestwebpackPlugin, integrates with the HTML Webpack plugin. To say I want you to inline this code ,or this JavaScript code into the index HTML.
+
+[00:06:52]
+And all that JavaScript code is setting a global variable, for that mapping. So actually there is yet one more thing that we need to do, for that magic to happen. And that is to update our template, or index HTML template. So we're gonna want this right at the top of our file.
+
+[00:07:16]
+And by default the HTML Webpack plugin uses something called the EJS, as the template syntax, so here this is all just like regular HTML. It's actually template and so we can utilize that template stuff, if we know how to use that. I don't use this template language ever.
+
+[00:07:38]
+But right now I am and we'll say htmlWebpackPlugin.files.webpackManifest. So this is all like, reading the docs and pretty much copying stuff. I can't really explain why that's, what it's called but that's. This is just kind of a copy paste, from docs and it works great. So basically, in this template, it's compiled with an object that has html webpack plugin and it files on it.
+
+[00:08:06]
+And then the inline webpack manifest plugin thing, adds an item onto the files array, called webpackManifest. So you're gonna inline it right there. Okay, so with that, now you can run the build and.
+>> Kent C Dodds: I should have like pulled react and D3 out of this, so it wouldn't take so long to minify all that stuff.
+
+[00:08:36]
+But if you look at the resulting index HTML, you're gonna see a script tag right here that has the minified runtime for Webpack. As well as the mapping that's in line, into that runtime. There's the mapping right there.
+>> Kent C Dodds: And this has like, so this is responsible for the Webpack JSON P thing, that will asynchronously load modules.
+
+[00:09:05]
+As well as everything else that Webpack does for us. So now bundle.vendor and bundle.app, contain only the code that's necessary for them to exist. For them to, like only the code that we have in those files, so if we like a bundle.app, well, good luck with that. But believe me, that's what's happening.
+
+[00:09:27]
+So now if I go back here and do, open up the source.app directory. And then I and this console.log ('foo'). So I've made a change to the app, you would expect that the app, is the only one that has a change in the ID we can actually. We don't have to memorize any numbers, we can actually see what it will be or compare right here.
+
+[00:09:55]
+So if I run this again I'll silent npn output as well. So we have.
+>> Kent C Dodds: So with before, we had app 749 and vendor is 8F1, so vendor is still 8F1 and app is no longer 749. Exactly what we want and now we can configure our server to say, every asset is cache forever.
+
+[00:10:29]
+And so we don't need to worry about, setting timings or having browsers with old versions of our code. All of those worries just, kind of go away and we can start having webpack update our index.html, anytime something changes. And the index.html is never cached, per the browser spec.
+
+[00:10:54]
+So any questions about all that magic, that just happened. I call it magic, because that's exactly what it is.
+>> Kent C Dodds: Okay, hopefully at least, what it's doing is making sense. I know that in the pre event survey, some of you. It sounded like you kind of knew, more a lot of this stuff.
+
+[00:11:14]
+But just didn't know, what it was doing, or how, or why. So hopefully you're getting some of that, out of this maybe.
+>> Speaker 2: Yes.
+>> Kent C Dodds: Just say yes, to make me feel it.
+>> Speaker 2: [CROSSTALK]
+>> Kent C Dodds: [LAUGH]
+

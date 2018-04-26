@@ -1,0 +1,78 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:03]
+>> Jon Kuperman: So I hope that it was easy to find that there was a problem, but I'm assume, as is usually the case that it was much harder to figure out what the problem was or how to fix it. I think that's usually the way it goes with memory leaks.
+
+[00:00:17]
+But so I would start off, I think I put some hints. I'd start off with a Timeline recording. I just always start with a Timeline. I don't know, I guess it's probably I'm most comfortable panel but it's also the easiest view in my opinion to see for having a problem or not.
+
+[00:00:37]
+So I expanded all the way out, yeah. So this time, sorry, instead of doing the on page load, we wanna actually make a recording of the page being loaded. Because we're not looking for memory leaks with the page loading which is almost never the case. So if you're looking for memory leaks, you wanna do one of these, start and stop, after the page is loaded.
+
+[00:00:57]
+And here's kind of one of the jigsaws like I was talking about so we've got kinda two different jigsaws going on. So we've got this nodes one is a very classic jigsaw if I may say so myself, just more and more and more being allocated. And it never being garbage collected.
+
+[00:01:14]
+And then this JavaScript heap. This is another pretty common pattern which is that it's generating a ton of code somewhere, a lot of memory. And then garbage collection kicks in and it's dropping. Except we can see that each time it doesn't quite drop all the way. So it is getting higher.
+
+[00:01:31]
+So they're both jigsawing. So we've got two problems. One is some sort of elements being created somewhere, I recognized these nodes. And then alternatively we've got some kind of loop or iteration something's going on that is being garbage collected but not all the way. So knowing that there is a memory leak, the next thing that I would do is go into the Profiles panel.
+
+[00:01:55]
+And I probably just kinda refresh the page. And get a Heap Snapshot just like where are we at from a fresh page. And you can play around here a little bit, seeing what the biggest thing is, there's kinda give away already in here. So the biggest thing by far are these strings, full of the letter x and some other stuff.
+
+[00:02:16]
+And the second biggest thing are these arrays. So again, I guess I like to take the approach before I dive too deeper just hitting all the panels. And trying to get in my head, getting in the head space of what the problems likely are. Before I have to dig into the code to be, but you know it's all those videos that I have on the page.
+
+[00:02:36]
+So now here I'm, okay so we've got JavaScript and we've got some elements. Now we've got strings, we've got arrays, I'm trying to keep in mind everything that's going on. So then yeah I guess hit this Do some work button, give that a second then I go back to Profiles.
+
+[00:02:52]
+And take another Heap Snapshot. So at this point, I've got two, I can see there dramatically different in size. So this one 61 megabytes, this one's only 11. And then I can switch from the Summary view to the Comparison view and compare it with Snapshot 1. And again we have this huge Size Delta of these strings which is the same kinda xxx-string.
+
+[00:03:15]
+So from there, there's a couple of different ways that you could go at it.
+>> Jon Kuperman: It gets a little bit tricky as again, it's not as simple as when you're doing those JavaScript profiling, that's as accurate as you can be. Cuz it'll be, this line of this file caused this thing to happen, right.
+
+[00:03:34]
+Whereas, with the memory allocation a lot of times it's like, it can tell you what it's experiencing. That you've been requesting a ton of strings or something like that but it's not quite as accurate as like, bam here's where all the strings are coming from. Because those variables, those data structures come from multiple places, right.
+
+[00:03:54]
+Lots of things can generate strings or arrays or things like that. So if we wanted to, we could have used some of these tools as well just to see that it's kinda growing. It all kinda gets you the same information, right, like memories growing, stuff like that. So yeah, from here we can kind of, I mean we could do it a couple of different ways of going through.
+
+[00:04:14]
+I thought somebody had asked what distance was, it was a really good question. I don't know how useful distances but the distance is the distance from the global object basically. So it's in this case since around web, Windows the global object so it's like your how many steps it takes to get to this element from Window, yeah.
+
+[00:04:39]
+So yeah basically about all these strings and I saw a lot of people I know some people were like running the button over and over again and seeing that it was crashing or whatever. So one approach that might be interesting to take is you could go back to this button kinda keeping it a little bit more old school like we're working on before.
+
+[00:04:55]
+And looking at Event Listeners or something like that. Why don't I, uh-oh.
+>> Jon Kuperman: I'm not seeing it, hold on a second.
+>> Jon Kuperman: No, all right, maybe we can't do that. There should be an Event Listener in there somewhere. I'm wondering if it's just that it's going through jQuery.
+
+[00:05:22]
+And it's not registering as an actual Event Listener. I have to look into that, that might be what it is. Although jQuery should be adding the Event Listener. Anyway, sorry about that. So yeah basically, that's not even going through jQuery. Basically what's going on here it's just some memory leak that I thought of writing really quickly.
+
+[00:05:44]
+But it's got two different problems to it. The main thing is that we've got this setTimeout which calls grow and then grow which calls setTimeout so it's a circular reference. It's a very, very vague form but another common form of memory leaks in JavaScript if you have foo has some mention the bar and bar has any mention of foo.
+
+[00:06:07]
+Neither can ever be garbage collected because they'll both forever have a reference to each other. This one's even more severe because it's actually calling it over and over and over again. So you get this infinite, in an infinite loop of calling it. And then I just have this, I don't know, some huge leap, I think arrays money wrote this code.
+
+[00:06:24]
+And I found it on some memory leak website but basically it just goes from a hundred down to zero. And it creates a div and it adds a bunch of date time to string kinda things. And then it just appends those Child. So there's two different things going on that's where we saw, with the grow, that array is able to be garbage collected.
+
+[00:06:45]
+Which is why you are seeing the actual JavaScript blue kinda able to go up and down. Stuff that's being appended in the nodes category that was the one that we saw it was, sorry, a very classic jigsaw, none of that ever getting garbage collected. So yeah basically you can, [LAUGH] anyway, looks like I don't have a Event Listener which is why I didn't see an Event Listener.
+
+[00:07:08]
+Unless I think I must have removed that but so that's the basic kind of concept of there. Again, these things are gonna be really easy to spot and really hard to fix. Just because there's not a one-to-one mapping on, this memory comes from this line of JavaScript. It doesn't have that capability, it's more, you're allocating a ton of strings or a bunch of objects or arrays.
+
+[00:07:30]
+And you kinda use the tools between Timeline and Profile to get a better idea of what's going on. But yeah, I mean ultimately it's gonna come down until you either taking a profile approach, or you looking through your code. And trying to figure out what's causing those kind of things.
+
+[00:07:46]
+Is that pretty clear at least being able to identify that there are problems was clear for everybody, cool.
+

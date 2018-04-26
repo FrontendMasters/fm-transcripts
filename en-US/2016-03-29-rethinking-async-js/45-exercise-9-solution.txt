@@ -1,0 +1,115 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:03]
+>> Kyle Simpson: CSP, probably for several of you, a bit brain bending. Still brain bending for me, and I've been at this for awhile, so that's okay. Don't run away from those things that twist your brain a bit. My instinct is when I see something that is twisting my brain, and I'm not really sure I understand it, that's the thing I run towards because I feel like there's probably something I'm missing and it's probably really, really powerful and really, really useful.
+
+[00:00:28]
+So I encourage you to embrace that. Rather than fully
+>> Kyle Simpson: Fully develop the solution for you from scratch, I'm going to switch over to the fixed version and just walk you through the different pieces and why they're there, partly that's just not to overwhelm so much and partly to save time, so we can get on to our last exercise.
+
+[00:00:54]
+All right, so what I'm first doing here, this should look familiar from the reactive solution. I'm setting up a channel for each of the clicks and messages. So I'm going to use channels for my communication rather than observables. That should make pretty straightforward sense and then I have my runner which is going to run my two go routines.
+
+[00:01:18]
+I'm gonna have one for sampling the click events and one for logging out those click messages. So those are my to go routines that are gonna run. Now I'm also going to listen to the clicks from the button. So lets look at what listen to clicks is doing.
+
+[00:01:33]
+What I'm doing is I've got a variable called queued click, it's kind of like what latest was in the previous one. But queued click is going to keep the return value from putAsync. Remember I said putAsync would return as a promise that would let us know whenever the put had been accepted by the channel.
+
+[00:01:53]
+So I'm gonna take advantage of that and say, I don't want to queue any more clicks until I know that the previous one has already been accepted. So it's a way of sort of simulating in a non go routine, that back pressure thing. So I'm gonna store it off into a variable only if it hasn't been stored off in a variable, and I'm going to listen to the completion of that and that's when I'm going to clear it out.
+
+[00:02:16]
+So only one click event is going to be able to go into the channel, be pending and waiting at a time rather than them stacking up. That's how I'm gonna prevent that because there really isn't a direct way or even a proper way of draining out a channel.
+
+[00:02:32]
+So you're not gonna wannna go down that direction. So here rather than doing that, I'm going to simulate the back pressure by just knowing that it hasn't been received yet. If I were inside of a generator here, I wouldn't need to be storing off and listening to a promise, I would just yield on the put.
+
+[00:02:49]
+But I'm not inside of a generator because this function's being called by a click handler every time. So that's why I have to go the extra route of dealing with something as a promise. This is one of the reasons why I said earlier, that these higher level patterns even though they're much more powerful and they do offer some really nice affordances that the lower level patterns don't, they're not fully replacing the lower level patterns.
+
+[00:03:13]
+We still need to understand what a promise is because there's gonna be times when a promise is gonna be useful to accomplish something. So let's take a look at sample clicks. I'm gonna have a while true loop spinning and I'm gonna take from a 1,000 millisecond timeout channel And I'm going to take from the clicks.
+
+[00:03:37]
+So remember I'm only allowing one click to go down. So I'm gonna sit here and wait until there is a click ready for me and then I'm going to put a message out. And here's my log click. I'm going to sit here waiting for somebody to put something on to the messages channel and I'm going to append what I get to the list.
+
+[00:04:02]
+
+>> Kyle Simpson: Not terribly dissimilar from our reactive solution in terms of how we split it up. So hopefully that made at least a little bit of sense. There is one difference that I do wanna point out just in the interest of full transparency here. When we're sampling, we're throwing away all old events and here, we are throwing away events by just not even putting them into the queue.
+
+[00:04:30]
+So we're actually storing the first event that happened, whereas in the reactive observables thing, we were keeping only the last event to happen. So if you had a thousand events a thousand button clicks between now and the last time the timer fired. We only use the last event and here we're using the first event and throwing away subsequent.
+
+[00:04:54]
+So there is a slight difference there conceptually. As with the reactive, there are 100 different ways that you could've modelled this differently. Some of those may have ended up producing different behaviors there, but I was going for the simplest way to illustrate the same kinds of concepts here.
+
+[00:05:17]
+So, questions about csp.
+>> Kyle Simpson: Maybe we're just in that my brain is completely melted. I couldn't possibly formulate a full English sentence anyway. I get there too, its no problem.
+>> Speaker 2: I'm just trying to do something simple and it's not not working. So we could back up and say why can't I just print something on the screen, but that seems to be like a waste of everybody else's time.
+
+[00:05:48]
+
+>> Kyle Simpson: Okay well, over a break or at the end or something, let's talk through it.
+>> Speaker 3: Yeah, is it always used with generators or almost always used with generators?
+>> Kyle Simpson: Generators are the way to model a Go routine most directly in JavaScript. If you didn't use a generator, you'd be doing a lot of extra work to make your own state machine stuff.
+
+[00:06:07]
+And you wouldn't get the benefit of that synchronous semantic the way you want.
+>> Speaker 3: So the power comes from these channels plus the generator together?
+>> Kyle Simpson: Yeah, yeah, exactly. If you already learned the power of generators, which is the synchronous sequential-looking async, then you layer on the semantic that channels give us, that blocking, back pressure semantic.
+
+[00:06:30]
+That's what CSP is giving us.
+>> Kyle Simpson: All right, before we go on to our last exercise, I wanted to just show you something. This is an in-process work of mine. I started about a year ago thinking about this problem. When I first started getting into CSP, it was one of the first things that occurred to me and then I realized very quickly when I was implementing my own CSP stuff, how hard it would be to do this thing that I had dreamed of doing.
+
+[00:07:09]
+But I thought in the back of my head, one of these days, I'll get around to trying my hand at it. And then about three months ago, I got invited to speak at a conference and I was like, you know, I'm gonna propose that I talk to them about this moonshot that I'm not even sure is possible.
+
+[00:07:27]
+So I gave myself a deadline by which I would have to do that and that deadline is a week from now. So what I'm gonna show you, it's the first time I'm showing this, what I'm gonna show you is a proof of concept for a solution to this idea that I came up with and it's directly related to the CSP stuff.
+
+[00:07:47]
+What's happening here in our CSP is that we're modelling these generators, I mean we're modelling these processes as generators within the same JavaScript program, which is great because we get the independence, the semantics of blocking, and all of that stuff. But from a performance perspective, these generators are not running on separate threads.
+
+[00:08:06]
+So we're not really getting the full power of something like Go or Clojurescript the way they model stuff. We're not getting that because we're not actually using multiple threads here, multiple processes, we're using one single blocking JavaScript event. So about a year ago, I was wondering to myself, I wonder what it would be like if I could create a channel for usage with CSP, where the channel itself was implemented as a bridge to a remote thread.
+
+[00:08:38]
+What if I could have the same Go routine, like the one that's on line 27 to 35. What if I can have that in the browser and then the ones from line 38 to 43, would if it could be on the server? Two different go routines that could communicate with each other exactly the same way using the channel semantic and have the channel figure out how to bridge across a remote wire.
+
+[00:09:05]
+And I thought at first that sounds not that hard and then as I got into the implementation of it, I was like holy crap, that's really hard to do because there's a whole lot under the covers just to make these channels work. This is not an easy implementation.
+
+[00:09:20]
+So I put it off for months and months and months and then I said three months ago I said, I'm going to get around to trying. And at that point, I was about 30% sure that it was even possible. I was like well, why not? Let's propose a conference talk and see whether I can make it happen.
+
+[00:09:38]
+If not, I'll fall back on one of my other talks. So I've been working on it for the last several months in all of my very limited free time. And about a week ago, I got the first message to cross the thread barrier across the process barrier, not between browser and server, but now that I've proven that I can do it here, I can easily do it over the wire.
+
+[00:10:00]
+When I started which I thought would be a lot easier to develop is what if I could do this between the browser and a Web Worker, have a remote web worker that I could spin up a Go routine in? And if I could do it in one of them, then I could spin up 10,000 Web Workers with 10,000 independent Go routines and communicate with all of them through channels.
+
+[00:10:18]
+So my proof of concept was good. I could spin up a Web Worker with a Go routine and spin up the browser with a Go routine and have them do blocking communication. And what I decided to illustrate that with is, I would have the Web Worker do some blocking activity like run a fore loop all the way up to like 1 trillion which would take several seconds, which would block the Web Worker and if that code was running in a browser, it would block up the browser page.
+
+[00:10:43]
+So could I let that happen in a Web Worker while my web page continued to be interacting, and then as soon as the Web Worker was ready to take and send a message, then the message would go through. So that was my proof of concept and this is networking.
+
+[00:10:59]
+So right now, the Web Worker is running a loop up to 1 trillion and then there, whatever that number is and then it sent me that message along. And while it was running in the background, my browser remains completely interactible. So that doesn't look impressive at all, but holy crap, was that a lot of work to get!
+
+[00:11:19]
+I mean I've spent months trying to figure out how to get this to work and developing the protocols for the back and forth messaging, because with CSP, you have to know that the message got to the other side. So there has to be an ACK involved, where you let it know and you don't know, when you're sending a message out, you don't know if somebody else is sending a message in, and what's the sequencing.
+
+[00:11:37]
+It was a lot more work than I thought, but I finally got a proof of concept for remote CSP channels with JavaScript. So now with that protocol in place, all you have to do is write a very simple wrapper for Web Workers, which I now have, write another one for cross frame communications, write another one for web socket communication to a server, basically any remote process that you can dream up.
+
+[00:12:00]
+You can now use a channel to send CSP messages back and forth so. That's where I'm at with CSP, I'm trying to dream up doing really powerful stuff like even having truly remote, truly independent, truly threaded processes, even on Node where Go is the one that kind of like wins in terms of being able to spin out 10,000 lightweight threads or whatever.
+
+[00:12:21]
+It's not gonna be hard at all to spin up an adapter for the child process and Node, so I'll be able to spin up 10,000 child process threads, very lightweight and have each one of them with their own Go routine and split up large amounts of work into a very highly current system.
+

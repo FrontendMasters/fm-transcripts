@@ -1,0 +1,93 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:04]
+>> Scott Moss: So the first thing you had to fix was this file stings. So normally, if you ever used Karma before, this is where you pass in just tons of files here.
+>> Speaker 2: [LAUGH]
+>> Scott Moss: Angular marks, angular this, angular that. Borrow this, borrow that, and you'll pass in all this stuff, and then you'll pass all your source code.
+
+[00:00:23]
+It's like, here's all my source code. And then underneath that, now here's all my test, right? You'd have this array would be like, 30 files. 30 glop patterns of files, it'd be so much stuff. But now we don't have to do that because webpack is going to bundle everything for us.
+
+[00:00:38]
+All we need is one file. So, we pass an object instead, that gives the path of the file and to just say, just don't watch it. So, that's the easy win. How could you have that figured out? Two things, you could have just looked and seen that there was a file down here and read the comments in it.
+
+[00:00:54]
+Or check out this preprocessor what we were doing down here, some big hints. And speaking of the preprocessor, this is telling Karma what to do with the file before it sends it off to Mocha in the browser. So it was like, hey, before you do that we want you to run it through webpack and we also want you to run it through the sourcemap plug in.
+
+[00:01:15]
+Sourcemap plug in just creates a source map. So for whatever reason the tests start acting weird you wanna figure out what's going on in the test while it was running. Source map will allow you to like, when it when we run a test and Chrome pops open, allow you to go is that Chrome window and look at the dom and look at the source maps for all our stuff.
+
+[00:01:32]
+So you can figure out where in the test everything is breaking. So it's pretty cool. So run it through that, preprocess it, and then the webpack, this is the exact same object that the webpack config takes. So we just put an inline source map here. And then pretty much copied everything over, except there was a regex in the webpackconfig.js right here, so this is webpackconfig.js.
+
+[00:01:56]
+There was a regex to exclude all the spec files. Definitely wanna exclude them here, because we don't want the accidental chance of compiling our spec files into our production code. That just really won't work, in fact it will break. If you try to run it and describe inside your production code, it just won't work.
+
+[00:02:14]
+So that's why that's there, but it prevents us from just copying this whole thing and placing it over here. So that's the only one change you gotta do is get rid of that. And then this stuff was already here, cool. That was pretty much it. Everything else is pretty much set up for you here.
+
+[00:02:30]
+So if we head over to, where is it at, I have the go file, sorry. Spec.bundle.js, so here's the crazy stuff. Here's the the bee's knees of what's happening with the testing. So in short, what's happening in this file, think of this as apps/app.js, this is the entry file to our tests.
+
+[00:02:53]
+This is what webpack is going to use to bundle our tests. And we do it completely differently than what we've been doing app.js as far as importing stuff and I'll show you why. So we import angular at the top and angular mocks. So the approach before was like just import everything you need into individual file, so we can get rid of these two things And just import them independently in every spec file that we do, which is cool, because that's what we do in a production code.
+
+[00:03:22]
+But for testing, I decided to just put them here, cuz they'll be at top of the file and everything will be fine. So, I decided that one is because it's going to get attached to the window, so angular mocks will be, it's gonna attach inject and it's also going to attach module to the window.
+
+[00:03:39]
+So I didn't really feel the need to import it over and over and over again. It's going to be a window thing. So was angular. Angular is gonna be attached to the window, inside of whatever browser we run karma in. So I'll just put them at the top to make sure that there before anything else happens.
+
+[00:03:50]
+And this is where it gets crazy. So require.context. You had a question over there? You had a question? Okay. Require.context is something that webpack has added, and I think is really cool when I found out about it. So basically what's happening here is, I give it a path and the second option is do I want to you know dig recursively or not and the third option is the rejects to test for it.
+
+[00:04:16]
+So what this is saying is, look inside this directive recursively, and find me all the paths that match this. So find me every single file that has spec.js. That's what that's saying. It's like a glob pattern almost, pretty much. And then what it's gonna do, it's gonna return this function over here called context.
+
+[00:04:39]
+
+>> Scott Moss: So context is a function that has a property on it called keys, which just returns an array of all those path names. So if we were to console.log, context.keys, we'd see a an array of all the spec files, in fact let's just do that. So you can see, I'll just console.log this and we'll see it in the terminal.
+
+[00:05:01]
+So you can see what's happening, because it's kind of confusing.
+>> Scott Moss: So let this thing boot up.
+>> Scott Moss: Yeah, so I think we are only gonna have like two files. So we only have one file. So it's an array of those actual files. So any file an in app that has .spec.js will be inside of here.
+
+[00:05:22]
+So that's what context.keys is. So, then we loop over those arrays with .forEach and the actual context function itself is going to require those paths. That's what it's going to do. It's just like calling require on those things, which will load those files up. So we're saying, loop over all of those paths and require each one of them, and load them up here.
+
+[00:05:46]
+That's what it's doing. So, just like going, okay, I'm gonna require blog.spec.js. That's what it's doing. It's just doing this for every single file inside that array, which is gonna load them up here. So it's just a way of not having to manually do them. You could do this manually, you can just go ahead and like, all right, here's a spec file, require that.
+
+[00:06:07]
+Here is a spec file, require that. That's cool. Or you can just do this, which is way faster. Any question on this one? Yes.
+>> Speaker 2: Hey Scott, it's a little off topic, but was wondering if you could say a few words on what would be different about this if we were using jspm.
+
+[00:06:22]
+
+>> Scott Moss: You would not need this file in jspm. You would be doing most your work in this karma file. With jspm, it's really a lot harder to work with jspm because what's gonna happen is, the issue around jspm is the fact that the actual imports and requires are not relative to the file that you're importing, requiring from.
+
+[00:06:49]
+They're relative to whatever you tell system.js is the entry, which is usually the folder that you're serving. So, this case it would be dissed. The problem is, is that when you do that, it confuses karma. And karma doesn't know how to resolve those URL's correctly. So, you have to set up proxies.
+
+[00:07:07]
+So, you have to come down here. The only way I got it to work was set up a proxy and you have to have it say something like, I don't know the exact syntax of how karma does proxies. But you'd have to say, if you see something that has app in it, you should redirect it to something else, to get it to work.
+
+[00:07:28]
+Otherwise it just wouldn't work. I kept having the same issues with that. But other than that, JSPM its own plug ins that you have to use with karma. There's a karma JSPM and if you're using Babel, use Babel. Other than that it's about the same thing but you definitely don't need the spect.bundle thing right here, because system.js is going to run your code, it's gonna run your code in the browser, like your ES2015.
+
+[00:07:52]
+It's like, in memory, it's gonna run it in there. So it doesn't need to create a bundle.js. It's gonna run it in the browser. It's kind of crazy. You only create a bundle with JSPM when you're like production. You're like cool, I'm going to create a bundle, let me run this.
+
+[00:08:06]
+But other than that system.import will run it without you. It will transpile it at run time. It won't build it and then serve the build it file. It'll just run it at, or it'll transpile it at runtime, which is great but hard to set up. Cool, so yeah, any other questions on spec.bundled.js?
+
+[00:08:35]
+
+>> Scott Moss: This one is tough. If you've got questions let me know, this one is really tough. It's only four lines but it's really tough, that's why I wrote a story in here.
+>> Scott Moss: Okay, so again the concept is, we're just requiring all the spec files. I didn't feel like doing them one by one.
+
+[00:08:52]
+That's the only reason why these two lines exist, cuz I just didn't feel like doing them manually. I would rather spend four months trying to figure these two lines out, than write that stuff manually. I just don't.
+

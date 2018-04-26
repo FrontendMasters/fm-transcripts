@@ -1,0 +1,120 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:04]
+>> Jafar Husain: Got a question in the back?
+>> Speaker 2: Yeah, the question, so this is a way to stop the race condition?
+>> Jafar Husain: Yeah, this is a way, exactly, that's a great way of putting it. If I subscribe to two different events, they're gonna fire to me at whatever order that they come out.
+
+[00:00:16]
+They don't care that I subscribed to this event first, and that event second. You're not gonna wait until all the data from the first event is done before you start getting messages from the second. That's a very hard thing to do usually in concurrent programming, and that's the way you would do it.
+
+[00:00:28]
+This is what you use when you wanna order events. You wanna say, look, I'm only interested in this event after these events have occurred. Does that make sense? Another question?
+>> Speaker 2: And then the next one was, can you give another example of observables like the cake cutting example?
+
+[00:00:46]
+
+>> Jafar Husain: So sometimes these things can be a bit abstract and they defy metaphor, but we're gonna try. So let's give an example. Now, instead of dispensing slices of cakes, I'm gonna dispense cakes, right? So, in this case it's the observable, so I'm just gonna start throwing cakes at this poor woman.
+
+[00:01:04]
+Now I'm throwing whole boxes of cakes at her, right? And now, you're gonna try, and before I throw you another cake, you're gonna try and cut that cake up and then hand the individual slices of the cake around. Does that make sense? A cake is a collection of slices and I'm pushing one at her and she's gonna then turn around and start cutting as fast as she can, cutting cake slices and then throwing them at the other people in the room, right?
+
+[00:01:27]
+But while this poor woman's cutting up cake, I might take another cake and throw it at her, right? But what does she wanna do? She wants to make sure that everybody in the right order in the room gets their cake in the right order. That nobody gets their cake before anybody else.
+
+[00:01:39]
+So even though I'm throwing cake at her, what she's gonna do is, if she's in the middle of cutting a cake and I hand her a big cake, she's just gonna sort of put it aside. She's just gonna put it aside and she's gonna cut the slices and hand them out in sequential order to the people next to her.
+
+[00:01:52]
+Does that make sense? So I might be throwing cakes like crazy real fast, right? But you're just piling up the cakes next to you, right? And as you can methodically get to them in order, you're handing out slices, and that's the buffer of observables, right? I've handed you a cake, right back here.
+
+[00:02:10]
+I've handed you a cake, that second observable, this observable right here. I've just handed her a cake but she's not done cutting the slices from the second observable and handing them out yet. Does that makes sense? So that's like an observable of observables, right? The individual cake is a collection of slices.
+
+[00:02:23]
+But we also have a collection of cakes, and that's the outer observable. The inner observable is a collection of slices. Outer observable is a collection of cakes. Does that make sense? Another question.
+>> Speaker 2: Would you ever have a case where one of the subobservables never completes, therefore restricting the forEach method?
+
+[00:02:37]
+
+>> Jafar Husain: Great question. Great question. Absolutely, if I give you, and I know this is where metaphors tend to break down. But I give you a magical cake, an Alice in Wonderland cake, where the slices never end, right?
+>> Speaker 2: Throw printers.
+>> Jafar Husain: [LAUGH]
+>> Speaker 2: Throw a printer with unlimited paper that keeps printing forever.
+
+[00:02:53]
+
+>> Jafar Husain: Sure, that works too, I guess. So now I've given you this magical cake, right, and then you're never gonna get to any of the other cakes I give you. You're just gonna keep handing out slices from this magical cake that never. In the meantime, your buffer of cakes, I'm just gonna keep throwing cakes at you, but you're just gonna keep piling them up, forever.
+
+[00:03:10]
+And so yes, you would not want to use concatAll on an infinite stream. Probably not a good idea. Does that make sense? So these are hazards to be aware of. You don't wanna try and concatenate an infinite stream to another stream cuz you're never gonna get to the other stream.
+
+[00:03:23]
+So great question.
+>> Speaker 2: What makes a mouse move event not an infinite stream? Because eventually the mouse stops moving, but I mean what if the mouse never stops moving?
+>> Jafar Husain: The mouse is an infinite stream. Because we've gone from a DOM event which has no notion of completion onError, that was the missing piece that the design patterns guy didn't add.
+
+[00:03:41]
+And we've adapted it into an observable. But because the underlying source never says I'm done and never gives you an error, the observable that we've adapted it to will never say I'm done or never give you an error. It's perfectly reasonable and okay to have an observable that goes on forever.
+
+[00:03:54]
+And that might seem odd at first and it seemed odd to the design patterns guy, and it will, actually, sorry. That's what seemed natural to design patterns guys to have a stream go on forever because they were thinking about a UI event. But when you start thinking about observables, I mean what can you do with a collection that goes on forever?
+
+[00:04:08]
+It seems impossible. It's hard for us to imagine the infinite, right? But it turns out because of DOM events we work with collections that go on forever all the time, right? Those are all collections go on forever. The difference is we have to manage, we as the consumers have to say whoa, no more cake.
+
+[00:04:25]
+Stop listing at the right time, and that usually takes a lot of work and coordination. And it's that that I'm gonna show you how you can avoid today. I'm gonna show you how you can deal with observables that are infinite and combine them together with observables that are finite, all using simple commands without introducing a bunch of variables to keep track of what's going on.
+
+[00:04:40]
+Another question in the back. So on this example, if the observable ended up throwing an error between 2 and 3 would 4 be prevented? So what would happen is if an observable throws an error between 2 and 3, the outer observable, rather the flattened observable, would, imagine a little x there between the 2 and the 3.
+
+[00:04:59]
+And then you'd never get 3 and 4. The whole observable would stop because any error inside any of the inner observables is forwarded up to the outer observable and as soon as you get an error the whole thing is completed. You're never gonna get any more data. So remember, an observable works this way, you can get onNext, onNext, onNext infinitely, but if it doesn't, it's gonna end with either an onErroe or an onComplete.
+
+[00:05:20]
+And so if we got an error between the 2 and 3 it would be forwarded up and the stream would stop right after that error's arrived. Does that make sense? Yep, question?
+>> Speaker 2: Will an inner observable still be iterated over even if you call dispose of its outer observable?
+
+[00:05:40]
+
+>> Jafar Husain: No, what happens is every single time I call forEach on any of these inner observables, we get a bunch of little subscriptions, right? When I call forEach over the outer observable, I get a subscription object which I can use to stop listening to the stream. But every single time I call forEach on any of these inner observables, I also get another subscription object for just that tiny little stream there.
+
+[00:05:57]
+If you call dispose on the stream for the flattened observable, what it's gonna do is it's gonna take a look. First it's gonna call dispose on the outer observables. It's gonna say I don't care about any more cakes. I don't want any slices. All right, so I'm gonna stop listening for cakes.
+
+[00:06:10]
+And then if you're currently cutting up a cake, right, let's say you're the one doing the flattening here, right? You're just gonna stop cutting up that cake. Does that makes sense? So calling dispose on the subscription on the flatten observable will end up calling dispose on the outer observable subscription and whatever inner observable you're currently listening to, if you are listening to one, right?
+
+[00:06:28]
+Because you might be done with the inner observable and the next inner observable hasn't arrived yet. Does that makes sense? In this case they all overlap but they could arrive over time, these observables might not overlap at all. Yep?
+>> Speaker 2: Got at least two more here. How does concatAll know what pattern to follow?
+
+[00:06:43]
+
+>> Jafar Husain: Well, this is the pattern of concatAll. So, concatAll's job is to make sure that all the slices are handed out in order. And so it knows that if it receives an observable before it's finished with another observable, it has to buffer them up and make sure that it only subscribes to the observables in the order in which they arrive.
+
+[00:07:00]
+And if it does that, naturally what'll happen is the flatten will happen top to bottom, left to right. And you'll get all the items out in the order of the collections that they are inside of arrive. Does that make sense?
+>> Jafar Husain: Okay, so yep.
+>> Speaker 2: And then does dispose trigger the onComplete?
+
+[00:07:19]
+
+>> Jafar Husain: No, great question. I really wanna nail this. When you call dispose on a subscription, what you're saying to the producer is, what she's saying to me is, I never want you to talk to me ever again, right? Which you could understand, I'm throwing cakes at her, right?
+
+[00:07:33]
+If I were her I would say, dude, just go away. Don't ever say another thing to me. So that means I'm never gonna call onComplete. I mean if you think about it, it's kind of silly, right? You just said I never wanna get a call back and then I say onCompleted, right?
+
+[00:07:45]
+And you're like well, yeah, I know. I don't want the data, right? So yes, when we call dispose what we're saying is I never wanna hear from you ever again. I don't care what method it is, right? Does that makes sense? So it is different. Yes, another question.
+
+[00:07:58]
+
+>> Speaker 2: There's some confusion now about dispose, but you might have covered. If dispose is called with an onCompletion callback, nothing happens?
+>> Jafar Husain: Yeah, the first thing you notice is, you wouldn't even bother to call dispose when you get an onCompleted. Because the whole point of calling dispose is to make sure that the producer never sends you another message.
+
+[00:08:14]
+And by the time I've said onCompleted, you know that I'm never gonna send you another message. So there's no reason to call dispose.
+

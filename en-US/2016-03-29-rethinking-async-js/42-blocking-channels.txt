@@ -1,0 +1,90 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:03]
+>> Kyle Simpson: That's a pretty simple example. How might we have a slightly more complex one? This one, I've got csp in front of everything because I'm now using a library. There are libraries for CSP, and one of them uses the namespace csp for it. And you notice that we call it .go because we're modeled off of that go routine mentality, the stuff that comes from the GO language in from Closure script.
+
+[00:00:29]
+So this is how I actually passed those two generators to something that can do it. The previous code snippet just pretended that somebody did it but this is a little bit further step along. It shows us how it would work. We would pass those generators in to a method called Go and you notice now I have a while true loop going.
+
+[00:00:47]
+Which is gonna let those things run forever. That's how you end up modeling these independent processes that run your application as you end up basically having every one of them with a while true loop in it. They're all running independently.
+>> Kyle Simpson: So here I've got on line 1 through 5, I'm declaring a go routine that's going to, every time somebody lets it it's gonna generate a new random number and push it down the channel.
+
+[00:01:15]
+It would like to do that as fast as possible but if you'll notice the notion of this blocking channel is, it's going to be, there is a back pressure here. It's not going to be allowed to push anything down the channel at any faster speed than somebody on the other end is consuming it, can you see that.
+
+[00:01:34]
+So on the other end of the channel, I have another go routine in an entirely different part of my application and he's waiting every 500 milliseconds. And he's pulling something off the channel once every 500 milliseconds. Does that sound familiar? Does that sound like a sampled stream? This is a way of modeling the sampled stream through CSP semantics.
+
+[00:01:58]
+So the guy up on line 3 is note able to push the random values any faster than somebody is consuming. And the guy down on line 9 is consuming them only once every 500 milliseconds. Well, the guy in line 9 has no idea how those values are being produced or where they're coming from.
+
+[00:02:15]
+The guy on line 3 has no idea who's taking them. They're literally completely independent sequential processes but they're able to coordinate through blocking channel semantics.
+>> Kyle Simpson: Yes?
+>> Speaker 2: This should walking through this just a little bit more and you might be doing it now but there's the two takes, right?
+
+[00:02:42]
+Yield on line-
+>> Kyle Simpson: The first one on line 9, yep.
+>> Speaker 2: Line 9, that is taking a value from the first function?
+>> Kyle Simpson: But look where it's taking it from, because take always requires a channel. And what we're passing to it is a channel that is created by the timeout function.
+
+[00:02:58]
+So the time out utility which is provided by this library creates a channel that won't push a message down until after 500 milliseconds has passed. So we're basically saying I want to take from that channel and I'm gonna wait until that channel gives me something. That's a way for us to do the blocking semantics or I mean the blocking the local.
+
+[00:03:22]
+
+>> Speaker 2: Maybe I missed what is the channel?
+>> Kyle Simpson: So the first argument to the put and the take methods that we're showing here is always a channel. So if I take from a channel produced by the timeout method, it doesn't matter to me what channel it is, but I know that that channel is not gonna send me a message until after 500 milliseconds.
+
+[00:03:44]
+
+>> Speaker 2: There's a channel declaration ch above.
+>> Kyle Simpson: Yeah, it's like in the previous slide, we made one here. These libraries have different ways of making your channel so that's how you make a channel is like up on line 1 for example. Here that channel, we just know it exists in the ether.
+
+[00:04:03]
+It came from somewhere.
+>> Speaker 3: Channel is kind of a global though. You say they don't know about each other, but somehow you have to have this global state that's-
+>> Kyle Simpson: That's in my opinion one of the downsides of this particular library. It assumes global variables. We'll see that other libraries like mine don't do that.
+
+[00:04:24]
+okay? But yes, that's a detail that you have to figure out some way to transport the channel so that the two different. The only thing they have to know about is they have to share a reference to the channel. There's lots of different ways that you can do that global variables as just one of them, okay?
+
+[00:04:47]
+
+>> Kyle Simpson: Last thing I wanna show you, so the puts and takes are pretty straight forward but there are actually dozens of different primitives that are defined here. Put and take are by far the most commonly used. But there's another one that's pretty commonly used, and it's called alts.
+
+[00:05:01]
+Alts lets you define a list of multiple channels and say I want to do some action on the first of these channels that lets me do something. So you might have two channels that you'd like to take from and one channel that you'd like to put on and you don't care which of those three actions happens but you're just waiting for somebody to unblocked you so that you can do something.
+
+[00:05:22]
+So you pass in those instructions here. Because I'm just passing in three channels the default is that I wanna take from those channels. But I could also pass in one channel where I'm saying I wanna put to this channel. And it's not gonna get to channel 2 and channel 3 at all if channel 1 always has a message ready.
+
+[00:05:41]
+So it's basically saying whichever one in order that I specify them whichever one has something for somebody it's kind of like a promised out rate sort of. So everyone has something for me, then it's gonna unblock me and let me go. So this is a way to have lots of different input channels coming in and being able to manage all of those different channels.
+
+[00:06:08]
+
+>> Kyle Simpson: That's just a silly example I wanted to throw in it's one of the canonical examples for CSP, you notice on line 1 I create a single go routine. And there on line 2 is where I'm making a channel so you see csp.chan that's on make a channel with this particular library.
+
+[00:06:24]
+So I'm making a ping pong table for my channel and notice lines 4 and 5 are creating more go routines. I'm calling the go method and I'm passing it a reference to another generator, the another go routine, the generator that's on line 12. So I'm creating two instances of my play or go routine, so now I have three go routines happening at the same time.
+
+[00:06:49]
+I have this main one, which is kind of like the referee for the game and then I have two players. And I have a table which represents my channel, and the way we're going to trade information back and forth is that we're gonna trade a ball back and forth across the channels.
+
+[00:07:04]
+So the first player is called ping in the second player is called pong. And you notice that the player on line 13 it set up with a while true loop. He says while I can keep going which means basically forever. I am going to take from the tables so I'm waiting for the ball to get hit to me.
+
+[00:07:25]
+And as long as I didn't get the message that my channel is closed, which tells me that the game is over, then I'm going to update my hit count by one, print out the fact that I'm the one hitting the ball. And then I'm gonna wait 100 milliseconds to add a little bit of latency to the system, and then I'm gonna hit the ball back to the other player.
+
+[00:07:44]
+And that's line 22, and I put the ball back. So these two different player instances that trade the ball back and forth every 100 milliseconds until the referee says game over. And that's what happens up on line 9 after 1000 milliseconds the referee closes the table channel says the game's over.
+
+[00:08:11]
+
+>> Kyle Simpson: First time I saw this example that's when I had that, what. I'd never seen anything like this before and ever since then I've been fascinated and actively researching how can we take that and make the programming that we do more reasonable, more understandable by making things more modular and more independent, so we don't have so much complexity in our systems.
+

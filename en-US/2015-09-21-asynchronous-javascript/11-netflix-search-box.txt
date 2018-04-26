@@ -1,0 +1,172 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:04]
+>> Jafar Husain: So we already covered this point. switchLatest and takeUntil are why I don't unsubscribe from Events ever. I never call or removeEventListener and I haven't in five years. My code isn't littered with memory leaks because I do takeUntil and switchLatest. It turns out, that's pretty much all you need.
+
+[00:00:21]
+So let's take a look at another example. This is where things get particularly sexy. If we look at the Mouse Drags example, we're just composing together events, right? But I already told you, UIs are made up of usually three asynchronous actions. Events followed by an asynchronous request, to a network for example, and then finally ending with an animation.
+
+[00:00:39]
+So let's do something just a little more interesting. And let's use Observable to combine together events and asynchronous requests. So who's built an autocomplete box, sorry I've got a question back there.
+>> Speaker 2: Can you filter ahead of time and ignore the empty observable?
+>> Jafar Husain: Well, ahead of time implies that there is some sort of, that you can look ahead.
+
+[00:01:01]
+You can't. With an observable, you can only get data when it arrives. You have no notion of what's coming down the pipe. Much as when you subscribe to a mouse move. You don't know when the next mouse's gonna arrive, there is no look ahead with an observable. There's only the right now, right?
+
+[00:01:17]
+I just threw a piece of cake at her. She can't look ahead and see that I have no more cake left over or I have 15 more slices. There's no way of knowing that. So there is no look ahead. So basically, the switchLatest operator has to get an observable, and then because it doesn't know that it's empty, and it won't know at all until it for eaches, it doesn't try and figure out that it was empty.
+
+[00:01:35]
+What it does is, as soon as it gets a new inner observable, it stopped listening to the current inner observable by calling subscription.dispose. So you can't look ahead with an observable, there's no foresight. Can't see into the future, right, cuz it's a collection over time. Much the same way you can't see in the future, you do not know what an observable will give you.
+
+[00:01:55]
+So who's written an autocomplete box before?
+>> Jafar Husain: Anybody find it really easy? Was it hard? I mean write it from scratch, not just use a component.
+>> [INAUDIBLE]
+>> Jafar Husain: [LAUGH] Somebody used a component, that's great. If you write it from scratch, it's one of those problems that seems like it's gonna be really easy, and you're gonna go home at 5 o'clock, and you don't.
+
+[00:02:19]
+It's surprisingly hard. And it's everywhere on the web. Why would it be so hard to write an autocomplete box, does anybody got an idea?
+>> Jafar Husain: There's a reason why people make components so they don't have to keep solving this.
+>> Speaker 3: Race, there's a race between the inputs.
+>> Jafar Husain: There's a race condition.
+
+[00:02:35]
+The race condition is, I type A, I'm in a Netflix search and I type A and then we go off and we send a network request for all the search results for A. And then I type B, and then we send a network request for all the search results for AB.
+
+[00:02:47]
+Is there any guarantee at all that the request I sent for A will come back before the request I sent for AB? No, networks, shit happens, right? So it can come back in any particular order. So I might end up getting the request for AB back before the request for A and then showing the old data on top of the new data.
+
+[00:03:08]
+Does that make sense? So how do we prevent that from happening?
+>> Speaker 4: switchLatest.
+>> Jafar Husain: switchLatest, this guy's on the ball. Absolutely, right? We're gonna start to see that some common UI patterns just fits into one of those three strategies, right? So how do we prevent it? What's another problem that we might run into with a autocomplete box that we can only solve with a little asynchrony?
+
+[00:03:33]
+
+>> Jafar Husain: What happens if I type ABCDEFG? How many network requests do I wanna send off?
+>> Jafar Husain: ABCDEFG.
+>> Speaker 5: If you Google, six.
+>> Jafar Husain: [LAUGH]
+>> Speaker 5: I mean, Google Instant, or whatever, you get the updated autocomplete coming for every letter.
+>> Jafar Husain: I think they probably have at least some debounce in there, right?
+
+[00:03:53]
+
+>> Speaker 5: There's some probably.
+>> Jafar Husain: They will have some debounce. But the point here is that you probably don't, cuz most of us aren't Google, you probably don't want to send off a network request for every single key somebody types. You wanna chill, right, just like wait a little second, a few milliseconds after somebody types a key.
+
+[00:04:08]
+And then if they type no other key, then you wanna take whatever's in the text box and send it off as a search request. Does that make sense? So this is sometimes called debouncing. Here is what an autocomplete box looks like at Netflix. So as we begin solving these problems, we are gonna start describing them in four steps.
+
+[00:04:30]
+What collections do I have? What collection do I want? How do I get from the collections I have to the collection that I want? And then, once I've got the collection that I want, what am I gonna do with the data that comes out of it? So what collections do we have when we're building an autocomplete box?
+
+[00:04:47]
+What are the input, when I say collections I mean observables, right. Observables are collections. What are the collections of events that we have that are interesting to help us build an autocomplete box?
+>> Speaker 6: Key press?
+>> Jafar Husain: Key presses, right? That's one interesting collection. Another one is the one created when we make a network request.
+
+[00:05:03]
+When we call this getJSON function that you see up here, what we're really doing is we're creating an observable that will eventually onNext us the one value of the result from the server. And so, if you were to visualize what that observable looked like, it would look like .......results.
+
+[00:05:18]
+In this case, it happens to be inside of an array. Don't get confused the fact that an observable happens to give you an array. It's no different than it gives you one or two or three. Don't get confused about the fact that we're handing off an array and that happens to be a collection.
+
+[00:05:29]
+It's an observable of a value, and that value happens to be an array. So the way this works is, well, actually technically, getJSON will return you a string I think, and well, yeah, a string in this particular case or a JSON object whatever that JSON object is. All right, so getJSON returns an observable and it's the result of whatever we get back from the server parsed as JSON.
+
+[00:05:50]
+Does that make sense? At that URL. So it's an observable with one value in it. Does that seem weird to anybody? That I create an observable with just one value in it?
+>> Jafar Husain: Nobody? Collections have one value, right? You can create an array with one value, nothing weird about that.
+
+[00:06:11]
+You can have an observable with one value. And so, again, if you were to use, visualizing that syntax we made up for what that getJSON observable, just the getJSON observable would look like. It would look like ......JSON object and then onComplete it. So it'll onNext you and then immediately onComplete.
+
+[00:06:27]
+Cuz it's only got the one value. So, what are we doing here? We're taking the key presses and then we're using this handy throttle method. And the throttle method is very simple. It takes an observable that looks like ABC DEF and turns it into CF. It takes any items that come very, very close together and it just drops them and gets the last one.
+
+[00:06:50]
+So the idea here is, if you get an item in the observable, right, instead of immediately returning that observable, the throttle operator will wait a couple milliseconds and see if another item arrives. And if another item arrives, it just drops the other item. And then it takes the new item, waits a couple of milliseconds.
+
+[00:07:06]
+And if a couple of milliseconds go by, in this case 250 of them, and no other items have arrived, then only then does it take that and forward it along to whoever's listening. So that's why it turns ABC DEF into CF. Does that make sense? So now we've solved the problem of issuing seven network requests when somebody types ABCDEF, right?
+
+[00:07:28]
+So that's how we solve that problem. Now we just have a less chatty stream. So we're gonna take each one of those key objects, we don't care about those key events. We're just gonna map and map is all about substitution. It's all about replacing something in the stream with something else.
+
+[00:07:42]
+And we are gonna map it and return the observable we get from calling getJSON. So we're gonna take this flat stream of key presses and turn it into a two-dimensional observable. Because each one of those key events is gonna get replaced with an observable that represents the network request to the server.
+
+[00:07:58]
+Now remember, it's an observable of one but it's still observable. So now we have an observable of observables. Because for every key press, we're creating an observable and substituting it in that represents the network request. For every key press, we're substituting in an observable that represents the network request.
+
+[00:08:14]
+So now that we've got a two-dimensional observable, we've gotta flatten it. And we've gotta flatten it so that we solve the race condition problem, right? So here's how we can do that. I'm gonna talk about the retry operator in just a moment, but notice what we're doing here with takeUntil.
+
+[00:08:29]
+I've got a network request and it's out for A, right? I've created my network request for A. And then I create B, and I create another network request and it's going out for AB. Does that make sense? I type B, now I've got a network request going out for AB.
+
+[00:08:40]
+Notice that because I apply takeUntil with (keyPresses) to each network request, as soon as I type B, that outgoing network request for A completes. It fires on completed and it just stops and it becomes empty, right? So I've triggered a network request for A and then I click B and that network request for A is immediately gonna complete because now I've pressed a key.
+
+[00:09:04]
+So it's gonna look like ...., and in just a few more milliseconds it would've actually gotten us a result, but instead, [SOUND] it completes. And then, we apply concatAll to the stream. And what happens to that observable that we completed, with nothing inside of it?
+>> Speaker 7: It's gone.
+
+[00:09:24]
+
+>> Jafar Husain: [SOUND] Right? We didn't cancel the network request. I didn't write abort or removeEventListener or any of that stuff. I declaratively described the conditions under which that network request was to end. And it was to end, regardless of whether we got the data or not, as soon as the next key press happened.
+
+[00:09:44]
+
+>> Jafar Husain: Very different way of thinking about asynchronous programming, all right? I'm not canceling things, I'm not changing things, I'm describing declaratively the conditions under which I want streams to end. And so that network request return for A has now completed. And now we've got an open network request for AB.
+
+[00:10:02]
+And eventually when that finishes, right, concatAll is going to return the network request for AB. Because the previous observable is completed so it's now on to the second observable. And we get out the search results for AB. And that outer observable, is it ever gonna complete? Is the searchResultSets observable that we've created ever gonna complete?
+
+[00:10:22]
+Anybody tell me. Is it gonna end? Well, first of all what is searchResultSets? It's the stream of all of the search results for every search that you enter into the text box. That's really what we've done. We've taken the streams that we had, which is key presses, and a function which creates more streams which is the network request, and we've combined them together into one stream, the stream that we want.
+
+[00:10:46]
+Which is the stream of all of the search results that arrive from the server. And then at the very bottom, we for eached over them and for every search result set that we get back, which is basically, it could be an array of search results, we're just gonna put it on screen.
+
+[00:10:59]
+That's what we're going to do with it. So let's go over the four steps. Yeah, question?
+>> Speaker 2: Question was, would we ever want to concatenate the throttled presses together to pass to getJSON instead of looking at input.value?
+>> Jafar Husain: Yes, we could. So I'm making stuff easy on myself here.
+
+[00:11:17]
+Now, because at any point I can just look up the value property of the text box, that's easy. But imagine you didn't have access to the value of the text box. Imagine all you got was key press signals. Well, then you'd have to figure out some way of concatenating them together and basically doing the job that the text box does.
+
+[00:11:33]
+Which is like I'm gonna aggregate up what the current string is in that text box. And when I get a back press key, I'm gonna have to remove one. There is actually a way of doing that. It's called a scan operator, which allows you to do exactly that.
+
+[00:11:45]
+To take an observable that's infinite and aggregate up values over time and then change them. We'll get to that later on. But I mean, you can get the value of a text box. So let's not bother, that's much more complicated. So let's just do it this way. But that's a totally valid question.
+
+[00:11:59]
+Yes.
+>> Speaker 8: What does retry(3) mean?
+>> Jafar Husain: Can I come back to that? I wanna get the overall structure first before we come back that. That is important, but I wanna come back to it. I really wanna make sure we go through, think about things in these four stages cuz it's gonna be really important for you when you do your exercises.
+
+[00:12:13]
+What are the streams that I have or functions that give me streams? What do I have? What do I wanna create? Well, I wanna take the key presses and I wanna take my ability to issue network requests and get them as observables. And I wanna create just a stream of all the search results that come back from the server.
+
+[00:12:25]
+Cuz all I'm gonna do with this is I'm just gonna display them on screen. I just wish that, think about this as a process of inspiration. Wouldn't it be great if I had an event that just fired every single time I had search results from the server? That would be super convenient, right?
+
+[00:12:37]
+Then I could just subscribe to that, and whenever one came out I could slap it on screen. Well, we don't have that but we can create it. So first, it's almost like starting backwards. Imagine what event you want and then take a look at the events you have.
+
+[00:12:50]
+And then the hard part is figuring out how to take the events you have and combine them together using these functions, map, reduce, filter, merge, zip, that I'm gonna be teaching you, into the event that you want. And then once you've got the event that you want, the stream of data that you want, all that's left to do is to forEach over it and do something with the data.
+
+[00:13:06]
+So we're seeing all three stages here in the sense that we've got keyPresses, we've got getJSON, those are the streams and functions that will give us streams that we have, that are very easy, we have them. Then we're using all of the map and retry and concatAll functions and takeUntil to combine all the these streams together into the stream that we want.
+
+[00:13:23]
+Which is the stream of searchResultSets. And then at the end we're using forEach to consume the data and put it on the screen. Does that make sense?
+

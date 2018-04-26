@@ -1,0 +1,85 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:04]
+>> Kyle Simpson: Our final discussion that we'll push through and that we'll try to get done as quickly as possible. There's another exercise at the end of this. It might also end up having to be homework because I don't know if we'll have time for it. But we're gonna talk through async patterns and I'll do my best to move quickly through it.
+
+[00:00:19]
+But I felt like it was really important. We've spent a lot of time in the weeds, down in the deep. Trenches of the mechanisms of JavaScript. I felt like it was important to have at least some discussion at higher level abstraction of how we do things productively in JavaScript.
+
+[00:00:33]
+Asynchronicity is a reality of our code in JavaScript. And so I think it's important for us to talk about what are the patterns that we use to deal with asynchronicity, in real world java script. The first pattern that everybody knows about is nesting of callbacks. We're gonna talk about what that means, why we do it and why there's a problem.
+
+[00:00:51]
+Then we're gonna talk about generators and coroutines, which are a new, brand new thing that might kinda stretch your mind a little bit, cuz it's a whole new concept that JavaScript's never had before. And we'll end our time talking a little bit about promises. So first I need to set up why are we even talking about asynchronous code, and the most basic way that I can explain this is our brains work synchronously.
+
+[00:01:15]
+If I describe to you a task like with set timeout, if we look at this code here, this is callback base code. If I were to describe, as a developer, if I were try to describe how does this code work, here's how I would describe it. I'm gonna set a timeout for a thousand milliseconds from now, and then when that time out fires, I'm gonna print out the string callback.
+
+[00:01:36]
+Just in the way that I described it using English grammar, I described it in a synchronous fashion. Because I said, I'm gonna do something and then I'm gonna wait 1,000 milliseconds and I'm gonna do something else. It's subtle, but did you see how I just glossed over the fact that there's no way to actually wait 1,000 milliseconds, because I'm not blocking anything.
+
+[00:01:58]
+And the reality of JavaScript code, though if I were to try to describe this how JavaScript is actually gonna handle it, here's what I'd say. I'm gonna set myself up a timer for 1,000 milliseconds from now, and then I'm going to come over here, and process some other work, and I got some other events handling, and somebody clicked a button and eject, it's been 1,000 milliseconds, time to go print out this callback.
+
+[00:02:17]
+That's how I'd actually describe the way this code works, if I were talking about it in an asynchronous fashion. The problem is that our brains don't work asynchronously. We like to think that we're multitaskers, but multitasking is just fast context switching. We're still synchronous thinkers. That's the way psychologically our brains work.
+
+[00:02:37]
+All of the biological functions in fact that you talk about that happen, like my breathing and stuff like that, they happen at a subconscious level. They're not consciously happening asynchronously. So, when we talk about asynchronous flow control patterns in our code, what we're really talking about, is how do I take something that is fundamentally asynchronous, like a timer.
+
+[00:02:58]
+And express it in such a fashion that I can reason about that asynchronous code in a synchronous fashion.
+>> Kyle Simpson: So, everybody see that? Callbacks are one such way that we do that. And a callback is really, if you wanted to extrapolate or to generalize what a callback is, a callback is a continuation.
+
+[00:03:18]
+What we've said is, my entire program up until this point of line one, the entire program that's happened thus far is the first half of my program, and the next half of my program happens inside of this function. So I'm gonna split my program in two, and I'm gonna say I want you to continue my program at some point a thousand milliseconds from now, so continuation is what it's called.
+
+[00:03:41]
+The problem with call backs is that they work ok in that one split. They really start to suck when there's more than one split. And almost all real world code, there's more than one step to our asynchronicity. And you probably heard the phrase, call back hell. Anybody heard that before?
+
+[00:04:02]
+Anybody seen code? This is sometimes called the pyramid of doom because it's shaped, you know, like we see this nesting in this indentation. Unfortunately, call back hell really actually has nothing to do with indentation. So if you've heard that call back hell is about all these nested functions in these indents, unfortunately you've been somewhat mislead.
+
+[00:04:22]
+So let me try to shed some light on this, because callback hell is a real thing and it's an important thing that we need to solve. It has nothing to do with indentation. Here's my proof, this particular piece of code is quite clearly a bunch of nested function and everybody would agree it's kind of ugly.
+
+[00:04:39]
+This code does the exact same thing as the previous slide, but you'll note that there's not really very much indentation, and there doesn't even appear to be a lot of visible nesting going on. And what I would suggest to you is that this particular code, I chose a different style, this is called continuation passing style.
+
+[00:04:55]
+I chose a different style of code, but this code is every bit as susceptible to what the problems of call back hell are, as the previous slide. So call back hell must be something deeper than just the indentation in the nesting, and what is that? Let me suggest to you a few things that are a problem.
+
+[00:05:12]
+We can go back to the set timeout function a few slides ago, and I could suggest to you, what if the set timeout function was not a utility that was built into the language that we could trust? What if it was some third party library? Remember what I said is that a callback is a continuation.
+
+[00:05:27]
+We take the entire rest of our program, if you will, and we wrap it in a function and we say, I want for you to execute the rest of my program at some later time. So when we're calling something trusted like a setTimeout, it's not such a big deal.
+
+[00:05:43]
+But when we're calling something that we don't trust, like a third-party library that we can't even audit, and we can't see and we just get a minified copy that we pull in from their CDN, then we actually have an amazing amount trust that we've given. Because we have done what is called inversion of control.
+
+[00:06:03]
+We used to be in control of the completion of our program up until that line. As soon as we take the continuation of our program and wrap it in a function and hand that off to some other utility, we have lost control of our program. We've handed over that control to some other party, in this case a third party API.
+
+[00:06:21]
+So, what have we done? There's an implicit trust that's been created when we hand control, when we invert control and hand it over to somebody else. What have we done? We have said, I trust that you will call my callback, not too early. Not too late, not too few times, not too many times.
+
+[00:06:40]
+If there's important context like passing along parameters I trust that you'll pass along what you're supposed to. And I trust that if anything happens that I need some output that you'll make sure to pass the output back to me. And a whole other litany of lists that we trust.
+
+[00:06:53]
+As soon as we take the rest of our program and put it in a callback continuation, and hand it off to somebody else. There's this implicit level of trust, and it's actually a gigantic amount of trust that we're trusting. Now let me give you sort of a tongue in cheek example of this.
+
+[00:07:10]
+Let's imagine that you hand a callback off to some third party API. It's one of these APIs that does Social metrics test, stats tracking, and stuff like that. It's tracking clicks or whatever. So you need to call this function on their API, but it's asynchronously completing, so you pass it a callback.
+
+[00:07:28]
+And you say call my callback when you're done. And there's some bug in their code, and instead of calling your callback once, they call that callback 1,000 times. No big deal right? Except what happens if that call back charges a customer's credit card because you are on the check out screen of any commerce site?
+
+[00:07:48]
+Now all of a sudden you've handed over control of your program to them. And you've allowed them to charge your customer a thousand times. Again, it's tongue in cheek. But the point of the matter is that there is this inversion of control trust issue when we deal with continuations using call backs, we are giving control over to someone else.
+
+[00:08:06]
+And all the rest of what we're gonna discuss for the next few minutes, is about trying to solve inversion of control in different way than with call backs, okay.
+

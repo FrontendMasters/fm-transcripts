@@ -1,0 +1,90 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:04]
+>> Kyle Simpson: So, the first one is storage. How many of you here in person have any experience with local storage or session storage? So, maybe about a third of you to half of you. Local storage and session storage are actually not all that new, they've been around for quite a while.
+
+[00:00:20]
+In fact, going back to the IE8 days, we saw the early beginnings of some of this web storage, APIs filtering into browsers. So, been around for quite a while, and they've been pretty stable. Of all the things that I'm going to talk about needing a facade, they're probably the least likely to need a facade because they've been around and they're so simple and they're so stable that they probably don't really need it.
+
+[00:00:41]
+But why not use a facade everywhere just to make sure that we're protected just in case? There are still some quirks about it that we can address with facades. So, we're going to talk about the storage APIs, the web storage API. We're not going to deal with WebSQL or any of those other more fancy ones.
+
+[00:00:59]
+We're just going to talk about local storage and session storage. But briefly, to understand what those are, they allow you to do persistent storage up to a small maximum, something like maybe five megabytes is usually, but small, maximum, small cap, maximum, persistent storage in a user's browser. Now, the old school way of doing that was to create cookies, and I'm sure many of you have had experience writing where you store data inside of a cookie.
+
+[00:01:26]
+The problem with cookies, of course, is that it didn't just store it on their machine, but it also transmitted all that data with every single request. So, if you were storing two or three megabytes worth inside of a cookie, you were also creating two and three megabyte size requests, which was incredibly limiting.
+
+[00:01:42]
+So, to recognize the idea that we do need to be able, say the Twitter web client can cache the most recent news feed of tweets directly into local storage on your machine or whatever, so that they can reduce the amount of information that's being requested all the sorts of things.
+
+[00:01:58]
+You can have, there's a whole bunch of different uses, and we won't belabor it too much, but the primary difference between the two APIs, they have the exact same API surface, same method names. The only difference is how long they persist the data. Session storage keeps it around for the lifetime of the session, and local storage keeps it around forever.
+
+[00:02:18]
+And when I say forever, I don't mean that tongue in cheek, I mean quite literally forever. Because there's been recent estimates, I don't know how accurate they are because everybody makes up statistics, but there's been recent estimates that better than 90% of the people that use the web have no idea what deleting their internet cookies in their cache is all about.
+
+[00:02:38]
+So, that's a really small, there's like maybe 10% of people that even know what that means. And of the people, and those are clearly people like developers or anybody who's called tech support or whatever. The people that do you know what deleting your internet cache, or deleting your cookies is, the people that do know what that is have almost no clue that that doesn't delete your local storage.
+
+[00:03:00]
+But there's a whole separate thing you need to do, a separate task, you're going to developer tools and clearing it out or whatever, and so. The take away from that is if you stuff some data into somebody's local storage, there's a good chance that data is going to be there forever, or until you decide to delete it with your code again.
+
+[00:03:16]
+So, if you're using local storage, and you say you have some schema for how you're storing it for people's information, and then the user comes back three months later and you've changed to a different schema for how you're storing it. Well, you've got a whole bunch of their data that you stored there that you should be responsible to clean up, so I have migration scripts in place to keep the local storage clean, and things like that.
+
+[00:03:38]
+Now, what about sessions storage? As I said, series alarm for the sessions, so you don't need to worry so much about that. But we have to actually think differently about sessions than we have in the past. Because if you ever dealt with session cookies, session storage, there's a subtle, but actually really important difference between the way those two work.
+
+[00:03:55]
+With session cookies, if you ever dealt with those in PHP, or any of the other server languages, session cookies would be stored for as long as somebody kept the browser window open, which means if they were to open up multiple tabs to the same site, they'd all be sharing the same session cookie.
+
+[00:04:12]
+Which means the person, if they're logged into their bank account, they can open up multiple screens, have multiple different views of their bank account. And we've built the web for fifteen years or more based upon that concept that we use session cookies, and they share across all the different tabs, all the different window sessions.
+
+[00:04:28]
+And only after you close out the entire browser and reopen it does it clear out that session cookie, and therefore, allow somebody to get a new session, or if they manually walk out. So, there's a difference with session storage though, because it's not based upon the window session, it's based upon the tab session, which means that if somebody comes to your site in three different tabs, they're gonna get three entirely separate sessions as far as session storage is concerned.
+
+[00:04:56]
+So, the storage there is now separate. Now, that can seem like a limiting thing, because you may have an app where you want people to have multiple windows. But it's also a powerful thing because there are plenty of cases where that would be really nice. For instance, airline sites, drives me nuts that if I I'm halfway through buying a ticket here, and I say well, I've got this other trip, I wanna make sure I'm getting my tickets.
+
+[00:05:15]
+So, I open up a new window, even a private window, but I open up a new window that should theoretically be separate. And I go over here and I start searching for a ticket. When I come back to this original window, the airline company is dumb enough to have not been able to keep those two things separate.
+
+[00:05:31]
+And I've invalidated something about my original session. It would be nice if I could open up two tabs and have two entirely separate sessions. Sometimes that's a useful thing. So, session storage is based upon the tab session. It means that it will be kept around for as long as they keep that tab open.
+
+[00:05:45]
+As soon as they close that tab, go to a different tab, it goes away. Otherwise, it's just a key value pair that we can store in. Now, remember I said local storage doesn't have any, it stays around forever. It doesn't have any kind of mechanism for expiration. So, I recognize that really, these because they're the same API, and really, they have kind of the same semantic, we could combine them into the same facade.
+
+[00:06:07]
+So I created a storage facade In H5, it's called H5.storage, shockingly, and you decide a construction time how long you want the data to stick around. So if you say, I want it to expire with the session, then obviously it's going to use session storage. If you give it no expiration, it's going to work like normal local storage, and it will stick around forever.
+
+[00:06:28]
+And if you give it a specific timeline, like we did with cookies, then it will store it in local storage, but it will wrap it in a wrapper. It'll wrap your data in a wrapper with a timestamp on it. So, the next time you retrieve data, if that data has passed that timestamp, the API will automatically just discard it for you.
+
+[00:06:47]
+So, it automatically does the cleanup for you. We use it just might like you might think. I can save objects by key name and value into my storage. I can discard things from the storage, and I can call .get to pull things out like you see on line 18.
+
+[00:07:05]
+Some things that I use session storage for, I typically will store a session ID in session storage. You have to be a little careful about that because when you start session ID's in cookies, they were automatically transmitted to the server with every web request. So, when a user refreshed their page, they automatically got a page back from the server that was session ware.
+
+[00:07:26]
+Session storage currently doesn't transmit your session ID's, so you're going to have to manually do that with JavaScript, so be a little careful that local storage. I typically used to store things, I'll remember somebody's username in a username field, or some preferences that they may have in terms of a font size in the website, or whatever.
+
+[00:07:44]
+So, you can sort of store preferences in local storage, anything that sort of session based is good for session storage. Questions about the storage API? One, I don't show it here on the screen, but one thing that's a really little known fact that I'm actually really excited about with storage APIs, how many of you have ever heard of storage events?
+
+[00:08:08]
+Yeah, I didn't think so. I think it's one of the the most unsung heroes of the web platform at the moment, because I think it's totally untapped. What actually is true of both the session storage and the local storage, and this is particularly important for the local storage, but both of those APIs, as soon as you change something, as soon as you add or delete or update something in one of those storage doors, it will fire off an event, and with local storage, this is important.
+
+[00:08:37]
+Because it will fire off an event that you can listen to not only in that browser, but in any other browser that's attached to the same store. So, let's imagine that somebody was on your site, and they had four different tabs open on your site, and it was a live editing for some documents, or something like that.
+
+[00:08:55]
+Well, in tab one, they make some change and they click save, and you save that document to the local storage. The other three tabs that are open are going to get an event fired in them that the local storage has been changed. For that site, and they can pull the new data out and synchronize their display right away.
+
+[00:09:10]
+So, it's cross window messaging using storage events. It's a very powerful technique that nobody seems to really be doing much with. So, I bring that up to say because that's not being utilized much that's something that we should put into a facade and make it really easy to use, we have nice clean event patterns for handling things, so it will stick an event handler in this, so that you can subscribe to storage rooms.
+

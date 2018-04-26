@@ -1,0 +1,125 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:03]
+>> Jafar Husain: So what I'd like to do now is I'd like to cover a couple small concepts. One is a subject. Has any of you ever heard of a subject before? Well let's say you wanna fire an event when somebody calls a method. Let's say you wanna create an observable that fires every single time somebody calls a method on a class for example.
+
+[00:00:21]
+Because that can sometimes be useful. Let's say you create an object in JavaScript with a function. And every single time somebody calls that function you want an observable that fires because you might want to do something asynchronous. Well, there's no real way to do that. We don't have to adapt a an event, a DOM event, to an observable.
+
+[00:00:37]
+We know how to adapt a call it typical callback API to an observable. But what if you had an object and you wanted to create your own custom event, right? Such that, when somebody calls a method or does something, that event fires. Now you could use addEventListener() or you could expose addEventListener() or removeEventListener().
+
+[00:00:54]
+But you can also use a subject. Let me show you a subject in just a moment here. And we are going to be implementing observable from the ground up. So as I do this, we're going to sort of learn what's going on into the hood. It's not that the interesting thing is the magic to make all of this stuff happen is really not that much code.
+
+[00:01:13]
+So all the stuff that you've been seeing happen take until concatALL, map, filter. There's a surprisingly little amount of code here. And that really comes down to what this is it's not about writing a lot of code. It's about thinking differently about events and that's what's gonna cause you to be successful when you take on asynchronous programming just thinking differently.
+
+[00:01:31]
+Having a little twist on the way that you already think about events. So let's start by defining the observable type, so to speak, the observable constructor. Now remember observable only has one method called forEach. So that's actually something that I'm just gonna except as a constructor. And I'm just gonna add it as a private member on the observable.
+
+[00:01:55]
+Now remember that observable allows you to call forEach in a whole bunch of different ways, right? You can either pass in an observer object with an onNext and onError, or onCompleted. Or you can just pass in three function arguments one after the other. So we'd like to support the same thing.
+
+[00:02:19]
+
+>> Jafar Husain: So if the typeof the first argument, the first function argument,
+>> Jafar Husain: Is a function, we'll know that they're passing in functions instead of an observer object. So now I'm just gonna call the stop forEach.
+>> Jafar Husain: Actually I can make this a little more readable still. Remember the three handlers that get passed into an observable.
+
+[00:02:54]
+
+>> Jafar Husain: All right, so if onNext is a function, there's only two possibilities here. That the very first argument is that object with the three onNext, onError and onCompleted properties or they're passing in functions. So they're passing in the onNext function, the onError function, and the onCompleted function. So we're just gonna check to see if the very first parameters of function.
+
+[00:03:12]
+In which case we are gonna build the observer object ourselves out of the functions that they pass in.
+>> Jafar Husain: Now remember onError is optional. And so if it's not passed in, we're just gonna define an empty function for it. So that when we work with an observer, it's always got,
+
+[00:03:33]
+
+>> Jafar Husain: A function for onError and onCompleted. Even if that that function does nothing. Does everybody understand what this code does? I just wanna clarify to make sure it understand what's going on here. What if this code effectively does it says if onError is null substitute it for this empty function right here and the same thing on the next line.
+
+[00:03:50]
+If onCompleted is null, we'll substitute it for this empty function. So that's one possibility. The one possibility is that they're passing in three functions. The other possibilities are actually passing in as an observer object in which we don't have anything to do. We're just going to forward on I forget my return statement here.
+
+[00:04:07]
+
+>> Jafar Husain: We're just gonna forward on the call to our private forEach implementation. And we're gonna pass in onNext, which in this case is an observer.
+>> Jafar Husain: All right, so those are the two ways you can call an observable. You can call an observable this way,
+>> Jafar Husain: Same by passing in three functions or you can call an observable this way.
+
+[00:04:58]
+
+>> Jafar Husain: Right, and so we wanna support both and that's all this public forEach function does. It just make sure that we support both. So if somebody passes in an observer object right here. We just use it and pass it to our internal definition of forEach. And if somebody passes a just three functions, one of the other.
+
+[00:05:15]
+We construct an observer object with the onNext, onError, and onCompleted method. And then we pass of that to the internal definition forEach. So when you create an observable, right? We're going to do it like this. We're just going to go new Observable. And remember, what's the only function that's defined on observable?
+
+[00:05:35]
+The only function you have to define to define an observable?
+>> Speaker 2: forEach.
+>> Jafar Husain: forEach. So that's the only thing we have to pass into the observable constructor in order to create an observable. So we actually just have to pass in an inline definition of forEach.
+>> Jafar Husain: So let's create a function which will fire.
+
+[00:05:56]
+Actually, let's create, remember our fromEvent function? Let's create the fromEvent function, so that we can work with Dom events and can turn them into observables. So I'm gonna create a fromEvent function on observable.
+>> Jafar Husain: And remember, it takes a DOM element and event name,
+>> Jafar Husain: And it returns an observable.
+
+[00:06:25]
+
+>> Jafar Husain: Make this a little bit smaller.
+>> Jafar Husain: Now let's go through how do we take an event-based API and convert it into an observable? Well, when somebody calls the forEach function, we want to add an event listener to the DOM. Actually, first, we're gonna create a handler. And when that handler fires, we're going to take the event object and we are going to just call observer onNext and thread that event object on to the observer.
+
+[00:06:55]
+Remember, the observable is just an object with a function, a forEach function. And when you handed an observer, it's gonna call that observer every single time it receives an event from the DOM object. So now we just have to take the Dom element, add an event listener.
+>> Jafar Husain: At the eventName, we're gonna add our handler.
+
+[00:07:16]
+And what's the last thing that we have to do? What's the last thing a forEach function has to do when you call it? What does it have to return?
+>> Jafar Husain: When you call forEach on an array?
+>> Speaker 3: Subscription.
+>> Jafar Husain: Subscription, right, because you need a way to say no more data.
+
+[00:07:33]
+So we're gonna return an object with dispose,
+>> Jafar Husain: And inside of here, we have to make sure by doing something that none of the observers onNext or onerror, or onCompleted callbacks are ever gonna get called again. So I'm going to unhook the event handler,
+>> Jafar Husain: Like so. And so this is our subscription object.
+
+[00:08:09]
+
+>> Jafar Husain: So this is actually all the code. Yeah, we've got a question in the back?
+>> Speaker 4: So why are we doing the one up there to the observable prototype, but this one we're just doing to observable?
+>> Jafar Husain: So, just, let's take a close look at the observable constructor again.
+
+[00:08:25]
+Notice that observable accepts an argument which is the definition of forEach, right? But notice that you can also call, we saw there's two different ways you can call an observable. One is where you pass three arguments which are functions. You pass in the onNext, the onError, and the onCompleted function is three arguments.
+
+[00:08:41]
+But another overload is that you can call with an object that has an onNext, onError, and onCompleted property. Instead, whenever you would create an observable, instead of you having to worry about handling each of those cases, right? Because otherwise you'd have to really kind of you need to make sure to check each time something called your for each function if they were passing an observer object or three-call box?
+
+[00:09:01]
+We're gonna add a public forEach method to observable that does that work for us. So it's gonna first check to see, are they passing in functions? In which case, onNet, and on air and onCompleted are all gonna be individually functions. And then if so, it's gonna create an observer object.
+
+[00:09:21]
+It's gonna wrap those things inside of an observer object and it's gonna call the actual definition of forEach that we passed in the constructor. So that way, when we create an observable, we don't have to worry about this little step of saying, are they passing in an observer?
+
+[00:09:36]
+Are they passing in three callbacks? Because when we have a public forEach method that gets called and then it creates an observer every single time. And then calls our internal definition of forEach. So inside, when we define an observable, we only have to worry about the case where we get an observer.
+
+[00:09:55]
+Does that make sense? So that's all that's going on here. It's just saying, hey is, are they passing an observer object? In which case, just go ahead take whatever it is the first argument in this thread it down to the internal definition of foreach. Or are they passing in functions in which case create the observer object and then pass that in for it.
+
+[00:10:18]
+So now would we define for each method. The only case we ever have to worry about is getting an observer. Okay, so now when I go and that define fromEvent and I create an observable when you call fromEvent. I only have to worry about ever getting an observer.
+
+[00:10:33]
+Does that makes sense? Whenever we create an observer when something calls forEach on us, we've got two jobs. Our job is to start whatever async or whatever action may cause asynchronous data to start flowing through and to return a subscription object. Which when disposed of, will stop any asynchronous data from flowing through.
+
+[00:10:53]
+So here's step one and here's step two, right? This will cause us to potentially start getting messages from the event. But when somebody disposes of the subscription object, when the caller of forEach, this was of the script subscription object. We'll make sure that we never give them any more data ever again because we'll have removed the event list.
+
+[00:11:11]
+Okay, we're good?
+

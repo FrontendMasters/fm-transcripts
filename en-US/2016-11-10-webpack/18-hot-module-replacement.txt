@@ -1,0 +1,88 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:03]
+>> Kent C Dodds: So this is how Hot Module Replacement works. You have your bootstrap file, right? This is our entry. And it requires the app and it requires helpers. And let's say that app gets updated. Like we're working on our stuff and we say, oops, helpers.log('stuff'), whatever. Okay, then we save that and we want to have our browser reload, right?
+
+[00:00:34]
+We want to see what happens when you do that. Probably, even more common would be in an event handler or something, like ( 'view setsss' ), whatever. So normally what you have to do in the web world is you hit Refresh and then set up the state properly so you can see your updates.
+
+[00:00:55]
+This isn't really that bad of a workflow for something like this. But if you have, okay so, I'm working on a modal. And inside of that modal, I have to fill out this form and then I have to hit submit to see what my code changes are doing.
+
+[00:01:11]
+Then that can be kind of frustrating because you have to fill out the form every single time, over and over again to manually test what you're doing. So the cool thing about Hot Module Replacement is it can take the module that you're working on and it wraps something around it called, oops, that is a mistake, that is not there.
+
+[00:01:33]
+It wraps webpackHotUpdate over it. So anywhere that is requiring bootstrap.js or anywhere that app.js is in use, is now actually going to be requiring webpackHotUpdate. And webpackHotUpdate will send updates to it as needed. So this is like, you can look at the output and it kind of maybe sort of makes sense a little bit.
+
+[00:02:00]
+But basically what this amounts to is when you make an update to this other component, it says hey, this has been updated. Let me reload that module code and you can rerun it. I think probably what would be more instructive is to show an example of how to do it.
+
+[00:02:20]
+And it's actually like, if you look at the dev it's not a whole lot of stuff. On your dev script you add --hot. And then, well okay, there is a a little bit of code, but this adds Hot Module Reloading or Replacement to our entire app. So anywhere that we save a file, it will get reloaded automatically.
+
+[00:02:45]
+I don't know if I want to spend the time to actually have everybody code this out necessarily. And so let's all go ahead and we'll check out the next branch and we'll look at it together locally. So the next branch is FEM/01.6-hmr. And now if you run npm run dev, this is gonna run webpack-dev-server with Hot Module Reloading turned on.
+
+[00:03:17]
+Sometimes you'll see something happen like this. You'll get tons of output that says it's rebundling. I think that's one of the webpack 2 bugs that they're working on right now. But it doesn't affect anything functionally, so don't worry about that. Okay, so here, if you look at your console, you'll see a couple of logs out here from HMR.
+
+[00:03:42]
+We also have some logs from ourselves and view set and then Hot Module Replacement enabled. So let's go ahead and you can do this anywhere that you like. So change any file, hit the save button, and go back to your app. It's actually probably more instructive to have these in side by side windows.
+
+[00:04:04]
+So that's what I'm gonna do really quick. We'll put this one right next to it.
+>> Kent C Dodds: Okay, so I'm going to say, we'll go to our view.js, I'm gonna look for all. Actually I think that's in the HTML.
+>> Kent C Dodds: Sorry, I did think of a good demo and I've forgotten what the example was.
+
+[00:04:49]
+
+>> Kent C Dodds: Bad me, okay, I'm gonna pop up in the dev tools. And if I say ( 'view setssssssss' ) and then I hit Save, then we're gonna get that console log right there. Not as exciting a demo but you could potentially update the place where this number is calculated here.
+
+[00:05:06]
+And it will get updated without actually refreshing the browser. This is a little bit more of an exciting feature if you do have a situation where you have a modal and a big form you have to fill out and stuff. You can see things updating without that form getting cleared out.
+
+[00:05:24]
+And so, yeah, you can potentially be working on a feature without ever having to reload the browser. And so let's go ahead and just take a look really quickly at the actual code used to accomplish Hot Module Reloading in a single file.
+>> Kent C Dodds: You move this over.
+>> Kent C Dodds: So, yeah, what we're doing here is we need to determine whether or not this is the first time the browser is loading this module or if we're being hot reloaded.
+
+[00:06:02]
+And so that's what this reloading variable is set for. We say, if the document.readyState is already 'complete', then we must be reloading. But then here we have this if (module.hot), and this module object isn't just like, where on earth does this thing come from? Just remember, module.exports, it's that same object that you're getting in a in a regular CommonJS module.
+
+[00:06:26]
+It's the one that webpack is using to export your modules for you. So webpack just monkey patches a variable called hot. So when you're running webpack in hot mode. So we go to our package.json and again, it's right here, in our dev script, where we say okay, turn on hot mode.
+
+[00:06:50]
+You can do this also in the webpack config. But you wouldn't wanna do this normally like in productions, certainly not, it's not a production feature. But when that is turned on, then this code runs. When it's turned off, then this code is deleted. It's turned into dead code and then uglify will remove it.
+
+[00:07:10]
+And so what normally will happen is you'll get this code running, you'll get a console.info. But if you didn't want to have that console info in production, you could easily work around that. And then ultimately what's gonna happen is this bootstrap, is we're gonna say okay, on window, load.
+
+[00:07:28]
+So this is exactly what we had before was this bootstrap function. So when hot module reloading is turned on, then we're going to say, okay, we'll accept this module itself. So there are actually a couple of APIs into this. So if we wanted to do something special for the app file, then we can do this.
+
+[00:07:56]
+And then we get the newApp and do stuff with app right there. But I want to accept all modules for this project. And so I'm just gonna say accept pretty much everything and what I get back is, all right, I just get a call back with the Error.
+
+[00:08:14]
+And so when anything is updated, including this bootstrap file itself, then it's going to rerun this entire file. And it's going to say okay, if I'm reloading then I'm gonna log out. That hey, I'm reloading, and I'm gonna call app.onLoad which is gonna re-render the entire app. So it essentially does the same thing that we're doing here already.
+
+[00:08:38]
+But it will maintain the state of the rest of our application. In a React context this makes a lot more sense. This is actually why Dan Abramov or Abbermoff created Redux, so that he could separate his state from his view. So he could update his view all he wanted and his state would stay preserved.
+
+[00:09:01]
+And so Hot Module Replacement actually really only caters to certain types of apps that have those two kinds of things separate. Although, still it can be really useful in other contexts as well. But that's one of the reasons why I haven't really used it a whole bunch because you have to kind of form your code around this feature.
+
+[00:09:24]
+But once you have it, it's amazing. And if you are using React, then there's a transform, I think it's a babel transform for React Hot Module Replacement that makes it a lot easier so you don't have to do this stuff yourself. And one other thing, this works on Node, as well with Express.
+
+[00:09:48]
+And so if you want to see an example of that, Eric Clemmons has a good example right here that you can look at. Okay, so that was a lot of words, I am open for questions now.
+>> Speaker 2: That only works if you're running the webpack-dev-server?
+>> Kent C Dodds: Yes, in addition to the hot command line flag, yeah.
+
+[00:10:14]
+And you could also set that in the webpack config as well. There are some places where people are using the webpack-dev-server Node API and you set it there as well. But I don't think I've ever seen somebody use it in the webpack config before. It's mostly CLI or if you're using the Node package.
+

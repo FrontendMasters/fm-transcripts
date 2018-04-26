@@ -1,0 +1,634 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:10.000
+[MUSIC]
+
+2
+00:00:39.358 --> 00:00:41.976
+&gt;&gt; Jafar: Today the topic is
+asynchronous programming in JavaScript.
+
+3
+00:00:41.976 --> 00:00:43.076
+First a little bit about myself.
+
+4
+00:00:43.076 --> 00:00:46.700
+I'm the Cross-Team Technical Lead for
+the UIs at Netflix.
+
+5
+00:00:46.700 --> 00:00:50.518
+I'm the architect of
+Netflix's UI Data Platform, FalcorJS.
+
+6
+00:00:50.518 --> 00:00:52.201
+And I'm a member of the TC39.
+
+7
+00:00:52.201 --> 00:00:54.983
+Netflix technically is a member, and
+I'm a representative there on the TC39,
+
+8
+00:00:54.983 --> 00:00:56.635
+which is the JavaScript
+standards committee.
+
+9
+00:00:56.635 --> 00:00:57.500
+Who's heard of that by the way?
+
+10
+00:00:57.500 --> 00:00:58.506
+I'm just curious.
+
+11
+00:00:58.506 --> 00:00:59.216
+Okay, a few folks.
+
+12
+00:00:59.216 --> 00:01:04.150
+Okay, they're the standards body that
+designs the JavaScript language.
+
+13
+00:01:04.150 --> 00:01:06.315
+And I've been about 16
+years in the industry.
+
+14
+00:01:06.315 --> 00:01:08.525
+I formerly worked for Microsoft and GE.
+
+15
+00:01:08.525 --> 00:01:12.821
+Today I'm gonna teach how to solve big
+asynchronous problems, hard problems.
+
+16
+00:01:12.821 --> 00:01:16.660
+The time that you run into when you build
+very, very large JavaScript code bases.
+
+17
+00:01:17.780 --> 00:01:21.560
+But we're gonna do it just by
+thinking differently about events.
+
+18
+00:01:21.560 --> 00:01:24.310
+Probably everybody in this room has
+worked with events, DOM events.
+
+19
+00:01:24.310 --> 00:01:26.540
+I'm gonna show you a different
+way of thinking about events.
+
+20
+00:01:26.540 --> 00:01:28.690
+Really a fundamentally different
+way of thinking about events.
+
+21
+00:01:28.690 --> 00:01:32.562
+It's gonna make asynchronous
+programming problems that seem really,
+
+22
+00:01:32.562 --> 00:01:34.726
+really hard suddenly seem a lot easier.
+
+23
+00:01:34.726 --> 00:01:36.640
+So asynchronous programming seems hard.
+
+24
+00:01:36.640 --> 00:01:39.870
+I'm sure a lot of us have
+heard of callback hell or
+
+25
+00:01:39.870 --> 00:01:43.590
+we've tried to structure large
+JavaScript programs asynchronously,
+
+26
+00:01:43.590 --> 00:01:47.260
+and it certainly seems to introduce
+a lot of complexity doesn't it.
+
+27
+00:01:47.260 --> 00:01:49.921
+To take a look at some examples here of
+the types of complexity you can run into
+
+28
+00:01:49.921 --> 00:01:52.932
+when you start building asynchronous
+programs, you have race conditions, right?
+
+29
+00:01:52.932 --> 00:01:55.870
+I start two actions,
+they're running concurrently.
+
+30
+00:01:55.870 --> 00:01:58.730
+And I'm sort of hoping that one
+finishes before the other or
+
+31
+00:01:58.730 --> 00:02:02.040
+I want to at least enforce that one
+finishes before the other, right?
+
+32
+00:02:02.040 --> 00:02:04.790
+Memory Leaks, anybody ever hooked
+up to a DOM event before and
+
+33
+00:02:04.790 --> 00:02:08.230
+then forgotten to unhook their event and
+if the app runs for
+
+34
+00:02:08.230 --> 00:02:11.750
+long enough you slowly start
+to see the memory go away?
+
+35
+00:02:11.750 --> 00:02:14.796
+Complex state machines, this is one that I
+don't think as many JavaScript developers
+
+36
+00:02:14.796 --> 00:02:15.721
+think explicitly about.
+
+37
+00:02:15.721 --> 00:02:18.924
+But this is actually the source of
+a tremendous amount of complexity when you
+
+38
+00:02:18.924 --> 00:02:20.684
+start building asynchronous programs.
+
+39
+00:02:20.684 --> 00:02:23.420
+And uncaught asynchronous errors,
+how do you deal with error handling?
+
+40
+00:02:23.420 --> 00:02:27.120
+I mean, when we're in JavaScript we've
+got try catch for synchronous errors, but
+
+41
+00:02:27.120 --> 00:02:29.070
+as soon as we start doing
+asynchronous programming,
+
+42
+00:02:29.070 --> 00:02:30.320
+try catch doesn't help us at all.
+
+43
+00:02:30.320 --> 00:02:34.172
+And so JavaScript provides no facilities
+to deal to with asynchronous error
+
+44
+00:02:34.172 --> 00:02:38.037
+handling and so if you find it hard,
+you're not crazy, it is hard, right?
+
+45
+00:02:38.037 --> 00:02:40.292
+So let's take a look at a concrete
+example of some of the things I
+
+46
+00:02:40.292 --> 00:02:41.579
+just talked about here.
+
+47
+00:02:41.579 --> 00:02:43.825
+Here at Netflix,
+we used to write code like this.
+
+48
+00:02:44.885 --> 00:02:48.355
+This is sort of very similar to
+the code that we used to write in order
+
+49
+00:02:48.355 --> 00:02:49.225
+to play a movie.
+
+50
+00:02:49.225 --> 00:02:51.929
+When you started playing
+a movie you would, for example,
+
+51
+00:02:51.929 --> 00:02:54.091
+this function here would
+accept the movie ID.
+
+52
+00:02:54.091 --> 00:02:57.116
+It would accept the cancel button,
+and it would have a callback,
+
+53
+00:02:57.116 --> 00:03:00.670
+which would invoke when that
+movie was successfully playing.
+
+54
+00:03:00.670 --> 00:03:04.214
+So I want to call your attention first and
+foremost to the state.
+
+55
+00:03:04.214 --> 00:03:06.760
+So really what's going on
+is two concurrent things.
+
+56
+00:03:06.760 --> 00:03:08.830
+The player in Netflix is asynchronous.
+
+57
+00:03:08.830 --> 00:03:10.660
+And so
+when you would ask it to play a movie,
+
+58
+00:03:10.660 --> 00:03:14.180
+first we've got to start loading up the
+player and that's an asynchronous process.
+
+59
+00:03:14.180 --> 00:03:17.911
+Another asynchronous process that
+takes place is going to the server and
+
+60
+00:03:17.911 --> 00:03:19.816
+authorizing you to play that movie.
+
+61
+00:03:19.816 --> 00:03:23.228
+So we have to confirm that you're logged
+in and you're who we think you are and
+
+62
+00:03:23.228 --> 00:03:24.886
+you're able to play that movie.
+
+63
+00:03:24.886 --> 00:03:26.585
+So here we've got two
+asynchronous actions, and
+
+64
+00:03:26.585 --> 00:03:28.922
+we don't want to do them one after
+the other cuz that would be slow.
+
+65
+00:03:28.922 --> 00:03:31.020
+So we wanna kick them both
+off at the same time.
+
+66
+00:03:31.020 --> 00:03:34.720
+So this is the race condition concurrency
+issue we talked about before.
+
+67
+00:03:34.720 --> 00:03:38.150
+In order to figure out, every single
+time one of these operation finishes,
+
+68
+00:03:38.150 --> 00:03:39.740
+we need to check if
+the other one's finished and
+
+69
+00:03:39.740 --> 00:03:43.180
+if they both finish, we wanna do
+something, in this case play the movie.
+
+70
+00:03:43.180 --> 00:03:47.200
+What I've had to introduce here, I want
+you to notice, is variables to track,
+
+71
+00:03:47.200 --> 00:03:49.670
+in this case whether the player's
+initialized, so player.initialized,
+
+72
+00:03:49.670 --> 00:03:53.120
+that's a Boolean variable hanging off
+the property, off the player, excuse me.
+
+73
+00:03:53.120 --> 00:03:57.120
+We have to check that whenever
+the movie ticket is successfully
+
+74
+00:03:57.120 --> 00:03:58.000
+retrieved from the server.
+
+75
+00:03:58.000 --> 00:03:59.418
+And so I've got these two variables.
+
+76
+00:03:59.418 --> 00:04:01.623
+One's tracking whether the movie
+ticket's been authorized,
+
+77
+00:04:01.623 --> 00:04:03.840
+the other tracking whether
+the player's been initialized.
+
+78
+00:04:03.840 --> 00:04:06.573
+And every single time one of the actions
+completes I have to check the other one.
+
+79
+00:04:06.573 --> 00:04:09.622
+So over time if you try and do this,
+if you use this approach to tracking
+
+80
+00:04:09.622 --> 00:04:13.190
+whether asynchronous programs are done
+by introducing state into your program,
+
+81
+00:04:13.190 --> 00:04:16.653
+you'll find that over time you've got
+all these variables and all these moving
+
+82
+00:04:16.653 --> 00:04:20.238
+pieces, and it's really difficult to keep
+them set to the right values, right?
+
+83
+00:04:20.238 --> 00:04:21.840
+And what happens if something goes wrong?
+
+84
+00:04:21.840 --> 00:04:24.620
+God forbid, then you have to reset
+them to the previous values.
+
+85
+00:04:24.620 --> 00:04:27.539
+This is actually the real
+source of complexity, I think,
+
+86
+00:04:27.539 --> 00:04:29.514
+in most large asynchronous programs.
+
+87
+00:04:29.514 --> 00:04:32.079
+If you start using state to
+track your async programs,
+
+88
+00:04:32.079 --> 00:04:36.060
+you're gonna find it doesn't scale very
+well as your JavaScript code base scales.
+
+89
+00:04:36.060 --> 00:04:38.550
+The other issue here is error handling.
+
+90
+00:04:38.550 --> 00:04:42.020
+Now because an error can happen
+in either of those two actions,
+
+91
+00:04:42.020 --> 00:04:46.390
+initializing the player or authorizing
+the movie, I have to make sure to clean up
+
+92
+00:04:46.390 --> 00:04:50.810
+after myself, and make sure that
+I forward that error along, but
+
+93
+00:04:50.810 --> 00:04:54.100
+also, if possible, cancel any
+asynchronous actions that are happening.
+
+94
+00:04:54.100 --> 00:04:55.360
+I don't want to send a requirement,
+
+95
+00:04:55.360 --> 00:04:58.870
+I don't want to keep request sent off if
+there's no reason for it to be sent off,
+
+96
+00:04:58.870 --> 00:05:01.200
+because one of those two
+actions of which was errored.
+
+97
+00:05:01.200 --> 00:05:03.790
+For example I couldn't authorize
+your movie ticket, or I couldn't for
+
+98
+00:05:03.790 --> 00:05:05.270
+whatever reason initialize the player.
+
+99
+00:05:06.480 --> 00:05:09.080
+Now I deliberately left a bug
+in this particular program.
+
+100
+00:05:09.080 --> 00:05:12.229
+If you notice here,
+I'm hooking up to the cancel button,
+
+101
+00:05:12.229 --> 00:05:15.206
+an event listener as soon as you try and
+start playing.
+
+102
+00:05:15.206 --> 00:05:18.186
+Because what if you decide you wanna
+hit back or you wanna cancel playing?
+
+103
+00:05:18.186 --> 00:05:20.829
+Well, we'd like to stop
+this action of playing and
+
+104
+00:05:20.829 --> 00:05:22.740
+then sort of cancel the whole thing.
+
+105
+00:05:22.740 --> 00:05:25.180
+Notice right here, this line?
+
+106
+00:05:25.180 --> 00:05:27.153
+Can anybody spot the bug in this program?
+
+107
+00:05:32.272 --> 00:05:34.570
+&gt;&gt; Speaker 2: You're missing
+your close param right?
+
+108
+00:05:34.570 --> 00:05:35.796
+&gt;&gt; Jafar: Sorry?
+&gt;&gt; Speaker 2: Are you just missing
+
+109
+00:05:35.796 --> 00:05:36.865
+a close param?
+
+110
+00:05:36.865 --> 00:05:38.675
+&gt;&gt; Jafar: [LAUGH] that's
+an entirely different bug.
+
+111
+00:05:38.675 --> 00:05:42.430
+[LAUGH] But yeah, I'm missing a close
+parameter so this will not compile.
+
+112
+00:05:42.430 --> 00:05:45.310
+However, the actual bug I'm
+trying to get at is I'm
+
+113
+00:05:45.310 --> 00:05:48.550
+forgetting anywhere to unhook
+from that event handler.
+
+114
+00:05:48.550 --> 00:05:51.422
+So I've hooked up an event handler and
+then you hit cancel and
+
+115
+00:05:51.422 --> 00:05:53.220
+then I just stop the function.
+
+116
+00:05:53.220 --> 00:05:56.060
+And so the next time you try and play it,
+I'll hook up another event handler and so
+
+117
+00:05:56.060 --> 00:05:59.350
+on and so forth, until gradually
+the program starts to lose memory.
+
+118
+00:05:59.350 --> 00:06:00.660
+And so, that's another thing.
+
+119
+00:06:00.660 --> 00:06:01.810
+Remember if I hit an error,
+
+120
+00:06:01.810 --> 00:06:04.730
+I also need to remember to unhook
+any event handlers out there.
+
+121
+00:06:04.730 --> 00:06:06.580
+It's a very complicated thing to do,
+
+122
+00:06:06.580 --> 00:06:08.800
+to clean up after yourself
+when you have an error.
+
+123
+00:06:08.800 --> 00:06:10.444
+But when we're doing
+synchronous programming,
+
+124
+00:06:10.444 --> 00:06:11.741
+try catch does all that for us, right?
+
+125
+00:06:11.741 --> 00:06:15.371
+It unwinds the stack, and any variables
+we've allocated are all cleaned up.
+
+126
+00:06:15.371 --> 00:06:17.891
+In asynchronous programming
+we're on our own.
+
+127
+00:06:17.891 --> 00:06:22.167
+So I'm gonna show you guys today a pretty
+radically different way of building
+
+128
+00:06:22.167 --> 00:06:26.707
+asynchronous programs, and it's actually
+gonna involve not much more than a few
+
+129
+00:06:26.707 --> 00:06:30.300
+flexible functions that you guys
+are gonna use again and again.
+
+130
+00:06:30.300 --> 00:06:33.220
+In fact these may be actually some
+of the most flexible functions
+
+131
+00:06:33.220 --> 00:06:35.100
+you will ever learn,
+the ones I'm teaching you today.
+
+132
+00:06:35.100 --> 00:06:36.690
+And you're gonna to be
+able to use them for
+
+133
+00:06:36.690 --> 00:06:38.340
+asynchronous programming
+as well as other things.
+

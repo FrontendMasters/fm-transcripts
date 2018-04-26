@@ -1,0 +1,86 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:03]
+>> Douglas Crockford: It's time now for a Asynchronicity. So there are two kinds of functions in the world, there are Synchronous functions and Asynchronous functions. So let's first look at Synchronous functions. A Synchronous function is a function that does not return until the work is completed or has failed. So all of the functions that we wrote for the last couple of days have been synchronous functions because that's how they work.
+
+[00:00:28]
+And that's a very useful thing to have in a function because it means, it's easy to reason about its behavior over time. When asynchronous function calls another synchronous function. The caller is suspended in time and nothing advances until the the callee returns. If the caller is looking at a clock at the moment that they make the call.
+
+[00:00:54]
+Their experience will be, that the hands jump forward quickly. But otherwise, they're not aware that this stuff has happened, except that the thing that they asked for has magically been completed. And that makes it easy for us to reason about things, unless we need to make multiple things happen at the same time.
+
+[00:01:12]
+You can't make multiple things happen at the same time if you're suspended in time. So, the way that Topham mitigated is by use of the threads, that thread allows to have multiple threads of execution happening through a memory space at the same time. So that's lots of things and happen at the same time.
+
+[00:01:28]
+Unfortunately, races come with some problems including, threads come with problems including races, deadlocks and other reliability problems and performance problems, and will look more at these. So the threading model, like all models comes with pros and cons. And the first pro is a really important, really significant one.
+
+[00:01:49]
+No rethinking is necessary. You can take any existing piece of code, put it in a thread and it'll just work that way. You don't have to make any changes to it, in order to introduce it to a threaded environment. Now that doesn't necessarily mean that you'll never need to change it, but the starting up phase is really easy.
+
+[00:02:10]
+The next pro is that blocking programs are okay. It's okay for programs to block and in fact, that is what threads are for. Threads exist, so that things can stop. And have other things happening while it stopped. Execution will continue as long as any thread is not blocked.
+
+[00:02:25]
+But there are some cons. The first con is that there is stuck memory allocated per thread. This used to be a significant problem. It's not any more. Moore's Law continued to ramp on memory capacity, and so thread stacks are now in the noise. We don't care about them anymore.
+
+[00:02:44]
+A more important con is that if two threads use the same memory at the same time, a race may occur. And the fact, this is a big problem. So a lot of people been asking, when are we going get threads in JavaScript and the answer is never. And let me illustrate why.
+
+[00:03:01]
+So here we have two programs which will each run in its own thread and we were run them, possibly at the same time. And there are a number of possible consequences of this program. One is, an array containing A and B. And the other is, an array containing B and A.
+
+[00:03:21]
+Because we can control in what order these two threads run, these are two possible outcomes. But that's not the race I'm worried about, the race I'm worried about is this one. Another possible outcome of this program is an array containing only a or an array containing only b.
+
+[00:03:38]
+And this is not due to anything, except what's happening in these two statements, and you can look at these for a long time and try to figure out did half of my data go. How did this fail? It's really hard to reason about programs that race in threads.
+
+[00:03:54]
+So let's zoom in on this and look at what's going on. So that's the first statement. One of the things that makes jobs descriptive and expressively powerful language is that one statement can do the work of many statements and that's the case, in this one, that one statement on the top, does what the four green lines do.
+
+[00:04:11]
+It'll get the current length that we'll assign to the part of the array. If the length of the array has increased, then we'll make that change. And if we look at the second thread, it also expands into stuff like that. And we cannot control how these might be ordered in actual execution.
+
+[00:04:33]
+So one possible ordering could be both capture the length at the same time, and both will be using that to store into the rain both will be using it to change the length of the arrays. And as a result, which ever one run second is probably going to win.
+
+[00:04:51]
+So that's where half of our data went. And this stuff is really hard to reason about. For one thing, you can't see it in the original code but it's worse than this, because each of these statements could expand into multiple machine language statements. And you don't know how those are gonna interleave.
+
+[00:05:07]
+And each of those could expand at the low level into micro instructions and you can't control how those will interleave and it may be that the real time behavior of this threaded code changes according to loading. So might be working fine during development, but then fail when we put in production.
+
+[00:05:24]
+Or it's working fine most of the year, but it fails at Christmas. As things change, things that wouldn't appear to affect the behavior of the program can actually radically affect the behavior of the program. So it's impossible to have application integrity, when we're subject to race conditions. So that we mitigate that with mutual exclusion.
+
+[00:05:49]
+Mutual exclusion allows only one thread to be running in a critical section of memory at a time, and there's a long history of this stuff, starting with Dykstra semaphores. Or as an horse monitors the editor rendezvousing, now we caught synchronization but these are all transforms on the same idea.
+
+[00:06:07]
+This used to be operating system stuff. Used to be only operating systems were concerned with mutual exclusion and running multiple things at the same time, but this has all leaked into applications, because of networking and because of the multi-core problem. The concern with networking is that,
+>> Douglas Crockford: We want to be able to have stuff happening while slow things are happening.
+
+[00:06:31]
+And one of the slowest things we can do is go out to the network, cuz that has a large latencies, and In some cases are noble latencies, and so you can be stopped for a long time and generally, you can't afford to have systems be suspended for that long.
+
+[00:06:46]
+So you need threads in order to allow them to continue. Then there is the multi-core problem, CPU designers have lost the ability to make CPU's go faster. So instead, they're giving us more of them. And we don't know how to use them, unless if you have a problem that's embarrassingly parallel, then we can take advantage of it.
+
+[00:07:04]
+But most of what we do is embarrassingly serial and we don't know how to take multiple cores and put them in our applications and get a significant benefit from it. So that's where we are. So with mutual exclusion, only one thread can be executing in a critical section at a time and all other threads waiting to execute in the critical section will be blocked.
+
+[00:07:30]
+If the threads don't interact, then the programs can run at full speed across all the cores. But if they do interact, then races will occur unless mutual exclusion is employed. Unfortunately, mutual exclusion comes with its own dark side. And that is deadlock. Here we have two threads, Alphonse and Gaston.
+
+[00:07:48]
+They are both program to wait for the other to stand up, before they can stand up. This is deadlock. It turns out computer systems do this all the time. Here's another example. This is a real world example from Sao Paulo. You can think of, apparently they do this all the time.
+
+[00:08:05]
+
+>> Speaker 2: [LAUGH]
+>> Douglas Crockford: You can think of each of these cars as being a thread, which is ready to run. It's just waiting for the thread that's blocking it to get out of the way.
+>> Speaker 2: [LAUGH]
+>> Douglas Crockford: So deadlock, it's a serious thing.
+

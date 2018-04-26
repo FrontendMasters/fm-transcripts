@@ -1,0 +1,111 @@
+[00:00:00]
+>> Kyle Simpson: There are several different ways that you could try to model what I asked for from a stream's perspective, and I have attempted several different ways of modeling this. And so, I'm gonna walk you through one way of modeling it and then show you why that's not a good idea and then show you a second way, okay.
+
+[00:00:25]
+But that's not at all the only ways to do it. There are different ways of thinking about it and one of the things about becoming a good reactive programming developer is understanding all the tools that are available to you in understanding how we can mix and match these different higher level stream operations to accomplish our goals.
+
+[00:00:44]
+That is still a path that I am actively learning on, to be completely honest. And I wouldn't in any way, shape or form suggest that I'm a master of that. I am still trying to learn better how to model these sorts of things in streams. So, one way of thinking about this is we could think about the clicks as a single stream of data and the timer that's marching as a second stream.
+
+[00:01:08]
+And we could say what am I gonna do if I compose those two streams together. So, let's start that and let's see how that works. Let's call let's make one stream for our clicks. And I showed you in the slides that the simplest, easiest way to make an empty stream that we can push data into is to say .of.
+
+[00:01:26]
+And let's make another one for the timer is ASQ.react.of. Let's just see how this works out for us and see whether or not This is gonna be the path that we wanna go down. So clicks, every time I get a click event, I could say clicks.push and push an event into the end of the pipe, into the end of the stream.
+
+[00:01:55]
+And then, on the outside of it I'm gonna receive that event, of course, that's one way of doing that. And I could set myself up an interval to run every 1000 milliseconds.
+>> Kyle Simpson: And I could push a timer of that down. In fact, you could say that's such a common pattern I ought to have some little adapter for pushing timer events down, right?
+
+[00:02:19]
+So yeah, we might wanna create ourselves a little utility for making a timer stream to push timer events down. But maybe we're not going to push anything that just the fact that there's an event that there's no data to push along so in that called dot push was no events here.
+
+[00:02:37]
+So now, I have two different streams and I could think about what are my possible ways of merging two streams into a synthetic third stream. Well, what I really want is I want to send an event out whenever both of those things have happened once. Or whenever there is an event ready with both of those that's when I want my synthetic event to fire which is gonna be my messages that go out.
+
+[00:03:03]
+So, you could model this the same that by the way it's called Zip in the reacts the reactive extensions world. You can used .zip if you like here or I like to call it dot all because it is waiting for all of them to show up. So, we could model this is saying ASQ.react.all And give it both streams give it the clicks and the timer stream.
+
+[00:03:26]
+And that's going to be a NEWS STREAM that we call, I don't know I'm not coming up with a good name for it so let's just call it ready I'm ready to print out a message or maybe I'll just call it the messages stream, okay. So that's my new messages stream, and I could say the messages stream is going to receive an event every time there's something in the queue from both of these two streams.
+
+[00:03:53]
+That's when it's going to move on. But the thing that it's going to print out or the thing that it's going to move on is going to be a combination of an event object and an undefined value because I don't push anything in here. So, I could subscribe to that stream by saying every time a new event comes in.
+
+[00:04:12]
+I know I'm gonna get some data in here but I actually don't really care about the data.
+>> Kyle Simpson: So, I know that this val function is gonna get called every time the message's synthetic stream has something to give me. And I could take $.list and I could append to that list a Div, that says clicked for example, okay?
+
+[00:04:50]
+Now, if you ran this code, you're going to get something approximating what you were hoping for. But there's something deeper here that I want us to begin to develop some instinct about. First of all, did anybody try to go down this path? Is this the path that you went down anybody?
+
+[00:05:04]
+Okay, so you did. What's gonna happen here is that we're pumping in the clicks into the end of this pipe and there's nothing throwing away events. This isn't really sampling in the sense that the stuff that we're not waiting for is getting thrown away. So, there's gonna be a queue inside of here that's gonna be stacking up how many of those events are firing is going to be stacking those up.
+
+[00:05:31]
+So ,what would happen if you tried this is if you click the button a whole bunch of times and then stopped clicking. You're gonna start just seeing the click happen once a second as it drains out that queue of clicks that have piled up. Which isn't really exactly what we're wanting we're wanting sampling which is dropping stuff isn't there.
+
+[00:05:52]
+We see the conceptual problem there with that particular stream operation because what we have available to us with the .zip is it's not gonna drop stuff for us. That's not the definition of that particular stream operation.
+>> Speaker 2: So, this isn't like a hard observable and hacks chair
+>> Kyle Simpson: So, RxJS does have a notion, I didn't wanna get into all the complexities that.
+
+[00:06:13]
+They do have a notion of hot versus cold observables, and in RxJS terminology what that means is, let me make sure I get this right. If you have a cold observable. Then, nothing goes into the stream unless somebody is on the other end observing it and if you have a hot observable.
+
+[00:06:32]
+I don't know I might be getting that backwards but they do have this notion of dealing with this piling up of events of nobody's observing it. But in our particular case, it actually wouldn't matter because whatever whether you had a hot or a cold observable here. You're still observing it on your .all.
+
+[00:06:50]
+Your .zip is observing your observables. So, it wouldn't matter whether it was cold or hot in this particular case. So, there is that world in RxJS. That's another one of those complexities you have to learn when you learn RxJS is the difference between hot and cold observables. Basically, I tried to remove as much of that distinction from reactive sequences, because I find that to be more complex than beneficial.
+
+[00:07:16]
+But, okay, so this way of thinking about things is not really accomplishing our overall goal of sampling with throwing things away from the stream. Could we set ourselves up with another thing that manually drains the stream? Like whenever this timer fires we could manually dream drain the click stream until there was one and push it back in.
+
+[00:07:38]
+Yeah, we could go that direction. And I tried that one time I actually did that I just would approximate this I was like I'll drain the stream and then whatever that last one is I'll push it right back again and then. So that is one way of going about it but that's not really embracing the idiom of reactive programming the way you probably want to, okay?
+
+[00:07:57]
+So, the point I'm trying to make is there's a lot of different ways to go out in this. I'm going to suggest to you another way of approaching this that accomplishes our goal of sampling. So, what I'm gonna do. I'm still gonna have a clicks of it but I'm not gonna do a timer stream.
+
+[00:08:17]
+I am gonna do a messages stream. And I'm gonna keep track of the latest event message to come down the click stream. I'm gonna keep track of that in a free variable, in a variable that's in my closure. I'm just gonna call it latest. I could wrap that up inside of its own enclosure, like we did in functional programming.
+
+[00:08:39]
+I could make a pure wrapper around it, but I'm being lazy here, and I'm just trying to illustrate a concept, that I could keep track of the latest event that's happened. So for example, what I could say is every time that this has happened, I can say latest is equal to EVT.
+
+[00:08:59]
+And then, inside of my set interval, not gonna be pushing on that anymore, but inside of my set interval, what I'm going to do is if whenever this fires, if latest has been set, that is, I know that there's a waiting click event in the queue. Then, I'm going to go ahead and push into the messages queue.
+
+[00:09:26]
+
+>> Kyle Simpson: And I'll just go ahead and push the message clicked. That way I actually can push that message along.
+>> Kyle Simpson: That part's not strictly necessary, but it does illustrate the fact that I can make a stream with other pieces of data in it. So, I'm gonna do that, and then I'm going to reset latest back to null.
+
+[00:09:51]
+
+>> Kyle Simpson: Which means the next time the timer fires if no click is happen I'm just gonna go on past it. But if there's any click that's been waiting that I'm basically gonna tell it, there is something waiting for you go ahead and push out the message. So, I'm basically making a boolean variable ish Into something I'm treating as a stream.
+
+[00:10:12]
+Because in this particular case it's easier to do a boolean operation than it is to do a boolean stream operation. There are ways to model boolean stream operations, but they're much more complex. So, I don't think you should go down that route when there's a simpler option available.
+
+[00:10:29]
+This isn't maybe the most perfect and pure reactive programming. But under the covers, if you have a reactive utility like RXGS and I think they have a sampled stream operation. They have a way to sample a stream operation. Guess what they're doing? They're saving it into a variable, so we're just cutting out the middleman and doing that ourself.
+
+[00:10:49]
+
+>> Speaker 2: You wouldn't eclipse then, would you?
+>> Speaker 3: Stream in, don't you?
+>> Speaker 2: Yeah.
+>> Kyle Simpson: So I know, okay, yes. So, my intended, I'm sorry I did get a little slightly off track here. My intended thing was to not, too had here I was trying to separate concerns and then I forgot to go back and do that.
+
+[00:11:14]
+My intended thing was to observe the clicks thing and set latest. So, I was going to observe the clicks event and I don't want to be mixing my dom event handling with my stream event handling. That's a mixture of concerns when we want to keep things separate. The whole purpose of setting up these streams is so that I can produce events in one stream and observe them in a different place.
+
+[00:11:36]
+In this different place which is line 20 of my code I don't know anything at all about where the clicks are coming from. I don't know what DOM element is handling those, so I want to be able to observe that at a far, so that's where I'm gonna observe the event happening here.
+
+[00:11:51]
+And say latest is equal to event.
+>> Kyle Simpson: So basically, think conceptually. There is a dividing line here where these are two entirely different parts of our application. The production of our streams and the consumption of our streams and down here. In these things we don't know anything at all about the DOM elements that are occurring.
+

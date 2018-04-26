@@ -1,0 +1,195 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:03]
+>> Speaker 1: Why do we have both an index.js file in the root directory as well as a server.js file in the server directory? They both seem to be doing the same thing.
+>> Scott Moss: Are they? Let's take a look. So, index.js is the entry point to our server. What is it doing?
+
+[00:00:22]
+It's, first thing it's doing it's booting up the config which I think is very important, get that thing ready. The second thing it's requiring our app, our server application and then it's listening on the ports. So this is actually starting our server. If we go look in server>server.
+
+[00:00:41]
+
+>> Scott Moss: I don't see an app dot listed in here. So if they're the same thing, if I come in here and I say node server/server.
+>> Scott Moss: I get the database seeded, that's great. But the server didn't start up, and that's because it's in index.js. And the reason we did that is because if you go back to when we were talking about testing yesterday, I needed to export the app for testing.
+
+[00:01:09]
+And that's why I have this comment down here, export the app for testing. So because I had to export the app for testing, that means I need to create another file in order to start the server. I could also just start the server in this file and still export the app, there's nothing to stop me from doing that.
+
+[00:01:25]
+But I want my test to be in control on whether or not I want to start the server or not. So it's just a way of having more control on what is turning the server on or off.
+>> Scott Moss: And also, server.js is connecting to the database, it's seeding the database, it's setting up all the middleware, it's setting up error handling.
+
+[00:01:44]
+Whereas, index.js is just starting the server, that's all it is. This is like, just gonna start the server, just gonna load up the config. That's all I'm doing. So it's a little different. But good question. Keep them coming. All right.
+>> Scott Moss: Any questions before I get started on this stuff?
+
+[00:02:03]
+Everybody just wanted to see it or you probably all ready looked for it, all right? So now let me check out to the fix.
+>> Scott Moss: What is all this?
+>> Scott Moss: Whatever, I'll push it out.
+>> Scott Moss: I'm gonna push this stuff up right quick, okay? So now if you check out to the fixed branch, but you might have already be there.
+
+[00:02:41]
+git step-12-fix, okay. So, how does this look like? Well, let's just start at the beginning. The category routes. So my approach was this. I just wanted to show you a simple way. I wanted us to understand exactly how the middleware work. This is probably not the way I would do it in my application, but this way demonstrates how middleware works.
+
+[00:03:09]
+So the way I did it was I just made an array and I placed in the middleware that I want to run next to each other. And that's pas,t I'll just place that array on any route that I wanna use that on. So the one that we definitely need for sure is the decodeToken, that's doing the verification.e The other one auth.getFreshUser is not necessary.
+
+[00:03:30]
+
+>> Scott Moss: But it's great because this guarantees us that on any, this, what this means is that like, first, cuz we do auth.decodeToken, that means we're looking for a token. And because that means, if this passes, that means there was a user. So what I'm saying is, if there was a user, let's just go ahead and get the full user while we're here anyway.
+
+[00:03:50]
+So that means on any request or any controller route, we have access to req.user. That is not the same as the params. The params slash id will look at the id and give you the resource with that id. But that resource is not always the user, like for instance, in this case.
+
+[00:04:04]
+This param 'id', this isn't gonna give you the user, this is gonna give you the controller with that id. This will give you the user. So now we'll have req.controller, I mean, I'm sorry, req.category and req.user. We'll have both of those. So that's why we did that. Is it necessary?
+
+[00:04:20]
+Only if the controller method is relying on it, is it necessary. In our example, I don't think any of our controller methods were relying on it. Maybe one or two, we'll see in a minute. So it's not necessary, I just think if it was like, it may be nice to have.
+
+[00:04:33]
+But if it's an expensive database query to go fetch the user, probably don't wanna do it, or maybe cache it. I'm not sure, but it's nice to have it. So, as far as locking down our routes, categories, only authenticated folks should be able to make categories. So, I'll put it there.
+
+[00:04:51]
+Only authenticated people should be able to update a category, so I'll place it there. And only authenticated people should be able to delete a category. Everybody else should be able to get one category or get all categories. If you can imagine, in a WordPress blog it lists all the categories on the right, or whatever.
+
+[00:05:08]
+You get to click on them and they'll show you all the blog posts that relate to that category, something like that.
+>> Scott Moss: Any questions on category? Anybody disagree with the route that I chose to lock down, or have any opinions on other routes?
+>> Scott Moss: Maybe you locked down everything.
+
+[00:05:32]
+Okay. Now, if we go into the post routes, this one's pretty much the same thing. Again, I have this array and I'm locking down the same routes on the create a post, on update a post and delete a post, you should be authenticated.
+>> Scott Moss: What happens if I have a post
+
+[00:05:59]
+
+>> Scott Moss: That has an author on it or a user, and then I delete the user? Does the reference to that id and the post stay there?
+>> Scott Moss: Think about that.
+>> Scott Moss: Do I now have to go find the author, the post with that id and get rid of it?
+
+[00:06:22]
+Or will Mongo just handle that for me?
+>> Scott Moss: Is it atomic?
+>> Scott Moss: That's a good question?
+>> Scott Moss: The reason I was asking is cuz I ran into that the other day, and I wanted to know if anybody else knew on the top of their head.
+>> Speaker 3: Well, Mongo doesn't deal with the req cuz they don't involve relationships?
+
+[00:06:41]
+
+>> [INAUDIBLE]
+>> Scott Moss: Yeah, Mongo definitely doesn't care. What Mongo's doing
+>> Scott Moss: Yeah, they do it. Thank you for givng me that reference.
+>> Speaker 3: What did they replace it with, null?
+>> Scott Moss: I don't know. It's just not there any more. I could be wrong, try and prove me wrong.
+
+[00:07:00]
+I haven't used the Mongoose since version 3 something and now they're almost on 5, so maybe they changed it. But it definitely was the case.
+>> Scott Moss: So, user routes, this is the only one that's different. So, first I added the router that we're talking about for me. So, if I want to get me, let me verify you first and then I wanna getFreshUser.
+
+[00:07:26]
+So this is where you getFreshUser actually does come in handy. Because by the time I get to controller.me, I can just return req.user. I can say rest.json, req.user, done. All right, if anything else in that controller, because getfreshUser already got there, that thing for me. So we can go look at that.
+
+[00:07:42]
+If you go look at the controller.me. That's literally all it's doing, is sending that back.
+>> Speaker 3: Do you need the toJSON?
+>> Scott Moss: We'll talk about the toJson in a minute. I'm glad you asked. I was just like, is anybody gonna ask me about that? Yes, we'll talk about that in a second.
+
+[00:08:03]
+
+>> Scott Moss: So the routes that I chose to log down here besides the me was only the put and delete, so you should be authenticated if you want update a user or delete a user. But if you want to get one user, I'll let anybody do it with id.
+
+[00:08:17]
+If you want to create a user? Yeah, I have to let anybody do that cuz that's sign up. So if I require you to be authenticated to sign up then you would never be able to sign up. So don't want to put that there. And then get all users.
+
+[00:08:31]
+Yes, I'll allow anybody to get all users for the sake of a blog of being able to look at all the authors and seeing what they wrote about.
+>> Scott Moss: Any questions there? No, so back to the toJSON thing,
+>> Scott Moss: Where is it at? Right, so I made a new method on the user schema, it's called toJSON.
+
+[00:08:57]
+And all it does is, it uses the toObject method that you can call on a document that's built in a Mongoose. So that's gonna convert it from a document which looks like a JavaScript object. I was saying this before, when you retrieve something from the database using user.find and all those things that come back, they look like regular JavaScript objects.
+
+[00:09:18]
+But they're really not. They are actually documents that have all these atomic operations on them like .save, and .move, right? That's not a regular JavaScript object, so if you call a toObject on it, it's just like okay, cool. I'll remove all those atomic operations and literally just give you a regular JavaScript object which will have the same properties on it.
+
+[00:09:35]
+It's not gonna change any of this stuff. All this stuff will be there, this is gonna get rid of all the other stuff that comes along with documents, like .save, .remove, .populate, so you can't do that. So that's what toObject does. So I'll do that first, and then I delete the password property on it.
+
+[00:09:49]
+So I don't send back the hash passwords on all the calls and then I just returned the object. So that's what toJSON is doing. So it's making sure I don't send back hashed passwords. So that's one way to do it. This is how you would do it on an instance of a document.
+
+[00:10:03]
+And then the way you would do it as far as a query.
+>> Scott Moss: On our populate, when I populate the author, I can put a comma here and say you know what, only give me the username property of the author. I don't want everything. If I got rid of this and was like, yeah, just give me the author, it'll give me the entire objects, which is the username and the password, the hash password.
+
+[00:10:29]
+But I'm like, no, I just want the username, don't give me the password. So that's another way to do it, the word of population.
+>> Scott Moss: And then there's also another way to do it during queries, which is to, I'm not sure if I'm using it anywhere else, let's see.
+
+[00:10:47]
+I might be using it here, yeah. You can use the .select method on a query, and you can put negative in front of the field you don't want it to select. So, if I say negative password, that means don't select a password. That's another way you would do it on a query.
+
+[00:11:03]
+So those are three ways you can do it. On the document, I made a method. On the population, I just passed in the properties that I want. On the record query, I can use the .select method and say negative the field that I want to exclude.
+>> Scott Moss: And then call it exec.in, so all those will do the same thing.
+
+[00:11:22]
+So this is insuring that I should never see a hash password in my data.
+>> Scott Moss: Any questions on that stuff?
+>> Speaker 1: Somebody was just mentioning, it appears that an authenticated user can update another user's account if they know the id.
+>> Scott Moss: Yep, that's totally true. So, a authenticated user could update another user's account if they know the id, that is totally true because we haven't set up anything for that.
+
+[00:11:56]
+So, if you go into userRoutes, user id, put. We go into put, here, there's nothing stopping an authenticated user who new/id/id from coming in here and changing stuff. You're right, there's nothing stopping that. How would you get around that? Off the top of your head, what would you do to get around that?
+
+[00:12:18]
+With all the stuff you know about express.
+>> Speaker 3: That's part of your requirements, right?
+>> Speaker 3: That's part of your requirements, right? I mean you might want to be able to so.
+>> Scott Moss: Right, it all depends on what your requirements too, right? Yeah, so like on a role based system which most blogging platforms are, you have authors, editors, admins, maybe you want and they're all users.
+
+[00:12:37]
+But maybe you want a user with admin property be able to update a user with author property. So it all depends, in our case, they're all users, there's no role-based. So maybe it's dangerous, but how would you check for that, how would you prevent that?
+>> Speaker 3: You could just do an if or [INAUDIBLE] merge, and say, if user id equals update, got id, would that work?
+
+[00:12:56]
+
+>> Scott Moss: Yeah, you can do that. What's a better way?
+>> Speaker 3: All that I got, you don't get no better.
+>> Scott Moss: You sure?
+>> Speaker 3: [LAUGH]
+>> Scott Moss: You sure you don't get no better? What if you can do that before you even get here?
+>> Scott Moss: What if you make that check before you even get to this controller project.
+
+[00:13:12]
+
+>> Speaker 3: Is this a middleware or something?
+>> Scott Moss: Yeah, you just make a middleware. It's like, hold up, let me make sure these id's match up, you know what I mean? Let me make sure the req.params.id equals req.user._id. And if they don't, get out of here, right, cuz on this put you have req.params.id, so you get this id of the user you're trying to update, right?
+
+[00:13:35]
+And then you also have req.user._id, which is the user that sent the request. So you see those two match inside of a, you put that right here, right? You just put it right here. This makes the middleware that would check those two. If they don't match, REST.sim unauthorized.
+
+[00:13:54]
+
+>> Speaker 1: Editing yourself or something?
+>> Scott Moss: Yeah. Another approach is you can just get rid of this id thing. All right, it is does not have id's. That way people can't update anybody else but themselves, right? So if you wanted to update yourself, you would just do a put request to like, slash me.
+
+[00:14:13]
+Or just do a put request to slash users, and then I would know who you were because you id is at req.user.
+>> Speaker 3: It wouldn't really solve the problem, it would hide the id?
+>> Scott Moss: It would hide the id's, yeah. I would never be querying the database for an id.
+
+[00:14:28]
+
+>> Speaker 3: Unless you updated it later and then, yeah, I see what you're saying.
+>> Scott Moss: It would never happen, right? Cuz the reason this happens is because, if we go to params, I'm querying the database for an id. But if I never have params, if it's gone, and the only way I know about an id is off req.user.
+
+[00:14:45]
+And the only way I know about req.user is off of a decoded JSON Web Token, I'm guaranteed that the id that I was looking at on req.user is the person who actually signed in. Whether that's you or not, that's not my problem. Somebody might've got on your computer, but I know that it is the person who's username is this, and whose password is this, yeah.
+
+[00:15:03]
+So you see that a lot too with token APIs. They're like, do not use the slash id's stuff anymore. When you're only accessing resources about yourself then they'll bring the id stuff back when they access resources about other things. So it's a little different
+

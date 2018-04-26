@@ -1,0 +1,120 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:03]
+>> Kyle: Judging from some of the looks on the faces in the crowd here in person. This was challenging right? I promised that it would be challenging, I didn't want to let you off easy. But actually you might kick yourself when you realize how stupidly simple this is. It just requires you to train your brain to think a little differently about these problems.
+
+[00:00:24]
+So here's what I'm gonna do. I'm actually gonna solve the problem in reverse. Cuz I find it easier to understand when I do that. So what I'm gonna do is I'm going to assume that I have a getFile function that does that magic. And will come back and figure out how to make it do that magic, but I'm gonna talk about how I use the function.
+
+[00:00:41]
+So I'm going to need to get something back from getFile, and that thing that I get back is a thunk. And I'm gonna have three of them because I'm gonna make three separate AJAX requests. So I'm gonna call it th1, thunk one, is getFile, file1. And th2 is getFile, file2.
+
+[00:01:08]
+
+>> Kyle: And th3 is getFile, file3, okay? Now, that takes care of making the request, but it doesn't take care of coordinating their responses. So I'm going to coordinate their responses.
+>> Kyle: Using exactly the way we know how thunks work. What is a thunk? It takes a callback, right?
+
+[00:01:34]
+So I'm gonna call th1 and give it a callback which gives me some text. And for just clarity's sake I'm gonna call it text1. It doesn't matter what we call it. But I know that this callback will be called when there is a text1 to respond to. Does everybody agree with that?
+
+[00:01:53]
+So I can simply output it at that point.
+>> Kyle: And then I know I can call th2 and pass in a callback.
+>> Kyle: And at this point I know I can print out the contents.
+>> Kyle: And then I know I can call th3 with a callback.
+>> Kyle: And print out the contents, oops.
+
+[00:02:30]
+
+>> Kyle: And finally print out my complete message.
+>> Kyle: Okay, now if my thunk was lazy. Does everybody see why I would not be making my AJAX request in parallel? If my thunks were lazy, if it did not make this AJAX request until that point, it would not make that request until after th1 had finished.
+
+[00:02:55]
+Is that a valid solution? Yes, except for the fact that it violates our principle of parallel requests. It would work, but it would not fulfill the requirements of the problem. So the requirements of the problem are going to ask us to somehow pull a rabbit out of the hat and create not a lazy thunk, but an active thunk.
+
+[00:03:14]
+Okay. But if we do have an active thunk, can everybody see why this is always going to make sure that they are responded to in the correct order? There's a couple of options here. If I run th1 and I print out the text for one, and then I run th2.
+
+[00:03:30]
+One option is that th2 is already ready to go, it already has a response. In which case it's right away gonna call me with text2, that's one option, cuz it already had that one there. Another option is that it's not yet got the text2 ready, which case I'm just gonna keep waiting.
+
+[00:03:46]
+But in either case I know that once it does fire I do have a text2. And once I get to th3 there's only one of two options. Either th3 is already finished, in which case when I call it I'm gonna get the value extracted right away. Or I'm not gonna get the value extracted right away but I'll wait until I do have a value.
+
+[00:04:04]
+So in all possible combinations this expression, this nested callback expression, is going to sequence my output. And I don't have to worry about any kind of looping through some array or object to find stuff. I know that they're going to be sequenced correctly as a result. Does everybody follow me on that reasoning, okay?
+
+[00:04:26]
+Whether you realize it or not, that's a huge massive improvement over our previous, and we didn't invoke any kind of library or any fancy thing at all. We're just using functions in a different way. This blew me away when I first realized that this was possible all along.
+
+[00:04:41]
+Why on Earth did I write so many years, decades of crappy code not realizing how to use my tools more effectively? Cuz this is significantly more clean and understandable. It's not perfect, but it's way better than what we wrote in exercise one. Now that I know that that's what I need to come up with, I need to figure out whether it's even possible to solve.
+
+[00:05:05]
+This silver bullet, this active thunk. So here's how we're gonna do that. We're going to observe that there are two possible cases for every thunk. First of all we know to be an active thunk we are going to need to call the fake AJAX call right away. Does everybody agree with that?
+
+[00:05:27]
+With the file URL, and we're going to need to pass it some callback that gets a response. That's gonna have to happen right at the time we call getFile. If that happens later then we have a lazy thunk and we've failed our solution, okay. We also know that a thunk has to return a function.
+
+[00:05:48]
+And that function needs to receive only one argument which is a callback.
+>> Kyle: So everybody understand that reasoning? So with this setup we have line 24 and line 28 need to get bridged together in some way. Either line 24 is going to run before line 28, or line 28 is going to run before line 24.
+
+[00:06:13]
+Those are the only two possible outcomes. So we need to bridge the two and we're gonna do that by looking at both scenarios independently. So let's imagine for an example that line 24 runs first, before line 28. So let's say line 24 has run, that means we got the response back.
+
+[00:06:35]
+But we have not yet called our thunk. We're gonna need to hold onto that response, does everybody agree with that reasoning? So here's what I'm gonna do. I'm going to, in my closure, have a variable called text. And what I'm going to say is text = response. Now on line 30 now, which was the previous line 28.
+
+[00:06:59]
+When line 30 runs at a later time, I have a callback and I have some response text. So couldn't I just say cb(text). Does everybody see how I did that? That's only one of our two scenarios but I just want you to understand how we're bridging. In the one scenario we're bridging by saving the text and then passing it into the callback at a later time.
+
+[00:07:24]
+Okay, now let me back up. Let's imagine that now instead that it's line 30 that runs first, before line 26. So Line 30 gets a callback but we're not ready to use that callback yet, are we? So what if we save it off, what if we say fn = cb.
+
+[00:07:51]
+
+>> Kyle: And then when this line 26 runs I have a callback to pass my stuff to, I can just simply pass response directly into fn.
+>> Kyle: Does everybody see that?
+>> Kyle: So in either of those two scenarios I have a way to bridge the gap and that bridge is closure.
+
+[00:08:14]
+Now I just need to put those two solutions together, okay. So what I'm going to do, I'll start back at scratch. What I'm going to do is set up an if statement to ask for these two conditions. So on line 26 what I'm going to ask is if fn has been set.
+
+[00:08:35]
+Then I know that the other one has been called first, right, cuz that's the only way it gets set. Which means I can simply call it right away with what I just got. If fn has not been set, I need to save the response.
+>> Kyle: Down here, we're gonna do the reverse if logic.
+
+[00:08:55]
+If the text has been set, then I know I can just go ahead and send it to cb. Otherwise, I need to save off my callback.
+>> Kyle: Few of you had that. I had that mine exploding like [SOUND]. What? How has this been around and I just never even knew it?
+
+[00:09:22]
+Why didn't anybody ever teach me this in all my years of JavaScript? I don't need some library. I just need to know how to better use the tools I already have.
+>> Kyle: I've looked, and looked, and looked for a name for this pattern of bridging the closure of these two states.
+
+[00:09:45]
+And really, I've asked functional programming developers and other people what do I call this pattern? Nobody has any good name for it. So I just call it active versus passive, or active versus lazy thunks. Cuz I don't have any better term for it. But when I discovered this a few years ago, I started using it all over the place.
+
+[00:10:05]
+And in fact, I realized I'd already kind of fumbled upon that solution before in some of my earlier libraries. Because I needed something like a promise before I had promises. And I had accidentally stumbled upon something kind of like this in the past. And then I realized, wow, that's actually a pattern I use all over place inside of the various libraries there, right.
+
+[00:10:31]
+
+>> Kyle: So it's a more effective way of using the callbacks and closures that we already have in the language. And again, the take away. We have completely factored time as a state out of the equation. We don't have to worry about it. We set this code up once, this is like plumbing.
+
+[00:10:51]
+This is the program code that we write over, and over, and over, and over again. And this is the part where we don't have to worry about time. Cuz that part's already been taken care of for us. So it makes our code fundamentally easier to reason about.
+>> Kyle: Okay, so
+
+[00:11:20]
+
+>> Kyle: that's thunks. The next step, when we get back together, is to understand how promises add on to that pattern and give us even more of a solution. Promises are not a replacement for thunks. Cuz inside of my libraries that I'm making thunks, I mean that I'm making promises, I use thunks.
+
+[00:11:40]
+Thunks are things that you can use, it's a very lightweight way of solving asynchronous sequencing issues. Without having to invoke some huge library or some crazy API or something like that, it's a very lightweight, easy way of doing it. It's gonna take some practice to wrap your brain around that pattern, it took me quite a bit of practice.
+
+[00:11:58]
+Would highly encourage you between now and the next time we get together for this workshop, spend some time going back over that. Try that from blank file and see if you can recreate that same reasoning that I just recreated. It'll make our exploration of promises a lot more fruitful for you if you do.
+
