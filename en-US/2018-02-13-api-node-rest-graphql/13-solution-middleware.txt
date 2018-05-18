@@ -1,0 +1,103 @@
+[00:00:02]
+>> Scott Moss: Let's hop into the solution of this. So first thing let's talk, am I in the solution branch? Yeah, okay. So let's talk about the global middleware. So inside this middleware file, if you used the bodyParser, you can use them in any order you want. But basically using the bodyParser, You can say app.use, and you can set up that bodyParser middleware like this, urlencoded, extended true.
+
+[00:00:25]
+Basically what this is allowing us to do, this is middleware where this middleware is going to format the query string for us basically. If you pass in the query string like this,
+>> Scott Moss: So your API,
+>> Scott Moss: Like this, right? thing=1, other=2, stuff like that. It'll format that so we can access it on request.params.
+
+[00:00:59]
+
+>> Scott Moss: That's what it's doing. So you wanna be able to do that. Extended just means some extra rules that they'll add for free. bodyParser.json is basically anything that's posted or put to the API gets treated like JSON, parsed, and given to us at req.body. This is where req.body comes from.
+
+[00:01:16]
+WIthout this we don't have req.body, this is very important. So that's the GlobalMiddleware, it is already attached globally here, so I put setupMiddleware, I passed the app in and it's like a mix in, right? It just mixes the middleware in, doesn't need to return anything. I mean, you can return the app if you want but it doesn't really matter, app.use just mixes it in, so it's up to you.
+
+[00:01:37]
+And then down here for the API I used, yeah, so I didn't go in and specifically said you could do this, but if you experimented you could have attempted to do it. But basically if we go look at the, where we at? There we go, modules/auth. So we're going to use the auth stuff here.
+
+[00:01:59]
+I have an array down here, that has two middleware inside of them. One is called decodeToken, one is called getFreshUser. You don't have to use getFreshUser, all you have to use is decodeToken. This is for later, when we get into models, which I think is next. Because in order to understand what getFreshUser is doing you need to understand how models work, so I left it out on this exercise.
+
+[00:02:17]
+But if you just put the protect array in there you're totally fine, but then that's hat I'm saying is, middleware can also be an array. Because we can come inside of here and we can pass an endless amount of functions doesn't matter they're all gonna run serially. So, if I wanted to run this function, if I can type.
+
+[00:02:37]
+There we go, I got so much adrenaline from that bar fight. [LAUGH] And I run this function. You can run as many functions you want or you can just pass in an array which is exactly what protect was, it was an array of middleware.
+>> Scott Moss: So you can pass in an array, which cleans things up so if you need to share middleware stacks across different route definitions you can do that.
+
+[00:02:58]
+So I want this chain of middleware shared across multiple routes. I'm gonna put them in an array so I can just put that array in different places versus writing them all over again, over and over and over again. You can also compose your middleware, so you can have your middleware compose themselves, which is something different, but what that will look like.
+
+[00:03:16]
+It's basically, instead of returning an array of middleware, I would have a middleware that calls another middleware, that calls another middleware, that calls another middleware, and I would just place that one entry middleware as my main middleware. It's kind of crazy, but yeah, you can do that. It depends on how you want to do it.
+
+[00:03:32]
+You want an array? You want to pass them in line? You wanna do anonymous functions? You want composer middleware, express doesn't care, you can do whatever you want. I chose to be slightly explicit and use the arrays. Composer middleware is a little advanced, but basically you're taking middleware and you're calling next and you're extending it to another middleware right inside the middleware, which is kinda crazy.
+
+[00:03:56]
+If we just take a quick look at what's going on here. Who here has used JSON web tokens? Okay, JSON web tokens, at the end of the day it's a unique string that's signed on your server. It's a unique string that basically when decoded turns back into the object that was signed on.
+
+[00:04:16]
+So basically if I have an object like I have a user who's id is 1, if I get a JSON from this I might get back some crazy looking string here, right? That string the client would use to send requests to the API, the API would then take that string decode the token and verify it, and it would get back this object.
+
+[00:04:39]
+Right, it'll get this object back. And then with that object back, I'm like, let me go see if there's a user id of 1 in here. And that's how we do authentication, it's a stateless way to do authentication. So that's what we're doing here. And basically this decode token, what it's doing, it is checking for the token in the headers or the query string.
+
+[00:05:00]
+And then it runs this checkToken middleware, which is something we have not created because it's given to us by express-jwt. You pass in the secret, the secret is how you sign the token and also how to decode the token.
+>> Scott Moss: And then refresh user, all it does is, after decode token runs, at the decode token runs this function checkToken it attaches that object to The req.user.
+
+[00:05:25]
+Whatever the value of this token is, its going to attach it to req.user. So inside of getFreshUser, I can get req.user.id. Look in the database and see if there's a user with the id in there, if its not, you're unauthorized. If it is, continue to test that's a req.user and then call next.
+
+[00:05:43]
+So it's a little complicated because we haven't talked about database queries and that's why I don't want to talk about this, but that's what's happening inside of getFreshUser. This will make more sense when we go back over databases in the next one and you can also look at the comments of exactly what's happening here.
+
+[00:05:56]
+It seems complicated, but it's not as complicated as it looks. It's just a lot of comments here that makes it look really big, but it's not. So that's what that's doing. So to verify that, now that I have protect in front of here, if I try to hit the API, if anybody's tried this so far, you'll probably run into a problem, right?
+
+[00:06:14]
+Has anybody got to this point? And what's the error that you see?
+>> Speaker 2: Unauthorized.
+>> Scott Moss: All right, you'll see unauthorized error. And it'll say no authorization token was found, right? Yep, that's exactly what it's supposed to do. There was no authorization token found. It completely-
+>> Speaker 3: Should that error be handled by an error handler, though?
+
+[00:06:33]
+
+>> Scott Moss: Should that error be handled by error handler? Well it depends on where you put your error handler. For me, no, my error handler is not here. I don't have a global error handler. But if you set up a global error handler, cuz we'll see where I put my error handler.
+
+[00:06:46]
+But if you set up one here, app.use a global, let's make one here. Error, request, response, and then next, even though we'll probably never use next. Then I can console.error the error. Let's just say error.stack, and then res.send, or status(401).send,
+>> Scott Moss: Nope.
+>> Scott Moss: So you could do that, and let's try it again.
+
+[00:07:25]
+
+>> Scott Moss: So now if I run this, yeah, now it will. This is like, nope, not gonna happen and you can see a console.log.error.stack just to get the stack of it for my login purposes. But yeah, it totally got handled here. But where I put my error handling, I made error handling specifically for the API router.
+
+[00:07:46]
+I think you would probably handle errors differently for your API routes than you would for any other routes. So the error handler that I made was specifically for API error handler. So, I mean it does the same thing, claws the stack, 500. But the difference is where I placed it, because I wanted to log for the API, I placed on the rest router, here at the end, all right?
+
+[00:08:09]
+Another thing to mention about error handlers is they have to go at the end. If I did this, it would never run, right? Because the errors bubble up. When the error is thrown in here, it's gonna be like, cool, it's basically gonna call it, cuz you called next, right?
+
+[00:08:22]
+When you called next you threw an error in, you've sent it to the next thing. But if this is before it, that means it's not after it, therefore you can not go next to it, it's previous, right? So, it needs to be next in order for you to bubble the error up.
+
+[00:08:36]
+So, you need to make sure ErrorHandler's always at the bottom, otherwise it won't work. So if you did that and you're like, why is this not working, it 's probably because you put it at the top.
+>> Scott Moss: Any questions on that?
+>> Scott Moss: Nope, okay, let me see if there's any opportunity to cover anything else.
+
+[00:08:57]
+I know people are probably looking at the author and are like, what? What is this, this seems cool, let's go over this. When we get time tomorrow, we can go over this, cuz,
+>> Scott Moss: In fact, depending on how we do it with GraphQL tomorrow, we may or may not use it this way.
+
+[00:09:15]
+This is kinda hard to explain with GraphQL, but yeah, we can get into this in more detail. There's some features here like, disable all that I'm not talking about, but we'll get into that later today as well. But yeah, auth is not as hard as it seems. I mean, at the end of the day, nobody's stuff is safe.
+
+[00:09:30]
+[LAUGH]
+Nobody is safe at the end of the day, let's be real. We can only make it harder, so
+

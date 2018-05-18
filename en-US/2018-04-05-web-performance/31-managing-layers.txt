@@ -1,0 +1,54 @@
+[00:00:00]
+>> Steve Kinney: But you're thinking, how do I avoid painting? Isn't that fact of life when I'd like to get pixels on the screen? That's you all right now thinking, I can read your minds, turns out. My thing is, let the Compositor Thread handle that stuff. You're like, well what does that mean?
+
+[00:00:14]
+So here are some things that compositor thread that works with the GPU is really good at. It's not good at drawing bitmaps, but it's very good at taking a bitmap that was drawn before and drawing it in more different places, right? It's good at scaling and rotating bitmaps.
+
+[00:00:30]
+It's good at making them transparent and applying Instagram filters to them. It's also good at mining Bitcoin, right? There's lots of stuff you can do on a compositor thread that you can ship on over to it. So generally speaking, whenever we're doing some of these things, if we can pass it off to the less-busy thread that's only good, super good at a few things and not do those on the very busy thread that's not as good at those things, we should totally do that.
+
+[00:00:56]
+So the browser does that and it creates these things called layers. Now this is a single website where we have a sticky header. And in this little 3D view in the Chrome Dev tools, you can see that it's on its own layer. So if you've ever used Photoshop and you have something on a layer and you can move it around without destroying the pixels underneath it.
+
+[00:01:14]
+It's the exact same concept, right? So the top bar kinda floats above, and we basically instead of repainting the top bar over different pieces of text, we're basically sliding the rest of the page underneath it. And we can have it like that. And this is really kinda cool, and it's why if you are looking at a retina screen before when you took this for a spin and you saw this happening, you didn't see the paint before, because it was like automatically on retina, it will take anything on position fixed and move it to its own layer.
+
+[00:01:38]
+Right, and you didn't see it but on a non-retina screen, we don't do that. The reason for that is when you move it to its own layer, you lose some pixel aliasing which makes your font look smooth, right? On Retina, you will never notice that, on non-retina you could notice that so the browser doesn't automatically do it, and that's why you have the difference there.
+
+[00:02:03]
+So it's like, I wanna know everything about how to get stuff to the compositor thread. That's not possible or useful because the compositing is kind of a hack. It's not like, in the W3C spec. Java Script is specced out, the dom is specced out, the CSS object model Inspector.
+
+[00:02:21]
+There are rules for how these things behave. Compositing is kinda done by browsers, however they want with the rights to change it. We just need to know that it exists and we're gonna talk about how to make suggestions to the browser like hey, hey, why do you make this it's own layer?
+
+[00:02:35]
+I think it will be good, right? And the browser can choose to either listen to us or not listen to us. Some other kind of use cases. We do our thing, this is our code area with a side by side code and then the Visual Studio Side and we have this settings that slides out over it.
+
+[00:02:50]
+So that would cause a whole bunch of repaints, but because it's its own layer, it slides out in front. We slide it back when it's done, the only repainting that you saw there was the turning of the gear. And select to drop down that I wanna talk about, but jQuery plugin that's fine yeah the thing slides out we don't repaint any of those parts which very cool.
+
+[00:03:17]
+So all right I wanna use layers through everything, that's great. One does not simply use layers, right? You can say I want this to be it's own layer, you probably shouldn't. We'll talk about why in a second. But you're not really in charge of layers. That's not your thing.
+
+[00:03:34]
+You can simply make recommendations. There are optimizations that the browser does for you under the hood. Again they're not specced out. You don't really have any control over them but you can influence. [LAUGH] You can bow before the compositor king. And ask to become a layer and the browser can decide whether or not you're worthy of becoming one.
+
+[00:03:53]
+So out of the box we saw that right now those top bars got their own layers, a few other things do as well. The root object of a page gets its own layer cuz you need at least one layer, right, you need something. Objects that have specific CSS positions like position fixed, so that's when, that's only on Retina.
+
+[00:04:11]
+That's when you saw that header float above. Objects with CSS transforms, objects that have overflow so if they can scroll those are usually on their own thread cuz you don't wanna repaint, wanna keep each part, just basically slide it from underneath. A bunch of stuff will get its own layer, right?
+
+[00:04:29]
+Again it's a browser thing. It's not necessarily for you, but it can be really useful in some of work that we do. If you wanna know all the things, you can be an elite hacker and go read the Chromium source code, and see, there's literally a file called compositing reasons.
+
+[00:04:43]
+[LAUGH] And you can sit down with a cup of coffee or a drink and sit there and read through this file but generally speaking the shorter list that I showed you before is probably a good start. So an object that doesn't fall under compositingreasons.h is not going to get its own layer and that's probably a good thing.
+
+[00:05:02]
+We'll talk about that, right? It will be on the same layer as the last element that did get worthy. So it will go up to its parents. Somebody got their own layer. If nobody got their own layer, well, the root object is on the layer's one flat page, right?
+
+[00:05:16]
+It will just join the previous layer, which makes sense.
+

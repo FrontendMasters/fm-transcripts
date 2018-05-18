@@ -1,0 +1,163 @@
+[00:00:02]
+>> Scott Moss: All right, so we're going to continue working on this example. This one was pretty complicated because it was like so much mental overhead, so many like things you had to follow in order to understand it. Or you could have just ignored all of that and just like focused on just populating that field and try to work it.
+
+[00:00:21]
+Either way, it's gonna be difficult because we didn't really talk about population. So either way, it was a difficult thing but let's jump right into it. First thing is, I went ahead and I enabled users on this one. So if you wanna use users just make sure you pull from upstream of the solution, the lesson 13 solution.
+
+[00:00:43]
+So you can use users as well. I'll walk you through how I enabled that but let's just start with the playlist. So let's go over to resources playlist and we'll look at the playlist resolver.
+>> Scott Moss: And what I'm gonna do is pull open the playlists graphQL as well, okay.
+
+[00:01:07]
+I just don't wanna put them in both places, all right.
+>> Scott Moss: There we go. So if we go down to,
+>> Scott Moss: I'm sorry, if we stay right here on this playlist type, again, we have songs, which is an array of songs. I wanna query that that I wanna be able to query the songs inside of that.
+
+[00:01:27]
+So in order to resolve that, we make a nested resolver, and this is how I did it. So the first thing is on the playlist type, which matches this playlist type, I want to resolve the songs field which matches this field. And it should return an array of song types.
+
+[00:01:52]
+So the way I did it is this playlist, the root value that's passed in is always going to be a document. And the reason I know that is because this field resolver never gets resolved until the playlist before it gets resolved. So then you just go look to see okay, how do I know exactly what this is.
+
+[00:02:11]
+Well, I'll just go look at every point where we resolve a playlist and they're all up here. Each time we resolve a playlist it's always a document. That's a document. That's a document, that's a document. That's a document. It's always a document. So I'm pretty confident this is always going to be a document.
+
+[00:02:29]
+Because this songs is a branch of this. And so far in our app this is the only way you can get a playlist, is one of these four methods. And they all return the same thing, a playlist document. Follow me so far?
+>> Scott Moss: Okay, so now that I have that if it's a document I could look up,
+
+[00:02:50]
+
+>> Scott Moss: Populations documents mongoose. And I can go here.
+>> Scott Moss: And I can scroll a little bit, until I find
+>> Scott Moss: This thing, Document#populate, okay, cool. And it'll take me here. It's like, populates document references executing the callback when complete. If you want promises use execute populate, so cool.
+
+[00:03:16]
+Basically what we would do, is we would take our document. We would call doc.populate on it, with the field that we want to populate. The field that we want to populate on a song model
+>> Scott Moss: I'm sorry, on a playlist model, is also called songs. We want to populate this field.
+
+[00:03:34]
+This is why we have an ID with a reference of song. What population does is, for each of these IDs, it's gonna go to this model and query it, and find the object pertaining to that. It's gonna go to this model, like find by ID for all these IDs, and put them in this array.
+
+[00:03:50]
+That's what it's gonna do. So we'll get back an array of objects, versus an array of strings, so we'll populate it. And then we can call .execPopulate() which returns a promise and we like promises.
+>> Scott Moss: So that's what I'm doing here. I'm saying cool, I've got the playlist.
+
+[00:04:08]
+I'm going to call populate on it. I'm gonna populate this songs array. This array of strings, I want to populate it. I wanna inflate it with the data. I wanna rehydrate it. And then I want to call execPopulate, or execute populate, which returns a promise, which allows me to do await, which is why I have async in front of it.
+
+[00:04:25]
+And the one important part to remember is that this returns the entire document with the populated field on it. I only just want that field, so I'm going to return that. This is now an array of objects now. Everybody following me? This playlist was a playlist document with an array of strings for songs.
+
+[00:04:46]
+It is now a playlist document with an array of objects for songs and I'm just returning that array of objects. And luckily enough, GraphQL is smart enough to know that, hey you return an array of songs. Here is your array of songs. And then for each one of those songs in the array, it's gonna go to the song type, it is now gonna go over here.
+
+[00:05:09]
+And it's gonna be like, okay cool. Now those better match this and they have to match that. And by default they do because we made our type exactly the same in the database as it is in GraphQL, right? But if it didn't, it would look on this resolver to resolve these properties.
+
+[00:05:24]
+So if this thing had something nested on it like things and it pointed to thing, it would then try to resolve that. And over and over and over and over and over again, until it got to the end. So it's pretty crazy, so that's that and then for getting the users to work, basically all I did was,
+
+[00:05:44]
+
+>> Scott Moss: I went to the config. I disabled authentication for dev mode. So up with disableAuth true. I disabled the authentication. The next thing I did was, I added the authentication middleware that we had before for the restRouter. Also put in front of our graphQLRouter. We're going to talk more about this but, it does the same thing.
+
+[00:06:05]
+This is like, check the JWT. If there is a JWT, decode it, attach a user. But I turned authentication off, so why would I need this? Well, that's because inside of that file it's checking to see if authentication is off. If it's off, if the authentication is off using our configuration driven config, it's just gonna call next so it won't try to decode a token.
+
+[00:06:25]
+And then where would normally attach a user from the token if it's off it'll delete our user from the database and then just create a user on the fly, attach it to req.user and call next. So now we have req.user inside of our resolvers, so it's a little cheap way.
+
+[00:06:39]
+Obviously you would never do this in production. Just don't do this in production. This is just so we can use users because I wanted to show like a completely nested solution. So because we have that, we can go look at the user resolver. So if you got past the first one you can go to user resolver and the other thing was to resolve the playlist for the user.
+
+[00:07:01]
+We don't have any associations with users and playlist so this one was pretty simple. Just returned all the places in a database. There's no association with the users and playlists with at this point. But I do need to set up for the user type when you ask for the playlist field I want to return all the playlists in the database.
+
+[00:07:18]
+And then these playlists are playlist types which have songs which then gets resolved. So you'll see in a minute how all that works. And then we'll come back and we'll do some logs. And then we can follow it so you all can see how GraphQL is walking through these resolvers.
+
+[00:07:31]
+And you can see step by step what's going on. So let's run this.
+>> Scott Moss: Cool, nothing broke, that's always a good feeling. We'll refresh this. And the first thing is let's start with let's get allPlaylists. And allPlaylists returns what? Array of playlists. An array of playlists, exactly, so this array of playlists.
+
+[00:08:02]
+For each playlist I wanna get the ID and I wanna get the title. Let's just make sure that works. Cool. We got one playlist. It has an ID. There's the title. Now, I wanna see if I have some songs. So I'm also gonna come in here and I'm gonna just, right underneath here, I'm gonna say all songs.
+
+[00:08:15]
+And I'm gonna get the ID and I'm gonna get the title. Cool, we do have songs. I also believe this song belongs to this playlist. I think that's how I set it up in the database. So, let's just, let's verify that. So, I'm gonna see if I can get the songs for this playlist.
+
+[00:08:29]
+So, I'm gonna, now I'm gonna come here, I'm gonna say songs. songs is an array of strings in the database. But because we set up a resolver to resolve those strings I should be able to come in here and say now I want to get the title of that.
+
+[00:08:44]
+And I can. You see that? That's where that resolver came in. It knew that to get songs, I got to run that function. That function populates it and puts it in there. So you can imagine if songs had another field on it like things we can come here like okay, now for things, I wanna get the ID.
+
+[00:09:03]
+And things has a user, and then for user, I wanna get the thing. Like, you understand what I mean? You can go on forever and ever and ever, as long as you just eventually resolve every type. You don't need to know how it's being called. You just need to resolve every type, and you're done.
+
+[00:09:17]
+GraphQL will figure out how it’s called. And we’re going to see that in a little bit.
+>> Scott Moss: So, we got that. Cool. Now, I want to take it a step further. And I want to get all the playlists for the users and, then get all the songs on those playlists from the user.
+
+[00:09:35]
+So let's say you have a music app. You just logged the user in. All of the sudden, the first thing you want to display is all their playlists and underneath every playlist, the top five songs, right? So you need one query that gets all of that. So I'm like cool.
+
+[00:09:48]
+First I want to getMe, which is gonna get the user. Let's verify that works with my auth. That works. There's me, here's my username. Okay, so I got the user. Now I want to get all the playlists associated with this user, so I'm going to do that. I got that.
+
+[00:10:02]
+And now I'm going to get all the songs associated with that playlist, which is the id and the title. And now I got that.
+>> Scott Moss: It's pretty crazy, right? We didn't set this up this way in the backend. I didn't know that somebody would come in and ask for a user and then a playlist and then a song.
+
+[00:10:23]
+All I did was a song? This is how you resolve that. A playlist? This is how you resolve that. A user? This is how you resolve that. Figure it out, GraphQL. And that's all I did. Right, it's pretty magical, right? So this is like the beauty of GraphQL.
+
+[00:10:35]
+So you can see where it's like, if a song refered their playlist, then this would be recursive. Cuz then I went, cool, cool. I want the playlist that this song belongs. And then I want all the songs of this playlist. And then I want the playlist that this song belongs to.
+
+[00:10:49]
+You see what I mean? And then it will just keep going on and on and on, so You don't wanna do that. Any questions on this? It's crazy I know. It's not gonna know that you have a loop there and prevent you from doing it? No. No. You think it would but No, it wouldn't.
+
+[00:11:15]
+I think it's good that it doesn't, because it encourages you to build better stuff. And then it can't really make any assumptions like maybe you want that. Maybe you you want to go 20 levels deep, I don't know. I don't think it should make assumptions. I'm not saying it's a good idea.
+
+[00:11:35]
+I'm saying, maybe you do want that. Maybe you're literally trying to show an example of how bad of an idea this is and you want to show that. I don't know. What I'm saying is that if it starts doing that, I think it starts to make assumptions about your app and the whole point of our GraphiOL is that it just sits here and it does not care what is under here.
+
+[00:11:51]
+It just does not care, and I think that's the beauty of it. If it starts like, well actually, we're gonna start looking in here, and seeing to make sure you're only doing this a couple times. I think it starts, it gets at a point where it's like, it's reaching too much, and it's losing a little bit of its flexibility.
+
+[00:12:05]
+But it does provide you with the tools so that you can do it yourself. I've broken so many people's graph API's just doing that. I'm like okay. Here check it out. I've broke it and emailed them. I'm like look and they're like yeah, I need to fix that.
+
+[00:12:22]
+
+>> Scott Moss: It's really easy to fix. Just don't have bad data modeling. Don't denormalize your data. So a graph is flat. You guys know data structures, right? So you have a graph, it's flat, but then you have nodes and edges that point to each other? So if you just make sure all your data's flat, you're fine.
+
+[00:12:42]
+Just don't have double-references to two things that reference each other trying to get data. Don't have a playlist referencing a song and a song referencing a playlist. Just do either one, and you're fine. You'll never have this problem, and then you're good. Now if you do that, let's just bat datamon and you should probably just take a step back.
+
+[00:13:03]
+
+>> Scott Moss: Any questions on this stuff?
+>> Scott Moss: Well, what if you wanna find like every playlist in which a song is Isn't included. Every playlist that which a song is put, so then what you would do is you would probably make a different query for that. No I mean that would be a scenario on which you have.
+
+[00:13:24]
+Like this kind of midi to midi relationship. You have it in your database but that doesn't mean you have to expose for your GraphiQL. You might have a midi to midi in your data. That's totally fine, I'm not saying don't do that. I'm saying when you expose it to GraphiQL, The way I will get around that is I would have like, you know, play list for song and then you pass in a song ID and then it would go do that.
+
+[00:13:45]
+Versus like, somebody trying to like explore it, you know what I mean? I would make a query for that. Yeah. That makes sense.
+>> Scott Moss: Any other questions on this.
+>> Scott Moss: So when I first saw this, I thought it was the coolest thing I've ever seen in my life, right?
+
+[00:14:02]
+Coming from REST and stuff, I was just like, what, what is that? That's pretty cool. So there's a lot more stuff you can do here. What you learned today was 60% to 70% of GraphQL, and you can go your whole life writing GraphQL with just this and you'll be fine.
+
+[00:14:19]
+There's other stuff that's out there. But that stuff is mostly associated with client side, so you've got fragments, you got interfaces, you have directives, which you almost never have to use unless you're doing some pretty crazy stuff, there's a lot of other stuff but you don't really have to use any of that stuff, you can go far with just this.
+
+[00:14:42]
+
+>> Scott Moss: Cool, so let's move onto the next thing,
+

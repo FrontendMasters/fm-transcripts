@@ -1,0 +1,555 @@
+WEBVTT
+
+1
+00:00:00.310 --> 00:00:03.369
+&gt;&gt; Steve Kinney: So a few other
+things that I wanna talk about on
+
+2
+00:00:03.369 --> 00:00:08.118
+the topic of network load and
+then also the amount of code that we ship,
+
+3
+00:00:08.118 --> 00:00:10.373
+is we have increasing support for
+
+4
+00:00:10.373 --> 00:00:15.874
+something called HTTP/2 which shock
+surprise is the successor for HTTP/1.
+
+5
+00:00:15.874 --> 00:00:19.171
+And it has some unique characteristics,
+right?
+
+6
+00:00:19.171 --> 00:00:23.158
+And again, it's like, should I
+totally optimize my strategies for
+
+7
+00:00:23.158 --> 00:00:25.050
+everything based on HTTP/2?
+
+8
+00:00:25.050 --> 00:00:28.250
+The answer is, you measure your traffic
+and then make you the call, right?
+
+9
+00:00:28.250 --> 00:00:30.680
+If you don't find you have
+a lot of HTTP/2 traffic,
+
+10
+00:00:30.680 --> 00:00:32.416
+maybe it's not the time yet, right?
+
+11
+00:00:32.416 --> 00:00:36.795
+Cuz like we're gonna see that a lot of
+the best practices of HTTP/2 are literally
+
+12
+00:00:36.795 --> 00:00:39.662
+what are called like
+the anti-pattern to HTTP/1.
+
+13
+00:00:39.662 --> 00:00:43.750
+So it's one of those things where you
+have to kind of like make a decision.
+
+14
+00:00:43.750 --> 00:00:49.540
+Sometimes whether or not you support
+HTTP/2 is not your call to make.
+
+15
+00:00:49.540 --> 00:00:54.504
+So for instance, like I said, we are on
+a bunch of systems right now that don't
+
+16
+00:00:54.504 --> 00:00:57.903
+support HTTP/2,
+we're moving to a bunch that do.
+
+17
+00:00:57.903 --> 00:01:01.001
+[LAUGH] Like that's just a thing
+that's happening, right?
+
+18
+00:01:01.001 --> 00:01:03.269
+So I have no point optimizing for
+them now, but
+
+19
+00:01:03.269 --> 00:01:06.650
+this is a thing that I will likely
+do in the very near future.
+
+20
+00:01:06.650 --> 00:01:07.450
+So it's an upgrade.
+
+21
+00:01:07.450 --> 00:01:09.003
+The big thing is this
+idea of multiplexing.
+
+22
+00:01:09.003 --> 00:01:12.579
+We'll talk about why that's
+important in a second, and
+
+23
+00:01:12.579 --> 00:01:17.807
+also that service can push assets to the
+client before they're asked for, right?
+
+24
+00:01:17.807 --> 00:01:21.797
+So you can kind of like theoretically tie
+this in, like rather than parse the HTML,
+
+25
+00:01:21.797 --> 00:01:23.310
+I need to go get the CSS file.
+
+26
+00:01:23.310 --> 00:01:26.570
+The server can know here's the HTML file,
+here's the CSS file,
+
+27
+00:01:26.570 --> 00:01:29.865
+I know you're gonna need next,
+start taking it now.
+
+28
+00:01:29.865 --> 00:01:33.560
+So yeah, it solves all
+the problem we have in HTTP/1.
+
+29
+00:01:33.560 --> 00:01:37.360
+We do a lot of like weird
+hacks to make HTTP/1 work.
+
+30
+00:01:37.360 --> 00:01:40.890
+Bandwidth has gone better but
+latency hasn't,
+
+31
+00:01:40.890 --> 00:01:44.340
+cuz like again, electrons going through
+copper wire around the planet, that is
+
+32
+00:01:44.340 --> 00:01:49.070
+a physics problem that I don't think we're
+gonna solve any time soon, that I know of.
+
+33
+00:01:49.070 --> 00:01:53.661
+I'm sure there are people working on that,
+but that's not my domain of expertise.
+
+34
+00:01:53.661 --> 00:01:56.593
+But with HTTP/1,
+we can send one file at a time.
+
+35
+00:01:56.593 --> 00:01:59.500
+That means while theoretically, and
+I'll show you the cheat that we use for
+
+36
+00:01:59.500 --> 00:02:00.530
+this in a second.
+
+37
+00:02:00.530 --> 00:02:04.742
+But you can send the CSS file or
+the JavaScript file, or one of whatever.
+
+38
+00:02:04.742 --> 00:02:08.385
+So like breaking stuff up into a lot of
+small CSS files is usually not a good
+
+39
+00:02:08.385 --> 00:02:11.612
+idea, cuz you'd have to like
+make any connections expensive,
+
+40
+00:02:11.612 --> 00:02:13.727
+jam it all together in one, send it over.
+
+41
+00:02:16.158 --> 00:02:17.815
+&gt;&gt; Steve Kinney: So the way it
+works is normally, you get a thing,
+
+42
+00:02:17.815 --> 00:02:19.283
+you ask the server for
+a thing, you get it.
+
+43
+00:02:19.283 --> 00:02:20.765
+You ask the server for
+a thing, you get it.
+
+44
+00:02:21.935 --> 00:02:26.115
+Like browsers cheat a little bit by they
+open like six connections to a given, and
+
+45
+00:02:26.115 --> 00:02:29.650
+I think that changes depending on
+the browser, Firefox might do eight.
+
+46
+00:02:29.650 --> 00:02:31.100
+Don't quote me on any of those numbers.
+
+47
+00:02:31.100 --> 00:02:33.662
+Somewhere between six and
+eight connections, so
+
+48
+00:02:33.662 --> 00:02:35.742
+it can get stuff concurrently, right?
+
+49
+00:02:35.742 --> 00:02:39.716
+And then when it uses all the six and
+it can go get other stuff, but
+
+50
+00:02:39.716 --> 00:02:41.960
+you're maxed out at six at a time.
+
+51
+00:02:41.960 --> 00:02:45.680
+So I'm gonna break my CSS into 40 files.
+
+52
+00:02:45.680 --> 00:02:49.580
+That's a bad idea, because you can
+only get six at a time, right?
+
+53
+00:02:49.580 --> 00:02:53.495
+And so, normally we would go through these
+processes of jamming all of our files
+
+54
+00:02:53.495 --> 00:02:56.476
+together and concatenating them and
+creating these large,
+
+55
+00:02:56.476 --> 00:02:57.712
+large bundles, right?
+
+56
+00:02:57.712 --> 00:03:02.443
+Which we've seen has a certain cost
+associated with it on the other side of
+
+57
+00:03:02.443 --> 00:03:04.596
+the tube, when the user gets it.
+
+58
+00:03:04.596 --> 00:03:08.240
+HTTP/2 on the other hand,
+can send multiple things at the same time.
+
+59
+00:03:08.240 --> 00:03:11.857
+So we make connections that we saw
+just pumping all the assets, and
+
+60
+00:03:11.857 --> 00:03:14.901
+they get put back together
+when they are in the browser.
+
+61
+00:03:14.901 --> 00:03:17.375
+So that's like major difference,
+
+62
+00:03:17.375 --> 00:03:21.666
+makes some HTTP/1 practices
+not good HTTP/2 practices.
+
+63
+00:03:21.666 --> 00:03:24.903
+And some HTTP/2 practices
+not good HTTP/1 practices,
+
+64
+00:03:24.903 --> 00:03:28.155
+just on the very nature of
+how the technologies work.
+
+65
+00:03:28.155 --> 00:03:29.905
+So yeah,
+concatenating all of your JavaScript and
+
+66
+00:03:29.905 --> 00:03:31.475
+CSS into large single files.
+
+67
+00:03:31.475 --> 00:03:35.678
+Useful when you can only have a certain
+number of connections at the same time,
+
+68
+00:03:35.678 --> 00:03:39.246
+not useful when you can like
+concurrently send multiple things and
+
+69
+00:03:39.246 --> 00:03:41.298
+then like pull them back apart later.
+
+70
+00:03:41.298 --> 00:03:45.582
+Inlining images as data URLs instead
+of sending the image, you might make
+
+71
+00:03:45.582 --> 00:03:50.260
+the basic 64 encoding and put in your
+CSS file as a giant, long string.
+
+72
+00:03:50.260 --> 00:03:53.920
+But when you can send multiple things at
+once and you can predictively push things,
+
+73
+00:03:53.920 --> 00:03:58.070
+you can't predictively push just
+that 64 bit encoded string, but
+
+74
+00:03:58.070 --> 00:03:59.810
+you could predictively push the image.
+
+75
+00:04:01.220 --> 00:04:02.520
+So what do you do?
+
+76
+00:04:02.520 --> 00:04:04.990
+Like, honestly, you measure, right?
+
+77
+00:04:04.990 --> 00:04:07.910
+And for you, as front end engineers, for
+
+78
+00:04:07.910 --> 00:04:12.040
+us as front end engineers,
+I care more about our asset strategy.
+
+79
+00:04:12.040 --> 00:04:13.150
+Do we make giant files?
+
+80
+00:04:13.150 --> 00:04:14.890
+Do we make tiny little ones, right?
+
+81
+00:04:14.890 --> 00:04:16.870
+It's about measuring and figuring out.
+
+82
+00:04:16.870 --> 00:04:21.420
+It's not like do you turn HTTP/1 on or
+off, because it is backwards compatible.
+
+83
+00:04:21.420 --> 00:04:23.170
+Like if your server supports it,
+it's whether or
+
+84
+00:04:23.170 --> 00:04:25.060
+not you choose to take advantage of it.
+
+85
+00:04:25.060 --> 00:04:28.013
+And so, you measure and you figure it out.
+
+86
+00:04:28.013 --> 00:04:29.793
+So how do you get HTTP/2?
+
+87
+00:04:29.793 --> 00:04:34.930
+And this is also the answer to
+the question of, how do I get a CDN?
+
+88
+00:04:34.930 --> 00:04:36.580
+Is you use somebody else's.
+
+89
+00:04:36.580 --> 00:04:40.343
+So there's a bunch of services,
+where you put your code up there,
+
+90
+00:04:40.343 --> 00:04:44.732
+it is on a CDN, it is supporting HTTP/2,
+you get everything out of the box.
+
+91
+00:04:44.732 --> 00:04:50.021
+So the left two is now.sh and Netlify.
+
+92
+00:04:50.021 --> 00:04:52.110
+Now .sh gives you a command line tool.
+
+93
+00:04:52.110 --> 00:04:57.300
+You do like now deploy, and
+your app goes up into the cloud.
+
+94
+00:04:57.300 --> 00:05:01.110
+Netlify is actually pretty cool too, which
+is like you can install GitHub hook and
+
+95
+00:05:01.110 --> 00:05:04.560
+whenever you merge into master,
+it deploys your code.
+
+96
+00:05:04.560 --> 00:05:07.340
+That is like kind of the things I use
+like my own projects and stuff like that.
+
+97
+00:05:07.340 --> 00:05:11.529
+That's probably not, I'm sure there
+are like large companies using both these
+
+98
+00:05:11.529 --> 00:05:14.441
+services, like that's not
+what we used in 7th grade.
+
+99
+00:05:14.441 --> 00:05:17.083
+We use Amazon cloud
+front which is Amazon's,
+
+100
+00:05:17.083 --> 00:05:20.139
+the picture I showed you
+earlier that's Amazon CDN.
+
+101
+00:05:20.139 --> 00:05:23.270
+You put stuff in S3 bucket,
+all your traffic goes to cloud front.
+
+102
+00:05:23.270 --> 00:05:26.350
+Like generally speaking,
+you can configure, you can or
+
+103
+00:05:26.350 --> 00:05:29.540
+your app's team or whatever,
+can configure these back end service.
+
+104
+00:05:29.540 --> 00:05:31.950
+But you can also just pull
+a solution off the shelf.
+
+105
+00:05:31.950 --> 00:05:33.450
+Cloudflare is another great
+
+106
+00:05:34.820 --> 00:05:38.590
+service that provides a CDN
+that is supportive of HTTP/2.
+
+107
+00:05:38.590 --> 00:05:43.200
+So like, you can basically if you
+choose to use one of these services,
+
+108
+00:05:43.200 --> 00:05:44.790
+all of them have some kind of free tier.
+
+109
+00:05:44.790 --> 00:05:46.500
+But if you choose to use
+one of these services,
+
+110
+00:05:46.500 --> 00:05:48.240
+you basically get these
+things out of the box.
+
+111
+00:05:48.240 --> 00:05:51.080
+Your job as a front engineer
+is to think about like, okay,
+
+112
+00:05:51.080 --> 00:05:53.620
+what are the assets you're building now,
+right?
+
+113
+00:05:53.620 --> 00:05:58.310
+What other things can you take advantage
+of should these features exist?
+
+114
+00:05:58.310 --> 00:06:02.070
+This slide is here basically cuz no one's
+going to be able to look at those screen
+
+115
+00:06:02.070 --> 00:06:04.580
+shots, zoom in close
+enough to get the URLs.
+
+116
+00:06:04.580 --> 00:06:08.240
+So in case you wanna reference this later,
+here are URLs for
+
+117
+00:06:08.240 --> 00:06:09.290
+all the things I just talked about.
+

@@ -1,0 +1,229 @@
+[00:00:03]
+>> Scott Moss: Welcome back, I hope everybody had enough time to work on the mutations and gather some understanding of it. If you didn't finish that's totally fine that's why we have the solution. Ask me questions, we'll walk through it and we'll figure out how this stuff works together. Was there anybody out there that was able to complete this, because there was some Sme gotchas in there.
+
+[00:00:23]
+There were some wrenches I threw at you. I wonder if anybody got through all of them. No? All right, okay. That's good, or maybe it's bad. [LAUGH] Let's find out. So if you want to follow along on the solution just pull down the solution from Upstream. I made one change, it's not a big change but I want to simplify somethings a little bit.
+
+[00:00:49]
+So again [INAUDIBLE]
+associated with this right now, specifically of how you would name these. So you could have named them whatever you wanted, you could have, use whatever technique you want to pass arguments. It's totally up to you because, at the end of the day, you still have to gravkill's strictness.
+
+[00:01:09]
+The strictness is whatever you create. You create that level of what's going to be and what's not going to be. At the end of the day, you could have named it and did whatever you want. As long as you got the desired result. As long as the resolver resolved the right value, how you got there It's totally up to you.
+
+[00:01:23]
+Does that make sense?
+>> Scott Moss: Okay, so let's start with the song resolver, and we're looking at mutations here. So the first thing is, let me pull up the,
+>> Scott Moss: Song.graphql over here and we'll look at the song result over here.
+>> Scott Moss: So for new song we're just gonna use the create method on the Mongoose model song and we're gonna pass it into input.
+
+[00:01:54]
+We can pass into input there because, if we go look at the input for a new song on GraphQL, it's basically the desired shape that we need. There are some things missing like this new song. We know if we look at the song model, for instance song model here, we know that the title is required where the URL is required and that's about it.
+
+[00:02:20]
+So if someone was to create a new song and they always supplied an album, and not a URL or a title, it would pass GraphQL, cuz it's fine. Cuz GraphQL's like yeah, any of these is fine, and none of them are required. But it would fail on Mongo because it's like, we need a title.
+
+[00:02:39]
+Does that make sense?
+>> Speaker 2: Don't we require rating and favorite as well though? On the song type?
+>> Scott Moss: Let's go look. Song model, or are you talking about the type up here?
+>> Speaker 2: On the right, in the song.graph scroll up.
+>> Scott Moss: This here, the song type. So this is when you're requiring it though.
+
+[00:02:59]
+
+>> Speaker 2: Okay.
+>> Scott Moss: Yeah, this would also break, but it wouldn't even get here first. It wouldn't even save it in the database. When you try to go save it in the resolver, song.resolver, this would break, because they're like, where's the title in URL? So that would break. So you need to make sure your schema is synced up with your, you need to make sure your graph [INAUDIBLE] schema is synced up with your database schema.
+
+[00:03:23]
+And using the same validation. So either you take care of the validations here while doing this or you take care of the validation inside your resolver. I'm a sanitize this input and make sure it's got the right stuff. Maybe set some defaults before I save in a database.
+
+[00:03:36]
+But if you sync it up with your schemas, then you get to pass this straight through like this. You get a nice clean resolver.
+>> Scott Moss: Does that make sense? Okay, cool. The other one we had was update song. I don't think we got to find by ID and update yesterday, because we used a different method yesterday due to updating.
+
+[00:03:56]
+We used like merging, and then it's called dot save. So we didn't get to the find by IDs, or find by ones. I know I talked about it a little bit, but I don't think we did it in practice. So, this one might have been a little tough, depending on what you were doing.
+
+[00:04:08]
+But if you did some research on mongo, or Mongoose, you would have found the find by ID or at least to find one update. And basically what I'm doing here, this looks kind of crazy, right? Who's seen this before? I'm basically popping off the ID property, and putting the rest of the stuff in an object in another object called update.
+
+[00:04:28]
+The reason I'm doing this is, I'm just trying to be safe. Because the way it find my ID and update works, is it takes an ID, it uses that to find the document. Once it finds it, it'll issue the update with this object. I don't want the ID to be there.
+
+[00:04:42]
+When I update. I know Mongo ignores id but this is just me being safe. What if the id was something different? I don't want the ids to change, right? Obviously I think Mongo is a smart enough database to not change the ids on you, it kind of just ignores it.
+
+[00:04:53]
+But this is just me saying, I don't wanna put the id field, so you might have just did like input id here and put in input. That's totally fine. That would totally work. Cuz I think Mongoose sanitizes that but again, I'm just making sure that that doesn't happen.
+
+[00:05:08]
+If, because actually, what's happening underneath, Mongoose, or I'm sorry, Mongo uses underscore ID for its ID field. They don't have a dot ID. That's a virtual field that you get when you create a database. So if you were to update this with ID and then you had this option here called like upsert true, which means if you can't find it, create it.
+
+[00:05:33]
+Then it would create a field called ID, you would have a bug. So that's why I'm popping the ID off of the update and just passing in the stuff I wanna update. Does that make sense? There's a lot of other ways you could get around this. You could just come into grab ql for your song and be like, you know what?
+
+[00:05:47]
+For an update, I'm not going to put the ID on this object. What I'm going to do is, I'm gong to have it take two arguments. It's going to take the ID, and then this one is not going to have the ID on it. That way, I can just patch it straight through and you can do that too.
+
+[00:06:00]
+It's solely up to you. It's literally however you want to do it. You just need to follow it, but that is the project I decided to do.
+>> Scott Moss: Does that make sense? Yeah, okay. So we got that and then of course, we say, for this mutation we want to add the new song field.
+
+[00:06:21]
+Which when resolve will return a song type and we want to make update song field which when resolved will return a song type. This new true is key. This is basically saying when I issue the update, give me the new document that was updated. By default it will only just give you the old document with the still value.
+
+[00:06:40]
+So if you don't put new true here you won't get the updated document you will get the previous document. So,that's very important. All right, so we got that. And then if we head over to playlist, and this is where some of the stuff comes in where it's like, what is this?
+
+[00:06:58]
+What is this? Let's go to playlist resolvers. We'll put that over here. So many things and then we'll look at the playlist type. Okay, so let's just look at the playlist type really quick. It has ID, title, song. So it's a song type, an array and then favorite, which is a boolean.
+
+[00:07:21]
+So if you were just to look at this, you might assume that you would also pass in the song type. Or some variation of it of update playlist and new playlist. And in your version you probably seen new songwriter, probably right? Okay where did that come from? New song comes from song.graph key artist new song right?
+
+[00:07:45]
+Because if you put anything on the input, it also has to like resolve to an input. So you couldn't put song here. Why couldn't you put song here? Well, because song is a type, it's not an input so that would break. So you have to use an input, newSong is an input so that's why that was there, and again, it's totally up to you.
+
+[00:08:03]
+If you put new song there there are some tradeoffs and that's what I had at first. That's why I made it change. I was like there's too much complexity that I don't really wanna walk through. I actually prefer just to put the id. If you put NewSong there what you would have to do, this is how it would work.
+
+[00:08:15]
+If you put NewSong there, that means on your client when you update a playlist or create a playlist and you also wanna attach songs to it you'd be creating new songs. You wouldn't be attaching songs that are already created, you'd be creating new songs, right? Because you would be passing a new song object.
+
+[00:08:31]
+So then inside the resolver of this updated playlist, new playlist, you have to loop through that songs array. And for each one of those, create a new song, and then associate the IDs with it in the database. It's a lot more complexity, and really what you probably wanted to do was like, hey, I wanna add these songs that I already have to this playlist, right?
+
+[00:08:48]
+So in that case, you would just need a reference to it, which in this case is just an ID for the song. Because let's just double check one more time on the playlist model, songs are just IDs. This allows it to pass it straight through. We can just save that array straight to the database, because songs is just an array of IDs.
+
+[00:09:05]
+Does that make sense? Now if you go the other way where you do pass in that object, those are the complexities. And realistically, from a US perspective, if you're building an app that probably doesn't make any sense. You wouldn't be creating a song and adding it to a playlist at the same time.
+
+[00:09:18]
+You'll be adding a song that's already created to a new playlist, most likely. Or updating a playlist with a song that was already created. You most likely won't be creating a song and a playlist at the same time. Unless you got some app that we don't have yet, and you got, like some new music app, that nobody has done before, I don't know.
+
+[00:09:37]
+But realistically, probably passing IDs.
+>> Scott Moss: And then for the new playlist input, it's basically the same thing as the updated playlist input minus the ID. Because you don't need the ID to make a new playlist. You do need a title though, so that should be required, all right?
+
+[00:09:58]
+And then for the mutations themselves, I have a new playlist, and an update playlist. I should probably just call this playlist from my convention. There we go and what this does is, I'm just going to call that playlist. Come here.
+>> Scott Moss: There we go and basically, I'm just making, just like we did with song, we have a mutation called playlist that takes the input.
+
+[00:10:29]
+Takes that new playlist, returns that playlist and we're going to look at it right here It does playlist.create. Pretty simple. Passes straight through, just like we did and then for the update play list, takes input, that takes an updated play list. Which is this type and because we made that change for it to be an ID, we can also just pass it straight through with a new true.
+
+[00:10:51]
+
+>> Scott Moss: And we just assign them here and we're good to go. We got our mutations. Now, for everybody that was working on this, what was the thing that you were stuck on? The thing that was just like, I'm just not getting?
+>> Scott Moss: Or it was just not enough time?
+
+[00:11:07]
+Like you knew what you were doing, you just didn't have enough time?
+>> Speaker 3: I spent a lot of time figuring out where you destructured the update into the [LAUGH] ID. Yeah, me too.
+>> Scott Moss: This right here?
+>> Speaker 3: Yeah.
+>> Scott Moss: Is it the syntax, that's crazy?
+>> Speaker 3: Yeah, I wasn't familiar with that.
+
+[00:11:22]
+
+>> Scott Moss: It's really cool.
+>> Speaker 3: Okay.
+>> Scott Moss: It's pretty crazy. It's basically just like this. It's basically saying I'm going to make a new object called update and it's going to equal everything on input, like minus the id. That's basically what it is, right? So it's like I want everything on input minus the id.
+
+[00:11:46]
+That's what it's doing on-the-fly.
+>> Speaker 3: But it's also putting id in [CROSSTALK]?
+>> Scott Moss: In another variable, yeah and it's putting id in another variable at the same time. So it's making another object called update. That doesn't have ID on it and is making another variable called ID at the same time.
+
+[00:12:01]
+
+>> Speaker 3: That's cool.
+>> Scott Moss: Yeah.
+>> Speaker 3: You Google object of spread.
+>> Scott Moss: Object rest spread, there you go. Well yeah, object rest spread.
+>> Scott Moss: Anything else that was confusing anybody else stuck on?
+>> Speaker 3: Let's try to do delete song.
+>> Scott Moss: Yeah.
+>> Speaker 3: It's.
+>> Scott Moss: Yeah let's do delete. That was actually credit right?
+
+[00:12:25]
+Let's walk through that right quick. So we'll do delete. Let's go to song resolver and we'll do a delete here. Let's a song graph. There we go, first thing first is make a mutation.
+>> Scott Moss: And we'll say, removeSong, that's gonna take an ID, that's really all we need.
+
+[00:12:49]
+And I'm gonna say it's gonna turn back a song.
+>> Scott Moss: All right, and then what I'm gonna do is I'm gonna come inside the song, I'm gonna make a function called remove Song. It's gonna take an ID here, that's really all I need. And then what I'm gonna do is I'm gonna return Song.findbByIdAndRemove the ID and then exec.
+
+[00:13:17]
+Execute.
+>> Scott Moss: And the I'm going to add that to my mutation, and I want to do that. Is that what you did?
+>> Speaker 3: Yeah, I was getting some weird error, cuz I was passing the ID. I was using the graphical QL.
+>> Scott Moss: You were using graphical? Graphical /docs.
+
+[00:13:35]
+
+>> Speaker 3: And I was trying to pass an ID that I had created previously.
+>> Scott Moss: It was messing up? Okay, so let's test this out, let's see if it works. If it doesn't work, we will find out. So where it really comes down to at this point, is it find by id and remover returns the actual thing that got deleted or not, by default.
+
+[00:13:55]
+
+>> Speaker 3: It's saying something null, so I don't know.
+>> Scott Moss: Okay, that could be it. I don't remember if that thing actually returns the thing or not, but we'll find out as soon as we run this.
+>> Scott Moss: Okay nothing broke that's always good. So if actually first we need to create a song, I think I already have a song right?
+
+[00:14:15]
+We can verify by doing all songs and getting some IDs. Cool so we got an ID here, let's just grab one of these IDs. Then we will come in here and say mutation. We will just say delete song and that takes an ID and the ID is the type of ID and this is going to be called remove song.
+
+[00:14:44]
+That takes an ID who's referencing that dollar ID and I'm just gonna asks with an id back, and let's see if it returns that. And then down here, instead of putting an input, I just have id and for the id it's that.
+>> Scott Moss: Does that make sense? So let's run it, and yeah, it removed it.
+
+[00:15:10]
+So now if I-.
+>> Speaker 3: I kept the input from the outside.
+>> Scott Moss: You kept the input on the outside.
+>> Speaker 3: Nested ID inside.
+>> Scott Moss: Yeah, so it's literally the name of the variable. That's pretty confusing. We've been using input this whole time. So if I go back and do all songs I should not see that one in there.
+
+[00:15:26]
+Yeah, it's gone. So that totally worked and the same would be true for playlists. It's the same thing.
+>> Scott Moss: Any questions on that stuff? All right, so remember like two lessons ago and I was like you're gonna run into an error, on playlist, when you try to populate the song it's going to break.
+
+[00:15:50]
+Let's figure that out. Now that we can actually make some stuff. I'm going to take this song ID here and I'm going to create a playlist. And it's going to take an input, of go away, go away. A newPlaylist takes a new playlist input, it has a title, songs and favorite.
+
+[00:16:20]
+So I will do that.
+>> Scott Moss: NewPlaylist.
+>> Scott Moss: And then,
+>> Scott Moss: Come back.
+>> Scott Moss: Playlist, right here. input: NewPlaylist, okay. So we'll say, this takes an input. Takes an input and then I was wanting to get back the ID, and then I want to get back the songs. And the songs, according to our graph QL, it is an object.
+
+[00:16:58]
+And playlist has an array of these, right but I'm only passing up an ID to save it because that's how it's saved in the database. It's GraphiQL wants an object back for songs, the database is saving a stream for songs. So there's some disconnect, we need to do something there, right?
+
+[00:17:15]
+So, we're gonna find out, and if you're referencing a non scholar type in GraphQL, so anything that's pretty much an object. GraphQL is gonna force you to expand on it and say you need to ask for something else. You can't just come in here and say, give me the songs array.
+
+[00:17:30]
+It's gonna be like, no, what? What properties on those objects do you want? It's gonna make you do that. By default I think this forces you to put id. So let's just put id and then we'll get the titles of the songs as well. So we'll do that and now we will go ahead and create this playlist with the given songs.
+
+[00:17:45]
+So we'll say input. We'll give it a title of Dope Mix and Songs. There is going to be an array of that and I think we're good with that. So then we're gonna save this, and boom, look at that. So this is one of the chances, one of the rare places where you have a success and an error at the same time, and that's only on mutations.
+
+[00:18:13]
+Cuz there's actually two operations that's happening. You created something, that was successful, but then when you tried to query it, it broke, and that's what it's saying. And what broke is we can't get song dot title. There's nothing there and that's the case, basically what I'm saying is you can't resolve the song type.
+
+[00:18:32]
+It just won't work. Look at that. What is that? It won't even do it right. So we need to figure out. Look, now it's doing it. There was something going on with my hot monitor earlier but anyway, there is an array of IDs. GraphQL expects this to be an object, so it's just freaking out.
+
+[00:18:55]
+This word stuff you see right here is what GraphQL spits out when it thought it should have got something else, but it didn't. It's basically a base 64 encoded something, I don't know, but it didn't get back what you thought. So if you ever see that in GraphQL, it's because you just messed up some type somewhere.
+
+[00:19:12]
+So we need to resolve those IDs. And that's what our next lesson is about is how to resolve nested non-scholar types and handle that stuff and handle that stuff in nested resolvers. We scratched the surface with nested resolvers but I didn't show you how to do it on a database level, which is what we're gonna have to do.
+

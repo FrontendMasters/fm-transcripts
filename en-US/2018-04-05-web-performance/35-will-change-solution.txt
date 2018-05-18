@@ -1,0 +1,88 @@
+[00:00:00]
+>> Steve Kinney: So our job is to clean up this paint storm. So we kinda talked a little bit about the approach before I cut you all loose to give it a shot. Which is, we have a CSS class, we have a transition, we have all the basic moving pieces, right?
+
+[00:00:14]
+The easiest thing we can do is get rid of some of this jQuery and we'll go ahead and we'll get our hands on the box. I mean, I could do this part in jQuery, I'm choosing not to, it's fine.
+>> Steve Kinney: And we'll grab the class of box. And step one that we do here is we could just say box.addEventListener('click').
+
+[00:00:42]
+
+>> Steve Kinney: And we can say box.classList, I'll go with a toggle. I think, or Google, or goggle in that case. Yeah, are you not all familiar with the goggle method?
+>> [LAUGH]
+>> Steve Kinney: Okay. [LAUGH] We'll toggle the move class. Right, and we won't get our own layer and everything like that, but it's a good start.
+
+[00:01:10]
+We will eventually get our own layer, it's just gonna happen at the same time. Let's go take a look. I'm gonna do the paint flashing in this case, so you can see It flashes. It moves without having that trail of green behind it, and then it goes back down again.
+
+[00:01:27]
+You can see the paint flash VCR is actively getting moved to it's own layer, right? It's going up to it's own layer, then it's moving, then it's going back down, cuz the transition is no longer there. But it would be great if I didn't have to do that simultaneously.
+
+[00:01:45]
+Let's also just do a recording real quick. Let's see what we've got going on here, I'm gonna turn off the paint flashing.
+>> Steve Kinney: Right, and you can see, we've got the click event. That's not right. Fun fact that actually didn't bite me until now is, a lot of times you're better off if you have clean profile in Chrome.
+
+[00:02:10]
+Or you do it in an incognito window, because sometimes you will get some of your Chrome extension that are also interjecting themselves.
+>> Steve Kinney: Cool, so we have the event listener.
+>> Steve Kinney: And it kind of moves across. But the one thing I want you to notice first, is remember when I showed you all of those intermediate frames in there when we did the jQuery one?
+
+[00:02:34]
+They're gone, right, cuz yeah, we added a class. The compositor thread is all about moving, we're basically sliding that layer along, and then pushing it back down again. But we don't actually need to manually move it on the main thread anymore. So we have nothing happening in here, which is super cool.
+
+[00:02:52]
+We could get a little bit better, like for more complicated animations or when there is a lot going on the page, you could stutter as you're like I have to repaint to get it up to it's own layer. Right, that's gonna block everything, it's gonna block other things going on on that thread.
+
+[00:03:04]
+So we can say, hey, when you're not busy, if you could move that up to its own thread, that'd be great. So let's go ahead and we'll implement that.
+>> Steve Kinney: So we've got the click listener, we're gonna add a few more events. We'll say box.addEventListener('mouseenter'). I think somebody asked earlier, the difference between mouseenter and mousemove.
+
+[00:03:28]
+Mousemove is effectively every time you're hovering over it, mouseenter is like when the mouse enters the bounds of that element. RIght, and leave will be when it leaves. Cuz we don't wanna do this all the time, we just wanna do it the first time it enters, and the first time wanna to do something different when it leaves.
+
+[00:03:42]
+Cool, and so we'll say box.style.willChange = 'transform'. And we're gonna be good citizens here, and we're gonna say when the mouse leaves.
+>> Steve Kinney: mouseleave.
+>> Steve Kinney: We'll set it back to auto in this case, auto is the default. You could also set it to an empty string. We'll probably do that maybe later, but I'm just going to set it to auto.
+
+[00:04:15]
+Cool, and then when the transition ends, that's also a good time to put it down. So you could say, box.addEventListener('transitionend'). It's really cool that the CSS transitions and animations will trigger JavaScript events. So you know when that transition or that animation has completed.
+>> Steve Kinney: Excuse me as I learn how to type.
+
+[00:04:39]
+
+>> Steve Kinney: All right, cool, and we'll do the same thing.
+>> Steve Kinney: And this time, I'm gonna turn back on paint flashing. Can you see hovering over it moved it to its own layer. When my mouse entered and left, it moved. When I click, it's just pure GPU animation there.
+
+[00:05:03]
+That final one was we put on the transition and that we wanted to be put back down again. But there's really nothing that happens on the main thread as we're doing the animation. Right, which means no other layouts or style recalculations or JavaScript or anything else going on is going to stop that buttery smooth animation.
+
+[00:05:21]
+Cool, let's actually look at that in the layers. And if you don't have the layers tab up here, again, you can just go to these three dots, go to More Tools and find Layers, and then it will be there.
+>> Steve Kinney: And then I like to give myself just a little bit of rotation there, treat myself to that.
+
+[00:05:42]
+
+>> Steve Kinney: Go ahead you can see, it's up on its own layer, and it's back down. It's up, it's down, it's up, it's down, I could literally do that all day, I will respect your time and not. [LAUGH] But I will never cease to be amused and amazed by that.
+
+[00:05:59]
+All right, cool, so we did it. Very useful for one thing are about to, the browser will handle what deserves its own layer and what doesn't. But you're allowed to give it recommendations on listen, I wrote the JavaScript here. I know what's about to happen here, why don't you get ready for it?
+
+[00:06:15]
+And you can actually save a lot in that case. And yeah, cuz if you're animations are janky, why even have them?
+>> Speaker 2: Can I ask a question?
+>> Steve Kinney: Of course.
+>> Speaker 2: If you have a really heavy element page, would it be easier to just, on enter transform that element, or one of the elements, to it's layer, leave it there?
+
+[00:06:37]
+Instead of having to go on and off all the time [CROSSTALK] just kind of drag your mouse around.
+>> Steve Kinney: If it's gonna be a permanent thing like, yeah, right, doing stuff. But if you think about most things if it is like, let's say you're swiping things away. Let's say it's like a Trello, right, or something along those lines.
+
+[00:06:54]
+Yeah, you can promote it, but you could move it again. But as the user continues to use that app, and you're making more and more and more layers, you run the cost. The main thread and the compositor thread effectively share memory space, which you can run out of, right?
+
+[00:07:09]
+So stuff like a sidebar, the general rule should be, put everything back when you're done unless you have a really good reason. So a sidebar that they're gonna interact with all the time, or a menu, or something along those lines might be an exception, maybe. But it should be used like incredibly judiciously.
+
+[00:07:27]
+Because yeah, if it gets out of control and the user spends a lot of time on the page, eventually you're gonna create more and more layers. It's gonna become increasingly problematic
+

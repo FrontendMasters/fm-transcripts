@@ -1,0 +1,87 @@
+[00:00:00]
+>> Steve Kinney: So the other problem, or the other solution, to this is when we need to send something, yes, have the browser go get it. But if we can have the browser not ask us for stuff, and just use the stuff it already has, that's gonna be faster, right?
+
+[00:00:14]
+And so a way to do that is to make use of HTTP caching. So imagine for a second that the year is 1997. We received a lot of great gifts that year. We received Puff Daddy and the Family's No Way Out. We also received Cache-Control response headers in HTTP/1.1.
+
+[00:00:35]
+Arguably one of those had more of an impact than the other. I'll leave it as an exercise to the viewer to figure out which one of those was more important in my childhood development. But yeah, we've got these Cache-Control response headers, that we put. You asked for something, we sent it to you, we have some headers that give you a little bit of extra information about it.
+
+[00:00:55]
+And caching is not gonna do everything. You send a post or a put, those are like, hey, change this data on the server. We don't cache those. But hey, you want this resource, you want this cat GIF, you want this JavaScript file? The CSS file? Like, if you already have it just use the one you have, don't ask me for another one.
+
+[00:01:10]
+Cuz I gotta get the thing half way around the world. This pipe is only so big, it's leaking, it's problematic. So these HTTP methods can be cached, Get, Options, and Head. A bunch of other ones that change stuff on the server, you wouldn't want them cached, right, like you wouldn't want them updating.
+
+[00:01:26]
+Something like cache, you want that to go to the server, so kinda makes sense. And there's a bunch of difference settings. We're not gonna talk too much about immutable, because I believe right now it's only supported in Firefox, not the rest of the browsers, but we will talk about these first four.
+
+[00:01:44]
+So imagine with browser cache that we're in one of three conditions at any given point. We don't have it in cache, that's easy. If you don't have it in cache, go to the server and get it, right, that makes sense. Stale, which is check but let's see if you have.
+
+[00:02:02]
+You have something in cache but it's out of date. Right, you need the new one. And valid which is you have this in cache. It's the right one. Don't talk to the network. Just use the one you have. And we all know that not talking to a server is going to be faster than talking to a server.
+
+[00:02:18]
+We understand the golden rules, right? Like skipping the entire, let me ask the server. Let me get these TCP packets. All that stuff over and over and over again. It is going to be faster to not do that. In a very simple express server you could tweak each one of these, from no-store to cache missing or no-store to no-cache to max-age, and so on and so forth.
+
+[00:02:42]
+Try each of these out. No-store which is like don't store. It's exactly what you think it is, right? Like browser, go get a new version every time. This could be, you might want this for your HTML page, right? Especially if it's a client setup that's just pointing at some bundles.
+
+[00:02:57]
+No, I need you to see what the new version of this one is. I updated this. Please go get the HTML page. No-cache means you can store a copy, but at least check with me to see if you have the most recent version. It will do what we call a conditional get, hey, have this version, is this the right version?
+
+[00:03:16]
+Right, there's a cost to that, because you still need to check. But if the server goes yeah, that's the right version, then it doesn't need to send you that file. And the other one is max-age, which you say like, listen, this file I just sent you, for the next however many seconds it's valid, just trust it, right.
+
+[00:03:33]
+Don't ask me, like maybe in a ten minutes you can ask me again, a year, whatever. We can do any of those things because caching is great unless it messes up, right? We can say, cache this for a long time, and then we ship some bad JavaScript file.
+
+[00:03:50]
+We wanna have some kind ofway of busting the cache. Because otherwise we can say, browser, hold on to this broken JavaScript file and never ask me for another one. That's called no longer a customer [LAUGH] right? That's called a user who has given up on you. That's not great.
+
+[00:04:07]
+And the user would have to do what we call a hard refresh, which is a little bit different in every browser. But it's not a refresh. It involves holding shift or hitting some other cocktail of keys to clear out the cache and do stuff. And you know who's gonna do that?
+
+[00:04:21]
+None of your users. None of your users are gonna be, you know what? I've probably got some bunk cache assets. What if I do a hard refresh? [LAUGH] No one's going to do that. I'm not even going to do that, right? That is never a thought, when something has not worked, that has ever crossed my mind.
+
+[00:04:35]
+I just go, like, there's something else that can give me a dopamine hit to go look at. I'm gonna go do that instead. So one solution for this is what we call Content-Addressable Storage, which is a very fancy way of adding a bunch of garbage to the end of our file name, right?
+
+[00:04:52]
+What this does is effectively rebuild it, we check some of the file, we give it a unique identifier, and we say, go get that file, and if we build a new version of our application, what has a new number? Right, you can tell the browser if somebody asks you for main.567ee7aa72b3ee48649.js, hold onto that for a year, right.
+
+[00:05:17]
+We can put that on our index study SMIL file and if we update our app, we updated the index study SMIL file, we'd be like, okay here's the new version. So we effectively get cache-busting for free with that. There's some interesting things you can do with CDNs, as well, right?
+
+[00:05:30]
+Because the CDN will also cache stuff, which is normally, if a CDN, the way that it works is you put your cool file on the internet, in the Cloud. That's either on your server, or in an S3 bucket, or whatever. The user goes to the CDN, and hey CDN, do you have name.567eea.
+
+[00:05:48]
+I can't, my memory's not that good. And it will either have it or it won't have it. If it doesn't have it, it will go to your server and get it, and then it will keep a copy of that in that region of the world, so the next person asks for it, they get the fast version.
+
+[00:06:06]
+So we can tell the CDN, hey, hold on to this and give it a max-age and it will do that. The browser can then hold on to it, so the browser won't ask. If the browser has to ask, it will go ask the CDN which hopefully has a version.
+
+[00:06:21]
+We don't wanna use this to hold on to everything forever because if we send them a bad version we're kind of up the creek. But, this s-maxage is for CDNs only because if we ship the CDN a bad version, we could reach out to that CDN and be like, yo, lose that version, clear it from your caches.
+
+[00:06:37]
+So it's another way to have a different max-age from what you set on the CDN. People only have to go as far as the CDN versus what they keep in their browser, right. And getting these right is a little bit of a fine art. Generally speaking, if you use web pack or a lot of the other build tools, the file naming part is done for you.
+
+[00:06:59]
+Right, it'll usually use that main and that string afterwards. Right, and that is, generally speaking, with barring some cool new future technologies, a great way of handling it. If the file changes, it will have a different file name. So you can store, you can set the max-age on the server, for that very long file name to a year.
+
+[00:07:19]
+That is the maximum you can do. Listen if you are like still asking for this file, right, cuz that's unique to that version of the file. Just use the one you have, right? And that is kind of the first step in fixing your load performances, making sure you have cache headers set.
+
+[00:07:33]
+Hold onto this, right? And don't ask me for it again. Now, for us as frontend engineers, it's always up in the air, and whether or not we control that, wherever I don't control those things, like the ops department controls all of them. I ask them, it is done.
+
+[00:07:46]
+Hopefully, or it's not done, or something along those lines, right? But the frontend engineer we don't always have control of those things. But there are other things that we do have control over, that I'm gonna kinda spend a little bit more time on, versus like those steps. So yep, we can reiterate I said before we ship because there is a bad version, we don't really have a great choice.
+
+[00:08:06]
+We ship the CDN a bad version, we can't talk to the CDN. We can't however, reach into all the browsers of everyone who has ever accessed our websites as we push out the bad version. It'd be like, yo, browser, clear that out. That's not how the web works.
+

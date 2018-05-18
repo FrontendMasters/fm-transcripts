@@ -1,0 +1,84 @@
+[00:00:00]
+>> Steve Kinney: All right, we're gonna take a look at another example. Gonna go into that, close activity monitor.
+>> Steve Kinney: I'm just gonna do an MPM start. I got the server as this cool port name. We'll go ahead we'll take it for a spin. We're going to use layout fun.
+
+[00:00:28]
+Because that's what we're talking about right now. All right so here's an animation. And you can see it's pretty janky. Right, that's not a fluid animation. Things are kind of stuttering.
+>> Steve Kinney: Let's go ahead and take a look at our tools. Let's do a recording.
+>> Steve Kinney: And you know, this is even more janky cuz the process of recording takes a lot of bandwidth.
+
+[00:01:00]
+Like I said before, the act of measuring makes stuff worse.
+>> Steve Kinney: Especially if you're on a little twelve-inch MacBook. Wow, that's not great, right? It's taking too long. If we go in far enough, you can see that it is, we are we're thrashing, right? We're recalculating. We're recalculating.
+
+[00:01:27]
+This is not good, right? A given frame took 205 milliseconds. Users are gonna notice that, right? That is going to look and feel janky for us. Granted you're all flying around a bunch of boxes, like totally. Cool, so the big question is what do we do about it, right?
+
+[00:01:50]
+So let's take a look at the code.
+>> Steve Kinney: Go into rendering. We go ahead to the moving boxes and we’ll look at. So, I’ve got some setup code that we don’t have to really worry about. It’s basically getting the buttons working and starting and stopping. And, let’s make believe that doesn’t exist.
+
+[00:02:10]
+But, here it is in case you were curious. So, then what we have is we're gonna get all the elements in array. And then, you guessed it, we're going to read. We're going to do some fancy pants math to just make it animatable and so that it recurs by using you know.
+
+[00:02:26]
+And then we're going to change their CSS transformation, right? And as we saw, that is definitely causing some problems for us, right? So obviously we could just apply the same thing we did last time which is do it in two steps, right? That would work. Let's try it out see what the difference is.
+
+[00:02:48]
+Cool, so let's go ahead and figure out each one's next position. I think my spacing's a little off here. We'll figure out the next position for each one. So we'll say const nextPositions plural. We'll do exactly the same approach that we took last time.
+>> Steve Kinney: We'll go ahead and we'll figure that all out here.
+
+[00:03:24]
+A little bit of copy-paste action.
+>> Steve Kinney: And here we'll just have const nextPosition.
+>> Steve Kinney: All right, so we'll go ahead and do a lot of reading, then we'll go ahead and do a lot of writing. And let's see what happens for us.
+>> Steve Kinney: Cool, so let's go ahead, much better, right?
+
+[00:04:02]
+Much smoother.
+>> Steve Kinney: Let's go ahead and do another recording. Also, do you see what I did to the CPU in that previous one? It was not happy with me.
+>> Steve Kinney: Let's go ahead in here. You see it looked a little bit jankier, but,
+>> Steve Kinney: We do need to recalculate the style for every frame, we're not getting out of that one, but we went from 200 down to 47.
+
+[00:04:33]
+The other piece of ice don't have that many boxes on the screen you're animating at the same time. We're never gonna get down to the 16 in this case, right? But we did cut it by 80% which will count as a win. And when you see it's not all of those little boxes, right?
+
+[00:04:48]
+Okay, that's what we expected. We saw it in the previous example. That's pretty cool but there's a problem. If I told you not to do this you'd just be like, yeah, I'm not gonna do it. Remember that code I showed you before in my application, right? It's happening.
+
+[00:05:05]
+I didn't do it, I know better, right? But it's clearly happening. Because if we're doing our jobs well, a lot of times we like separating our code out for different concerns, right? We're trying to make sure that, okay, the stuff that matters here is separated from the code that has a different concern.
+
+[00:05:22]
+Which means that you could have some layout thrashing happening from two very different ends of your code base. Where you don't see one happening before the other. But it turns out that they are, you are interspersing your reading and your writing, right? You didn't even know it because they're in two totally different files.
+
+[00:05:37]
+You haven't touched one of them in forever, and it's clearly happening, right? That's how I had it in my code base. When I first went to go find the example, my plan was to do a Cmd+Shift +F in the project, find in project. Search for some of the layout properties that I knew were gonna be problematic.
+
+[00:05:54]
+And then give blame to somebody and make fun of them, right? There was no examples in the code where you could see that happening, right? One after the other but clearly it is because this stuff was just separated out and out. All right, so then what can you do, right?
+
+[00:06:09]
+We can try some things. One would be to use requestAnimationFrame. RequestAnimationFrame basically tells the browser, hey, when you're getting ready to render something again, let me give you this function. And you can go ahead and call it, right? But by definition, that is later, right? And so what we can do is we can do it off our reading now and then we can always just we can be hey, whenever am going to write to the DOM I'll use a requestAnimationFrame so that I know that on this pass of running all my code all my JaveScripts gonna read.
+
+[00:06:37]
+And I know later when all those requestAnimationFrames come back to roost all the writing will be batched. I mean we can give it a shot, let's see. So this will involve effectively undoing the change we did before. How many times can you hit Cmd+Z? All right, now, there we go.
+
+[00:06:58]
+Cool, so let's grab this part where we actually did the writing. And we'll just say requestAnimationFrame.
+>> Steve Kinney: And we'll put it in there. All right, so now we know it's not gonna happen immediately. Which means all the reads will happen and then all the writes will happen. And we'll refresh the page, I'm not gonna do recording yet?
+
+[00:07:25]
+Seems pretty smooth, right? Seems good I'm into it. All right, let's do a recording.
+>> Steve Kinney: I should probably stop that.
+>> Steve Kinney: So we got this bigger flame chart right here. And part of it is that's the Anonymous function from the requestAnimationFrame, right? Here's the frame, use Anonymous function.
+
+[00:07:58]
+Then we are gonna forage but look at that, we are calculating a lot of requestAnimationFrames cuz we are doing it a whole bunch, right? We are only using requestAnimationFrame, to make it happen this thing happen later. We didn't need these many animation frames, right? It's actually stopping us from animation framing.
+
+[00:08:19]
+[LAUGH] It's stopping us from making that frame in time for the animation, right? It's less bad than the previous version, right? Twice as better of half as bad depending on if you are an optimist or pessimist. But it's certainly not good because we are doing a lot of repeated work.
+
+[00:08:37]
+And that's not great.
+

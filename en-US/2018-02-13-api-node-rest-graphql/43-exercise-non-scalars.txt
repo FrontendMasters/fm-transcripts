@@ -1,0 +1,103 @@
+[00:00:03]
+>> Scott: So that's what you're gonna be working on next. So let's get to the challenge. Let me walk you through what I'm talking about here. So if you check out to lesson 13.
+>> Scott: Let me see, if you go to lesson 13, yeah. So if you go to lesson 13, you'll see I added on line 4 a playlists property, a playlist field on the user site.
+
+[00:00:37]
+So this allows us to go to a user and get playlists. And then if you go look on the playlist type, it obviously has a song. So that means from a user I can get a playlist and I also get a song associated with that.
+>> Scott: So what you have to do is, you're gonna have to resolve those playlists for the user, and then you're also going to have to resolve those songs for the playlists.
+
+[00:01:05]
+Now I'm gonna walk you through how to do, I'm just going to pick a random example because I don't wanna show you how to do it.
+>> Scott: Let's go to song, let's make up something on song right quick. So if I go to song, and I'm like, song is gonna have a new field on it called,
+
+[00:01:28]
+
+>> Scott: I don't know, composer, or producer. Let's say it's producer, okay? There's a producer here, its type is user.
+>> Scott: All right, so I need to resolve this producer. By default it's not even there. In fact, our database doesn't even have a producer property on it. So if we just create the database and just fed it straight to GraphQL, which we're doing now, this will break if somebody asks for producer.
+
+[00:01:54]
+If nobody asks for producer, it's fine. If somebody asks for producer, it'll break because we just gave it a shape that has no producer on it. So it's like I don't know what to do with it. Not only did we not give it a shape with a producer on it.
+
+[00:02:05]
+Even if we did, it would probably be a string and not an actual user. So this read's messed up twice before even I got it right. So we'd have to resolve this. So the only way we do that is we go over to Song > Resolver, and we did this earlier today.
+
+[00:02:17]
+Is you'd have to come down to your resolver's object down here. And for the type of song, this property right here has to match the type. That's where it's coming from. This matches this. So for this type of song, when someone asks for the producer field, producer, I want you to run this function.
+
+[00:02:49]
+That's what that's saying. Does that make sense? So for the type of song, when a query comes in asking for the field of producer, here is the value that you're gonna give it. Right, so that value, in this case it would be something like actually now we have a root value.
+
+[00:03:06]
+The root value is the song that this producer belongs to. That's gonna be passed in. Because this is a nested resolver, it's going to happen after you get the song. Let's say somebody came in and got one song. So someone came in and got one song, it's gonna run the get song query, which is this one.
+
+[00:03:23]
+So it's going to run this query. Which runs this function, and then GraphQL was like cool, how do I get the producer? It's like that's how I get the producer. So it's gonna pass in that song that was pulled here to here. Does that makes sense? So this song that's created from the initial query is then passed down to the nested query as the first argument.
+
+[00:03:47]
+And then so forth, and so forth. If this producer had something else on it, which guess what it does? A producer's a user, and if users have playlists on them, then you'd have to resolve that playlist. But you wouldn't do it in here. GraphQL would just go to the user resolver, and just resolve it there for you automatically.
+
+[00:04:05]
+So you don't have to think of how to resolve it. You just need to make sure everything eventually resolves. Everything on every type eventually resolves to something, and then you're fine. I don't have to come here like, okay, this returns a user. Now I got this user, now I need to get the playlist for this user.
+
+[00:04:20]
+You don't have to do that. GraphQL is like, that's a user and they asked for playlist on this. Let me go to the user's resolver. It resolved that playlist. And then he asked for the songs on that. So let me go to the playlist resolver and get the songs on that.
+
+[00:04:32]
+And it will just do all that for you as long as it all resolves. Does that make sense? That's pretty crazy. So you can basically create a graph just by your query. So in this case, this would be something like user.find Find one, assuming we had this in the database.
+
+[00:04:48]
+It would be composer, something like that. This is all make believe. But yeah, you would do something like that, and then you'd be done.
+>> Scott: Can you overload other properties as well? You totally can, that's a good question. So let's say In our database we do have a URL property of a song, so it will look for that.
+
+[00:05:09]
+Or you'll be like yeah, I kinda want URL to be this. Or I'm sorry. I kinda want URL to be a function that returns thing. And it will will just it will use that. It will totally use this over what you gave it, yeah.
+>> Scott: So what you're going to have to do is, I would start with the playlist and try to resolve the songs array.
+
+[00:05:42]
+It's an array of songs so it uses the .find, not the find1 or find by id, use .find. And then inside of the playlist resolver,
+>> Scott: You need to make a nested resolver here that when someone asks for songs pluralized it returns an array of songs associated with the playlist.
+
+[00:06:05]
+Now let's talk about the strategy behind that. Let us just walk through this real quick. Because there's some stuff on here that I did not tell you about, specifically around databases. So if I ask for the songs and I get the playlist as the first argument, right? And we know that playlist is coming from either get playlist, or all playlist, whichever query they call it, it's coming from here.
+
+[00:06:29]
+Or maybe they even did an update playlist. Whatever is returning a playlist, it's coming from there. And we can assume that there's gonna be a songs property on it. And that song's property is what in a database?
+>> Scott: Array of strings. It's an array of strings. So we can assume playlist.songs is an array of strings.
+
+[00:06:47]
+So our objective is, how do we get this array of strings and covert it to an array of objects? That's what you wanna do there. And this playlist right here is a Mongoose document. This is a document because it came directly from one of these, which is a document.
+
+[00:07:05]
+So that's a hint. So whatever you can do in Mongoose document to populate, populate, strings, you probably need to do that here, document population. There is model level population, and you can do that but it'd be a huge work around. You probably wanna do document level population. [INAUDIBLE] What if in this case, a song producer just wanted the user's playlist and wanted to stop right there?
+
+[00:07:42]
+Let's see, a song producer. He wants, so it's up to you. If someone writes a query asking for information, and you're saying you don't wanna give them that information, that's up to you. But what you have to do is make sure that inside of your schema that you take away the nominal exclamation mark, otherwise it'll break.
+
+[00:08:00]
+So that's what you would have to do. I don't recommend doing that. If you don't want to give someone information and they ask for it, then they probably are unauthorized to get that information, you should probably just throw an error. Otherwise I can't think of a good reason you would deny someone information that is there.
+
+[00:08:17]
+
+>> Scott: So any other questions in there? Okay, cool. All right, so yeah, you'll need a document-level population here to populate the strings, the array of strings in this playlist, and only return that array. That is the other secret. You do not return the playlist. You only want to return the array, right?
+
+[00:08:34]
+What is the value of songs in a playlist? It's an array of song objects. So you want to return that array of song objects. That's it. You don't care if that song, if each song in that array also has things you have to populate because GraphQL will then take each individual song and try to resolve them.
+
+[00:08:55]
+And inside those resolvers you would do populations. It's really hard to visualize, but you only have to do that one thing. And then eventually you just take care of every single leaf and it will resolve itself. It's really hard to visualize but that's basically what it is. So I would recommend starting here first and doing that for the user.
+
+[00:09:14]
+Because really user's broken right now and to be authentication. You can do it, you just won't be able to test it. Because the way it works right now it's expecting a JWT. I kind of left it in that state because I was like, we're fine with just playlists and stuff.
+
+[00:09:26]
+So don't worry about the user right now. If you do get to it, you can attempt it. You just won't be able to test it, so your task is going to be resolve the song field in the playlist type. Just attempt that if you do get that working.
+
+[00:09:39]
+And the way you can do this is, one, go create some songs inside of GraphicQL, go create some playlists inside of GraphicQL, add some songs to a playlist. And then query a playlist, and ask for the songs back, and then try to get the titles of the songs.
+
+[00:09:52]
+If that works, you're good. If that doesn't work, you didn't do it right, all right? And then if you get done with that, resolve the playlist field on the user type. Again, you won't be able to test this until the next lesson where we do authentication and stuff.
+
+[00:10:07]
+But you can attempt it. And if you want to try and test it, feel free to go ahead. It's only one line change.
+

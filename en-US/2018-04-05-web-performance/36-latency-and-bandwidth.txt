@@ -1,0 +1,102 @@
+[00:00:02]
+>> Steve Kinney: Kinda move into our next topic, which is the issue of, we now know a lot about making stuff fast. We know how to diagnose things that are slow. We know how to adjust things, but what we need to do is get those things to the browser in order to handle those.
+
+[00:00:18]
+And that is a fine art in and of itself. First that we're gonna talk about is Latency and Bandwidth, right? These are two important factors into the speed in which you get a webpage. I guess the third factor is how much webpage you're sending, right? We saw that bar keep going up and up and up and up.
+
+[00:00:39]
+So these become increasingly important. We think a lot about bandwidth. A lot of times, we don't think a lot about latency. So we're gonna kinda explore both of them. But first, there's this quote from Alex Russell that I really like. That effectively when we're working on web applications, network CPUs and disks all hate you.
+
+[00:00:55]
+On the client, you pay for what you send in ways you can't easily see. We saw that with parsing, right? We saw the JPEG and a JavaScript file aren't created equal, right? There's a whole bunch of other factors to play into this. So for those of you who don't know, that the Internet is a series of tubes.
+
+[00:01:15]
+That basically, a cat meme starts at one point. It goes through the tubes, and ends up in your browser to be a cat meme. On your browser causing an immeasurable amount of joy, right? And so that tube has two dimensions. Bandwidth is how wide the tube is. How much stuff can you fit through the tube at a given moment.
+
+[00:01:36]
+And obviously, the wider your tube, the more cat memes that you can shove through the tube. This makes intuitive sense, right? Bigger tube, more cats, done. The other problem is how long is your tube, right? If the tube has to go halfway around the world, those cats are gonna take longer to get to you.
+
+[00:01:55]
+Sure, you can shove a whole lot of cats in that tube and push them along. But the laws of cat physics dictate that there is going to be a certain amount of time for that first payload of cats to get to you. So this are both like factors that we kinda need to think about.
+
+[00:02:09]
+And there's this really great video on center. Song it's like wild it and see matters. And the part that I really like it's this visual. They did a bunch of metrics here. This is all, like you can see that Sidney is the best, this is based out of my one.
+
+[00:02:23]
+So that's an important testing note. And when I looking at it, wow, Sidney's got some fast Internet. They've got very fast Internet to Melbourne [LAUGH] as compared to San Jose and London. But, you can see that as file size increases, download time isn't in a linear fashion going up.
+
+[00:02:43]
+It's not just, yeah, the file size gets bigger. It's taking these massive steps where it's taking longer and longer. For like every like, as the file size grows, these like jumps. Which seems strange, but is actually like a quote unquote feature of TCP, right? So TCP, the transmission control protocol, right?
+
+[00:03:07]
+Its job, it's not necessarily to get you stuff fast. You'd be like, wow, why is one of the major pipe beings of the Internet not in charge of getting me stuff fast? Cuz it's primarily focused with getting you stuff reliably, right? Getting you all of the bits in the right order, and it will sacrifice speed to do that.
+
+[00:03:26]
+I said earlier, that basically most performance things are some kind of trade off, right? Like layers, you're trading a certain amount of memory complexity for faster paint times, right? All of these things, in some cases like, your super cool JavaScript compiling and parsing hack is maybe affecting readability, right?
+
+[00:03:46]
+That's the thing you need to think of. There's always that human element there too. The way TCP works is, it continues checking with the server to make sure everything's working well. We're getting the packets in the correct order. They're not getting corrupted in the tube. That the client has acknowledged with receipt of each package.
+
+[00:04:03]
+Unreliable connections are handled well. We're not overloading the network, right. And so it's like, very careful to make sure everything's going incredibly well. That way we make sure we don't have files that go missing, or get corrupted. Because if you receive a corrupted cat gif. What is even the point of being on the Internet at that point?
+
+[00:04:23]
+I'm just gonna close my laptop and go outside or something, maybe read a book? Like, who wants to do that? So TCP starts by sending a small amount of data. If that goes well, it starts sending more, and more, as it finds out things are being successful. And that's why you saw those big jumps.
+
+[00:04:39]
+So it starts out by not sending as much data as it could. Like, let me send you a tiny little packet of data. Did you get it? Cool. After I know you've gotten it a bunch of times. It's almost like the optimizing compiler. Things are going well? I'll start kicking things into high gear, right?
+
+[00:04:55]
+But the also, the opposite is true. This is why things feel so much worse on a slow connection. Because packets get lost. They get corrupted. So TCP starts by saying small metadata. Your connection is already unreliable. So already slow. So sends you a small packet of data. Some of those get corrupted.
+
+[00:05:15]
+Sends them again. It's not like an Internet connection that's like, half as reliable is half as fast. Exponentially slower because TCP is like, I don’t trust you. I am putting cats on YouTube. YouTube is leaking, right. You still have YouTube, and then you get the cats you deserve.
+
+[00:05:35]
+CCP will be worse under unreliable connections like dramatic ways. So yeah, and we all know this. Unreliable internet is worse than no internet, cool. So just a fun fact, when we get to file sizes in a little bit. Is that the initial window size of TCP is 14 kilobytes.
+
+[00:05:53]
+Which means if you can get whatever asset under 14 kilobytes. You can send it in one go. If it's 28, then we got to start doing the handshake. Did you get the first 14? Cool. I'll send you the next 14. So on and so forth, right? And it's interesting because like our JavaScript apps are growing, right?
+
+[00:06:09]
+Like this seems like 14 kilobytes [LAUGH] that's not gonna happen, right. Maybe. We have some tricks up our sleeves. But yeah, if we could get that in there it would be way better, right? This is just the nature of the plumbing that the web is built upon. So let's actually kind of see that in action.
+
+[00:06:26]
+We're gonna go to http://www.cloudping.info/
+>> Steve Kinney: And there's a bunch of different tools that do this, and you should check out all of them because they're very cool. Basically from where we are right now, in Minnesota. We can hit a bunch of Amazon regions. All right, everywhere from US-East in Virginia, to Ohio, all the way out to California, all the way out to South America, India, so on and so forth.
+
+[00:06:55]
+So we'll go ahead and ping.
+>> Steve Kinney: You can see the simple laws of physics, that electrons can only go through wires so fast, like the speed of light is a thing, and yes, the Internet is bound by physics. Doesn't seem like it most of the time, but it definitely is.
+
+[00:07:14]
+And so the further away we get, the slower our times are, which I think is fascinating, right? And we can talk a little bit about how to solve this problem. It's actually both incredibly complicated and naively simply. It's incredibly complicated to do and naively simple for us to do, because we let somebody else do the work.
+
+[00:07:29]
+That is also the way to get performances. Third rule, if work has to be done, can someone else do this work is probably useful as well.
+>> Steve Kinney: So, you know like, I work it's in Denver. I'm sure we place our assets in Denver, right? Where are most of our customers?
+
+[00:07:52]
+Are they in the United States? I don't know, like probably. Where do we put our assets if we want people to get them fast? Knowing that if we put them in Denver, people trying to get them in Beijing are going to have a hard time getting it. In Melbourne it's gonna be even worse, so on and so forth.
+
+[00:08:09]
+So where do we put them? The answer is everywhere. You're like that's unsatisfying. And usually the answer is using a CDN. This is cloud front and later on I'm gonna talk about some easy ways to do this. Like there's both, it's one of those things where it's not even on how difficult it is.
+
+[00:08:30]
+But basically cloud front is that there are a bunch of places to host DSS. There's a bunch of like we call edge nodes all around the world. Each client talks to their closest edge node, which ideally can get them stuff faster. So you just spread it around everywhere, caching it all over the place.
+
+[00:08:46]
+I'll talk about this a little, but I'll ruin some of the surprise now. If it's, hey, I've been working on this thing like my own side project, and it's a small application. There are a bunch of services that will do this for you really easily. If you are a large company, actually, Amazon will make it not hard, right?
+
+[00:09:05]
+I'm gonna do a AWS class in a few months. Where we'll talk about how to set that all up. But it's a slightly hard, if you wanna build your own CDN, if you want to be Amazon or CloudFlare, well that would be, you need to like do the setting up of things all around the world.
+
+[00:09:17]
+But for those of you in the room, there's a picture of the world there. That just looks like dots as I look at the screen. But imagine a grey silhouette of the world. That big cluster over there is the United States. Over there we have China, and down below Australia.
+
+[00:09:34]
+So yeah, for most of us we're either, it's leveraging somebody else's content distribution network, right? And putting it in those places. But, the civil act of you do need to do it, right? Some services will do it for you for free. Will automatically, but not everyone out of the box.
+
+[00:09:51]
+And if you just have a server and they're serving your normal back-end services and you just put the files there, you likely don't have a CDN.
+

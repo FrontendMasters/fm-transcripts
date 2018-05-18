@@ -1,0 +1,99 @@
+[00:00:00]
+>> Steve Kinney: It runs okay, right, not great that's not what makes JavaScript really fast. What makes JavaScript really fast is that green arrow. Anything we can get across that green arrow to turbo fan is good, right? [LAUGH] Whenever we can do that, that is a thing that we want to do.
+
+[00:00:15]
+That is a good thing. So then it raises the question, how do we do that? There is a lot of the,
+>> Steve Kinney: Turbo Fan and V8 as a whole is mostly made in Germany, [LAUGH] particularly Munich. Most of the teamwork's there, and it's a bunch of really nice and smart people, friends of mine that work there, and they have PhDs and they're doing some very technical stuff.
+
+[00:00:40]
+We're gonna do it like a high-level version of that because I aspire to teach you a lot of web performance. If we could all leave here with PhDs I would totally do that, but that's probably not gonna happen. So we're gonna look at a few of the things that TurboFan does and how it works.
+
+[00:00:54]
+The three things that we're gonna look at are speculative. I can't wait to say that a bunch of times in front of a room full of people being recorded. Speculative optimization, hidden classes for dynamic lookups and function inlining. Because the reason that what makes the optimizing compiler faster is the like removal of the things that make the interpreter slower.
+
+[00:01:19]
+Cuz JavaScript is hard and JavaScript is dynamic and JavaScript has a lot of rules. So let's say we get an add function, right, add x and y it returns x plus y. You're like yeah, why is that hard? Well, what does a plus operator do? You're like it adds numbers, I'm like, yeah, what if I give it strings?
+
+[00:01:39]
+It concatenates them, okay, what if I give it a string and an object? Well, it calls two string on the object, and then concatenates that with the first one. What if I give it a number and a string of numbers? There's a lot of rules, right, in the JavaScript spec, and the interpreter has no idea, [LAUGH] what's gonna happen here, right?
+
+[00:02:00]
+It knows it has to add x and y, it doesn't necessarily know what x and y are yet, until the program's actually running, so it basically has to follow the rule book. But the hope is that, if we are writing the same function, 1000, 10000, a million times, that we can start to do like make some guesses on what's happening here, and maybe skip some rules, right?
+
+[00:02:23]
+Because, what is faster than doing stuff? Not doing stuff, right, and if we can skip all of those kinda crazy rules and concatenation and do I need to throw an error and be ready for that. If we can eliminate all of that, we can execute the JavaScript way faster, all right, very cool.
+
+[00:02:41]
+So, we're gonna go ahead and look at some code. In the, just that we've send out earlier for watching this then it should be like a link below the video. There is a repo called web-performance with a bunch of code in it. We're gonna play around with that for a second.
+
+[00:03:03]
+
+>> Steve Kinney: Here, I have a little file this is in the benchmarks directory in that repo. This is a file called benchmark.js, I'm very good with naming things as you can tell. And we're gonna actually look at some code, so what's going on in this code? The first thing is we're gonna pull in this performance object, this is not an MPM module or anything along those lines.
+
+[00:03:26]
+If you have for the LTS's node 8.5 and later, you have this, I'm running 9.8, I have this, right. So 8.5 and later should have this if you have an earlier version, you might not have this. And you might need to update during the break and we'll do it together and it'll be a lot of fun.
+
+[00:03:44]
+But this performance object gives us a whole bunch, it's basically implementing what's called the user timing API, which is also supported in Chrome. So yeah this is version is specific to Node if you have a modern version of Chrome you also have these available as well and you can run some of these maybe in your console.
+
+[00:04:01]
+Cool, so we gonna pull that in, then I have a little setup phase in my benchmark here where I'm gonna do one some scientific notation a lot. I'm a liberal arts major as you just found out from the fact that I can translate scientific notation on the fly.
+
+[00:04:16]
+We did this a bunch of times and we're just gonna add 1 and 2. And we'll kinda go through in a loop, add them together, we'll end the performance benchmark, and then we'll measure it, and then we'll console log that measurement, sound good? Cool.
+>> Steve Kinney: So I'll go ahead and I'll run node, and I'll just run the benchmarks.
+
+[00:04:45]
+Cool, so I did all of that in about 33 milliseconds. I'm gonna do a little kinda quick PSA for the user timing API and why it's really cool. Which I'm gonna take this code, other than the common js required, cuz we know that's not supported in the browser.
+
+[00:05:02]
+I'm gonna take the rest of it.
+>> Steve Kinney: And I'm gonna go ahead into Chrome. Go to about blank.
+>> Steve Kinney: I'll open up the tools here, and I could paste it in, it runs, same amount of time, great. But what I wanna show you is, I'm gonna go to the Performance tab, I'm gonna start a recording.
+
+[00:05:27]
+This is gonna be our friend today, we're gonna spend a lot of time in the Performance tab this is our first taste of it. I'm gonna record, then I'm gonna go to Console. No I actually you know pick the console here, I'm gonna record, I'm gonna paste this in.
+
+[00:05:43]
+
+>> Steve Kinney: I'm gonna refresh the page because I used constance and it doesn't like that, one more try. So we'll record,
+>> Steve Kinney: We'll paste it in hit Run we'll stop. Cool, so you can see I have this spike of JavaScript that I'm doing here. You can see it's evaluating a script that's cuz I just pasted it into the console, so it doesn't really know where it came from.
+
+[00:06:07]
+But what I want to draw your attention to is right here, right? I can put my own entries into what's called the user timing portion of the co-developer tools, right? So remember when I was hammering home this, hey, let's measure things, you're like, great, yeah, I don't know how to do that neat.
+
+[00:06:26]
+Use the timing if it has really useful for this cuz you can basically set your mark a start time, you mark an end time, and then you can do this measure where you can give it whatever name you want. I called it my special benchmark to have you believed me that I put this in there and this was not a Chrome thing.
+
+[00:06:40]
+But you can actually put in all of these benchmarks to see exactly how long a given action of your application is taking. So I wanna know like, hey, I think some of the hurt is here, you can put a, you can mark the start time of the thing that you think is hurting.
+
+[00:06:54]
+You can mark the end time and you can actually put that into the Chrome developer tools, do a performance recording and then see when those things are happening and how long they are taking, right, which is super interesting. And a really great way to debug, we'll see later that react actually in development mode uses this out of the box.
+
+[00:07:10]
+So you can actually see when a component started mounting, when it finally mounted, all those thing, it will actually log those all here as well. Which is super useful for figuring out if it's something in your reacticode that's doing this. But yeah this is a really great tool for figuring out why something that's taking as long as it is, if it's the thing taking a long time, and so on and so forth.
+
+[00:07:31]
+But back to our main event, so here, we ran it, it'd be really great if we knew like what was happening here, like is this code? I mean, one would argue this code, that we're just running the same function with the same variables, a lot of times, it feels like it's a good candidate for going to the optimizing compiler, right.
+
+[00:07:54]
+How do we know if it's going to the optimizing compiler, do we know? Is it just like, Steve told us that things go there and he seems confident, thereby it must, right. Or how can we tell if something's going to the optimizing compiler? It turns out that V8 has a bunch of flags that you can set to get more information about what's going on.
+
+[00:08:15]
+So for instance we could do node and get this flag trace opy, anyone guessed what traced opt stands for?
+>> Steve Kinney: Trace optimizations.
+>> Steve Kinney: There will be an easier question later that you can all like redeem yourselves with. Cool, and you can see there's some stuff being logged to the console here.
+
+[00:08:39]
+I'm kind of interested in this first one which is the JavaScript function add is being marked. We're marking the add function for optimized recompilation, reasons? It's a small function, there's in-line caching, which we'll talk about in a second. So yeah, we do it, we compile it with Turbo Fan, it completes the optimizing very cool.
+
+[00:09:03]
+There's some other things. There is a debugging tool called D8 which is used for debugging V8, cute. That it was much more specialized but you have to download it, compile Chrome and a bunch of stuff. If you get really into this that's definitely the way you wanna go, because Node is not just V8, but it's also Node.
+
+[00:09:23]
+So this other stuff here is actually Node happening. So a useful thing to do, if we're command-line wizards, is to run it. And we can do grep add, which will find every line with the name of the function in it, and we'll get a little bit less noise.
+
+[00:09:37]
+So here you can see the Subset of the previous information, okay? We optimized add for recompilation, we now know that it went to TurboFan, it got optimized. It went to to the optimizing compiler good, rock and roll.
+

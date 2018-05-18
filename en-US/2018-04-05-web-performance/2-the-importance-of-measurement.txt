@@ -1,0 +1,82 @@
+[00:00:00]
+>> Steve Kinney: So how do we improve that? We have to measure. There's no point like I'm gonna do this performance optimization. How do you know that A it worked or B you didn't actually slow things down, right? Cuz that is sometimes possible if you don't actually know what you're doing.
+
+[00:00:15]
+So we always want to measure first. This is a quote from Rob Pike, which is measure. Don't tune for speed until you've measured, and even then don't unless one part overwhelms the rest. It's easy to start with the first page, and there's a performance bottle neck, but it might not be the most important one.
+
+[00:00:33]
+There's this application called Skylight, which is rails performance monitoring thing, and what it does is it rates stuff by agony. The agony metric is how slow that page is, multiplied by how many people visit that page. So if your terms of service page is slow to load, is that the first thing you should optimize vs the home page?
+
+[00:00:57]
+The home page probably won't be. Like yeah the home page which gets all this traffic versus the terms of service which nobody reads right? You should like optimize the things that are kind of important and start there. So yeah we don't wanna go just blindly like you can see this and go like I know all these things now I'm gonna go and then implement it my application but like.
+
+[00:01:18]
+We want to make sure we know what's happening because every abstraction has some kind of trade-off. We'll see things in this course today where it's like the Chrome team implemented this one feature to make things faster most of the time, but it turns out that some of the time it makes some of the things slower.
+
+[00:01:35]
+Unless you're measuring you're gonna have no way of knowing that. And you could be doing quote unquote a bad thing to your application, in the name of doing a good thing, right? So it's important to measure because like, yeah, it gets really like easy to see the very next pull request on your app, and start like dispensing advice that you read on a blog post about performance, when we don't actually have any real data to talk about.
+
+[00:01:58]
+And it is one of those things where I do think we do need to regularly be looking at performance, because if we're not, yeah, yeah it's fast enough, until it's not, and then it's usually not one big performance thing that is your problem, but it's like death by a thousand cuts.
+
+[00:02:11]
+It's a thousand things that take about twice as long as they should, that end up bringing your application to a crawl and I can testify to that. So, just some things to think about. Are we testing on fancy Macbook Pros or consumer grade hardware? Are we simulating less than perfect network conditions?
+
+[00:02:29]
+We'll talk a little bit about how slow wi-fi is actually phenomenally worse than like or inconsistent WiFi is even worst than a consistent slow WiFi, but slow WiFi even for users is just general. I'd rather have no WiFi than slow WiFi. I'd rather be okay, there's no Internet, I'm gonna read a book.
+
+[00:02:46]
+I can see the timeline loading. Like not cool. And then finally thinking about performance budgets. I think this is a really useful technique of like, this is the state of our application. We don't want it to get this much slower. We'd like it to get this much faster and starting there and then setting those new budgets as you improve some stuff.
+
+[00:03:09]
+So the one last thing to think about is, measuring is not free. I'm gonna put a bunch of console logs in my application, they're gonna log the time every second except those console logs need to execute, right? And you are slowing down your app by looking at it.
+
+[00:03:23]
+And that's another kind of important thing to keep in mind, is you can put all these reporting matrix everywhere. But you will also slow down the application by doing that, so don't get carried away. And one final piece of advice is a lot of this stuff is gonna is thinking about what we call micro-optimizations.
+
+[00:03:42]
+These tiny little things we would get the this button to go just a little bit faster, right. In the state management course that we have on Front End Masters we talk a little bit about the fact that sometimes just the way you store your data and not doing a bunch of crazy stuff.
+
+[00:03:57]
+And the way you architect the application, itself, can make stuff faster before you even worry about the actual parts and compilation performance. Sometimes it's like, hey, you actually have a table with 1000 rows on the page. And having all those rows in the DOM is slow. What if you just added pagination?
+
+[00:04:16]
+Sometimes the answer is not some of the stuff we're going to talk about today. I want to make that disclaimer now. Sometimes just thinking about the design of your application, the way you manage the state in your application. There's not one silver bullet that's going to solve all your performance problems, which is why we all get paid Money, right.
+
+[00:04:36]
+Cuz if was an easy, just apply this rule, we'd have computers do it, right. Everything that we can automate to the point where there's no critical thinking about it, we have put into algorithms, and that's how the ones and zeroes that come over, the error into my computer, make stuff happen.
+
+[00:04:53]
+All right. Final disclaimer as we go through this is that there are three tiers of advice, definitely do this. Maybe do this, but measure before and after. And only do this if you have a problem that needs solving, right? And so, we kind of use these as our three benchmarks as we talk about different techniques cuz again I'll say this, I'm going to say this 100 times today.
+
+[00:05:14]
+Some things might make your application faster in some cases or slower in another. And like, unless you know what the problem is, you don't know what's going to happen. Now, I'm happy to unveil to you, the TLDR of this course, which are my two golden rules of performance.
+
+[00:05:33]
+Are you all prepared for this? Rule number one, doing less stuff takes less time. [LAUGH] You laugh but like literally, [LAUGH] this is all we're doing today, is like how do we do less stuff? Cuz anytime you do less stuff it's faster. Not doing something is way faster than doing something.
+
+[00:05:57]
+
+>> Steve Kinney: Cool. I ruined this slide. We'll go on. [LAUGH] To the second one which is, one would argue, this is a [INAUDIBLE] to the first one, which is, doing stuff later is better than doing it now. Right? But doing it later, you're not doing it now. And what's faster than doing stuff?
+
+[00:06:20]
+Not doing stuff. So, when in doubt, if you can get away with not doing it, don't do it. If you have to do it and you can do it later, do it later. One would argue this is performance advice, another person might argue this is life advice. I'll let you be the judge of that.
+
+[00:06:36]
+I'm not going to go down that road but it's definitely true for web performance. All right, rough outline of the day. Talk about JavaScript performance. One would argue that if we were doing this in chronological order we were going to talk about load performance first, but we're not doing this in chronological order.
+
+[00:06:52]
+We're doing this in my order, which is we're going to talk about JavaScript performance. We wanna write code that runs faster, later, or not at all, right? Cuz not doing stuff is faster. Got it, so we'll talk a little bit about how your JavaScript is compiled. We send this text file over to the browser, then what?
+
+[00:07:11]
+We'll talk a little bit about what happens there. Because if you just Google JavaScript performance, half the stuff in those blog posts was true when the blog post was written, is not true anymore. And it can become very difficult to figure out like what actually is true, what's not true.
+
+[00:07:27]
+What true in your application, what's not true in your application, so actually we talk about how JavaScript engine works. We'll look at V8 in specific. We'll actually see how the entire process of, you sent code. There is code on page, actually happens under the hood. And we'll actually benchmark it ourselves and try to optimize and unoptimize stuff and see what happens.
+
+[00:07:50]
+Then, okay, we've run code. We're ready to build app. We need to think about rendering performance. Cuz that JavaScript code, as I said earlier, does not exist in a vacuum. It has to interact with the. Unless you're just writing code that's mining Bitcoin in their browser while they're doing something else, likely you are changing the user interface.
+
+[00:08:10]
+There are implications to that that we need to think about. Lastly, load performance. If you do not get the application to the user, the other two are irrelevant.
+
