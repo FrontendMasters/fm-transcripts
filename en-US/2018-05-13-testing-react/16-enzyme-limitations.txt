@@ -1,0 +1,131 @@
+[00:00:00]
+>> Kent C. Dodds: We're not gonna jump right in cuz I wanna explain a couple things first. But we're gonna swap out all of this dispatch stuff with some other abstractions. And we're gonna change how we're creating these DOM nodes with some other methods for querying these. And so before we get into this, I want to kind of explain and justify this abstraction that we're going to be using.
+
+[00:00:25]
+So how many people have used Jest before? Or, sorry, Jest, Enzyme is what I meant to say, okay? Great, how many people love Enzyme? Pretty well, pretty okay? That's actually surprising, I used to love Enzyme. So I was actually, originally this workshop was all with Enzyme. And I was working on step one, step two, step three.
+
+[00:00:51]
+And then the jump from one step to the other with Enzyme felt kind of big to me. So I was figuring out how could we make this a middle ground. And in the process of doing that, I've created a library. And so, that actually, this React Testing Library came from this workshop.
+
+[00:01:12]
+So, let's talk about that really quick.
+>> Kent C. Dodds: This is the React Testing Library, goat is the mascot. And it has a couple of pretty useful methods. Before we look too far into these, let's check out the dom-testing-library. The React Testing Library was the first one, and then I took some of the insights of the React Testing Library and pulled it out.
+
+[00:01:40]
+Because it was just general DOM stuff, nothing specific to React. And so this DOM Testing Library, which you'll be using similar methods from, has some really handy methods that we'll talk about. But before we get to far into that, I wanna talk about Enzyme. Okay, so Enzyme is an awesome testing tool for React.
+
+[00:02:08]
+It allows you to mount a component kind of like what we're doing. It allows you to render it to a string and then exposes Cheerio as a mechanism for traversing that thing. And shallow render it to automatically mark all of the components that you're rendering. So there are a couple of problems that I have with Enzyme and all of the amazing things that I can let you do.
+
+[00:02:34]
+And these problems are mostly rooted in the fact that I have a very strong belief that your tests should resemble the way that your software is used. And the more that your tests resemble the way the software is used, the more confidence they can give you. So with Enzyme the utilities that it provides to you are a lot of different ways to use your software in your test in a way that they're not being used in reality.
+
+[00:03:07]
+So to take an example, shallow rendering, which is actually not just an Enzyme concept, this is supported by the office React Test Renderer. But the idea of shallow rendering is we'll render every one of your components that you're rendering is not a composite component. So like well, I'll render divs, I'll render spans in each ones.
+
+[00:03:27]
+But if you make a custom component, I'm not gonna render that. I'll just say this would be rendered, and then you can make assertions off of that, like you have this log inform for example. And I'm gonna render this div, but then I won't render the form. And so for your test you can verify that the log in renders a div that renders a form.
+
+[00:03:51]
+And that's a pure unit test, because the unit of login, you're severing all the connections to all of it's dependencies, and just rendering the things that the login itself is rendering. And so for me, I actually cared pretty much nothing for the pure unit test concept. If my test at the end of the day ends up being a pure unit test, I'm fine with that.
+
+[00:04:18]
+But what I care about is shipping my apps with confidence. And so if that means that my test is not a pure unit test, you can call it an integration test. And that's like, I don't care, that's fine, I'm shipping my stuff with confidence. So I can get that confidence, I render the log in and verify that it's rendering the form.
+
+[00:04:37]
+And then I'd have to have another test for the form so that I can verify it renders a label and then it renders this input. Well, then I would have to test the input also to make sure that that is rendering what it's supposed to be rendering and accepting the prompts that it's supposed to be accepting.
+
+[00:04:51]
+And pretty soon, you have this test suite full of these purist idea of what a unit test should be. But they're actually pretty confusing when you compare it to the totally, like, even with no abstraction test. It's actually pretty straightforward what's going on here. In comparison to the suite of let's just make sure that the form renders this thing.
+
+[00:05:15]
+On top of that, with shallow rendering, like, let's say I wanted to within this form component,. Let's say I wanted to pull this out and just within the same module have the username Field and return <react.fragment>, okay?. And then I just render my username. So this is a pure refractor, right here.
+
+[00:05:40]
+None of the functionality has changed it all works exactly the same as it had before. But with shallow rendering if I were just testing the form itself, it would stop right here. And the only way for me to get any coverage on this username would be to export that user name so I could test that thing itself.
+
+[00:06:02]
+And that's changing my source code to satisfy my test for no good reason. And so I feel very, very strongly against shallow rendering. So even if you decide you wanna use Enzyme, never use shallow rendering ever. There are situations where it is a good idea to mark things like for if have an animation library or something, you don't wanna wait for animations to end before the item has been removed from the DOM.
+
+[00:06:32]
+And so you just mark API and you mark that component to something that doesn't wait for an animation. It works great and I can show you an example of that. The React Testing Library has some examples of how to handle that. So never ever use shallow rendering, ever.
+
+[00:06:48]
+I used it one time when I found out that it was something I never wanted to do. So that's Shallow Rendering, and that kind of is the kind of overarching idea behind my problems with Enzyme is that it exposes a lot of different things that allow me to use my software in a way that it's not being used.
+
+[00:07:12]
+Which reduces the level of confidence I can have. So a couple other examples just really quick. Pretty much anything that allows me to find for example, anything that allows me to find by a component class like here, I can say okay, find me the component that you rendered.
+
+[00:07:32]
+That's the foo component, or what's even worse is the display name. So now you have a test that has this in it and you go and change the name of the function for one of the components that you're using and your test breaks. Your user doesn't care what the name of that function in, like, who cares?
+
+[00:07:50]
+Your user also doesn't care that you're rendering a foo component inside of whatever you're mounting, or anything. Really, to the user, it doesn't make any difference whatsoever. So I'm much more interested in avoiding tests that are like this. There's also, you can get access to the instance, which is the instance of the class of the component.
+
+[00:08:18]
+Pretty much no code is ever going to access the instance and call methods on that. But that's something that Enzyme actually encourages. So if you wanna test your submit handler while you get the instance and you call instance.handle submit. Well, now, you don’t know whether that handle submit is actually wired up to the form properly.
+
+[00:08:36]
+So there are a lot of things that- like, I never really used Enzyme in this way. I was able to use all the utilities without doing those things. But the reason I decided to write my own thing was because I didn’t wanna have a library where it was possible to do those things or at least not easy to do those things.
+
+[00:08:55]
+So with all of that said, now, next I can tell you about the React Test Library and the DOM Testing Library. But I'm gonna stop and let you ask any questions that I'm sure you have brewing. So feel free to ask away. Yes, Peter.
+>> Peter: So I have used shallow rendering a couple times in cases where rendering the entire component caused performance issues.
+
+[00:09:25]
+
+>> Kent C. Dodds: Sure.
+>> Peter: Snapshot just took forever to generate and I didn't really care. I don't even know exactly what the perf issues were. Maybe like some giant SVG or something, who knows? But that sort of just like allowed me to not think about the stuff that the component was rendering because I didn't care about it and move past it.
+
+[00:09:47]
+Does that, is there a reasonable use case for it or?
+>> Kent C. Dodds: Sure, yeah, so I can address that. What I would suggest is if there is a performance issue you probably check into it, cuz it might actually be a performance issue in your app. But there are situations where this thing renders some date picker third-party thing, and I'm just gonna trust that that thing's going to work.
+
+[00:10:15]
+In that case, I just use just mock and I'm explicit about how the things I'm mocking out. The fact that shell rendering pretty much just mocks everything, even in components that I have within my module. That's what just totally turns me off. So yeah, sometimes it is acceptable to mock things but I'll do that explicitly.
+
+[00:10:37]
+
+>> Peter: So, basically don't, what you're saying is don't mask those performance issues from yourself?
+>> Kent C. Dodds: Yeah, exactly. And on top of that, in talking about third party things. Any time you mock, you eliminate your ability to be confident about that connection, at least with that test that you're mocking, and so you may feel great.
+
+[00:11:00]
+Okay, so now my snapshot is not gonna fail any time that they change their implementation. But if they change their implementation in a way that breaks your application, now, your application will break when they change it and you wont know. So I'd much rather have the pain of having to update snapshots whenever that updates.
+
+[00:11:18]
+And so I'm made aware before it goes up to production but we'll talk more about snapshots later too and how to use those effectively for cases like this as well. Yeah?
+>> Speaker 3: Kind of similar problem, like, what if you're rendering something to be used reducts, react reducts, if you have a connected component in your rendered tree that causes all kinds of problems.
+
+[00:11:43]
+
+>> Kent C. Dodds: Yeah, yeah.
+>> Speaker 3: What do you do with that?
+>> Kent C. Dodds: Yeah, so we'll talk about that more when we get into integration tests but the TLDR is render with a provider.
+>> Kent C. Dodds: So instead of just rendering the component by itself, put a provider around it.
+>> Kent C. Dodds: Yeah, and then with that actually, so the conventional wisdom is to export the non-connected component and test that.
+
+[00:12:06]
+And that's great but you don't have any confidence on your map state to props or like then you have to do extra work. And also the actions and everything else.
+>> Speaker 3: If it's in the tree then you're testing something above it. And especially with a null kind of encourage like connect the components everywhere not just at the top, so.
+
+[00:12:28]
+
+>> Kent C. Dodds: Yeah, yeah, React is a special, special child. No, we love React. Yeah, good question, was there another one? Yeah?
+>> Speaker 4: I was just gonna ask, could you bullet point again why we wouldn't use shallow testing. Thinking that unit test we did last week we used everywhere pretty much.
+
+[00:12:47]
+Why is it a bad idea to use shallow?
+>> Kent C. Dodds: In the test we did last week?
+>> Speaker 4: Yeah, so we started writing unit tests last week using Enzyme and we were doing the shallow everywhere, and you said not to use that. I just wondering if you could provide the bullet point list of why it guest?
+
+[00:13:04]
+
+>> Kent C. Dodds: Yeah, so bullet point list is, shallow automatically mocks everything even components that are within the same module. And so, that mocking, that automatic mocking totally severs all confidence that you have, and refactors will break your test. And so if a reactor breaks your test and you're testing implementation details, and so I try to stay away from that.
+
+[00:13:34]
+There are use cases for mocking things, and so in those cases I am explicit about those with just a mock
+>> Kent C. Dodds: All right, anything else? Anything from the chat? We got something. So anytime the shallow rendering sort of makes you code to an implementation and not behavior, which is bad.
+
+[00:13:58]
+Yes, that's a good summary.
+
