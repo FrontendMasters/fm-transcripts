@@ -1,0 +1,78 @@
+[00:00:00]
+>> Scott Moss: So what we're gonna do is, we're gonna hop right into the optimizing the resolvers and different strategies for that. There's so many ways you can optimize resolvers, and it really all depends on your database, your infrastructure, how much money you have, there's a lot of things. Then there's this common practices that we're gonna talk about.
+
+[00:00:23]
+And then if anybody has anything specific, if you're using something you just want to talk about it, we can talk about that too. I feel like I've tried every single thing you can do inside a resolver to make it faster on many different platforms on many types of infrastructure.
+
+[00:00:39]
+All right, so what I'm gonna do is, I'm actually gonna stay in this repo because I need access to the database here. So let's do this, the first thing is, we're gonna talk about, it's really not a common name for it, but I call it pre-resolving your resolvers.
+
+[00:01:04]
+All right, so let me describe to you what that actually means. So I don't know if you remember, but earlier today, I said, there's an info object here. And then inside this info object, there's an AST and you could look into the fields of that info object. And you can project those onto a database query or a SQL query or something like that.
+
+[00:01:25]
+Well, you could actually take that info, and what's beautiful about this is, if you have a query that's n squared. Something like this where I'm getting the task and I'm getting the project, all right, I'm getting the task, stuff like that. What I can do is, instead of relying on the resolver underneath the current resolver to resolve itself.
+
+[00:01:55]
+I could just look at every single thing that's being asked in this query on this info object, and just do it in this first resolver. I could just do one, hopefully it's just one database call. But I can just do it here, I can do it all right here and then format the object in such a way that GraphQL will automatically resolve the fields for me.
+
+[00:02:16]
+All right, so let me explain that. So basically, right now, new project, let's do this, let's make a new project. All right, let's just get one project actually, way simpler. So if I say, I want a project with the name,
+>> Scott Moss: Insert projects, there we go. Okay, with a name, and let's just do that.
+
+[00:02:41]
+Cool, so we get these projects, and if I wanted tasks, I get their names, okay, cool. Now let's walk through how many resolvers ran for this to work. So we had the one resolver execute on the query called projects, so that executed. That returned an array of projects, and then for each one of those projects, a field called tasks was executed.
+
+[00:03:07]
+So if there are one, two, three, four, five, six projects, so six projects. For each one of those, tasks was executed, so that's six times this was executed. And then for each one of those tasks, which aren't any, but there were, name would have been executed if there was a custom resolver there too.
+
+[00:03:27]
+I know ID's a custom one, so let's use that. So that means there could have been six times six as many IDs, and then six tasks, and then one project. So that's a lot of resolvers being called, imagine if every single one of those was a database call.
+
+[00:03:42]
+Imagine if every single one of those was a call to some API that rate limits you. You would see a rate limit immediately. So speaking more on the database call stuff, what we could have done is, in this top level resolver right here that resolves project, we could have just went in the database and got all this stuff.
+
+[00:03:59]
+In that first query, just give me everything right here. Versus waiting for the other resolvers beneath it to resolve it. And then what we would have returned from the query that resolves this, is we really return something that looks like this, the shape of this. Therefore, GraphQL would automatically resolve it for us, because it's the same shape.
+
+[00:04:18]
+Remember, if you return a GraphQL object with the same fields as the types that it has, it will resolve it for you automatically. You don't need a function, so we could have just done that. But if you did have functions that overwritten that automatic resolution, then in those functions, your code would just look like this.
+
+[00:04:37]
+Let's say this function, let's say we format it, where is that, projects, so for projects, what we can do is. Cool, we've got all the projects, but we know that you;re going to be asking for the tasks too. And the reason we know that is because we looked at the info.
+
+[00:05:01]
+
+>> Scott Moss: We looked at the info, we know that you're gonna do the tasks. So we'll go ahead and we'll query all the tasks, too, for these projects. And instead of just returning back an array of project types, we're gonna return back an array of projects that have task properties on them that also have IDs on them.
+
+[00:05:18]
+
+>> Scott Moss: Does that make sense? And then if there are any other resolvers underneath us, for instance, there is one for project tasks. Instead of it doing some database work, it would literally just return project.tasks. That's it, cuz it's already there, you would just return it, or you would just get rid of this function.
+
+[00:05:45]
+
+>> Scott Moss: Anybody not following me there? The reason I'm not actually showing an example of this, because working with this will take me 30 minutes. It's an AST, and I don't wanna turn this into an AST class.
+>> Student: We already have one of those.
+>> Scott Moss: Yeah, [LAUGH] we already got one of those.
+
+[00:06:03]
+There's libraries out there that actually do the projection for you. You can just look it up, look up Mongo, GraphQL projection, you'll find it. But yeah, I don't wanna do it, but that's how you would do that. So that's a very helpful way to optimize your queries. But again, that is case by case basis cuz it depends on your database.
+
+[00:06:24]
+It depends on the framework you're using, there's so many different things. But in the perfect world, yeah, you can look at that info object, determine what's coming ahead, automatically grab all the data you need in that top resolver. And then you don't have to do any more database queries, that can speed up a lot of things.
+
+[00:06:43]
+But for people who can't do that, like at Type, we actually couldn't do this because our data, we create GraphQL schemas on the fly. Because your content changes all the time, the shape of your data. So we couldn't do this, cuz we don't even know what your schema looks like.
+
+[00:06:58]
+So we just couldn't do it, so we gotta think of something else. Any questions on this before I move on to the next one?
+>> Scott Moss: Yes?
+>> Student: Is the simple version, you just look inside the info object and you say, hey, you're gonna query this. So I'm just gonna get all of it right now, so that when the resolvers chain later, I just already have it, I don't need to do, is that kinda the-
+
+[00:07:23]
+
+>> Scott Moss: That's exactly it, yeah, that's exactly it. I guess I was making it complicated, cuz the info object is complicated. It's an actual tree, right, because this is an actual tree, and each one of these have different bits of metadata on them. So you're literally walking a tree to figure out not only what fields, but what order, and who do they belong to.
+
+[00:07:44]
+And then formatting that into a query that your ORM or your ODM can handle. So yeah, at the end of the day, you're just looking at that object to figure out what you need to do, but you gotta walk that tree.
+

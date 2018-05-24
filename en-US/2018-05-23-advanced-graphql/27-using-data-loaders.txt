@@ -1,0 +1,76 @@
+[00:00:00]
+>> Scott Moss: All right, really complicated. Now I'm gonna show you how to use it and it's gonna make more sense. So now that we can see what a day loader is, let's talk about how to use it. The first thing is to remember this is a per request thing.
+
+[00:00:12]
+So that's why I have it wrapped inside this function, because I don't want to create the day loader right now, cuz then that cache will always be there on the server. It's not like a lambda function or something like stateless thing that destroys itself every time. This is a long list server, so if I were to create this data loader now it will always be there, which would result in people accessing other people's caches.
+
+[00:00:33]
+So that's why it's in a function, and that's why it's in another function that I execute that creates it. So this is to ensure that it's per request, and as far as setup goes, I just add it to the context, just like I did with the models, it makes sense to put it there.
+
+[00:00:48]
+So we're gonna do context.loaders, and this is gonna create all of our loaders for us.
+>> Scott Moss: This is so we have the same, this is just guaranteeing that we have a new loader every single request.
+>> Speaker 2: That's why it's a function.
+>> Scott Moss: Yeah, that's why it's a function.
+
+[00:01:08]
+
+>> Speaker 2: Nice.
+>> Scott Moss: Otherwise it would just be the same one every time, which is not what you want. [LAUGH]
+Cool, so now that we have the loaders in the context, that means in our resolvers, we can just use the loaders. So, let's go to one of our resolvers.
+
+[00:01:27]
+Let's go to project. Check out project.resolvers and what we'll do here, look. I'm not going to do this one for you. You gotta do this one. Can you find a way to use loader? Actually, this is extra credit. There's no way you can do that. [LAUGH] If anybody does this, go look, it's download stuff but let's just talk about using the loader.
+
+[00:01:52]
+So here is an example. So for the project right here, instead of going to the databases, this is models, it's context.model.project findById. Instead of doing that, what I can do instead It's like I say ctx.loader.project and I can say .load is the method that I want, and I just give it an ID, and the ID that I wanna load is this one.
+
+[00:02:17]
+That's gonna make a call to the database and it's going to load the project for me. So it's gonna batch it. Just in case there's any other calls here, it's going to batch them all, it's going to wait. Am I like, are there any other calls through this project loader, are there any other calls?
+
+[00:02:35]
+And once you realize there's not, then it's going to load it and I'll have access to it. So I can pretty much replace all the places in my resolvers where I'm quering for a project by project ID with the loader instead. And then that way, I'm guaranteed to automatically get it from the cache if it already has been resolved in a previous resolver.
+
+[00:02:57]
+Or in this case, this is a top level resolver, so there's no way it was previously resolved. This is just gonna be priming it, basically. This is gonna prime the cache with the first instance of the project. So all the other resolvers underneath it can benefit from this project already being in memory.
+
+[00:03:11]
+Does that make sense?
+>> Scott Moss: So if we were to run this,
+>> Scott Moss: My God, stop, come here.
+>> Scott Moss: All right, there we go, I got a sticky tab button over here.
+>> Scott Moss: So if we were to run this and we were just like, what query was that? Was that projects or projects?
+
+[00:03:38]
+Projects, okay. Let me grab an ID.
+>> Scott Moss: All right, so if we grab one of these, and we ran projects, which takes inputs,
+>> Scott Moss: Id,
+>> Scott Moss: And let's just put id here. Cannot read property project of undefined. Is it,
+>> Scott Moss: Yeah, loaders, thank you, yes, plural.
+>> Scott Moss: There we go and we got the project.
+
+[00:04:18]
+So the loader works, it did it's job, it batched it, we were good to go. The way we can check that is, without setting up a really advanced example, is we can just do it again. I could just, just come down here I'll load it again, and I will call this project 2, and project 3.
+
+[00:04:43]
+So we'll do that and then what we'll do is we'll go into our loaders and you can see right here. Project loader batch and it will tell us how many it batched and what that looked like so, I had to restart, so [INAUDIBLE]. So let's do that, we'll run this query again and you can see right here, it only batched one.
+
+[00:05:07]
+There was only one call there so it was totally fine. Whereas if that was database call, it would have been three different database calls
+>> Scott Moss: Does that make sense? Because the first time, let's just walk through what happened, cuz it's two things that's happening. There's batching and then there's cashing, right?
+
+[00:05:29]
+The first time this executed, it actually went into the loader.
+>> Scott Moss: It ran the database query, this one right here, and that's why we saw this log. That was the first time. It ran this database query, it only got back one project. There was only one projectId in here, it did that but then, these next two times, because this one already got loaded, it's in cache, it's in memory.
+
+[00:05:53]
+So these never even went into the loader, into the database calls, they just came back from cache instantly. So this one loaded from the database after it was batched, and then these loaded from memory.
+>> Speaker 3: Is it because you were doing that O8, so that she waits to result the first one?
+
+[00:06:07]
+Like if it didn't have O8s on, wouldn't it make you call it three times?
+>> Scott Moss: Yeah, if you did not have an await on it, it would be a race condition and it depends on what happened first. The resolution or the caching or the bashing, you're competing with resources.
+
+[00:06:23]
+So yeah, the await is what guarantees that order for sure or if you get provinces with a dot end, you'll get the same consistency.
+

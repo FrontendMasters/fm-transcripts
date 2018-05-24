@@ -1,0 +1,89 @@
+[00:00:00]
+>> Scott Moss: This was awesome. So let's just walk through how I did it. So, if we look at the query, let's just break it down very quick. So one, we have this project query which is a top level query. Takes an input, and its type is project input, and then it has this property called tasks.
+
+[00:00:22]
+And if we look at it, we can see that on a project type, it has a field called tasks, which is a non-null array of tasks. What that means is, there always has to be an array there, that exclamation on the outside of the array. If there's an exclamation on the inside of the array, That means that the array can't be empty.
+
+[00:00:44]
+But there's probably a chance where you will have a project and no tasks, but you should always have an array at least. That's what that means. So it should be non null tasks. So we need to resolve that. And then if we look on the task itself it has a project field.
+
+[00:00:58]
+So if you look task, it has a project field whose type is project. So if you did some detective work, you might have went into. I'm in the wrong repo. You might have went into, there we go. You might have went into the models inside of API. And you will look at the model and like, what if the model already had it there.
+
+[00:01:26]
+Well, the project model doesn't have a task array here so you couldn't just get it from the database from the project model. You couldn't just query the project and also the task will be there. So you can't do that. So you might have checked the task model to see if it has a project on it.
+
+[00:01:43]
+Kind of, it has a project, but if you know Mongoose, you know that this is just an ID that's referencing a project, but it's not the actual full project. So it's kinda there, but not really. So that's all we have, so we couldn't do it the shortcut way where we would just pass graph key will, the exact object with the exact fields on it from the database and it will just work.
+
+[00:02:05]
+Because our database isn't modeled exactly the same shape as our graph field types are, so this wouldn't work. So this is an indication that we will have to write custom resolvers and also I told you, you have to write custom resolvers, so. If you just wanted to know why, that's how you know why.
+
+[00:02:22]
+The database schema doesn't match with the GraphQL schema. So there's some virtualizing going on with GraphQL that you've got to do. All right so let's hop on the project one first.
+>> Scott Moss: And basically for tasks here, one thing to know so remember the task property belongs to the project type.
+
+[00:02:40]
+So therefore I should write the task field on the top level project type here inside of our resolvers. So for task, because this is going to be a nested line and we know it's nested because we'll look at the query tasks is underneath project, so therefore project will be executed first.
+
+[00:03:01]
+The results of that will be passed to task. So that's how I know, inside of this resolver, I'll have access to whatever this returns. Does that make sense? Whatever this field returns will be the root value for this.
+>> Scott Moss: So that's how I have it here. And this is why I said it really depends on the query.
+
+[00:03:23]
+It doesn't depend on you, it depends on the query, right. So because this was queried secondly, I have the project, I have the args. The args here in this case would be any args that were passed to task, which are none, and then context. So basically here I'm just using the task model on the context to find any task that has a project ID of the given resolve project and that's how I get an array of tasks.
+
+[00:03:50]
+Did anybody do this differently? No, I was going to say, I want to know. That's crazy. That'd be dope. Yeah so that's how I got task. And then for the task models itself. There's a couple things here. So I have this thing called projects and this other one I didn't say, parentTask.
+
+[00:04:11]
+And this one's like, remember I said there's Easter eggs in there? This is the Easter egg. But you didn't have to do this one. So for project, it's very similar. So project, this is not the same project as this project. So that can be really confusing. This is not the same project.
+
+[00:04:33]
+This project is a field on the query. And it takes this separate input with these types. This project is a field on a test and it has separate association. So this project is not the same as this project. They're both called project but they're not the same. So that can get really confusing and the way you would know that is because we know that we cannot ask for fields on a type if we didn't describe it in our schema.
+
+[00:05:07]
+So all we gotta do is go look at that source of truth, which is our schema. In this case, it will be our task schema. And we can see that on a task type, there's a project, and it's type is project. That's the project we're referencing, we're referencing this one.
+
+[00:05:22]
+Completely different project, although they both return the project type. So again, very confusing, but they belong to two different places. One belongs to a query, the other belongs to a task. They both return the same type. But when executed when you give it a different context, they will definitely return a different object of the same type.
+
+[00:05:47]
+
+>> Student: So then does that mean if I create another nested task in project, it would be a new instance of a project so then if we continue to do that, it would effectively de-DOS your graph server?
+>> Scott Moss: Yes, correct, yes.
+>> Student: And what would a solution be to that?
+
+[00:06:05]
+
+>> Scott Moss: We are gonna get to that. Yeah, we talked a little about that them with the inflow object, but yeah, there's a lot of ways around that. So yeah, you would definitely d-dos yourself, I've done that a lot. A lot, like I was trying to test caching and stuff like that.
+
+[00:06:23]
+So the way you'd do that, the solution for that project, or the task, is basically we know that if you go look at a project model, again there is nothing on here that indicates anything with a task. The relationship is not bound on this model. So there's nothing we can do here as far as creating a project to figure out what tasks are associated with the project.
+
+[00:06:49]
+But we do know that tasks have project IDs. And we do know that we are, we could use the project ID on a task to find the actual project. So that's what we do here. So we just say, look at the project model, find one by the ID of the one that this task is referencing, and that will give us back our task, or I'm sorry, our project.
+
+[00:07:14]
+Did anybody do this differently?
+>> Scott Moss: There is actually another way to do this differently but it's more of a Mongo thing. That's called population. If anybody knows what population is in Mongo, it's basically like join tables at runtime. If you use SQL you do a join table, it's like that but virtual, it's like a virtual thing.
+
+[00:07:33]
+It's complicated, but yeah, you could have done that here versus doing this because you could actually just populate this ID. You can populate this ID and Mongo will actually give you, it'll go do the query for you, and give you back the project. So you could have done that as well, but that's a little more advanced, as far as the Mongo side.
+
+[00:07:52]
+This one works effectively the same until we get into optimizations. Cool, any questions on this solution? Or anything with resolvers and how they would work. No, okay, the parent task one, that one's there. If you go look at the task GraphQO, you'll notice some crazy stuff in here.
+
+[00:08:18]
+One, there's all these other fields like repo and asset URL, we'll get to that. But there is a parent task which is an optional task, and this is because tasks can belong to other tasks. So if you were to make a task with a mutation and you were to give it a parent task ID it would save that in the database and when you go query it later, you can say, who is your parent?
+
+[00:08:39]
+This is the resolver that resolves that. So you could imagine you would have a query that would look like [LAUGH] it would be ridiculous but you could do something like this.
+>> Scott Moss: Right, and it would just go on, and on, and on. And then just to make it worse, you throw a project in there.
+
+[00:09:06]
+Put some more tasks, and they got parent tasks, and they have tasks, but yeah, you can imagine it would just be bad. So if you did the math on how many queries would run there if you had like ten tasks, it would be well over 100, way over 100.
+
+[00:09:21]
+So yeah, just, this is where it gets dangerous. So the flexibility can come back and hurt you for sure.
+
