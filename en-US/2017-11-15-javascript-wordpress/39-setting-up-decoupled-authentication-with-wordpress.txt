@@ -1,0 +1,202 @@
+[00:00:00]
+>> Zac Gordon: Let's go ahead an open our stuff up, come down into JWT authentication and open up the Read Me. So one of the first things you'll notice is that, we now have an Authentication file, and this is where we're gonna store all of our authentication. It's a pretty good idea to abstract your authentication code, out from the rest of your code.
+
+[00:00:20]
+Because then, if you ever want to go build another app that authenticates, you literally just copy that file. And you shouldn't need to change anything, cuz everything's being passed into it. So good modular coding applies as much to WordPress as anything else you're building. [COUGH] Then we've got to, we'll do some import things.
+
+[00:00:38]
+We'll set up some stuff in our authentication. I'll talk you through that. And then setting up the save functionality, we will set that up as well. Now, one thing that is not mentioned here is that we do need the WordPress plugin. And that should have been in the instructions, so.
+
+[00:00:57]
+
+>> Speaker 2: I think what happened is that the six, three and six, four, this might be the one for the save.
+>> Zac Gordon: No because this should just be handling login and logout, and then saving posts will be doing it separately. But we do need the plugin, okay. Simple enough, jwt authentication plugin.
+
+[00:01:24]
+
+>> Zac Gordon: And let me just show you the one that we want specifically. There is more than one out there at this point. So we are using this one from a friend, Enrique Chavez. So this is the one that we want, and we can either download and install it, but I'm just gonna go directly through WordPress and install this real quick if I haven't already.
+
+[00:01:58]
+
+>> Zac Gordon: Let's double check.
+>> Zac Gordon: Was the code in 6.4 for the [INAUDIBLE] no it wasn't there either. Okay, good thing we'll go through this together. So, I already have the plugin installed. So you have to go ahead and do that. So go ahead and install the plugin, that’s the first step.
+
+[00:02:23]
+But there are a few other things we have to do to set this up. One of them is that there is a potential that you might you need to add this code to your dot HT access file. Mine’s working without it, so we’ll see if that’s necessary. But we do need the configure, a secret key and we need to unable the cross site access to our from one up into our WordPress site.
+
+[00:02:49]
+So by default, WordPress user server will blocked that but we're gonna unable it just for this plugin. So both of these are going to go into our WordPress configuration file. So if you open up the root files, we've been going into the themes and plugins folder. Step back a step or two, and open the file called wp-config.php.
+
+[00:03:19]
+
+>> Zac Gordon: And because I'm working in chasy, mine is slightly different.
+>> Zac Gordon: I didn't wanna do that. [INAUDIBLE] Okay.
+>> Zac Gordon: So my setup is a little bit differently, but this is the code that you're gonna end up putting in. So 'JWT_AUTH_CORS_ENABLE', so that will allow one side to access our site.
+
+[00:04:07]
+And we set that to true and then the other things is we need a secret key, so this is gonna be salted. So whenever, we've sent something back and forth not only that we have one doubled encryption but then we add this in and then encrypt it altogether.
+
+[00:04:19]
+So if you're familiar with salts, WordPress has a place that you could get access to them and they link it up right here in the docs for this plug in. So if you go to this link. I'm sorry, this was in the instructions at some point. I'm not sure how I lost it there.
+
+[00:04:37]
+And you wanna copy one of these strings.
+>> Zac Gordon: Okay, make sure you get inside the single quotes, copy that and then, place that into your WP config. And your WP config will have a lot more stuff in it than mine does. I said, my setup's a little bit different.
+
+[00:04:56]
+But paste that in right here. And then, this could go towards the top of your code. You'll see a bunch of other code in your WP config file. But that should be good. Okay, so that's what we have to do on the WordPress side to set stuff up.
+
+[00:05:13]
+[COUGH] Now, let's come back into our code.
+>> Zac Gordon: And now, I need to go ahead and make sure that I pull down all my files and that I.
+>> Zac Gordon: So I'll run npm install and I'll run npm start, and I'll just pull up the package that Jason filed to show you what we're working with here.
+
+[00:05:41]
+
+>> Zac Gordon: Oops, I'm in the wrong folder.
+>> Zac Gordon: So in the past, all we were doing was pulling in axios, but now, we have something called "form-urlencoder" and "js-cookie". So, we need these in order for our authentication to work. When we're taking what is basically going to be a username and a password, or form data.
+
+[00:06:23]
+There is a way of passing this as a header or with an http request, and that's called form URL in coding. And there is a script that will do that for us, pretty complicated to try to figure out on your own. So that is gonna be a benefit.
+
+[00:06:37]
+And then, the other thing is that when we ping WordPress and we say, hey we're logging in, it's gonna give us at token back that says, hey, you're logged in. Use this in the future and we'll trust it and everything's cool. So we're going to take that token and store it in a cookie for access.
+
+[00:06:54]
+We could potentially maybe use local storage but since we can make the cookie secure and require https, one little benefit and a just kind of a recommendation from the plug in itself, so that's what we'll be doing there. I'll run npm start, we've got everything down. And now, we could start going to town on what we actually need to do here.
+
+[00:07:20]
+So we're gonna start in our authentication file. Let's open that up and take a look at what's happening. So the style of this authentication file is actually borrowed from one of the major Wordpress OAuth libraries. So what happens is when you switch from one authentication system to another authentication system, it's not like switching from jQuery to Axios where it's one or two little things.
+
+[00:07:47]
+Switching from using something like JWT to using OAuth is a very different structure. But there are some underlying conventions and namings that can be similar. So I'm borrowing from another system in the hopes that one day if you start to explore OAF with WordPress. And you use the OAF WordPress example, these function names at least will be some place holders that makes sense.
+
+[00:08:13]
+So we have an initialized one, we'll come back to that one in a second. The main two ones that we have are onLogin and onLogout. So when someone actually logs in, this is what's going to be happening. But then, we have two other ones called initLogin and initLogout.
+
+[00:08:31]
+And basically, all these are going to do is just set up the, kind of event handlers, once you log in to make sure that now if you click log out, it's going to work. And that once you log out, once you click on the log in button, it's going to work.
+
+[00:08:48]
+So normally, I do not like to pass anonymous functions into Click handlers. Remember everything else we did in the past was like post.save or something like that. And we could have taken that approach, but because you're not going to have to likely remove this, and just to kinda simplify the code that we're looking at and not just create more and more functions, that's why I took this approach.
+
+[00:09:13]
+So we'll come back up to the top and the first thing we have to do is import axios to cookies and form url encoder. So the simplest way to do that is to just.
+>> Zac Gordon: Wait, where did those other ones come from? Were they there before? Yeah, they were there.
+
+[00:09:39]
+They were just already working. Okay.
+>> Zac Gordon: Okay, so then, what did we work with before where we had to give it a name? Okay, when we worked with nonces, remember we had to say, hey, this is our JWP like nonce. We're gonna do the same thing with our cookie.
+
+[00:10:02]
+And in our configuration file, which is starting to get a little bit bigger now, notice that, not only are we storing the rest_url, but we're storing the name of the cookie itself. So we're gonna call it jwt-cookie and we're also gonna store logged in. Because in WordPress when we're in a theme, remember how we could run some PHP and check if they're logged in and kind of use that PHP to check that?
+
+[00:10:26]
+We can't do that anymore, but we still want to have access in our app loosely. This is not the most secure way, right, to determine if you're logged in or not. But for our purposes, it will be helpful. And then the loginForm, the logoutForm, the wsername and the password, these are all things that we're adding to our configuration.
+
+[00:10:53]
+
+>> Zac Gordon: Okay. [COUGH]
+>> Zac Gordon: So what we wanna do is say config.cookie, which is going to basically, again, just be the name that we're using for it. And then if that cookie does not exist, so if somebody comes to our site and they do not have a token stored in the cookie, then we're going to runlogout to make sure that they are forced logout.
+
+[00:11:18]
+And we're gonna initialize the login so that it's ready for them. And then, if they come to our site and land here, and they already have a token saved as a cookie, then what we're gonna do is automatically log them in and then initialize the logout and get ready.
+
+[00:11:34]
+So this is the structure I was talking about that's pretty similar, having a login and a logout function. Naming them on login, on logout and then having an initialize to set up the next thing to happen. And you can do this a lot of different ways but the reason I picked this again, is just so that in the future if you explore things more, you might see some similarities as you go.
+
+[00:11:53]
+So when they log in, we're going to set log in equal to what? True, right? Because they're now logged in, and that will be pushed to our configuration file. And if you were dealing with react or view, it would be pushed up into state and you could now have access in or propagate through.
+
+[00:12:09]
+But we're just using vanilla JavaScript. And then if they're logged in, we wanna take that loginForm and we want to hide it. So we're gonna add a class of remove. And then if they're logged in, we wanna take the logoutForm and we want to remove the class, remove from it.
+
+[00:12:24]
+Initially, everything is hidden on our page, that's just one way to do it. If we were really going to full extent, we build everything dynamically and only load what need. So we're kind of hacking a bit just to see the deeper issues here and not code everything to the extent that we possibly could.
+
+[00:12:42]
+Now, if they're logged out, logged on, log out this should not be true. Did anybody catch that? That should be false, right? On log out, logged in should be false, right? That make sense to everyone? I think so. Okay? Then if they're logged out we wanna take the loginForm and remove the classList.
+
+[00:13:06]
+If you're not familiar, classList is kind of native Java Script now, supported pretty across the board, and it also allows for toggle which is nice. But I'm gonna do this all manually. But if you haven't played with classList, a nice native JS feature there. And then we're going to add a remove to the logoutForm cuz they're already logged out.
+
+[00:13:29]
+So we just wanna show the loginForm. Now, initializing the loginForm, we wanna get, as soon as somebody submits the loginForm. So again if we come to our site now.
+>> Zac Gordon: I think I'm still running the last one, no?
+>> Speaker 2: Should the classes be hidden instead of removed?
+>> Zac Gordon: I'm sorry?
+
+[00:14:12]
+
+>> Speaker 2: Should the classes be hidden instead of removed?
+>> Zac Gordon: Dude, you're totally right. Did I type remove every single time? I said that.
+>> Speaker 2: I just wanted to check the CSS just to make sure myself.
+>> Zac Gordon: Yeah, you were spot on, so what is that in here?
+>> Zac Gordon: There we go, okay.
+
+[00:14:38]
+So we could change that to hidden. Perfect, good catch.
+>> Zac Gordon: Okay, so we should see our loginForm off to the side here, that's all well and good. And when somebody submits that, as soon as they submit it, we wanna grab whatever values these are, right? So as soon as they click submit, we will prevent it from default loading, and we will pass in the config.username.value, and config.password.value.
+
+[00:15:12]
+Remember, any time you're dealing with forms, you gotta use value at the end. Otherwise you're just gonna get the form element itself, like the input field, for example. And now we're back to some axios stuff, so this should be familiar. We're gonna change post to that, we're gonna change our URL to config.rest_url, and then a pen on to it, this new end point.
+
+[00:15:37]
+So this end point, that needs to be a string, did not exist until we installed our plugin. So remember how I was saying that if we come to any WordPress site, and we add wp-JSON, you get to the root of the site. And this tells us all the namespaces.
+
+[00:15:56]
+And cuz I have that simple plugin and I have my jwt-auth, I could add that here, jwt-auth/v1. And right there is an endpoint that I should be able to do two things with. I can grab token, and it will allow you to post, so you're making a request to get a token.
+
+[00:16:21]
+And then it will allow us to make a request to validate. So if I try to go to the token right now It is not gonna work, because we need to pass it some validation data in order for that to happen. So let's go ahead and set that up, but now we know the reason this exists is just because this plugin created it.
+
+[00:16:42]
+
+>> Zac Gordon: So now the data that we're passing, this is where we take our credentials that we just set up, up here. And we format them in a way that could be passed, because you can't pass an object across in a JSON format. But there is formurlencoded passing in our credentials.
+
+[00:17:02]
+And then the Content-Type is going to be form-url-encoded. So we need to tell the server, get ready to expect some encoded form data, our username and password. Otherwise it'll try to accept JSON, and what we give it will be invalid. So that is not a good thing, we don't want that to happen, so need to change that.
+
+[00:17:25]
+And then once this goes through, so once we hit here and ask for the token, and it gives us a response back, we're basically going to take that data and pass it into our cookie and set it. So this is the name of our cookie, config.tokenCookie. And then where it says TOKEN_HERE, it's already been changed.
+
+[00:17:56]
+So this was originally TOKEN_HERE, that's going to be the actual data back. So we say, hey our cookie, go ahead and save that token. And if you were to echo this out or log it out, you would see what that looks like behind the scenes when we want to get a token back.
+
+[00:18:11]
+We could also do some things like have it expire in one day. Or if you wanted to have it expire in 100 days, or 7 days, I mean more secure is probably gonna be a shorter period of time. But if there is circumstance why you might want someone to come back a week later and hit your site, and that cookie still be saved, it'll work perfectly there.
+
+[00:18:32]
+And I'm just gonna set it for 1. We could also make sure that our cookie is secure, or working over, yeah, secure over SSL. So those are some benefits there, we will configure all that. And then if that doesn't work, we'll say hey login, I'm sorry, your login credentials didn't work.
+
+[00:18:52]
+And then if things go completely wrong, meaning that this whole request doesn't even go through, then we will go ahead and display a login alert message. Saying hey, something went wrong, go ahead and check this out. Now, so that's the login, right? We make a request to get a token, we get it back, we store in a cookie.
+
+[00:19:12]
+What happens when we want to log out? Well, it's pretty simple, we basically just say, hey go ahead and remove the cookie that I set up. And once that cookie's gone, then when our initial page loads, we don't have a cookie, and we can't come in, so it'll just force log us out.
+
+[00:19:30]
+So we will do COOKIE_ID is gonna change to this, secure is setting to TRUE. Because when we saved it, it was true, we also need to specify that the one that we wanna delete is the true one, cuz we might have an insecure one as well. And then we want to manually call Authentication.init, because otherwise, it will not run this code again and force someone out.
+
+[00:19:55]
+So you'll notice that after we run initLogin, we have the credentials. But we're still going to say run init again. And then after we log out, we remove the cookie, and we say run the initialization again. Again, this whole flow is pretty common from one thing to another.
+
+[00:20:14]
+So fingers crossed, let's see if we did it right. Let's see if there's more to do of setting up save. You were right that this was in one thing before, so let's come back over here,
+>> Zac Gordon: Look at that, I'm logged in, it works. Now, how do I testify I'm logged in?
+
+[00:20:38]
+It's kind of hard to, because we can't save anything yet. So that'll be kind of a next step we do. But when we click Logout, that should show, and at this point, that's our confirmation. Cuz there's no way that this login form should be disappearing until we have a cookie in place.
+
+[00:20:54]
+And I guess we could come in and, is it under Applications, or is that just Local Storage, where are our cookies?
+>> Zac Gordon: Look at that, right, so we've got the cookie there, we could see,
+>> Zac Gordon: The name if it, this is what we saved in our config file.
+
+[00:21:13]
+We could see the value of it, so this is gonna be our token. Look at that gigantum thing, it's huge.
+>> Zac Gordon: The domain name, the path, when it expires, the size of it, and then the fact that it is secure. So if I were to go ahead and delete this cookie and refresh my page, I have to log in again.
+
+[00:21:35]
+So I can manually control that as well, and that cookie would have expired 24 hours from now and disappeared anyways.
+
