@@ -1,0 +1,68 @@
+[00:00:00]
+>> Sean Larkin: One other thing I wanted to talk about is how we abstract things in our source code. So there's more than just like, through plugins is how you're gonna modify anything in Webpack, right? So there are some other things that we do abstract that are maybe important to know.
+
+[00:00:18]
+So for example, you must wonder, well, Sean, how do you guys do output in memory, right? Well, our file system is completely abstracted. In this code base, we never perform a FS call ever, never. So there is no required FS, because that would completely remove our ability to do in-memory stuff, right?
+
+[00:00:41]
+And so, we've completely abstracted it. I think it's in MemoryFile system. Yep, it's funny cuz this is the file. But in our source code, our MemoryFile system is actually, we've abstracted, we've written this ourselves as well, called memory-fs. And this is a package under Webpack. And it basically just allows you to bind fs to an in-memory version of itself.
+
+[00:01:12]
+And so, this is actually used and set during output file system. Here we go. Where is it? File system. There's an API where we set this on the compiler. There we go. So we instantiate this, and we actually set it to nothing if, it's the, we have two different ones that we set versus in memory or not.
+
+[00:01:44]
+But you could take this, and as long as it has the right fs calls, you could have it pulling in sources and exporting sources to a Redis cache. You could do anything. Well, there is a great talk online that talks about how because everything is so de-coupled in webpack and so abstracted, you have the ability to essentially, you could take a MongoDB database, or some online service database.
+
+[00:02:10]
+And as long as you implement the right adapter so that it works like FS, you could hook into the compiler and set compiler.input and output file system to these values. And so I've seen people do this and just do incredible, crazy things. Somebody was telling me, we were running 1,000 webpack builds every minute, I think.
+
+[00:02:33]
+And sharing the dependencies, sharing the module sources through a single Redis cache between all these instances. And then that way, they were able to do just crazy stuff. It just blows my mind. So yes, so that piece is completely abstracted. Technically, because our resolver is in a separate package, if you felt the motivation to write a separate entire resolver, you could do that.
+
+[00:03:03]
+We don't make any resolver calls for the exception of resolver.resolve, I think, right? I think resolver.resolve, and that's the only time we make those calls. So that means technically you could write a completely separate resolver, replace it in webpack through the, I believe the compiler sets it. No, I'm sorry, webpack options apply.
+
+[00:03:36]
+
+>> Sean Larkin: Options apply, and then find resolver. Yep, and there's actually hooks for this. So [COUGH] You can hook into this and literally set a different resolver if you wanted to. So let's say if you wanted to completely resolve from network resources. So instead of ever having build files on disc, you could use a get virtual file system and write a resolver that you could replace the resolver entirely for webpack, and you could do that.
+
+[00:04:08]
+I've had thoughts, but remember there's caveats. If you do a network resolver, you break watch mode, right, because how's it gonna pull changes from the network? If you wanna solve that problem, let me know, because that's cool. So yes, and you can even see here when we set the resolver, what are we also setting?
+
+[00:04:30]
+The file system. So all of these pieces are decouplable, all these pieces can be abstracted, or abstracted. I mean, overall it may feel silly that really all we did was hook into a couple hooks, but this is really how you make a webpack plugin. I guess another thing that I could cover is that you don't always have to get the compiler.
+
+[00:04:57]
+Like if we look at the source code in webpack, we see that we have parser plugins. And I wanna talk just really briefly about that. So it's like, when we look, how does a parser plugin work? Because really, when you look in here, it says parser, right. So now the purpose is to encapsulate it, right?
+
+[00:05:19]
+Cuz you just don't want a ginormous plugin, especially if you have these separate behaviors. And so what you can do is, I think CommonJsMod, or Plugin? There we go.
+>> Sean Larkin: So we take a plugin and you can apply other plugins from it. So if we go down to the bottom of this code and we look,
+
+[00:05:49]
+
+>> Sean Larkin: You can take a plugin, any plugin, you can apply that method, and just pass in whatever you want to be hooking into, right? So in this case, in this webpack plugin, this is how we support the CommonJS syntax, right? So at a whim, we could just delete this plugin from our source code and we don't support CommonJS anymore.
+
+[00:06:12]
+We isolate the feature sets per each plugin. And so in this case, this dependency parser plugin is just specifically for the purpose of listening to that parser hook. So we tap into the parser and then we're gonna apply the parser to it. So we go there and so that's just responsible for hooking into the specific parcer, adding the dependencies, adding the templates, etc.
+
+[00:06:42]
+So you can do that. You can basically separate your plugins into smaller plugins that get applied per instance. That's totally a possibility. So if we were to even just go back to our plugin and refactor this, we could do so. We could say, I'm just gonna write it in a single file.
+
+[00:07:03]
+So I could say, class MyFirstWebpackCompilationPlugin. Now, we use kind of a naming convention, where it's like whatever we're passing it to, we would add that name to the bottom. So that's why we have ParserPlugin, I instantlyy know looking at it, that's someting that gets the partial passed into it instead of just the whole compiler.
+
+[00:07:23]
+So that means your apply method will actually take a compilation. And it's just really a naming convention. You could call it whatever the heck you want. So instead I could say something like this. So this code, really, I could move down in here, right? Boom. And then I would just say, now I obviously can't access that closure variable anymore, but we could essentially say something like this.
+
+[00:07:55]
+MyFirstWebpackCompilationPlugin. But I think they call new on it too, right? Sorry, I just want to confirm that I'm not,
+>> Sean Larkin: You do call new, yes, you do. Okay, great. So, new MyFirstWebpackCompilationPlugin().apply(compilation), right? So just an easier way to create separation of concerns, isolate your behavior. I even find that it makes your plugins easier to read, right?
+
+[00:08:32]
+Cuz now you can separate your behavior, you don't have as many callbacks and indirection, stuff like that. Even if I like, let's say we actually try and run this. I'll just jump into, I'll just say yarn debug or mpm run debug. And I'll cheat and use VS code, okay.
+
+[00:08:59]
+
+>> Sean Larkin: All right, yep, we're in that. I could put this in a separate file, it doesn't matter. But that's the point here. It's an easier way, this is the best practice for writing plugins. And really it's just a reflection of how we write it ourselves for the code base.
+

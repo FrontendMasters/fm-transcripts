@@ -1,0 +1,64 @@
+[00:00:00]
+>> Sean Larkin: What I wanna do now, I guess before we go further is actually read at how the webpack runtime code has changed, right? Cuz how are we supporting this? How does this happen? So what I wanna do is actually, I'm gonna jump in and I'm gonna set mode to none.
+
+[00:00:20]
+
+>> Sean Larkin: Let's see, mode none, oops.
+>> Sean Larkin: Let's see, yarn webpack.
+>> Sean Larkin: It's just, this should give us that mode none. Let's see what it looks like in the dist. Yeah, cool, very cool. Okay, I'm just gonna wipe this dist folder and rebuild again, just so it's a little easier to see.
+
+[00:00:46]
+And let's hide this, and we can just walk through this code again.
+>> Sean Larkin: All right, so you see the output here is not only just a single bundle, but there's two bundles that we emit. So the code here has changed slightly. And the reason why we change it is because we care about this code coverage percentage.
+
+[00:01:11]
+So we're not gonna include pieces of the runtime if you're not using all the full features of webpack like code splitting, or cachability and things like that. So let's step through this code again. And so we have a function here that's called webpackJsonpCallback, right? And it takes data.
+
+[00:01:31]
+And basically what we do, this data's gonna be an array. And it's gonna be passing through what we call chunkIds, and then more modules. So you can think this might be an array of modules, similar that we're used to seeing, like in our IIFE parameters, right? So even if I went down, just like, we have our IIFE.
+
+[00:01:52]
+Let's make this a little bigger.
+>> Sean Larkin: Okay, and so we still have an array of modules, nothing has changed there. But we do have this new function, and so it looks like we define some additional information. And we say for every chunkId, or for the amount of chunkIds we have, basically it's gonna say, well, if installedChunks.
+
+[00:02:25]
+So now we not only have a module cache, but we have a chunk cache, right? And it says resolves.push, and it adds a resolve. And then it sets initial ID for the installed chunks.
+>> Sean Larkin: And then we basically say, well, for each module in this array of modules, so we can tell it is an array.
+
+[00:02:56]
+We basically check and see does this have, does this ID exist? So just basically verifying that for the IDs that are mapped to our bundle of modules, or the array of modules, we just check and make sure. And then let's scroll down a little bit. And you can see, here's the original code that we read, so it's the module cache.
+
+[00:03:20]
+The most important function though is this right here, __webpack_require__.e. So this is the lazy loading transformation. So this is what we convert, a dynamic import, in our code. It gets transformed into __webpack_require__.e. And so what you can see here is that we take and perform a JSONP export.
+
+[00:03:48]
+Or not a JSONP export, but a JSONP fetch of another file. So we're actually taking and finding the head, we create a script tag. And then we actually set a JSONP request. And then we append that script to the actual head.
+>> Sean Larkin: And then since this could be an array, then we do Promise.all.
+
+[00:04:22]
+So what does this actually look like when code splitting occurs though, right? Because we haven't actually seen what gets transformed for it. And then we have the single global variable called webpackJsonp. It's defined as an array by default, it's in the global scope. And this is where we actually register other chunks in what we call the chunk cache.
+
+[00:04:44]
+[COUGH] So let's take a look at where it's actually loaded. So here's our getFooter, and that's still a function that returns __webpack_require__.e, which is a promise. Now this number is the chunk ID. So this is the chunk ID that it's trying to pull from the cache. And then what we do is then we take the export inside of the promise and we do webpack_require.
+
+[00:05:15]
+So to actually find this, when you see this ID, it's actually referring to by default the chunk ID for the other bundle that's created. So this file hasn't actually been added yet onto the page, right? Only until it performs that __webpack_require__.e, and it looks for chunkId 1, does it actually add the script tag into your head, and then load this into the available modules in the available chunks.
+
+[00:05:50]
+And so when this happens now, it's being loaded just like any other array of modules. Or in this case, we haven't set, I believe it's set as an object, right? Yep, it goes object, and then the IDs. So whenever we're lazy loading, we're just accessing modules that have been just separated into a separate file asynchronously.
+
+[00:06:09]
+Do you have any questions so far? Does that make a little bit more sense in terms of how this behavior actually happens? Okay, so I don't wanna say it's not magical. Cuz I mean, I love it, and it's really amazing how we make it possible even across different module formats and things.
+
+[00:06:30]
+But this is really, this is the permeative of CodeSplain. That's it, we are able to create asynchronous bundles that can load on demand. And you don't have to control any of the on demand loading. It's part of your code, it's imperative. All you're doing is just using that function, using the dynamic import.
+
+[00:06:54]
+And the beauty is that, let's say ten years down the road, webpack's not here and you rip it out. This is still a browser specified standard, right? So that's kind of in a nutshell, I would say, code splitting. Now there's gonna be, I wanna show examples of another type of code splitting.
+
+[00:07:16]
+And this is static code splitting, right, because we're just providing a path to the actual module itself. And this is the vanilla way that you would lazy load any of your code. When anybody talks about code splitting or lazy loading bundles, this is the technique. And so now that you actually know how to do this, when you think about it, now you can tie together the concept of, well wait, if I’m not using 62% of my code, that entire chunk, that entire set of modules or unused code, that’s something that you should be instead lazy loading when that functionality’s actually needed, right?
+
+[00:08:03]
+And a lot of the time, it just adds up to being a really large library that you don't need upfront. Actually, that's a great, that should be one thing that I wanna showcase. So if you haven't followed along, I'm just gonna check this branch out. But what we're gonna do next is take a really heavy library, and just load it asynchronously.
+

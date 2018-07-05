@@ -1,0 +1,74 @@
+[00:00:00]
+>> Sean Larkin: The first line of code that executes typically web pack is node API. All of our CLIs, any of the CLIs use the node API, right? And this is the node API. Essentially we instantiate a bunch of things, specifically compiler, right? That's your tappable instance. And then we're literally just gonna call compiler.run.
+
+[00:00:21]
+This is the single line of when webpacks compiler starts. Now we're also doing some other things like taking options and we applied defaults, right? So people are like, webpack doesn't have enough defaults, well guess what? There are hundreds of properties we're defaulting for you out of the box right?
+
+[00:00:43]
+And this is where we actually implemented our modes, right? Because we basically said, if we're in, production or if we're not, we're going to set a bunch of different modes, right? We're going to choose to order modules by how often they occur, topologically inside the chunks. If not, we're not gonna do that.
+
+[00:01:03]
+And you save on build time. So anyway, that's the options defaulter and then we gotta webpack options apply. And so this is where we actually are applying each of the individual, we take the configuration, right? And I had just this was me working in a branch, and so I figured out how to get type definitions for the entire config.
+
+[00:01:29]
+[LAUGH] But webpack options apply, we literally take the config and the compiler instance, and we basically run a giant switch statement, just saying well, if it's this property, target. We're gonna apply a different set of templates, right? A different set of templates for the bundle, for the created code, right?
+
+[00:01:53]
+So, if you're in node, we can't use a jsonP, right? There's no DOM. So when the target is node, or electron main, or anything that doesn't have DOM, we're gonna actually apply a different type of template to it. This is the power of this kind of modularity, encapsulation.
+
+[00:02:14]
+And we apply a different plugin that then creates these different templates. But then if you jump all the way down here, you're gonna actually see a hook that's called Compiler. Complier.hooks.entryoption.call. So this is where the entry option hook is triggered and if we even did a source code search like, hmm, what actually is listening on that hook?
+
+[00:02:40]
+So I can now just search compiler.hooks.entryoption. My goodness. It's the entry option plug-in which takes the entry property and apply, creates this dependency, right? So, we need to kick off the traversal and resolve it. And to do that, you start with a dependency. So, we basically say, hey, this is a dependency.
+
+[00:03:02]
+And so, you need to go resolve it. So, then we end up going to the compilation where we call, well technically if we step through it like single entry plug in It's then gonna set basically the template for this type of dependency. So it can be transformed. And then we literally just call compilation.addEntry.
+
+[00:03:25]
+So if I go to Compilation and I search for addEntry, oops. No, there we go. [LAUGH] Now where is it? Add entry.
+>> Sean Larkin: So this is. Now I'm not going to explain everything that's happening here. I don't think it's as valuable. Because there's lots of edge cases and stuff but we call add module chain.
+
+[00:03:49]
+Takes a call back and at the end of it you get a module, right? Because you took a dependency, resolved it and you get a module from the module factory. But it's like add module and add module chain calls factory.create. So this is the normal module factory that has a create function.
+
+[00:04:06]
+And this is actually calling hooks. Before it resolves, there's a hook that you can plug into and do crazy things. Like change the entire request and go fetch a different module if you wanted to. But then the result is the resolver resolving that information with the data that you need.
+
+[00:04:23]
+And then it calls the factory function, and it's going to create, I even think if I search in here, new module, new normal module. There we go, it creates and it's gonna pass it back in a hook. So this .hooks.module is something you can plug into to access that newly created beautiful shiny module abstraction.
+
+[00:04:44]
+And now of course, then we would actually have to go back out four levels of callbacks [LAUGH] because asynchronous programming. And we would end up eventually we essentially call this function called, add, let's see, dependencies, it's like add module dependencies. Or process module dependencies. So this is where we basically, we have to now parse through this code and walk through it and we tie everything together, create the graph relations.
+
+[00:05:18]
+But so long story short, that's where this all happens. And I think the most cool thing is that now you that understand what the parser instance is, look at all these hooks.
+>> Sean Larkin: These are all hooks here. And what webpack does is as we walk the AST, we fire an event for every type of syntax we walk across.
+
+[00:05:45]
+So, it's not just the import statements. It's anything, it's decorations, it's any type, a variable. We walk across a variable, we're gonna admit it, an event about it. And so literally, why we do this is because if you look in our source code under dependencies, we have an individual parser plugin that is listening to that specific syntax, right?
+
+[00:06:12]
+So, a common js require dependency plugin, or parser plugin is just listening to require, and you can even see it here. We hook into the expression, parse.hooks. Require and then the common js. Sorry, sorry, [LAUGH] I can't see the code, there we go.
+>> Sean Larkin: And so, it's literally listening to it.
+
+[00:06:37]
+
+>> Sean Larkin: And then what we do in this handler is we basically just have this method called addDependency. So that's literally how we take on a module object. We add the dependency instance and tie it together. So, yes, we literally have individual plugins for every type of statement that exists in webpack and so events are firing in the thousands, the tens of thousands, the twenty hundreds of thousands of times when you run webpack, because as for every piece of the AST it's gonna fire an event.
+
+[00:07:08]
+So I think when I learned this, my mind exploded into oblivion. I was like, my gosh, this means that I could listen to anything and provide functionality or diagnostics or you could do crazy stuff. It's a little bit of abstraction and it's not the easiest thing to do, because you're having to create a parser plugin, hook into the parser.
+
+[00:07:31]
+Also create a dependency factory and, you know a dependency template for it because the template transforms that individual statement. But, the fact that everything is so modular and extensible is I think what like really made me super excited about this. And you can see, each dependency instance will have a template, and I think it's in this one specifically it's.
+
+[00:07:56]
+Let me. If you just type template in our source code. Am I still there?
+>> Sean Larkin: Hm. Let's see. Well, there's a whole bunch. Template. There we go. I don't know why it's not pulling them all up. There they are. Literally we have templates for every one of those syntaxes we need to transform, right?
+
+[00:08:19]
+And the reason behind this is because doing AST. We could modify the AST and that's it, to the code we want. But modifying the AST is slow, and so doing string transformations with templates is what we chose to do. But anyway, there's a template for everything. You can plug into the template and how it renders, that's all capable.
+
+[00:08:41]
+So the master way of learning how to write plugins that do anything is literally just looking at what we do in our source code, right? Because that's the best practise for how we write plugins, we dog food this entire system.
+
