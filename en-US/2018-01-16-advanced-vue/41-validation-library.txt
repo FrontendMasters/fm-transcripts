@@ -1,0 +1,123 @@
+[00:00:00]
+>> Evan You: And we'll actually find this pretty familiar. So let's look at the usage first, okay? Just ignore this super long regular expression. It's just for checking whether a string is an email. And we have an app, we have some data. This is so small, I'm sorry. We have an app, we have some data.
+
+[00:00:20]
+We have the text, which is foo, and email, which starts with an empty string. And notice this custom option, validations. So see, this looks very, very similar to the plugin that we wrote in the morning, right? It's a validations custom option contains text and e-mail and each of them contains a validate function and a message function.
+
+[00:00:44]
+Notice this message is not just a static string. It is actually a function that takes the key and value of the current value so that you can generate dynamic warning messages at one time. So, text must be, length must be bigger than 5. And for email, we just tested against the email regular expression to check whether it's valid.
+
+[00:01:09]
+And the good thing about being in JavaScript is, right, this function you can replace it with anything you like. So if the library provides some built in, you can say, you can have helper functions that just help you create these validator functions for you, right? And you can also have for example compose (greaterThan(5), allCaps().
+
+[00:01:44]
+So you can sort of have all these. In JavaScript land you can play with your creativity and compose all these validation rules and make them work together. Or you can make your plugin more powerful by accepting an array of validated functions. That's all up to you, but for now we're just gonna do value.
+
+[00:02:08]
+
+>> Evan You: It must have the minimum length of five, okay? So and then we have, this validate function doesn't really. We'll use it when we submit the form. So when the user attempts to submit the form, we'll again do a check to prevent it from submitting if the form is not valid.
+
+[00:02:31]
+And notice that we're using this thing, this sort of like, what is this $v thing? So this $v is going to be sort of injected or provided by the plugging. And this $v will be a sort of a big object that contains the whole state of your current validation state.
+
+[00:02:53]
+So this top level valid property essentially means the whole form is valid or not. If any of the fields fail a validation, this value will be false. And then there's some other things that if you look at the template here, we have a form and on the forms submit we will call the validate function.
+
+[00:03:16]
+So that will help us prevent default, preventing the page from reloading.
+>> Evan You: And input with v-model. Pretty straightforward, just syncs the input into our online data. And look at this part. This is the part where we display validation errors. So notice that v-if equals not valid, if this block only shows up if the form is not currently valid.
+
+[00:03:45]
+And it has a red color. So the good thing here is notice that we are responsible for rendering form errors ourselves because from the plugins perspective all it does is provide some state. How to present that state, how to present it to the user, how to style all of the messages, where to place them?
+
+[00:04:08]
+Completely up to you. So this gives you more room for customization and flexibility. So we can just iterate through $v.errors. So this is another API requirement. The $v should expose an array of errors, which can just be strings. So we're just like show them here. And then we have a form submit button, which you can disable the button based on the valid status of the form.
+
+[00:04:38]
+So let's take a look at, so if we check out the solutions. Oops! And run the code, this it how it looks like, so. Our default state already triggers warnings. Text should have a min length of 5, but got 3 and the email is empty so it's not valid, and the whole form is disabled because it's not valid.
+
+[00:05:14]
+So let's fill in something. Once we have a string longer than 5 the first warning disappears, and let's just and it's valid so this email address gets a lot of emails. And it's actually a valid email address. Because it's used so often it's almost like DDoS'ed all the time.
+
+[00:05:41]
+
+>> Evan You: So how do we implement that?
+>> Evan You: Let's go back to the master branch and try to implement that. So remember for any plugin, we should have an install method which takes Vue as the argument.
+>> Evan You: And, let's think about what we need to do for this plug-in.
+
+[00:06:05]
+We need to be able to process this custom validation's object. So, that means we need to have a global mixing that injects the created hook into every component. And then we check if (this.$options.validations), this is where we need to do work, right?
+>> Evan You: So some of the, let's see if we actually should use the created hook, right?
+
+[00:06:42]
+There's really, so some of you might start to think you can set up watchers in the created hook. Each of the properties run through the validations, and then set the data onto the $v right, that works. That could, indeed, work. But that feels very imperative. Is there a more declarative way to think about this?
+
+[00:07:08]
+The fact is, there is. So, let's look at this $v thing. What should it be? Should it be just an object on the instance that we can mutate? Or could it just be some declarative mapping from our current form state? So if we take that approach, let's actually mix it in as a computed property, right?
+
+[00:07:38]
+So you can do this. And now inside this computed property, you still have access to this.$options.validations, right?
+>> Evan You: So a more optimized version of this plugin would only make seeing this $v. Property if this.$options.validations is found. So you can do something like- created() { if(this.$options.validations) { this.$options So at this point, unfortunately, the computer properties we have are already being initialized.
+
+[00:08:28]
+But if you use before create
+>> Evan You: [INAUDIBLE] before create, computer properties, the reactivity system has not been set up yet. So here is your chance to kind of cheat the system and like sort of
+>> Evan You: just do this.
+>> Evan You: So you essentially create a, overwrite this
+>> Evan You: See what we're doing here?
+
+[00:09:06]
+We're not, so we need to retain whatever is already declared there. But this might be on the find. So we're just using object.assign here here because it can handle undefined values. Essentially we want to clone everything, if there is any, into this empty object, and then eventually we add this $v functionality to it.
+
+[00:09:26]
+S inside this $v we want to do return something, and it should probably have errors if there are any, and a valid status. So the question becomes let valid = true, const errors = an array. Now the question becomes, how do we do this? How do we map the current status to these valid or errors?
+
+[00:10:11]
+This becomes much more straightforward. This is just synchronous computation, you're going from some state to another. And where do we get the form state that we care about? Notice that we have this so let's extract it out, const rules.
+>> Evan You: Again we're gonna iterate through the rules object.
+
+[00:10:42]
+Keys, rules forEach(key). And in here we'll have rule = rules(key). Const currentvalue =, now, we are trying to get the value. So, where do we get this? Just take it from this, right? Because we are inside a computed property, we have access to this which is component instance.
+
+[00:11:15]
+And this key actually point to the field of this particular role is interested then. Now this is very similar to what we did in the plugging that we did in the morning. We can just do const result = rule.validate,
+>> Evan You: So let me just do this, validate(value). Right?
+
+[00:11:44]
+If the result fails something should happen and that is setting the whole form to invalid. Invalidate the whole form if any one of them fails right? And we need to push a message into the errors, and where do we get that? We can do push(rule.message). Remember message is also a function.
+
+[00:12:13]
+It takes the key, it takes the value, and that's pretty much it. So we've, we're iterating through the rules. For each rule, we'll retrieve the current value and run the validate function. If the result does not validate, we will set the whole form to invalid status and push the corresponding message into our errors array.
+
+[00:12:37]
+And after we do this, we simply return this object that contains the valid field and errors. Now this is just a computer property. So notice that this is where reactivity is registered. When we access this key, this is similar to a dot access which triggers the getter on our instance.
+
+[00:12:59]
+So it registered the activity, which means when any of these fields change, our computed property will be properly updated. So, let's take a look. It doesn't work. Let's see. It's not defined by reference to our render, okay. So this $v is
+>> Evan You: not being defined.
+>> Evan You: Okay, so
+
+[00:13:40]
+
+>> Evan You: options computed.
+>> Evan You: Hm. Well for the, so just to be safe, our monkey patch and options scheme may not be working properly. So what we want to do is take this whole part out.
+>> Evan You: And instead we will simply mix this computing property into every instance.
+>> Evan You: Well, this my screen is too big so the sensitivity of the scrolling is much too high.
+
+[00:14:33]
+Right, so we can take these out. Okay. Still this on work. Rules is not defined. Okay.
+>> Evan You: Const rules. You put this .options.validations.
+>> Evan You: If (rules) well actually you don't so object keys works on.
+>> Evan You: Let's just do this. Okay,
+>> Evan You: So we're achieving the desired result here.
+
+[00:15:21]
+
+>> Evan You: And always just a single computed property, really all it does is It's actually pretty functional if you think about it. So we have, this is the input. The validation is the input and this key is also input. So the data source is the current state of your component and these validation rule.
+
+[00:15:48]
+All we do is compute the current status based on the source data and then return it from within a computed property. And with this computed property, we can do arbitrary rendering styling, decide how to actually present these error messages to the user and you can decide preventing form submissions, disabling buttons.
+
+[00:16:11]
+Everything is state driven so this is sort of the way you do model based validation. And it actually is very similar to how Vuelidate works. So if you like this style of form validation you should probably check out Vuelidate.
+

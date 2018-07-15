@@ -1,0 +1,102 @@
+[00:00:00]
+>> Mike North: All right, so looking back at the slides, now we want to add a reasonable content security policy. So I'm gonna open up Helmet JS and look at their example here. And basically we require this thing, we bring this in, and it is a middleware for connect, which also means that it's gonna generally work with Express.
+
+[00:00:23]
+So I'll just grab this whole thing and we'll trim down to what we really need in here. Now I made the claim that you really only need to work in index.js in the server folder, so let's start there. Get rid of that, get rid of this we don't need it anymore, all right, so I wanna paste it right here just to make it consistent, so we're grabbing the CSP object.
+
+[00:00:56]
+And effectively, when you're dealing particularly with Express, all of these app.use things, this is a stack of middlewares. So these think of them as little pieces of code that each get a chance to do something, to request as it kind of filters down and comes in. And then potentially do something to respond as it bubbles back up, right?
+
+[00:01:15]
+So we talk about it like it's a stack, and think of it like a stack of things. And we kinda bounce all the way down until we get to the bottom and everything handles it. And then we travel all the way back up through the stack, and ultimately return the value.
+
+[00:01:30]
+So because of that, we gotta pick kinda where we want this to go. And you want your CSP to be wherever any of the other headers you have are. And I recognize cores as something that deals with headers, so we can do that. Now if you needed like a value from a cookie or something, like when we talk about cross-site request forgery.
+
+[00:01:52]
+You might want to say, well this is something that like extracts the cookie out of a header and gives me a reasonable value for it. That might be a reason to sort of say, well let's deal with cookies first. And then now I can access the cookie values easily and because I need those for something.
+
+[00:02:09]
+All right, so the way I like to do this is there are a bunch of options here, a lot of them are worth looking at but we don't need them for this first intro to this library. I'm gonna leave report only as true. This basically means that it's not gonna block anything from working, but it's gonna yell at me.
+
+[00:02:32]
+Note that we have this report URI thing that's available in the configuration for our CSP headers. So what this means is you can specify an end point or errors will be sent from browsers that detect violations. This can be used for what some people call a dynamic kill switch, where you basically, in the event that you get information about a CSP violation.
+
+[00:03:01]
+You can pass along with that some safe indication that can be used to find that user's session and essentially terminate them right away. Essentially logging them out if any CSP thing happens and triggering some escalation in whatever security management software you use. This is a good place to hook in.
+
+[00:03:22]
+The downside is, it does give us some ability to figure out status about current users. It bleeds information out about domains that our code is not executing on, which potentially we could use. So for example, if we tried to request an asset from Facebook, and we were able to put our own report uri violation there.
+
+[00:03:52]
+So say I get you to click on a link and go to this page. And now you try to access Facebook. I can get some information about, were you allowed to see that? Were you logged in or not? So we can kinda infer by whether a request was sent out, what is this user allowed to do or not.
+
+[00:04:10]
+So I wanna not deal with objects, we can leave that as is actually. Sandbox, this has to do with iframes. So you can only permit iframes that have the Sandbox attribute on them. Which would say, you're not allowed to cause navigation in the top frame. You're not allowed to open up post message channels.
+
+[00:04:32]
+You're not allowed to run scripts, right? You can limit what an iframe can do, and this would say well, we can have iframes, but only if they are at least this restrictive. Image source, we're going to say that falls back to our default source, that's fine. Font source we're gonna need, we'll leave self in there, that's probably a good practice.
+
+[00:04:53]
+And we're gonna add data; cuz we'll find that we've got a base 64 in coded one. I'll actually get rid of that just so we can see the error. And we can get rid of unsafe-inline. Let's see if we can get away with not including that, we certainly don't need this.
+
+[00:05:15]
+
+>> Mike North: All right, let's try it. So I'm gonna bring our app back into the picture.
+>> Mike North: And this is where you wanna open up Dev Tools.
+>> Mike North: Refresh. We're gonna stay on authenticated now. All right, so you see we got a bunch of errors here. So let's just stop up at the top.
+
+[00:05:40]
+It says Sandbox is ignored when delivered in a report only property. Okay, we'll get rid of that.
+>> Mike North: And we'll refresh again, a hard refresh, so we don't hit our cache. I'm still preserving my log.
+>> Mike North: There we go. So upgrade-insecure-requests is ignored when delivered in a report-only policy.
+
+[00:06:03]
+That's fine, we'll leave that, it'll disappear. So default-src, blah, blah, blah. It was delivered in report-only mode, but does not support a report-uri. Let's see what happens when we get out of report only mode.
+>> Mike North: All right,
+>> Mike North: So now you see, stuff's breaking down. The browser has obviously refused to do some things that it was doing before.
+
+[00:06:37]
+It refused to load this style sheet because it violates the content security policy. And it states my policy right there.
+>> Mike North: Style-src was explicitly set, so default-src was used as a fallback. Sorry, it was not explicitly set so default source is used as a fall back. So we can add into default sources self is added there.
+
+[00:07:05]
+
+>> Mike North: I know what I
+>> Mike North: That's interesting. I would have expected self to work, but no matter, we can just add it here. Let me look at the policy I asked you to implement, it might the unsafe inline. So let's add that.
+>> Mike North: And self must be in those quotes, it has to be in the CSP header value between quotes.
+
+[00:07:50]
+
+>> Mike North: So something crashed the app, let's see what it could be, styleSrc, objectSrc.
+>> Mike North: Problem was what?
+>> Mike North: It must be quoted, unsafe-inline must be quoted.
+>> Mike North: Okay,
+>> Mike North: Do a hard refresh, see if we get a new policy.
+>> Mike North: Let's try our lvh.me
+>> Mike North: All right, I'm just gonna continue to just implement the CSP that I asked you to do, which is style source self, unsafe, inline, font source is data, and default source is only self.
+
+[00:09:06]
+So default source is, sorry, I lost my place, default source is self. Font source is data. We'll take out the object source. Take out this, take out this.
+>> Mike North: I'm gonna in a second try to stop and restart my server just to make sure all that works. I had to have,
+
+[00:09:36]
+
+>> Mike North: Yep, it looks like I'm on there, maybe I just need to stop and restart.
+>> Mike North: There we go. So this is why I'd advise you test a couple domains. Sometimes this stuff sticks into the browser and basically, you gotta kick the cache to make sure it works.
+
+[00:10:05]
+So if we look at our network request here for the document, we can look down at the headers, the response headers. And you can see, here's our content security policy. And effectively, this little package that we added made it so that we only permit the things that we really want to permit.
+
+[00:10:25]
+I think there's, so I'm using inline styles on some elements. On a dom element, for example, saying style equals something, that would be something I should probably get rid of, right? Cuz if I can forbid it entirely within this app, I can now basically eliminate a possible cross site scripting vector entirely.
+
+[00:10:50]
+And it's gonna as far as CSS practice to do that anyway. So, what we've effectively done here is we've allowed our view library to work for us by telling it to escape any untrusted user input. Ad we have added a content security policy header, so that basically you can't inject arbitrary code into this thing.
+
+[00:11:15]
+For example, that cross site script injection that I did earlier on Carnegie Mellon's website, that would not have worked. Now of course, because that was over plain http, I could have modified that CSP as it was going over the wire. And basically said to the browser, yeah you can trust anything.
+
+[00:11:37]
+That would absolutely be the kind of thing that these tools like the man in the middle framework, that'll just strip that header out and the browser will never get it. So obviously we have to go a couple steps further here.
+

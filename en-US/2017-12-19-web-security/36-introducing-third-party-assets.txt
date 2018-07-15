@@ -1,0 +1,107 @@
+[00:00:00]
+>> Mike North: So, last area that we'll look at when it comes to client side development, well, attacking by way of the client, is third party assets. And when we talk about third party assets, all three of these things apply. On the top, we're pulling in a resource that we're not hosting, right?
+
+[00:00:20]
+Someone else is hosting that. We're pulling it in off of a cdn. In the second example, we are using a version dependency. We're pulling down source code from some repository. And in fact, we have a fuzzy dependency here, where we're saying we'll allow patch and minor version increments to come into our code base any time we go and retrieve dependencies.
+
+[00:00:41]
+Right, we'll take 4.16, 4.18, we'll take any of those. The third and the worst, honestly, is when someone says to use our service, please drop this script tag, this big chunk of HTML right into your application. So that's bad. Worse is when we kind of look at what this script is doing, and I don't know if it's because I've been doing this for a while and can cross my eyes and look at minified JavaScript.
+
+[00:01:10]
+But it is pretty clear to me that this is creating a new script tag. So this chunk of HTML that we're dropping into our app, when it runs, it'll create its own script tag that will bring in the real program. This is bad because it can basically be released, a new version can be released without us deploying our app.
+
+[00:01:35]
+The same might be true of the first example here, but at least someone's making the attempt to version that, right? 3.2.1, one would assume that they will not write over that same version, that should be an immutable URL. Down here, it's googleanalytics.com/analytics.js. That is definitely not an immutable URL.
+
+[00:02:00]
+They are changing that program all the time. So all three of these we would say are third party because we didn't write the code. We probably didn't thoroughly review the code before bringing it into our app, and with the exception of the middle one, we're not even hosting the code.
+
+[00:02:21]
+So for situations like this where we're bringing in a dependency, but at least we're packaging it into our app, keep in mind that although people who manage these dependencies, core teams, experts, they make big security mistakes, just like everybody does. So do not fall into the trap of thinking that it was written by, in particular, a big tech company, and therefore you can blindly trust it.
+
+[00:02:51]
+These people find issues in those kinds of projects all the time. So recommendations for dealing with this are to have reproducible build. So even if you have those fuzzy dependencies, you want to make sure that you define when you're willing to take in any change in those dependencies.
+
+[00:03:12]
+You may say I'm okay with any express version 415 or above. But that doesn't mean that every time you NPM install, you necessarily wanna pull in any potential new version there. Right, that is why we have a yarn.lock in this file. Or if you're using NPM, you probably have a package lock.
+
+[00:03:34]
+That basically says, yes, we know that we're allowed to take in new versions. But for this build, until the user says all right, go and see what's upgradable and we'll pull it in. That is what you're shipping. When you don't care about bleeding edge features and an LTS release, right, long term support, when a long term support release is available, consider using that.
+
+[00:03:59]
+That is not as quickly a moving target, right? They will usually release at a slower frequency, but security issues will get patched back into them. And the benefit there is that you're using kind of hardened, well, hardened is the wrong word. You're using more mature code. You get all of the security benefits of future development, but none of the risks associated with new feature development between LTS releases.
+
+[00:04:25]
+And essentially you're letting kind of those who wish to adopt bleeding edge versions of a package to test it out, identify any issues, fix any problems before you start taking it on immediately. And this would be in the case where maybe it's a library that you're just using in a basic way, and you don't need the most modern stuff.
+
+[00:04:46]
+Your code would have worked with the ten year old version. So why are we taking each new patch into account? Now, you would wanna look for an LTS release there, because without that, you wouldn't be getting any security fixes, right? So this doesn't mean just stick with an old version, but when someone says here's a very stable version that doesn't get incremented as much and it's secure and any new issues we find will be ported into that, that's good.
+
+[00:05:16]
+Support bug bounty programs and official security reporting channels in your open source projects. So there are great programs now, like Open Collective, that fund costs related to maintenance and development of projects that we use all the time, right? I think webpack, and preact, and a couple others that don't have an official association with a company, they're supported by this kind of thing.
+
+[00:05:43]
+What you wanna see is that some of that is going to incentivizing security researchers to go and look at what trouble could be caused here. You wanna see that because it shows you that that is being taken seriously. It's not a bullet point on a website, but it is allocation of scarce resources, right?
+
+[00:06:04]
+They're putting some thought into it. Even just go into GitHub and see, do they have an issue label called security? That at least shows you, and look at, have any issues been created there and how seriously have they been taken? Finally, I like to use, when I'm writing my acceptance tests, especially for a single page app, I like some form of these acceptance tests to assert that only the requests that I expect are being sent out, right?
+
+[00:06:37]
+So this typically, you wanna hijack XML HTTP request or hijack fetch so that you can simulate a JSON response from some server. I do like to write these tests in such a way that if a new request goes out for some sneaky reason and it didn't go out in the last release, I am alerted to that.
+
+[00:06:56]
+And any unusual change in the way network traffic is behaving like that causes a test failure. Someone must go in and address that. And a minor package version increment should not, I don't know, send a bunch of stuff to pastebin or wherever. So assert that expected application behavior does not change as you release new packages.
+
+[00:07:20]
+And you can even do something as simple as setting Chrome up to record network traffic and then assert the list of URLs is of the same length when you updated ten of your packages, right, something like that. So for third party assets, one that you pull in from CDN, I'm not saying that any of these CDNs, like CDN JS or unpackage, are untrustworthy.
+
+[00:07:51]
+But they are maintained by a group of people, and they hold the private keys to be able to deploy new versions of things to these CDNs. So effectively, if you choose to trust these people, then you're trusting them to not add something malicious to these scripts that you're pulling in.
+
+[00:08:14]
+And I'm not suggesting that they have bad intent, but they could maybe just do something like use that same password that they use to deploy a version of a library somewhere else. And then that application has a database leak, and now someone can figure this stuff out. So you're trusting them not only to have good intentions, but to be vigilant and protecting you and your users and to not alter that code.
+
+[00:08:39]
+In the event that you do decide to pull stuff in via a CDN, you can, of course, use, actually, we didn't talk about this yet. You can use something similar to what we're doing for our content security policy stuff, and that is called subresource integrity. So what we've done here is we've added to the script tag an attribute called integrity.
+
+[00:09:00]
+And that is basically a hash, right? It's like a checksum of the contents of that file. If the contents of that file change, the browser, if it supports SRI, will refuse to load this file. And we're also saying don't send any cookies along with this request. So essentially, now, we can pull stuff down from the CDN, and if even one semi colon was moved, we will know about it and we fail secure, right?
+
+[00:09:28]
+We fail secure means we break in the event that we're potentially about to do something dangerous, would we continue to operate? The easiest way to get this hash here, just like content security policy, leave it out. Your browser will complain, and it'll tell you exactly the right value to add into this.
+
+[00:09:52]
+Right, and this asset should not be changing much, so you don't need build tools. You just need to do it once per time you change the version of the asset. You can do it on stylesheets too, by the way. So for situations where we're pulling in vendor tags, this is the chunk of HTML that Google Analytics asks us to paste in.
+
+[00:10:12]
+You have to be really careful about these. But keep in mind, it's just JavaScript. And you can modify that little chunk of code that they asked you to put in there. And add your own integrity attribute to the script tag that they create. Right, that code that you're pasting into your project, that's under your control.
+
+[00:10:32]
+And so you can basically say, all right, Google Analytics, if you start messing with your JavaScript, we're gonna get an error. And in fact, you can even have, I believe that SRI errors will ping out. So there's a report URL thing you can add to your content security policy, where basically you'll say, let us know at this endpoint if you encounter any errors on a browser.
+
+[00:10:58]
+I believe that SRI errors will also use that URL, and you can be informed that hey, looks like Google Analytics changed something. We'll have to evaluate that script and upgrade to it. Now obviously, it would break in the meantime. But if you're really trying to tighten things up, that is the preferable option over potentially allowing some malicious code into your app.
+
+[00:11:24]
+
+>> Mike North: Yes?
+>> Student: Is there, in kind of JavaScript world, anything like Brakeman that's used in Ruby world?
+>> Mike North: So for aggregating logs and things like that?
+>> Student: But also, I think, isn't that the gem checker? They'll kind of look and see if there's been a security, it's a security scanner.
+
+[00:11:49]
+So I think it also checks your gems, or maybe that's something else.
+>> Mike North: I don't believe such a thing exists in the JavaScript world. I don't think there's any automated scanning of modules. Sorry.
+>> Student2: There is one, I mean, that I've seen, SNYK it's called.
+>> Mike North: SNYK, should we take a look?
+
+[00:12:11]
+
+>> Student2: Sure, if you want. It has a library of third party vulnerabilities, and it can be set up to automatically scan your build.
+>> Mike North: Interesting.
+>> Student2: Kind of a new thing, but it's pretty cool.
+>> Mike North: Okay, I have not seen this before, but definitely fits into what we were just talking about.
+
+[00:12:28]
+So looks like it is library scanning as a service. And this is fantastic cuz there's not even a consolidated place where people are reporting issues. It is great to be notified of stuff that's happening. So, I haven't used this, I'm not here endorsing it. But I'm glad to see that people are working on solving this problem because it's a tough one, right?
+
