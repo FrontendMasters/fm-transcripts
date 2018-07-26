@@ -1,0 +1,200 @@
+[00:00:00]
+>> Steve Kinney: So we can see in this backend directory that we have, this new cloud API folder. And we take a look, and it has its own package.json and a package.json lock, or packagelock.json. So it has its own set of node dependencies. We can take a peek in there if we wanted to.
+
+[00:00:16]
+It's nothing really special, because it's restricted it has this access to Amazon Cognito, the AWS SDK, this serverless version of AWS Service Express. Body parser which is how Express needs to read request bodies. For some reason, that's not built into Express. So almost every Express app, within the first ten minutes of its creation has to have this module added so it can actually read API request bodies.
+
+[00:00:42]
+And then Express. So it's its own server side backend application that we're gonna be able to just deploy, and it was kind of created for us. Most of the kind of logic here is in this app.js, which is a set of routes for getting, creating, updating, and deleting grudges.
+
+[00:01:03]
+And what it does is this backend service can talk directly to DynamoDB. So again remember, the requests leave our client side app, it goes to API gateway. This is hitting this lambda function which is able to modify Dynamo, send a request back, right. So this is the entire backend of our application at this point, plus the user authentication piece.
+
+[00:01:27]
+And there's a bunch of settings in here that are Dynamo specific that we won't belabor. But you can see there is a,
+>> Steve Kinney: A get method.
+>> Steve Kinney: That was get all. A get one individual one. If you don't love this endpoint, you can literally go in here and change it.
+
+[00:01:49]
+If you just want it to be grudges/:id, you can go in and edit it, right, this is your code. This does not have a big do not edit in all caps at the top. This is simply a file that was generated for you that you are welcome to go change and do whatever else.
+
+[00:02:03]
+If you wanna add default values, or date created, or anything along those lines that you want to be generated server side, you can do that all in here as well. This is just some defecto boiler play code. You can change it, this is your full, everything you can do in node you can do in here.
+
+[00:02:20]
+This is just kind of generated for you. And you can see that's kinda talking directly to the DynamoDB library. All right, so there's the ability to put. When you see path, that's going to be /grudges. Later on when I implement the ability to get all of the things, create one, you're going to be like, how do I know what the endpoint is?
+
+[00:02:41]
+Basically, if you don't know, you can just look at the code, right. It feels a little bit black boxy. I know some of it just out of just sheer experience. But you can very easily go ahead and just look at the code if you're confused by what that end point is expecting or how it works.
+
+[00:02:56]
+Most of them are 10 or 20 lines, including these conditionals about what happens if there's an error. You can figure out what it returns. So if there's an error, it's gonna return to you the error, the URL in the request body. If it was successful it's going to put this neat message.
+
+[00:03:13]
+You don't like that message? Change it [LAUGH], right. This is your code, you can do whatever you want with it. You want additional data, you can do all that stuff. One of the things I don't like right now is that it doesn't give you back the ID of the thing you were working with, right.
+
+[00:03:28]
+Which is because we are removing stuff from state based on the ID, it'd be cool to get that back from the server. We have it on the client, but we're also coming up with the ID on the client. We could move that logic to the server if we so chose to.
+
+[00:03:43]
+Cool, post method, so on and so forth. At this point my API should be fully cooked. And there it is, up and in the cloud. So our next goal is, we've created a database, we've created an API. We just haven't used it in our application yet. So this point we have all of the mechanisms for managing that state in the application itself.
+
+[00:04:08]
+Let's actually go ahead and begin to start actually implementing the API. So one of the things that we're gonna need to do is when the application first, we start off with this empty array. When the application first mounts, at that point is when we want to go, hey, go talk to the API and get me all of the grudges in the database.
+
+[00:04:29]
+We do need to give ourselves a method to handle that. So we'll say, componentDidMount. And this is a life cycle method that is called when the component is mounted to the page. So as soon as you appear on the page, React will call this method on the component.
+
+[00:04:53]
+
+>> Steve Kinney: Say, I am alive.
+>> Steve Kinney: Go to our React app, open the console.
+>> Steve Kinney: And you can see that once the login page is gone away, cuz it's verified that we exist, it'll console log, I'm alive. So this is a great place to go fetch everything out of the database.
+
+[00:05:19]
+So what would that look like?
+>> Steve Kinney: Well, one thing we're gonna need to do is pull in the API helper from AWS Amplify. The API helper, the API set of methods, is not React specific. So it's just gonna be in the AWS Amplify library. So let's say import.
+
+[00:05:45]
+
+>> Steve Kinney: We'll say API from aws-amplify.
+>> Steve Kinney: Cool, and here we go. And now we're able to use this to go ahead and fetch some stuff for us. So with the cloud APIs, they are each set of things that you make wrapped around a table is its own API gateway.
+
+[00:06:10]
+So it basically takes up to three arguments. The first argument it's going to take is which one of our API gateways do we want to hit, the API name if you will? Which API do we wanna hit? What endpoint at that API do we want to hit? And then the third argument is any extra data that might happen.
+
+[00:06:30]
+And we'll kind of review all that in a second, but we'll see it in action first and then we'll look at it on some slides. So what we can do in this case,
+>> Steve Kinney: Is the API.get. First thing we need, and you can see I get a little bit of help from Visual Studio in this case, is the API name.
+
+[00:06:49]
+In this case it's called grudgesCRUD. I did not name it, that was the default convention that I got from AWS Mobile Hub, right. Remember when it asked us, hey, do you want to make a CRUD API around this DynamoDB table, and I said yes? Well, [LAUGH] that's what you get, cool.
+
+[00:07:10]
+And then, so we know we want to hit that API, we wanna set a get request to the grudges end point. And forgetting that all of them, there's not really any extra things that we need to do. This will go ahead and fire the API request. This returns a promise which will resolve with the, it will resolve either with an error or it will resolve with the grudges, right, that are in the database.
+
+[00:07:36]
+Currently, that will be an empty array cuz there aren't any. Thing I've noticed is that it will, like you might say, did he just say it will resolve with an error? He did just say that. It won't actually, you can't use catch. It will actually resolve with that error property.
+
+[00:07:51]
+And if we look in the API, we can see kind of where that happens. Either way, sending us something with an error in the body or the data So it's gonna resolve either way. But we're gonna just hope for the best in this case. We'll say then, and we'll say that we'll get back these grudges.
+
+[00:08:11]
+And I'm just gonna start by console logging them, cuz it's gonna be an empty array, there's not really a lot to do at this point.
+>> Steve Kinney: Cool, so let's go ahead and head back over to Chrome. And you can see when the component mounts, it's like, got grudges.
+
+[00:08:35]
+And it's an array of zero. Which means that our API works. Right, there's nothing in [LAUGH] the database, just yet, but it works. So I guess, the next step for us is to put some stuff in the database.
+>> Steve Kinney: So in this case, we will go ahead, and to add grudge, that seems like a great place where stuff should go in the database.
+
+[00:08:58]
+We'll go ahead and say api.post to our grudgesCRUD.
+>> Steve Kinney: And this is gonna be the same endpoint, but we're gonna send a post request to it, instead. So I'll say grudges. We are gonna need some data. We've seen a whole bunch of options and we read all of them but the two major ones in this third argument is you can send custom headers by saying header and then like some object.
+
+[00:09:27]
+We're not actually gonna do that. We do need to send a request body.
+>> Steve Kinney: Right, and we'll go ahead and we'll say it's that current grudge that just got sent from that new grudge form. Right, that's coming from the component New Grudge. You can see at my side bar.
+
+[00:09:42]
+That's gonna give us the grudge when they hit Submit. So that'll send it. And then we wanna know what to do when that's successful.
+>> Steve Kinney: So we'll go ahead and we'll just
+>> Steve Kinney: Originally, we'll be like yeah, we're successful cuz we didn't actually have any network logic. So what we'll do in this case is API.post('grudgesCRUD', which is the name of the API gateway.
+
+[00:10:10]
+The actual endpoint we wanna hit, the request body that we wanna send along, and then when the promise resolves. What we wanna do after it's been a rousing success, right? We can also check for an error in there, and display an error message but we'll stick with the happy path for now.
+
+[00:10:33]
+Cool.
+>> Steve Kinney: So we have this in place. And now let's see if I made any live coding mistakes.
+>> Steve Kinney: We'll go ahead and submit. And he said it was added, right? Now the big test here is when we refresh the page. Cuz that was where our app was falling over before.
+
+[00:11:07]
+This all worked previously, it was just when we refreshed, everything was gone cuz it was in memory. So already we can see that it's in the database. Grudges, there it is. Avenge false deed for making the shift key on my MacBook stop working. It's got an ID. The user ID that created it, and the person that I'm mad at, or in this case, companies are people right?
+
+[00:11:33]
+It's fine. So you don't see it on the page because right now all we do is console log. So, that's something we should resolve. So set state. We'll put our grudges in there. Okay so now we are actually gonna modify the state when we hear back from the database.
+
+[00:12:03]
+
+>> Steve Kinney: So we refresh and it says, automatically loaded on the page, right? We have the ability to put some of the database, we get stuff out of the database, it is scope by users if I log out and create another user and log back in. They would not see that data, cuz we're pulling it by the particular user in this case.
+
+[00:12:23]
+What we don't have and we'll implement next is the ability to either remove. Now I'm not a fan of removing things from my Grudge list. I think you can forgive but not forget. But we'll be able to remove them or also toggle them back and forth. Right now it looks like that works but again but we're doing it all in memory and it doesn't actually persist to the database at all.
+
+[00:12:46]
+So we just need to add two additional APIs around that. And then we're gonna take this application, and if you think about, so I'm all the time talking and explaining. If you think about the actual amount of time I spent writing code, implementing authentication, implementing an API layer, implementing a database, or even the stuff like implementing a dashboard for enabling user confirmation when I didn't see it in my email, so on and so forth.
+
+[00:13:11]
+It's actually pretty impressive. So there hasn't been a lot of code, there's been a lot more talking than coding. So it's kinda cool to see that happen. So deleting will be out next one, so we've got remove grudge. If we look at the app.js, it's always great. This is like in the good part about JavaScript is you can write front end and back end code together.
+
+[00:13:36]
+The bad part is you have an application .JS, and an app .JS, and now you have to remember which one's the front end and which one's the back end, which is terrifying. So in this case, we can go ahead and we can look at the .delete. So this one actually takes this whole URL that is looking for here.
+
+[00:13:59]
+So, this ID is a dynamic segment, which means it'll look for grudges, object and then whatever the ID is. So we'll actually kind of create a URL that is /grudges/objects/ and we saw it before it was a long number in this case. So we can go ahead and take a look at that.
+
+[00:14:18]
+So all we'll do is, we'll go back over to our React component, called Application.js, and we'll say, API.del is not delete in this case. Our grudges API.
+>> Steve Kinney: /grudges/object and then I can just add on the grudge.id that's coming in here. So I will send the request there, and when that is successful to say what we have done previously
+
+[00:15:13]
+
+>> Steve Kinney: You see it, we'll put it there. So like when that happens, that's when we remove it from the page.
+>> Steve Kinney: Cool, and so what we'll do is, we'll go ahead and we'll try to remove, failed. Let's actually look at the network.
+>> Steve Kinney: It looks like I'm missing a slash.
+
+[00:15:37]
+See, it's just object and then the number.
+>> Steve Kinney: It turns out that I am not perfect. Which I learned just now. So here we go. We have API.del. And now I have suspicions that it will work.
+>> Steve Kinney: Remove It's gone off the page, the big test.
+>> Steve Kinney: Sweet.
+
+[00:16:11]
+All right, we have one more action. What is the other action?
+>> Speaker 2: Avenge or unavenge?
+>> Steve Kinney: Avenge, [LAUGH] we hit avenge. Update I think is the technical term, but if we can either avenge. I'm not quite sure how you unavenge a grudge. That's not something I thought about in the product research for this application.
+
+[00:16:33]
+But I'm sure it's a thing. All right, very cool. So we'll say API.put and you're like, how do I know it's not a patch or a post, sometimes it's a post. Where would we go look to find that out?
+>> Speaker 3: App.js?
+>> Steve Kinney: App.js, right? And for some reason they put post in between, I always think about get, post, put, and delete.
+
+[00:17:02]
+But they put it out of order, but if that really bothers me, you know what I could do? I could just move it, cuz it's my code. [LAUGH] Clearly I'd rather just complain about it than move it, but it's a thing that you could do. So this one apparently takes the /grudges with the entire body being the one we wanna change.
+
+[00:17:22]
+Not necessarily how I would make an API, but that's fine, again I could change it. You can see that the path in this case is /grudges. So let's go ahead, and this is going to look suspiciously like our post. So I'm gonna be really lazy, and I'm gonna take this post.
+
+[00:17:44]
+We'll change that to a put. Now I am doing some logic on the client here, where I'm basically looking at the given grudge that I need, taking all of it's properties and I'm copying them. And then I'm taking the avenge property and flipping it to the opposite of whatever it was.
+
+[00:18:04]
+So if avenge was true and flipping it to false. If it was false, I'm flipping it to true. I'll do that first. And then this is called updatedGrudge. Cuz if I just send grudge, it's gonna be what was already in the database. And everything is gonna go swimmingly, and then nothing's gonna change.
+
+[00:18:23]
+As much as we get frustrated as programmers by error messages, you know what's worse than an error message? No error message, but also not doing the thing you expected it to do. That's the actual worst thing. That's not true, the worst thing is it actually works and you get some weird console error anyway.
+
+[00:18:42]
+And you don't wanna deal with it, cuz everything's fine. [LAUGH] So cool. So we'll flip the value on that one. So this is just making a copy of the object. Could you just like say grudge.avenge equals the opposite of that? You could, but in React we're very much into not mutating state, so we're not going to do that.
+
+[00:19:03]
+But we'll send it to that grudges endpoint on our grudges crud API with a new updatedGrudge. And then when that happens, this is our happy path logic.
+>> Steve Kinney: We'll say, okay, take all the other grudges. So basically when I say filter, I'm basically taking out the one we're getting rid of and replacing it with the new version of that.
+
+[00:19:28]
+Moment of truth, and then I'll push it up. I'm only gonna push up if I feel like we're successful. If it's a failure, I'm gonna fix it before I push it up. So let's make a new one, who's angry right now? Anyone angry, anyone have something they wanna, I guess this is my grudge list.
+
+[00:19:44]
+I don't have that many grudges.
+>> Steve Kinney: Leaving legos on the floor, they're very sharp.
+>> Steve Kinney: And they all have light sabers now, which is even worse. Darth Vader with the front of his mask, [LAUGH] it's deadly. Deadly if that gets under the heel of your foot. Anyway, I digress.
+
+[00:20:09]
+Cool, so we added it. That change, we can see a whole bunch of requests were made. The moment of truth is that we request, refresh, and it's where it should be. And so, I've avenged it by secretly taking the Darth Vader Lego and putting it on my desk at work, please do not tell him.
+
+[00:20:30]
+I've told you that in confidence live stream. So that's how I handled that one. And so, we have a full crud API. We didn't have to sit there and install on a Linux VPS, and then spinop arrails up behind passenger. I'm speaking from scar tissue of my previous lives.
+
+[00:20:50]
+And do all of those things over the course of several days. Other than a lot of talking, we're able to set up a crud API suspiciously quickly.
+
