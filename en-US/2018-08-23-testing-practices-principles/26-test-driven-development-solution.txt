@@ -1,0 +1,217 @@
+[00:00:00]
+>> Kent C Dodds: So we're actually gonna be writing a couple, or covering a couple of use cases. So taking a step back, what are some of the things that we need to consider when we're exposing a mechanism to delete a user? This is where we step back and think, okay, what are the use cases for this?
+
+[00:00:20]
+And then, in the spirit of TDD, you want to implement as little as possible at a time to make it so you can iterate quickly. So, from my perspective, I think the first thing that I'd wanna do when trying to delete a user is to verify that whoever is making the request is authenticated and that they are capable of deleting the user.
+
+[00:00:50]
+That seems to me makes sense to me, so that's where we're gonna start. So, oops, we'll say, deleteUser can or will have 403, right, access denied. If not made by the user, okay? So what do we want this to look like? Well, we are definitely gonna make it a async test.
+
+[00:01:18]
+We're gonna be doing some awaiting here. I'll move this thing over. And so, we'll say await, and then we'll do usersController.deleteUser(req,res). And because we're using our handy dandy setup function, we'll have request and response coming from setup.
+>> Kent C Dodds: And yeah, if not requested by the user, that makes more sense.
+
+[00:01:55]
+Okay, so if it's not requested by the user, then that will mean that there either is no request.user or that the request.params.id, the ID of the user that we are trying to delete, doesn't match the request.user.id, okay? So we'll go ahead and I'm gonna copy this mechanism, we have to generate some user data and insert that into the database to get our test user.
+
+[00:02:26]
+So this is the user that we are going to try to delete. And then we will say the request.params.id, or actually, sorry, request params, it's going to equal an object that has an ID of testuser.id. So, this user that's in the database has an ID and that's the user we're gonna try to delete.
+
+[00:02:55]
+And then we'll have a request.user that has an ID that's anything else, it doesn't matter.
+>> Kent C Dodds: We could actually use generate ID here. Let's see, server, yeah, so our generate, yeah, that's right. Sharedgenerate, so if you're curious where these files are, all of your generate methods are in shared/generate.
+
+[00:03:26]
+So you've got user data, post data, log in form, you won't be using that right now, maybe in a little bit in generated token. One of those things is ID, so rather than anything else, we don't really care what it is, so I don't even wanna think about it.
+
+[00:03:45]
+So we'll say generate.id. Okay, cool, so we're trying to delete that test user's ID, and then we're trying to do that with a user that has any other ID. And so then we try to delete the user. And we want to expect that the res.status toHaveBeenCalledTimes once) and expect res.status toHaveBeenCalledWith(403)
+
+[00:04:24]
+
+>> Kent C Dodds: Okay, and then also expect res.send.toHaveBeenCalledTimes(1). And if you want to you can look at how this actually will work. So, we'll just say res.status(403) and then send. Okay, cool, so that's definitely enough for us to be getting along with. I'm running the post test, let's run cont.users.todo, there we go.
+
+[00:05:01]
+And it's passing, why is it passing, what?
+>> Speaker 2: Importing the real deal?
+>> Kent C Dodds: I'm sorry, what?
+>> Speaker 2: Is it importing the [CROSSTALK]
+>> Kent C Dodds: You're right. Yes, thank you so much, todo. So thank you very much.
+>> Kent C Dodds: Okay, cool, so we're getting an error. And the first error that we're getting is delete user is not a function.
+
+[00:05:25]
+Well, that makes sense, we never defined it. So, we'll go here to users.todo, we'll make an async function. Actually, it doesn't need to be an async right now, so let's just leave off. Let's just make a function called deleteUser and request a response, and let's make sure we export that.
+
+[00:05:44]
+And then we'll save that and we'll get a new error. So, our test is kind of driving our development, test-driven development. So, now with this new error we need to make sure we call res.status. Okay, res.status, so we'll call that. Okay, new error, 403. Okay, 403, I can do that.
+
+[00:06:07]
+New error send, okay, I can do that. Great, and it's passing. So that's clearly not the function that we want at the end of all of this, but that's as much as we're gonna do right now. And then we can move on to writing a new test that can drive the next steps of our development.
+
+[00:06:28]
+There we go. Okay, so let's see [COUGH] so another thing I might do is to see if it sends a 404 if the user doesn't exist. So deleteUser will 404 if user does not exist. This will be async, and lots of this stuff will be the same, so we'll copy this.
+
+[00:07:03]
+And so when I find myself copying and pasting text, sometimes that's a situation where maybe I could extract some piece of that to make a new setup function or something. So just something to keep in mind. So in this case, we don't actually need a test user, we'll get rid of that.
+
+[00:07:21]
+We'll generate an ID. And the user parameter actually could be the same idea. It doesn't really matter in this case, because we're gonna look for the user, it's not gonna exist anyway. So here we expect it to be a 404. Cool, we've got a failing test. So now we have to actually start writing some useful code.
+
+[00:07:48]
+We'll say, let's see, yeah. Yeah, so from here it looks like we will need to get the user from the database, so Okay, let's find this update user thing. Wait, no, no, no, rec.user, here we go, okay, get user. Okay, and now we'll need to make this async function.
+
+[00:08:16]
+So we're gonna get the user from req.params.id. And then if that user does not exist, or if that user exists then we'll send the 403 else,
+>> Kent C Dodds: We'll do a 404.
+>> Kent C Dodds: Cool, okay? So we're getting closer, let's think about refactoring. I don't really see how we can make this any cleaner than it is.
+
+[00:08:46]
+Potentially, as we see above, we try to exit early and so the rest of our code doesn't have to be indented any further. So potentially we could say if not user and then stick this up here, do a return, and then maybe that could work.
+>> Kent C Dodds: Well, I should turn off that else roll, that's annoying.
+
+[00:09:11]
+So either way would work just as well. This exit early strategy seems to be working pretty well for up here, so we'll just keep doing that over here. Okay, so the last one will be the happy path. So we actually are able to delete user. So let's go ahead and create this.
+
+[00:09:32]
+Delete a user, eh or yeah if properly requested. Okay so we're gonna create a test user. This time the user.id will be our test user id, and then we try to delete it. We'll expect, so this is where we think okay, so what do we want it to do?
+
+[00:09:59]
+Do we wanna it to send us JSON as a user it deleted? Or should we just have it send a 200? I think in my solution I have it send us a JSON, but what do you all think?
+>> Speaker 3: A 204.
+>> Kent C Dodds: Send a 204? Isn't that successful or whatever?
+
+[00:10:13]
+
+>> Speaker 3: Yeah.
+>> Kent C Dodds: Cool, let's do that.
+>> Kent C Dodds: 204 and then, yeah, we don't have to worry about. Is there anything else that we could do to verify that things are working properly?
+>> Speaker 4: Check the database for the user.
+>> Kent C Dodds: Yeah, yeah, did it actually? So, yeah, did it actually delete that user?
+
+[00:10:38]
+And we can just copy this thing. These are from the database. And in our case, to equal null I think is what it returns, if there's no user found. We'll find out here in a second. But that'll be testuser.id. Okay, great, so it's just returning a 403, that's a problem.
+
+[00:11:03]
+So in our case, we'll say if the user.id is equal to the req.params.id. So the user we're trying to delete is the same as the user that's being deleted. Here let's actually negate that and we'll stick that on there. Okay, good, and now that actually is breaking a previous test and our new test is still broken.
+
+[00:11:30]
+So what I'm gonna do is I'm gonna fix the test we're currently working on, and then we'll go back and fix the other one. And this is one of the nice things about TDD is that you have this safety net of tests that ensure that you don't actually break anything as you're adding more stuff.
+
+[00:11:46]
+So here we'll say, it'll just be await db deleteUser.id. And with that we can, once that's all finish we'll return res.status(204).send(). And it looks like deleteUser is still not working. All right because when you try to get something that doesn't exist in the database instead of null it's actually returning undefined, so to be undefined, there.
+
+[00:12:27]
+Okay cool, so we've got that one, and now we have to fix this one. Great, so the problem is that it's getting called with a 204 instead of a 403. So it looks like this is actually not taking, so 403
+>> Kent C Dodds: I'm actually not sure what's going on in here, oops.
+
+[00:12:56]
+Cancel log user id, and req.prams.id. Here's a little nifty trick, so you see how we have, well I guess that's okay, that's not too much. But if you had a bunch of tasks that are running the same code, and you're adding console logs and you're like too many console logs.
+
+[00:13:11]
+There are a couple things you could do. First, we could say .only, and it will run just this one. But just watch mode is pretty neat and if you hit w, it will show you the watch usage. And one thing is you can press 2 to filter test name so do 403, cool.
+
+[00:13:32]
+So now it's just running that one test within that test file. And we can see that we are getting, interesting, those two actually are identical. That's super duper weird, so we'll just do anything else. I'm not sure what's wrong with that, what? Well that's odd, wait, sorry, we're on the wrong, so it's request.user, there we go.
+
+[00:14:05]
+So yeah, of course the user that's in the database with the ID that we just requested is gonna have the same ID that we just requested. Like, clearly, okay, good. [SOUND]
+>> Kent C Dodds: Great, okay, so we got all of our tests passing. Let's make sure we don't skip the refactor step.
+
+[00:14:27]
+So there are a couple things that we could do. We could Change this to an elseif if we wanted to or whatever. I think it looks okay, so we'll probably just leave that where it is. Well that's TDD, anybody have questions about test driven development, yeah?
+>> David: So [COUGH]
+
+[00:14:52]
+
+>> David: We try to be TDD in a UI context which is quite difficult, obviously. And the main thing we struggle with and I'm interested to hear your thoughts on this especially in light of your testing library. So if it's simple DOM manipulation it's relatively easy, because we can write an assertion like grab this button, click it, and expect this thing to happen.
+
+[00:15:14]
+
+>> Kent C Dodds: Mm-hm.
+>> David: And usually we can write those pretty easily. When we start using like third party libraries, like UI component libraries and stuff. Then it's like really hard for us to, I mean sometimes just ever but specially ahead of time. No, like what APIs were gonna use to actually trigger the behaviors were expecting, right?
+
+[00:15:35]
+
+>> Kent C Dodds: Mm-hm.
+>> David: So I'm just wondering if you have thoughts about that like I guess for UI stuff in general? But then particularly in the case of using those third party libraries where the API is in that always like transparent right?
+>> Kent C Dodds: Yeah, yeah, so you're saying that in your test you're planning on marking those APIs and you're not sure how to TDD.
+
+[00:15:54]
+Like which APIs you're gonna call before you do so.
+>> David: I mean, I feel like even use well, so given an example, right? Like say like we're using a boot strap [COUGH] Like reactive bootstrap or something, it has a menu.
+>> Kent C Dodds: Mm-hm.
+>> David: It was like, all right, click the second menu item and expect this thing to happen.
+
+[00:16:10]
+But if we like I would love to write that assertion and then implement. But what we'll often find is for like react bootstrap menus, it only works if you grab the a element inside the second menu item.
+>> Kent C Dodds: Mm-hm.
+>> David: And then it'll behave, but if you're just trying to grab the second menu item or the that surrounds the a or whatever, and you simulate a click, then nothing happens right?
+
+[00:16:33]
+
+>> Kent C Dodds: Mm-hm.
+>> David: So then we`ve failing tests, and you don't know, is my test failing cuz I implemented it wrong or just cuz my test was-
+>> Kent C Dodds: Right.
+>> David: Detected right.
+>> Kent C Dodds: Yeah, so it's easy to get to the red but getting to the green with the existing test that you wrote is tough.
+
+[00:16:49]
+Yeah, so I would suggest that perhaps TDD in that scenario doesn't make a whole lot of sense, in that particular scenario. If you don't already know what the APIs that you're going to be hitting look like or how to interact with your component from the outside, regardless of the implementation.
+
+[00:17:08]
+If you're not sure how that interaction will work, then it might not be a good use case for TDD. Because yeah, generally with TDD, you know exactly what, how you're going to interact with that thing or at least generally. Yeah, so I think that's pretty much all I can say on that.
+
+[00:17:28]
+
+>> David: Okay, could I ask a quick follow up on that?
+>> Kent C Dodds: Mh-hm.
+>> David: So like, say it's a related problem. We can't inject, say, a data test ID into the A element that we wanna click for a test.
+>> Kent C Dodds: Mm-hm.
+>> David: Because, bootstrap won't let us, right? There's no, [COUGH]-
+
+[00:17:44]
+
+>> Kent C Dodds: Yeah, there's no mechanism for that.
+>> David: Right, and so that`s like some of those helpers, getting it by the label text or whatever, it's sort of a crap shoot with those. So I mean, I don't know if in PayPal you guys, you probably have more control over the component libraries you're using and so on, but.
+
+[00:18:00]
+
+>> Kent C Dodds: Yeah, no that's a totally valid point. So when you're interacting with third party libraries, you really only have what they exposed to you. And
+>> Kent C Dodds: I'm trying not to say too much about the react specific stuff cuz that's more for tomorrow. But I think that the best that you could do for a situation like this is just to play with it first, and see what does it expose to you, how do you access those properties, or whatever?
+
+[00:18:30]
+How do you make assertions. But the general principle to get out of this might be take a step back and think how, if I was a user manually testing this. How would I interact with this component that I'm testing in a way to verify that it is working according to my specifications?
+
+[00:18:54]
+So that's the general principal when it comes down to the implementing that with third party API, or third party libraries or things. Things get a little bit more complicated if they don't expose things for you. So specifically with react testing library it has the get by label text.
+
+[00:19:14]
+Well if the label text isn't associated to an input. For example if the something is broken there. That's actually a bag in the software, and should be fixed. And so especially in component libraries, if they are not accessible, then the library won't work very well for them but that's a bug so it should be fixed anyway.
+
+[00:19:39]
+For some situations like you mentioned, you can't, where it doesn't make sense to put, like it's not a form input or something, then you'll have data test ID. But you can't put that on there, either, and so, in those scenarios, I would probably file an issue and say, I wouldn't suggest necessarily to put a data test attribute.
+
+[00:19:59]
+But to maybe have lots of these will have accessibility implications and those will have aria attributes, and then you can select off of those.
+>> David: Thank you.
+>> Kent C Dodds: Yep.
+>> Kent C Dodds: Any other questions, yeah?
+>> Speaker 3: Maybe related to that. You were talking earlier about how it's not really worth I'm thinking about whether something is integration or unit tests or sort of that's not your first concern?
+
+[00:20:29]
+
+>> Kent C Dodds: Yeah.
+>> Speaker 3: [INAUDIBLE]
+>> Kent C Dodds: Mm-hm.
+>> Speaker 3: As far as like when I've been successful with TDD it's usually been in situations where I actually did have like a pretty minimal unit that I could test. So maybe, I don't know it doesn't makes sense to think about whether your test as a unit or integration test in this scenario?
+
+[00:20:52]
+
+>> Kent C Dodds: Yeah, I think you're right. So like going back to David's example, if you wanna TDD then like and I do think that TDD and unit tests go better hand in hand. And so if you wanted to TDD that, you could mock it out with your own implementation of that thing.
+
+[00:21:12]
+And yeah, then there are the trade offs of well, okay, since I'm mocking it, I need to have another test to make sure I'm using it properly. And maybe that's fine, maybe this unit has enough complexity around it, that it'd be kinda of nice to slice off all the dependencies.
+
+[00:21:26]
+So I can iterate very quickly on the complexities here, and then just have one other test to test it altogether. And I think that's actually a pretty solid approach. So if you really wanted to do TDD, then maybe mocking is probably a better approach for that.
+

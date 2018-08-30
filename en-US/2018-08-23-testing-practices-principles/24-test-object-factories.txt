@@ -1,0 +1,94 @@
+[00:00:00]
+>> Kent C. Dodds: For each one of these tests they each need to have some things set up on the request and the response. For our first one the request could just be an empty object and that was totally fine. For these other ones we need to get like a specific user or we need to Update a specific user.
+
+[00:00:20]
+So we need to set up the user property on the request. And there are various things. And then once we start getting into setting the status to 404 and testing those. Then the response is gonna need to have the status and the send methods on it. And what happens is in a bigger application as this grows the request to set up for this request object.
+
+[00:00:46]
+You'll have the users locale and you'll have other pertinant user information. So these request and response object, these fake versions of those start to get pretty sizeable. And what is mostly concerning for me is when they're almost the same in pretty much every way except to some very important and subtle unique ways.
+
+[00:01:14]
+There's something unique about this particular request object that makes this function behave differently. And I can't tell that when most of the request object looks exactly the same as the other test so this is where you come into test object factory. This pattern is also called an object mother, which I think is the weirdest term for this.
+
+[00:01:40]
+So, that's why I call it test object factory, but the idea is that you take the common stuff, and you put it in a function, and you get back what you're looking for that actually sounds like programming to me. So it's a pretty normal thing to do. So in our finished version, we have this setup function.
+
+[00:02:04]
+I'll just stick right here and the set up function is responsible for any set up that's common to all of our test it doesn't have to be all of them you can have a set up like case one and set up case two whatever is relevant for your test but the general idea is, if there are objects that you need, if there's some state that you need to initialize or something like that?
+
+[00:02:29]
+Then you could use this setup function to do that. You can also do stuff like this using before each, and let rec equal, or yeah, let rec, and then in the before each, rec equals, and stuff. I really actually don't like using those kinds of utilities cuz I think it kind of obscures what's going on in my tests.
+
+[00:02:50]
+I want to look at my tests and see where these variables are coming from. And so we have this set-up that will initialize a request, that handles all the necessary cases for our That are common to all of our tests. We also have this res object that's doing some fancy things with binds and stuff, cuz they express as funny.
+
+[00:03:11]
+And then it just returns those for us. And so anywhere that we need our request and response, we can use those instead. Here, let me format all that stuff. So get our rec and our res and we don't need to do anything else for this one. And for this one there's some extra on the request.
+
+[00:03:32]
+So what we're gonna do is say {rec, res} = setup () and then on the request for any extra stuff will Just put it explicitly on there. And then the response doesn't need anything extra. There's nothing fancy about the response. So it shouldn't appear in my test if there's nothing unique to this test about that.
+
+[00:03:56]
+And the same thing can be said here. We say rec and res equals set up. And then for each one of these, I´ll do =, get rid of those things. And then the rest doesn´t have anything special. And so now when I look at my test I say, yes this is a normal request object But it has these additional special things to handle the update user case.
+
+[00:04:25]
+So an update user needs to have a user. It needs to have params and it needs to have a body. Whereas if you look at the other, well what often happens as the test phase kind of goes over Iterations is somebody will come in here and they'll copy this and they'll just paste it.
+
+[00:04:43]
+They'll make any of the modifications they need. Let's say that we're trying to write this test. Maybe this one didn't exist before. So we copy this and we paste it and then we make any alterations that we need. Okay well I guess for this we just, yeah, we need params, yeah, so we've got that already.
+
+[00:05:05]
+So then we just keep on going without realizing that this endpoint doesn't actually need a user. It doesn't need a body. And now we have some extra stuff, extra craft in our test that isn't actually relevant to the test, but people who come later think that it is.
+
+[00:05:20]
+And so the whole process of testing is trying to communicate to people who are going to be maintaining these tests what actually is relevant. So that when they start making changes they don't think, well if I'm going to change the update user or the get user then I better not make any changes to rec user because apparently there's something important there.
+
+[00:05:52]
+
+>> Kent C. Dodds: Okay, so actually, there is a great question here from you, Bear. How much should we care if units can be tested in isolation? I care nothing about your units being tested in isolation I care about my application being me being confident in shipping my application and so if that means that I need to slice off all the dependencies of a units so I can test it as a pure unit test and that makes me more confident than that's what I'm going to do but that's like pretty rarely the case.
+
+[00:06:27]
+In some sense, if I have a unit that is sufficiently complex and maybe initializing the database before every test just to test all the complexities of this unit, if initializing the database like takes too much time Maybe I'll take the complexities in that, I'll rip it out and put it into a pure function, and then I could test that all day long and make that be an isolation.
+
+[00:06:56]
+That's a great way to get the best of both worlds. I can get the speed of pure actual unit tests without sacrificing a lot on confidence. So I'd have maybe one test that ensures that this extracted, complex piece is being called properly, and then a whole bunch of unit tests around that complex piece that's a pure function now, makes it a lot easier to test.
+
+[00:07:21]
+So there are definitely things and situations where dropping down to a lower level of testing is optimal, and that would be a good situation. You have something that right now you can only test as kind of an integration test. You pull out the piece that really has a lot of edge cases it's handling, you put that into its own little module and then you can test that all out.
+
+[00:07:43]
+So I wonder if instead of making mock database columns we can check with data the function was called with. Yeah, actually this is a good question perhaps with a schema assertion. So yeah, I was gonna show this, decided not to, but I guess I will. I won't demo it.
+
+[00:08:00]
+So what the suggestion is, is rather than pulling all the users from the database and comparing the users from the database with the test user, you can actually just assert that what you get back looks like a user. So you could create a schema here that is like id: expect.any(String) and so on and so forth and that would be okay with me.
+
+[00:08:25]
+I'd be fine with it. Especially since this is generated data anyway. You do back up a little bit on your confidence in doing that because what if somebody has it off by one error. Now it's grabbing a different user from the database. Well it passes the schema, but it's not doing what you want.
+
+[00:08:43]
+So just make sure that you're considering those circumstances as well, but in the case of the getUsers, it's just gonna get a whole bunch of users, like all the users from the database. You can just check all of those match the user schema and probably be okay, but if it's reasonable, doing something that has more confidence is probably better.
+
+[00:09:13]
+I think that was it for test object factories. I should say one thing About this before each thing. And test to clean up. So your test, each test should be able to be run in total isolation, or with any number of other tests that are happening around it, even in parallel, because that's what [INAUDIBLE] is doing.
+
+[00:09:40]
+And so When you're talking about databases and stuff, that can start to get a little bit complicated. So in some situations, you either change your tests so that it's cool with anything else writing to the database at the same time. In other, and that applies to client side tests as well.
+
+[00:09:58]
+If you're doing end to end tests And wanting to run those in parallel or something. You want your test to be able to operate in parralel with others. If you can't get your database to or your software to work in that way then running them serialy is okay.
+
+[00:10:17]
+It's just gonna take a fair amount longer. So just be aware of that trade-off. But whatever the case may be, doing your cleanup ahead of your tests, rather than when your tests are over, can often be really helpful, especially when it's interacting with a database. Because when if you do all of your like lets say you are creating a bunch of user and then you're verifying that those users were created or something.
+
+[00:10:46]
+When you are all done you're going to delete all those user. So that now that test can setup and cleanup by itself. So, the, that's a great thing to do but if you do have a test failure, one of the things that's really nice to be able to do is to inspect the state of the world at the time your test failed.
+
+[00:11:07]
+So, if you use an after each to re-initialize the database every time your test runs or clean up the database. What's going to happen is your test will fail, and then your after each will run it will clean up the database. And so now you can't inspect the database to see what was wrong with the database.
+
+[00:11:25]
+And so if instead you do all the cleanup ahead of time, then your tests can still run in isolation from each other. They just clean things up before each run, but if something breaks then you can check out with the status of the databases at the time it broke.
+
+[00:11:39]
+That pretty much applies only when you are learning text serially because things are always knocking around and stuff, but especially when you're taking your end to end task making sure that your cleaning things up before hand rather than after can help your application be in a debunkable state at the time it breaks.
+

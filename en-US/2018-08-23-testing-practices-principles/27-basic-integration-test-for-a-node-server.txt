@@ -1,0 +1,198 @@
+[00:00:02]
+>> Kent C. Dodds: Alrighty, so with that let's go ahead and move on to integration tests. So like I was saying before, the distinction between integration and unit tests can be a little bit fuzzy. If you wanna be totally purist unit tester than a unit, like if you consider a unit to be a module, it will mock every single one of it's dependencies.
+
+[00:00:29]
+And that is your unit that you're testing, whereas an integration test will not mock anything. I'm kind of loosey-goosey in the middle. I pretty much I just care about getting confidence, but there is a certain point where I say, yes this is absolutely an integration test. And from a client side application perspective, that's like let's take this page and test this page.
+
+[00:00:53]
+Maybe that's still happening in Node, you're not pulling it up in a browser or anything necessarily when you're using jsdom in Node. So rendering a component that's higher level would kind of be an integration test in my mind. On the server side, that would be starting up the server and hitting it with requests.
+
+[00:01:12]
+So that's what our tests are going to do. And in an express server you have your routes that you define. So that's where our integration tests are going to live. If we're talking about colocating tests, that just makes the most sense to me for these kinds of integration tests is to put it right next to the routes.
+
+[00:01:33]
+So if we look at our index, we have our router that we're adding different endpoints to, or different subroutes to. And so we have the setupRoutes, we have the setupAuthRoutes, userRoutes, and postRoutes. And these files are responsible for setting up those routes on each of these subrouters, and then we mount those onto different parts of our application.
+
+[00:02:01]
+So for us, we have the user routes and on the root of the user route, we'll have getUsers. Then you have this authMiddleware for when you're trying to get a specific user. And if you're authorized, then you'll get more information about this user. And then you can put, if you're authorized, then you can update a user, and then delete.
+
+[00:02:29]
+If you're authorized, you can delete a user. Okay, so this is actually what we're going to be testing is this flow. I want to be able to register an account, and I want to get the user that I just created and log in as that user. And I want to update that user and then I want to delete that user.
+
+[00:02:50]
+And we could do this in a bunch of different tests. And in some scenarios, that might make more sense, but if we can do it in a single test that will actually save us a fair amount of extra setup with test. And so that's what we're going to be doing, is doing all of this in a single test.
+
+[00:03:13]
+But the first thing we need to do when testing a server, as an integration test, is we need to start up that server. And sometimes starting up your server could require a fair amount of time. It takes a while to boot up your server. And so you might do that in a separate process before you start your tests on that server.
+
+[00:03:41]
+But if you can get away with it, try to have the same process that's running your test start the server. In a Node context, we can start the Node server with Node APIs. The reason that I say that is because then, can instrument all of that code for coverage.
+
+[00:03:58]
+And now you can have code coverage on your integration tests for your server which is really handy. In addition, you'll get better error messages. If the server throws an error, you'll be able to see that better if the same process that's running the test is the one that started the server up in the first place.
+
+[00:04:18]
+And so to do that, here we have our index. This is the entry for our server. It's not doing a whole lot because most of our modules in this project are pure modules. And so it's just getting things started. It starts out, our server, isProduction then we're gonna use the port.
+
+[00:04:36]
+Otherwise we'll specify the port is undefined and then it will actually default to a random port for us. So if we look at that startServer. We'll detect the port, we'll figure out a good port for us. It sets a whole bunch of stuff up, sets up the routes and then it does a whole bunch of weird stuff to make Express work with Promises.
+
+[00:04:59]
+Thanks a lot Express.
+>> Kent C. Dodds: So anyway, this is actually the function that we are going to call in our test. We'll call this function to start our server up and then we'll have that server to make these requests against. Okay, so let's go ahead and start with that test.
+
+[00:05:25]
+So yeah, we already saw this. We're initializing our API a little bit differently, but the same thing kind of applies. This is actually a little bit better because this port actually can be dynamic, and so we're getting whatever the server's port actually ended up being. We're still closing.
+
+[00:05:44]
+In this case we are initializing the database before every single one because we have this extra test that wants to get all the users. But yeah, so we are going to create some registration data with the login form. We pass that data to the auth register endpoint. And then map that the user property of the response data.
+
+[00:06:09]
+So that gets us our testUser and we want to make sure that our testUser's user name, the user we get back from the registration is the same as the one that we registered with. We can't do anymore verification than that because I wouldn't want them to send me back my password, that would be pretty annoying.
+
+[00:06:26]
+So then we have this read where it's an unauthenticated read for the user that we just created. We want to make sure that because it's unauthenticated, that we get back this test user, but that test user doesn't have a token. Because I wouldn't want people who make unauthenticated requests to my user to get my token.
+
+[00:06:50]
+And so then we are going to create a new instance of axios that is authenticated and this is how we do that. Your mileage may vary, however you do authentication, but the general idea is let's create a mechanism by which we can make authenticated requests. And now that's interesting, that should be authAPI.
+
+[00:07:18]
+The reason that actually worked is cuz there's a bug in axios, that shouldn't work. And I'm pretty sure that there may be a new version where that bug has been fixed. Yeah, so then we're gonna make an authenticated request to the user's API, map that to the user so this is actually the user object from the response data.
+
+[00:07:39]
+And make sure that when I make an authenticator request, I get the same response that I got when I registered the user in the first place. And then we can update, so we'll make this updates object. We'll put to that endpoint with the authorized API. And then we'll map that to user to get the user and we want it to match.
+
+[00:08:01]
+So yeah, we want the updated test user to match the updates. So it's gonna have the same user name.
+>> Kent C. Dodds: Okay, and then we can delete with the auth API and make. And in this case, an actual implementation the delete will send back the user that we deleted.
+
+[00:08:19]
+So we can verify the deleted users the same as the one we just updated. So our most fresh version of that user. And then we can verify that. If we try to read again, it's gonna give us a 404. So there are a couple of things to kind of pull out from this demonstration of an integration test.
+
+[00:08:41]
+First of all, all of this is happening in a single test. And before our let's say for example, here, before we had the tools that we do today this might be kind of a bad idea because all you would see is user cred failed. That won't be super helpful.
+
+[00:08:59]
+But with the error messages that we have now we can see exactly which one of these assertions failed. We can go to line 33 that's the one that failed, its error message is much better. And so the ergonomics of that are just so much better because the alternative would be, like, we have a whole bunch of logic in it.
+
+[00:09:19]
+Before each test we're going to create a new user and do all this extra stuff. Instead we can just do it all at once. Actually in this way, you can kind of think of it as somebody who is using the software to test it. No user is gonna go in and register and then delete their account immediately thereafter.
+
+[00:09:39]
+Update and then delete it. But if you are a tester testing some software, you might go register and then try to get that user and then log in and update then delete. So we can do all that in a single test. Another thing to note is that we're pretty much doing the happy path here.
+
+[00:09:59]
+We have one set half right here at the end. I don't even know if sat path is something people say, but I like to say it cuz we got happy path. So we have this one kind of educause situation here. We're not doing a whole lot of educause testing in here.
+
+[00:10:16]
+We could but I don't think that would give me any more confidence than to do those as unit tests. And so for most of the time my educases are going to be covered by lower level tests. Whereas the the happier situation are gonna be covered by these higher level tests.
+
+[00:10:36]
+Because there is a significant difference with regard to how how complicated these things are to set up and run and to write and maintain. Versus a unit test of a smaller component. Those are normally easier to maintain. And so spending a lot of time dealing with edge cases at the integration test level when you could just as easily do it at the unit test level, doesn't make a lot of sense.
+
+[00:11:06]
+So I generally do most of my edge case testing lower level. And yeah, so that's pretty much it for the integration test. Does anybody have any questions about that? Yeah?
+>> Speaker 2: Yeah, so when I'm doing, integration testing, one of the first things I do is I figure out what are all the different-
+
+[00:11:33]
+
+>> Kent C. Dodds: Help you paths and paths. Yeah.
+>> Speaker 2: Yeah, the most extremes in each possible direction based on what the data might look like. And I'll run it through all of those possible scenarios because that's the edge of work.
+>> Kent C. Dodds: Yeah, yeah, that's a fair point. Because generally your happy path is gonna stay happy, because that's what developers are using as they're going through and stuff.
+
+[00:11:57]
+But if you take a step back and think, what do I really wanna make sure never ever breaks? It's normally the happy path, I don't want that to break. I wanna make sure that a user can go through the the register and they can add an item to their cart, and they can check out with that item.
+
+[00:12:17]
+That's a happy path that I never want to break, and so I will definitely have a test for that. Like if the process of, like I add something to my cart, and then I go back. I make a change and that's no longer, like we're out of the quantity, or whatever of that and then I try to check out.
+
+[00:12:37]
+And something with that breaks you don't want that to break either, for sure. And those are the kinds of things that often do. But if that part breaks you're going to affect a fraction of the users than if your happy path breaks. So if you're trying to decide to do one or the other I would always do the happy path.
+
+[00:12:52]
+But normally you can do both. And I would like you said, I would suggest people do both. But whether the sad path is covered by an integration test or a unit test. Or whether these edge tests are covered by integration unit It kind of depends. Can you reasonably accomplish recovering the SAD path with a lower level test?
+
+[00:13:22]
+If you can, I would put that there.
+>> Speaker 2: So let me clarify. What I guess I am thinking of is same path, different data to, in part, validate that the contract with the server is being honored the way that it was documented.
+>> Kent C. Dodds: Hm. Yeah. So yeah, I'd be totally cool with that, too.
+
+[00:13:43]
+So like if you're saying that like all the tests will look pretty much the same, except the data will be different? Is that what you were suggesting? Yeah.
+>> Speaker 2: Absolutely.
+>> Kent C. Dodds: Yep. So what I would do in that situation, and that also makes sense, is I would probably use that just in case thing, and just have a bunch of cases.
+
+[00:14:03]
+All of these should work with the happy path. You get, with integration tests, often, they're more expensive. We've got, like, a JavaScript module that is, like, our database, like, it doesn't take any time to start up the database and all that. And so we could add millions of tests and I mean millions of tests that take a while.
+
+[00:14:24]
+But you'd add like dozens and dozens of tests, it wouldn't take long. You got a bunch of those and you're starting to get into situations where you're like, well do we really need to run all these tests on CI, and maybe you don't. Maybe you just run those nightly or something like that.
+
+[00:14:39]
+But I totally agree, I don't see any reason why you couldn't just add additional tests just to say, we these subtle changes it's should still actually work. I'm glad you mentioned that. Anyone else? Yeah, Peter.
+>> Speaker 3: Can you talk a little bit about how a test like this, I'm curious how a test like this that like range across your code base impact your code coverage.
+
+[00:15:07]
+
+>> Kent C. Dodds: Yeah, if I understand you correctly, that's a good question. Even if I don't, it's probably a good question too. Yeah, with integration tests you most definitely are covering a lot more of your code. Because we are starting out the server within this process, Jess can actually instrument that code for coverage.
+
+[00:15:28]
+Lots of times I've seen integration tests where you start at the server here and you start up your test and you hit that server, and you can't cover your code. Well, there are tools, but it's pretty hard to set up those tools to cover a code for a server that you start up in a different process.
+
+[00:15:44]
+But I only care a little bit about the code coverage report. It's a helpful metric, but it's not like an end-all be-all. So I'm not gonna make critical decisions based off it. But yeah, so in general, your integration test, you're gonna get a lot more code coverage. But as I was saying before, I don't normally use integration tests to test Like these edge cases, because you can cover those with lower level tests.
+
+[00:16:11]
+So with the integration test, you'll get a lot of code coverage. But you'll miss out on some of these edge cases, like if random edge case then do this, you'll miss code coverage there. But then you can easily pick that up with the unit test.
+>> Speaker 3: Sure, and I guess that gives you a way to see what you're not covering with you integration test.
+
+[00:16:29]
+
+>> Kent C. Dodds: Yep, exactly.
+>> Speaker 3: So I guess I'm kinda of missing.
+>> Kent C. Dodds: Yep, go ahead.
+>> Speaker 3: If you're coverage report has all this green because of your integration tasks, right? Is that gonna give you a false sense of confidence that hey, all this code is covered? How do you know what then you need to go back and add some unit tests for?
+
+[00:16:59]
+
+>> Kent C. Dodds: Yeah, that's a good question. The question generally is about, well, okay, so it sounds like my integration test and my unit test have some overlap. What's the point in unit testing if my integration test can actually cover all that stuff? Is that what you're kind of asking about?
+
+[00:17:16]
+
+>> Speaker 3: No, if you're using code coverage as kind of like a sense of, okay, what needs attention, where do I need to write some more tests? I fear that kind of sweeping integration tests might just make you blind to all of the kind of open untested edge cases.
+
+[00:17:47]
+
+>> Kent C. Dodds: Yeah, I'm glad that you brought this up. Actually, it reveals to you the fact that that actually is tested. Because if it is green then it is tested, it's covered by the integration test. And so if you're using the coverage report as a mechanism for you to know what you are not testing, if it's green then your are testing it.
+
+[00:18:09]
+The integration, and that's one of the nice things about-
+>> Speaker 3: [CROSSTALK] testing the happy path.
+>> Kent C. Dodds: That's true, and so if there are edge cases then those will normally live in something like if edge case then do this, and that will be read. And so then in your unit when you're like, okay, I wanna make sure I cover those not happy paths, then you can add that in as a unit test.
+
+[00:18:33]
+I should also add that it's not a bad thing to test edge cases with integration tests. Sometimes the edge case is best tested as like a process of several steps. And so that could make sense as an integration test as well. But yeah, in general, if it's green because of your integration test, then adding a unit test is not gonna give you any more confidence because you already know.
+
+[00:19:00]
+Your integration test would fail if this code broke, and so there's no reason to add a unit test cuz it'll also break. Yeah, just extra noise. I also wanna clarify something that I said. So if your integration test is covering some code, it's not always a bad thing to also unit test that same code.
+
+[00:19:16]
+Because the integration test, we can say this is user create, read, update, delete. But there could be something that's broken in this process. And all that it can tell us is, I can't read a user, but a unit test could tell us that a specific part of that is broken.
+
+[00:19:35]
+And so even though you're covering the same stuff, sometimes it can actually be useful to do that anyway. I would actually, generally, be happy to over-cover certain areas of my app that are really, really critical to my application's success. And it just helps you come up with what the problem is more quickly.
+
+[00:20:01]
+The one trade-off with that is when something breaks, everything breaks and it's a total nightmare. And that's one of the things people don't like about integration and end to end tests. They're so easy to break because they cover so much stuff. But they cover so much stuff, and so there are trade-offs there.
+
+[00:20:18]
+Yeah?
+>> Speaker 4: So I think you made a good point earlier, right, about how integration tests or tests of compositions of modules, right, or compositions of units. And so to that end, right, unit testing those individual units is additive, right? Cuz the point is the integration tests should actually let you combine those modules in multiple ways and not break your test, right?
+
+[00:20:43]
+Nonetheless, inside each unit there are, right, possibly also implementation details that shouldn't break unit tests at that level or at the integration level, right? But if you're refactoring at the individual unit level, you still need that around the unit testing to tell you that's what broke, right? So I think when you put it that way earlier, it kind of makes sense to me in the context of what you're describing there, like why the two coexist and it's not duplicative cuz even though they cover the same code, they cover it from different perspectives.
+
+[00:21:13]
+
+>> Kent C. Dodds: Mm-hm, yeah, you're thinking more about use cases and that kinda thing, exactly.
+
