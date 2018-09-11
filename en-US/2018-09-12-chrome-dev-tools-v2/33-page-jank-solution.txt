@@ -1,0 +1,88 @@
+[00:00:00]
+>> Speaker 1: All right, so for this performance and page jank one, it's pretty easy to kind of identify just by looking at the app. You make a bunch of these, they start moving really slowly. Whereas when you start off, they are nice and smooth. So it's pretty easy to tell, I mean, we're doing a lot of work here, right?
+
+[00:00:18]
+We have all these different things. We add 50, then we have 60 different things we're trying to animate and all that. But I think what's interesting is to take a deeper dive through the performance panel and just seeing, what's going on what is really expensive? What could be done to improve in those kind of things.
+
+[00:00:35]
+So yeah, one thing we can do, we can make a bunch of Ms., we can go to the performance. Do a little recording, maybe just a second, and then stop it. And yeah, so we can kind of see like hear, basically, the CPU is kind of maxed out the whole time.
+
+[00:00:50]
+What interesting is, it's doing kind of a big combination of stuff, right? It's doing a lot of JavaScript, a lot of rendering and a lot of painting, whereas sometimes you see it's just a lot of JavaScript code or in the one where we were demoing all those green boxes.
+
+[00:01:02]
+It didn't even have to render anything, it was just repainting as you were scrolling, right? So this one's doing a lot of work on both ends, and just to illustrate an example, if the speed were to get really bad and you were to run a profile. So I'll just kind of re-record one.
+
+[00:01:18]
+You would actually start getting all of these big red things, right? And these red things are up here in the timeline, but they're also on specific request animation frames. And these are Chrome, dev tool way of telling you like for sure, page jank. We're dropping frames, there's too much work to be done.
+
+[00:01:34]
+So when it gets really terrible, you'll be able to see them in red. But even otherwise, I mean, if you can see them on the site, that's a really good sign. So kind of like looking in again with the green and the purple, the painting and the rendering.
+
+[00:01:47]
+We don't have control over how Google Chrome paints or renders, but we do have control over what it renders and when with our JavaScript. So at the end of the day, we never really dive too deep into the composites. We dive into the code that right before them, right?
+
+[00:02:02]
+So it's like well, we had to do all this work and something in here happened. So you can pretty quickly, and I think this is something to keep in mind. These are pretty overwhelming pages. But if you were to see this site for the very first time and somebody's like, this is super slow, right?
+
+[00:02:16]
+And you're like yeah, it is really slow. Within a few seconds, you can at least pin it down to a specific function, right? You have like add JavaScript. We can see, this is really slow. It's these composites. Here's the yellow before it. We find the last wired one like we've been doing and we click on here, at least we're in the zone.
+
+[00:02:35]
+I feel like that's a big win, right? We know what part of the code base is causing that problem. We can start diving in from there. On top of that, so it's like this move function. So on top of that, you get this really nice timing stuff that we had talked about earlier.
+
+[00:02:47]
+So whenever Chrome does a performance audit, you get all these timing things. So we can see pretty much right away, by far and away what the most expensive thing is, right, which is this check here. It's like this if the current logo is offset top is ==0. And what's kinda going on here is like what we talked about back in the layout threshing, right, where it's like this move function get called a lot.
+
+[00:03:10]
+Every time that all these things need to move, but what we're doing here that's problematic is that we are. Every time it gets called, we go through all these different things, and the first thing we do is we start setting, or we start reading and then immediately writing to this offsetTop, right?
+
+[00:03:28]
+So it's like when you're doing that, you're thrashing the layout. Additionally, we can see that just as these things get big. There's a part of this that's just it's a lot of work, right? As you have a big list of things that are animating that you're trying to measure, there's an unavoidable reality to just there's a lot that you're trying to do, can you animate less of them or something like that.
+
+[00:03:47]
+But the thing that we're really seeing is this layout thrashing is happening, right? So what happens is we read the layout here, so we're getting all these things from it, then here and this happens every single time for every icon, we set a style attribute. When we set that style attribute, it throws out all those cached values on offset top.
+
+[00:04:07]
+I can't know what those are anymore, right? So if you have something absolute 00 and you grab offsetTop, it's gonna be 0, right? And then you say, well, style top ten. It's gonna throw out all the caches it has, cuz now the thing is moved, and it needs to know where it ended up in the dom again.
+
+[00:04:23]
+So even just as an ordering thing, if we could just do all of our writes before or after we do all of our reads, it would just be a lot more efficient, right? Because what's happening here is we do a read, we do a write, then we do more reads.
+
+[00:04:37]
+Cuz then here, again, we need to see if it's equal to this or this. So as one improvement, I mean, again, this is just a tremendous amount of work. As one improvement, we could do here, is we could just basically instead of, let me see here. Sorry, just getting my bearings.
+
+[00:04:57]
+So we've got the offset top here and then we kinda write it again here, and then we read it again here. So I was kinda playing around with the solution and let me just pop this.
+>> Speaker 1: I had kinda done this little bit of a thing here. So what we did is same loop, but what we do first we grab the position and we sort in a separate variable, right?
+
+[00:05:16]
+And so we grab that variable and then we just use that variable. We never hit that dom element again. We just use that variable from now on. So even if we need to set the top to something else like we set it here. Sorry, we set it here.
+
+[00:05:28]
+We never go back to the dom again for it. We're just okay with the position that we grabbed out. So this is really similar of a problem. I don't know if you've ever done caching selectors before. So if you're in jQuery or something like that and you have an unscroll handler, and it needs to grab a dom element and put some data in it like how far you're scrolled, or something like that.
+
+[00:05:50]
+The way you might do it is an event unscroll and in that unscroll event, you grab the dom element and write to it. What that means is every time scroll fires, you're hitting the dom again. You're grabbing it again and it's totally unnecessary, right? So what you would do is you would take that get element by ID or the jQuery selector, and you move it out of the onScroll event.
+
+[00:06:07]
+You kind of move it into a global negative space, right? So you're like just grab it the one time, then the scroll can just keep hitting it. It's the same thing in here is if you're gonna be writing and reading, and writing, and reading back and forth. All I've done here is I have abstracted the very first read into a variable and then we keep doing everything else as normal.
+
+[00:06:23]
+We never go back to the dom again, right? So after we do this style top, you'll notice we never hit currentLogo.offset height or top or anything like that ever again. So we can do little things like that and then that makes, again, this isn't a perfect solution. But there's still a ton of work going on here and my page is kinda died while I was working on it happening.
+
+[00:06:41]
+There's still a ton of work going on here, but you can see big performance wins. S you can even see the shape of everything change. So over here in the performance tab, we're seeing almost all of this kinda like green here. And these jank areas, whereas if we kinda run it here, we can see that everything is a lot more in the animation frame, right, nice and spaced out.
+
+[00:07:00]
+And you can see there's a nice, clear area for the CPU gets that little break after each time. So the move is still expensive. These are all definitely coming from the move call. The move gets called way too often still, and it uses a lot of the CPU, but we're not really hitting that same amount.
+
+[00:07:15]
+And really, the cause here was this layout thrashing. It was just the read, the write, the read again. Subtract it to a variable and we're good to go. Honestly, there's a lot that we can still improve about this like from an architecual standpoint. Keeping the way that we're doing the whole architecture of the code is probably not great, iterating through everything and reading values and things like that.
+
+[00:07:36]
+We can move all of that to a variable, right? We couldjust programmatically know where everything's position should be and then never read from the dom again. That would be a cool way of doing it. It's like a lot of these visualization libraries do, right? They just try to stay away from the dom as much as possible, keep things in CPU memory.
+
+[00:07:50]
+But as just an example of like, you can see a slow website. You can instantly find the function that's causing it, and you can even find what line within the function is really slow. It's a pretty good jumping off point from there.
+

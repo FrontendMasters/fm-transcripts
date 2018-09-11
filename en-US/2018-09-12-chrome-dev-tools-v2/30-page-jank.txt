@@ -1,0 +1,111 @@
+[00:00:00]
+>> Jon Kuperman: So the next thing, profiling. So we're kinda getting into the last two chapters, which are CPU profiling and memory. So for profiling, there's this really great article on real time JavaScript cost by Addy Osmani, who works for Google, and he has this drawing that he put in his blog post that I really like.
+
+[00:00:18]
+Cuz I think it gives some deeper understanding in what's going on here. So it's basically, it's like how do browsers work. And so VA, for those that don't know that's the rendering engine and in Chrome, so every browser has its own rendering engine, and that makes all the heavy lifting, right?
+
+[00:00:30]
+It takes your text, your JavaScript text, and it figures out how to put things on a screen, and move them around. It does all this optimizations, it's like this full like compiler, and so, this is a really cute drawing. So it's like take your JS, so whatever you write.
+
+[00:00:43]
+And they parse it, and they turn it into an abstract syntax tree, which is a compiler term. I don't know if anybody's ever messed around with Babbel before. They also use abstract syntax trees. It's basically into this tree that you can kinda walk. It's very similar to how the elements panel turns HDML into a DOM tree.
+
+[00:01:00]
+So it's like kind of this text to tree. It kind of explodes this interactive thing. So it turn it into an AST. They optimize it with these multi level, really complicated compilers that have a quick optimize, and a slow optimize, they all do the speculative optimization. The generate byte code, and that byte code is what actually needs for a processor for your CPU to run.
+
+[00:01:22]
+So it's kind of this like process is happening, but it means something, cuz I think that, as we study performance, we talk a lot about size, like file size, like how big is your JavaScript file, and that's really important. But we really need to keep in mind that no matter what you're sending over, it has to be parsed.
+
+[00:01:37]
+And parse time is a real cost, as well. So this parse time is after the file comes down, how long does it take for this little happy process to happen, right? And a lot of things can affect this. So one thing is, we can g-zip, and we can minify, and it makes our file size smaller, that's a great win.
+
+[00:01:51]
+But at the end of the day, it's just white space, we're removing, it's gonna be parsed the same way. And so, if we have a meg of JavaScript that we've managed to get down into 100 kilobytes of this really, really compressed thing. It's still gonna be a meg, not the size, but that's how much code is still gonna be parsed.
+
+[00:02:09]
+So parse time becomes a real issue, especially on devices with lower NCPUs. So we're were talking about mobile phones, older computers, a lot of things like that where maybe the delivery, you've fixed the speed of that delivery, but people are still as waiting forever for that parse time to finish.
+
+[00:02:26]
+Page Jank, is another thing that we're gonna be looking at a lot. So for those unfamiliar with Page Jank, it's like whenever you see any jumping or jittering on your screen when things are supposed to be a smooth animation. And so, the kind of idea with Page Jank here.
+
+[00:02:40]
+This gets a little bit math heavy, even for me, but it's not so bad [LAUGH], so basically, I think a lot of people have heard this phrase of like 60 frames per second. Like smooth as 60 frames per second, or whatever. If you haven't heard it, it's just in blog post sometimes, that'll be like, you should be chasing 60 frames per second for smooth scrolling.
+
+[00:02:58]
+And what does that really mean? So the idea is that most of our screens, unless you have a high-end gaming monitor, or something like that, are 60 Hertz, which means they refresh 60 times in a second. So if you take one second of time, your screen is refreshing itself 60 times in that second.
+
+[00:03:14]
+And, so, when you think about that from a browser's point of view, the screen is just constantly probing for updates. It's like, hey, did anything move? Can I show them something's moved? What happened? So the browser, every time that call happens, those 60 times in a second, the browser has to have a frame to send to the screen, right?
+
+[00:03:29]
+Okay, here's what it looks like now. Here's what it looks like now. And that is just always happening, as you're browsing the web. And so, it wants to put up one new picture for each of those refreshes. So if you take the 60 frames in one second, and you divide one second by 60, you get 16.66 milliseconds.
+
+[00:03:47]
+And so, every 16.66 milliseconds, the browser tosses another frame to the screen. It's like hey, here you go. Stuff update, here you go, here you go. In reality, you don't have all that time to yourself, right, to do heavy JavaScript work, because the browser just has stuff, it always has to just general housekeeping stuff.
+
+[00:04:04]
+So really, every one of your frames needs to complete in about 10 milliseconds. And we're not gonna dive into, we don't get fine tune control over our frames, but what I wanted to explain, is when you do so much stuff, like you're trying to animate, or you're reading, and you're writing all this stuff, you can cause the browser to skip frames, right?
+
+[00:04:22]
+Where basically the browser is so busy doing your work, that is doesn't have a frame to give to the screen, so it skips a frame, and so what looks like very, very smooth at 60 frames per second, can start looking like this when frames are missing. It's kinda like jittering around the screen.
+
+[00:04:36]
+So you'll see this a lot on big sites some times, as you're scrolling through a big sight. And the scroll kind of jitters, or maybe you're playing like a game, and the animation jitters for a second. These things happen. This is because frames are dropping, dropped, cuz there's too much going on.
+
+[00:04:49]
+Again, we don't have 10 milliseconds, how much can I do? And it's not like that. But it is to know why am I getting that? I'm giving it too much work at a time. Another thing that contributes to page jank, is what's called layout thrashing. And so, if you kind of think about it we really do two things when we interact with the dom.
+
+[00:05:07]
+We read values from it, what's the screen height, what's the width, what's the color. And we write values to it, inner text, inner HTML, class list, all these things. And so, basically, when you read something from the dom, like I read element one client height, and I read that in.
+
+[00:05:22]
+Chrome can catch that. It's like, hey, if you ever need element one client height again, I know exactly what it is, don't worry. But then, if you change anything about it, like we changed that style height to something else, it disposes of that cache. It's like, I don't know what it is anymore.
+
+[00:05:36]
+So then if you [INAUDIBLE] reading it again, it triggers another layout. It has to read that again. It's not cached. And so, this is unfortunately the reality of what our apps do. We have all these different stuff, all this code all over the place, all vying for things, trying to do an animation, trying to have a listener, trying to do scroll events, all this stuff, and you get this kind of layout thrashing a lot where you're reading and writing from the.
+
+[00:05:59]
+So what would be ideal, is if we could batch these things together, so we could be like, hey, everybody on our whole team, and our whole million line of code app, get all your reads together, and we'll do them all here. And then get all your writes together, and we'll do them all here.
+
+[00:06:12]
+And then, we'll do all our reads. But that's like totally not realistic. Right? That's not the way programming works. We're never gonna be able to do that. And so, there's this really cool tool called, and it's built into the browsers called, request Animation Frame, or RAF. And request Animation Frame is sort of like this asynchronous way of being like, when you're about to render the next frame, I have some stuff I wanna do before you do that, right?
+
+[00:06:33]
+So instead of like, kind of, when you think about our single threaded JavaScript world, it's like everything you do is like an action, it's like I need this now, I need the height, now I need to set the height., now I need, you're just kind of like this very demanding of the computer, right?
+
+[00:06:45]
+You're like, I need all of this, and I need all that happened instantly, and it does its best, but maybe it does it inefficiently. With request Animation Frame, it's really cool, because you can just be like, hey, it's not urgent, I mean, it's still gonna happen within 10 milliseconds, so this is faster than we can perceive, but you're saying, I don't need it right now.
+
+[00:07:01]
+I just need it before you do another re-render. I wanna change some stuff. It's really cool. So on top of that, kinda primitive, there's some libraries. These are still low-level libraries, but there's a library called, FastDom. And Fast Time just provides you with a read call back, and a write call back.
+
+[00:07:15]
+So you pass your read call back in, you do your read stuff, and your write call back, and you do your write stuff. Again, we probably won't be using Fast Time, but it's important to know when you're using it, you iLibrary like Angular, React, or View, what they are doing under the hood, is they're making heavy use of request animation frame.
+
+[00:07:29]
+So in React, you say, on click change the class, deep down what it's doing is like hey, they collect, whenever you get time. There's really trying to smooth things out for you, so your experience is a lot better. This is where some people make these contentious claims that a view library is faster than vanilla code.
+
+[00:07:46]
+Which it couldn't be, right? Cuz it just is vanilla code, that's what a view library is. But I think what they mean is they set up these nice bumpers for you. So when you're programming within React, it's gonna be a little bit smoother than if you don't know what you're doing, and your programming in Vanilla, cuz you could do that layout thrashing.
+
+[00:08:01]
+This is like a cool kind of thing, so when we talk about layouts, and repaints, and all that stuff, there's this site here koalastothemax.com. And every time you hover over it, it kinda splits these images, right? And it splits them again, and splits them again. So if we start over at the beginning, where we have this one image, there's a cool tool we can use.
+
+[00:08:20]
+So we open up Dev tools, and dock these back to the bottom. And then, I'm gonna open this up a little bit. And I am gonna hit escape for that console drawer. I'm gonna click on this three here, and I'm gonna go to Rendering. And then, I'm gonna turn on paint flashing.
+
+[00:08:34]
+And what paint flashing does, is it shows you with this really cool green, whenever anything is being repainted, and it shows you what all is being repainted. So you can see on a screen re-size, the whole screen gets repainted, and it's because this image needs to grow, it flexes.
+
+[00:08:51]
+What you wanna see when you're doing heavy animations, is only the stuff that's moving is getting repainted. So we click on this, and we're seeing that it's doing a very good job. It's all it's covering in green is what's actually being animated, and moved around. What you'll see on a lot of websites, especially, ones that feel slow, is even though you're only animating over here, everything's being repainted.
+
+[00:09:12]
+And what you wanna look for there, is these calls to reads and writes of moments. Lke are you grabbing document dot body dot height every single time you do one of this things, maybe you don't need to be doing that. Or you're reading, and then immediately writing to the dom again, so you're invalidating that layout.
+
+[00:09:29]
+Side tip, if you keep hovering on this things for like a super long time, a kowala appears, which is pretty cool
+>> Jon Kuperman: I think that's its face.
+>> [INAUDIBLE]
+>> Jon Kuperman: Okay, it's worth it.
+
