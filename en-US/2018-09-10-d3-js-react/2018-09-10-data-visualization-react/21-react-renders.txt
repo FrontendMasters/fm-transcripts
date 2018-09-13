@@ -1,0 +1,73 @@
+[00:00:00]
+>> Shirley Wu: We've finally, finally come to the React section of this workshop I titled Data Visualization for React developers. We took a few hours. But so before we start rendering with React, because remember at the beginning of the morning I said I wanted to use D3 to calculate. So we just talked about [LAUGH] of the different ways that D3 can calculate your data and turn it into what we need to draw.
+
+[00:00:28]
+And now we're getting the second half which is about React and how should React do the rendering. But before we get into that specifics, I want to kind of talk about the architecture of your data visualization within your React application. And so I have this general guideline that I follow for myself that has come from a few years of doing React and D3 together.
+
+[00:00:57]
+I guess this is my fourth year. And so first of all, I think of a division of responsibilities. So I always, always have a component. Each chart gets its own component. So for example, the 3D charts that we had just now, each of them will have, I'll have a line chart component, a bar chart component and a radial chart component.
+
+[00:01:20]
+That's probably really straightforward. And then I'll also have a root component. That's the parent of it all that manages them all. And the way that I think about them is that for the chart component its responsibilities are to get passed in the raw data from its parents. So that it can do those D3 calculations and translate those raw data into screen space, basically everything we've been doing up until now.
+
+[00:01:47]
+And then it renders that calculated data in the render function, so the chart component is responsible for three of those things. And then it also manages state for interactions that don't require redrawing ofthe whole chart. And so those interactions might be hover interactions. Maybe in the bar chart you can hover over each of the bars to see the date and the high temperature, low temperature, etc.
+
+[00:02:17]
+That interaction doesn't require you to redraw the whole bar chart. And similarly, if you have click interactions, if you click on one of them to bring up more detailed information or something like that, that also doesn't require you to redraw the whole thing. And so I manage state for those sorts of interactions in the chart component itself.
+
+[00:02:37]
+And for the root component, for the parent component, that's where I manage loading in that raw data either from just a static file that lives on a server somewhere or from an API that I'm accessing. So I let that route component manage loading in the data and any updates to that data.
+
+[00:03:00]
+So for example you mention having real-time data come in. So the root component might manage like if you have to open up web socket or something and manage that sort of real-time communication. For me personally, I'll do it in a root component. And this has some asterisks, as in this makes some assumptions about your application that I'll go into later.
+
+[00:03:27]
+But the root component manages update to that raw data. It also manages state for interactions that require redrawing of the charts. And so that might be interactions will filter down your data or aggregate your data or sort your data. And if you can imagine like for the bar chart, if you have some sort of user interaction, that filters down to maybe just a few months out of the year.
+
+[00:03:52]
+You can imagine that takes redrawing the whole bar chart cuz now you're only down to a few months instead of the whole year. And so I'll have the root component, the parent component, and manage all of that. And in terms of, we've been talking a lot about calculating the data.
+
+[00:04:11]
+In terms of where to put that calculation, I have a few different places that I want to suggest. The very first one is getDerivedStateFromProps. So then as soon as you get passed in raw data or any updates through raw data down from your parent as props, that's where you put your calculations in.
+
+[00:04:42]
+And then your calculated data can be returned as state. So if we calculate the array of bars, that can be returned as a state. The pro of this, it's really simple and it's really straightforward. And we'll see that in our example in a little bit. The con is obviously that getDerivedStateFromProps is a static method and it's asynchronous.
+
+[00:05:05]
+And you can get race conditions if not careful. It could be returning things from this that doesn't actually belong, and the render function. You can be calling it in one instance, and then it will get passed into the render function of another instance or something. That is my understanding of what can happen with getDerivedStateFromProps.
+
+[00:05:31]
+I've never gotten that yet just because it's so new, but that is what I would say, be careful with using this. I would use it like as a first run through to just prototype and get your idea out, and then from there on like consider other options. Another option is to just put the calculations in a render function of the lifecycle, and that's extremely straightforward cuz that right where you're going to do the rendering.
+
+[00:06:03]
+The con is it's going to recalculate on every single lifecycle. So if you have interactions like the hover I was telling you about, it's going to redo your calculations every single time someone's hovering or someone's clicking. Every single time there's a lifecycle trigger, but you don't want the data to be recalculated.
+
+[00:06:25]
+Then I would not suggest render anymore. But on the flipside, if you don't have any sort of interaction that's the hover click or something, then render is a great place to put your data calculations into. And then this is also,
+>> Shirley Wu: Actually a pretty good suggestion that I got of putting into componentDidMount and componentDidUpdate.
+
+[00:06:53]
+It's got no race conditions. You just have to make sure that you don't get into an infinite loop. Cuz if you can imagine, if you set state at the end of your component to update, it's gonna trigger like a lifecycle. And then it's gonna hit componentDidUpdate and set state and then trigger another lifecycle, etc.
+
+[00:07:12]
+So just make sure that in your componentDidUpdate that you're checking if the data is new or not. And the con for me for that is you have to do that check. And sometimes checking if the data is new or not might require like a little bit of a backflip maneuvering to figure out.
+
+[00:07:32]
+It depends on how your application is set up, but when I usually do calculations, I don't really do componentDidUpdate just because that requires someone checking that the data has updated. So those are the options. And what I want to say for what I just talked about the architecture is that first of all, it assumes that React is doing all of the state management and that you don't have any redux or anything similar.
+
+[00:08:10]
+Obviously, some of things that I've said might change for you if you have redux. I've personally not used redux before just because a lot of my visualizations are I guess the interactions is simple enough that I can just manage all of the state changes with React. And also these recommendations are based on having, you're trying to render multiple charts that all share some part of the data or state.
+
+[00:08:42]
+And that's why you have a parent that manages all of the raw data, etc. And then the children are only, the chart components, are only responsible for translating that raw data into the screen space and then rendering it. So these are some of the assumptions that it makes.
+
+[00:09:01]
+But the main takeway, the thing that I really, really want to drill home for this workshop is that kind of that very clear division between have D3 do the calculations that are really hard to do by hand, and have React do the rendering. Because, and I want to kind of make that very clear because once you kind of separate those two parts of drawing a visualization, then it's very easy to just be like, the D3 calculations can actually go anywhere that makes sense for your project.
+
+[00:09:40]
+As long as React can access it in its render function to draw all the bars or draw all of the lines or draw all of those archs. So I don't want to sit here telling you the D3 code must go in this function, and the rendering code must go in this function.
+
+[00:10:02]
+Or I don't want to give you this over-arching rule. I just want to say, I think put it anywhere or architect it any way that makes sense for your project and the needs of your project, as long as React can access that calculated data.
+
