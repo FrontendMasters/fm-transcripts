@@ -1,0 +1,122 @@
+[00:00:00]
+>> Brian Holt: Let's go and write our Node server now. So create a new file, let's save that, and where do I put this? Typically you would have, this is the source directory for our application, your Node server's gonna be more complicated than one file. Our is not, so I'm just gonna put it in the root directory and call it Server.js.
+
+[00:00:20]
+But if you had multiple files, I'd probably have like a server side folder and a client side code folder, but for now, server.js is good.
+>> Brian Holt: Here and we're gonna do a bunch of stuff like this, import Express from express, import React from react. Import renderToString from react-dom/server.
+
+[00:00:53]
+Import ServerLocation from @reach/router. Import fs from fs, and import App from ./
+>> Brian Holt: src/App, okay? So let's talk about some of the things we imported up here. First thing, I'm still using ES6 modules and this is gonna work in Node because everything is being run through Babel. Typically, Node does not understand modules like this.
+
+[00:01:40]
+You typically have to do something like const express = require express, common JS modules as they are called. But because everything is being run through Babel I can do it like this and I like to keep things uniform if I can, so this is fine.
+>> Brian Holt: React, I think that's self evidence where that's coming from and why we need it.
+
+[00:02:02]
+RenderToString, so we've seen render and we've seen hydrate before, but what renderToString does exactly that. It's going to take our Node application and generate the HTML as a string which then we can insert into our HTML file, right?
+>> Brian Holt: Okay, ServerLocation, this one is kind of an interesting one because our routing is happening on the client side, right?
+
+[00:02:28]
+So we wouldn't need this if we weren't using, this is, sorry, reach/router. Yep, reach/router like that, not react/router, on line 4 there. Make sure that is an h, or else you're gonna have a bad day. ServerLocation is going to help us do all of the client side routing.
+
+[00:02:49]
+But it's gonna execute all of the reach/router code inside of Node, so that all the routing maps up together. So this makes it really easy to do routing. We just let reach/router handle all of the redirects and stuff like that.
+>> Brian Holt: Okay, make it's all super simple. Okay, underneath that I wanna say const PORT = process.env.PORT or 3000.
+
+[00:03:22]
+So if you wanna deploy this to like Azure or something like that, what Azure will do when it starts up a server, it will pass in the port that that application needs to be listening on. It's gonna be something like 80, it could be 5,000, you don't know what it's gonna be, but if you don't pass into port then go ahead and use port 3000.
+
+[00:03:41]
+This is just a good habit to be into with Node, then we're going to read in our HTML we generate from our build process. So, this is going to be done with the fs module which stands for file system, fs readFileSync from dist/index.html.
+>> Brian Holt: .toString. So this is going to read the generated mark up, right.
+
+[00:04:13]
+Which is gonna have all the correct file paths and all the CSS, and all that stuff is gonna be built for us. We're going to read it in here, this comes in as a buffer and we set it out the string which is what this is gonna be a string of that HTML, right?
+
+[00:04:27]
+So it's gonna be a string of, see if I can just show you really quickly what it looks like, index.html, right? So this has like a style path, I like to correct all the stuff will be done, so this is going to be loaded in the string here in this HTML.
+
+[00:04:48]
+Const app = express, this will start the application, or not start it but allow us to start configuring it. First thing is we need to use app.use stop, app.use/dist express.static('dist'). So, anytime anyone makes a request to /dist on our server, look at our dist directory, insert that statically, so all of our HTML, CSS, images will come from that dist directory.
+
+[00:05:24]
+So, for every other request that comes in we're gonna give it this handler. So this will be run on every other request that doesn't hit that first handler.
+>> Brian Holt: Const reactMarkup =, and we're gonna wrap it in ServerLocation, url is going to be equal to req.url. So if someone calls with slash search params, we need to render that page, right?
+
+[00:06:02]
+So that's what ServerLocation and req url does, is it passes slash search params into the ServerLocation, which will make sure that app renders correctly.
+>> Brian Holt: And again, this is being run through babel so we're free to jsx directly in our Node.
+>> Brian Holt: Then,
+>> Brian Holt: We have something that needs to happen here.
+
+[00:06:29]
+So if we go into index.html, our code goes here, right? Inside of what says not rendered. So how do we render the string markup that we just did, how do we render that specifically into here?
+>> Brian Holt: There's a bunch of ways that you can do this, and I'll let you pick your favorite.
+
+[00:06:52]
+The way that we did it at Netflix, is we actually had all of this living inside of React and so React generated the whole document. That's fine, I think it's a little bit overkill because that React will only be run server side, right?
+>> Brian Holt: I'm gonna give you the absolute simplest way to do this.
+
+[00:07:12]
+But feel free to use something like Lodash templating or handle bars, like any sort of templating language would make this pretty easy. For our specific used case we have two parts. The part that comes before not rendered and the part that comes after not rendered, right? And then when everything else goes in the middle of that.
+
+[00:07:33]
+Well, this comes in as a string and if I have a before part and an after part and a delimiter, can I just use string.split? Sure, why not, it will work.
+>> Brian Holt: It will be fast too. So if I come in here to server.js, and often times what people do is they'll just have two different strings exported from some document and then just read from that, and that's fine too.
+
+[00:08:01]
+But what I'm gonna do is I'm gonna say const parts = html.split. And actually, we can do this outside of this cuz this doesn't have to happen. We can do this once cuz it never changes, so up here, const parts = html.split. And we're gonna split around not rendered.
+
+[00:08:30]
+
+>> Brian Holt: Right, so this is gonna give me back two things, everything that comes before not rendered, everything else that comes after not rendered. And because you use split, it doesn't keep not rendered in there, cuz that's the delimiter.
+>> Brian Holt: Makes sense? It's a JavaScript thing, there's nothing specific to React here.
+
+[00:08:48]
+So now I have two parts here and I can say res.send.
+>> Brian Holt: And I'm gonna use a HTML template stream with the back ticks, first part is gonna be parts[0]. Second part is gonna be renderToString
+>> Brian Holt: reactMarkup. And the third part is gonna be parts[1]
+>> Brian Holt: And that works.
+
+[00:09:28]
+So now at the end here after I send that I can just say res.end, that's it.
+>> Brian Holt: Just throw in here console.log
+>> Brian Holt: Listening on port, just so we know that the server is up and I need to make that a template string, not a normal string.
+>> Brian Holt: Okay, and then at the very last thing is app.listen on PORT, okay?
+
+[00:10:07]
+
+>> Brian Holt: So let's go see how that works, hopefully it just works, npm run start.
+>> Brian Holt: So it's gonna run that build process first again, if you're on Windows npm run build first and then run npm run start
+>> Brian Holt: You can see there that`s everything that it generated,
+>> Brian Holt: Throw error, one we gonna solve.
+
+[00:10:47]
+
+>> Brian Holt: I think I did this wrong here. So I just called the server.js right here, that's gotta be correct.
+>> Brian Holt: So that's the part, I took out service/index.js and I just make this server.js.
+>> Brian Holt: Okay, so now we're gonna do npm run start again.
+>> Brian Holt: Listening on 3000.
+
+[00:11:24]
+So now, hopefully I can just come in here to 3000 and it's working, right? Our application works, all that stuff is working, so React is obviously working cuz it's doing all that client set handling. But let's take a look at what happens if I look at interact here.
+
+[00:11:42]
+And I'm going to, let's just throttle this.
+>> Brian Holt: So we refresh the page, notice it comes in with complete markup. Let's even go one step further and say, settings, disable JavaScript.
+>> Brian Holt: No throttling there we go, Settings, and disable JavaScript.
+>> Brian Holt: So now JavaScript is disabled on this page, right?
+
+[00:12:22]
+So this actually is not gonna work. If I choose dog, it's not going to go request anything because it has no code governing that, but this is complete markup, right? Go even one step further, you can view source up here and you can see coming in here is like you have the label, and the value, and all that kind of stuff.
+
+[00:12:38]
+On the first page load it appears to load much quicker because you get complete markup. So you're immediately showing the user something, this is a big win for perceived performance, right? The page is not actually loading any faster, if we're gonna get really into it, technically server side rendering it's not free, right?
+
+[00:12:56]
+It does have to do some rendering and some work at the back-end. So you might be slowing down your time to interact a little bit, but you can be a big winner you show something to the user right away. And so the user will immediately see something to have to start deciding what they wanna do, right?
+
+[00:13:09]
+Like am looking at this page, is like do I really wanna search in Seattle? And by the time you click on here and start typing in here, hopefully you've loaded, right? Because that's good half second that someone has to take make a decision and click on something. So it's a big win for, cuz it feels like it's loaded instantly.
+
