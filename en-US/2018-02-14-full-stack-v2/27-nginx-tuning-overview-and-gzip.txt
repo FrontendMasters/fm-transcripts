@@ -1,0 +1,126 @@
+[00:00:00]
+>> Jem Young: So now let's get into Nginx tuning. It seems boring, but this is probably, as web developers, probably something you'll be very interested in. I can make our site perform way faster just by tuning our Nginx. So I added in some slow sites. So if I say jem.party, or whatever your URL is, if I say slow file, we watch our network tab.
+
+[00:00:24]
+Man, this is taking a long time, why is that? Because I added in a timeout just to simulate what a slow connection would look like. Lets say it's doing a complex database query, let's say it had to parse a bunch of things. I added a slow file in there so we can learn how to speed this up.
+
+[00:00:42]
+And if you want an even slower file, jem.party, if you go to cats, it's gonna download a bunch of very large cat pictures. So large that you can't even see them, but they're there. That's great.
+>> Jem Young: And all these are on the GitHub repo. If you look at the source code for that Node app, which we'll take a look at in a second.
+
+[00:01:06]
+You'll see just these routes in there that I added just for convenience sake, to understand how to make our connections faster just using Nginx. [LAUGH] Cats, that's great. So to start with, let's start with gzip. We touched on it a bit in the last class, but can anybody tell me what gzip is?
+
+[00:01:26]
+You've probably heard of it. Hazard a guess?
+>> Speaker 2: To compress the file.
+>> Jem Young: Yes, it compress files. So we know zipping is an algorithm that runs through and compresses files. How does a zipping algorithm work, in general? Like high-level, super high-level, how would you imagine you compress a file?
+
+[00:01:45]
+
+>> Speaker 2: Finds repeated strings and then matches them to a smaller string?
+>> Jem Young: That's exactly right, perfect. So all compression algorithms work essentially the same. It looks for repeated patterns, it takes those and says, instead of 00000000, I just say x50. It just means I'm just gonna repeat this over and over again, and it's just a shortened syntax for repeating bits and bytes over and over again.
+
+[00:02:11]
+And it's actually, it's brilliant once your understand that, cuz you understand compression, you understand how every compression works in general, how we make things smaller, so great answer. Gzip is the public version of, well, it's not the public, it's the widely adopted version of how to compress files on the Internet.
+
+[00:02:31]
+Fortunately, most browsers, almost all browsers support gzip to some degree, and Apache and Nginx support gzipping content. So what it does is, all those cat pictures, it's gonna compress those down as best we can. Pictures are very good at being compressed. And then it's gonna send down those down to the server, or send those down to the browser.
+
+[00:02:48]
+The browser's gonna unpack those using an unzipper, and it shows it to you. And because it's very well known, it's very fast at doing this over and over and over again. So gzip is just a well known format for doing that. And you're thinking right now, why are pictures particulary good at being compressed?
+
+[00:03:05]
+Knowing what you know now about zipping, what would you think?
+>> Speaker 3: Similar colors?
+>> Jem Young: Yes, exactly right, cuz what is an image? It's just the bitmap of hex colors or what have you, just bits and bytes, and generally they're repeated over and over again. So if we look at our, sorry, I'm just nerding out a bit, cuz I think it's interesting, if we look at our cat picture, all this is the same color.
+
+[00:03:27]
+It can compress really well, cuz it's just gonna say, the next million pixels, it's just this color blue, rather than this being blue, blue, blue, blue, blue, it just compresses that down. That's why images compress particularly well. Now, if you had complex data, say like a JSON payload, it doesn't compress as well, because there's not a lot of patterns in there, not as much.
+
+[00:03:48]
+Yes, we're learning all about compression, who knew, full stack?
+>> Jem Young: So if we wanna look at gzip, let's look at our response headers, and we'll see what Nginx is doing for us. So in Chrome, or any browser you want, let's open up your dev tools, and let's look at the response headers.
+
+[00:04:14]
+
+>> Jem Young: It's not gzipping currently, we'll fix that.
+>> Jem Young: Maybe it's not doing. It's probably not doing images.
+>> Jem Young: So we have two things we send out with every request, they're called the header files, they go along with the packet we send out. It's just saying, as a browser, here is all the things that I accept.
+
+[00:04:35]
+I understand gzip, so I can accept gzips. Don't worry about connection, do not track the host, don't worry about the other stuff, but these are the headers that go out to the client or to the server. The server reads these and may or may not act on them.
+
+[00:04:51]
+The response headers is what Nginx is sending back. It's saying, okay, here's a cache connection, it's gzip encoded, etc., etc., etc. Questions on headers? I could do a whole course on different headers because they're kind of what, they're the instructions that make your requests go out properly. Any questions on headers, any at all?
+
+[00:05:15]
+
+>> Speaker 4: Can you think of a reason why I would not have BR on mine, and accepting coding?
+>> Jem Young: No, maybe you're just using different version of Chrome. Yeah, as long as it takes gzip, you're okay. And even accepting coding, it's kinda of an optional header cuz almost all modern browsers will take gzip now.
+
+[00:05:38]
+All right, no questions on headers. Let's modify some headers then, because again, these are the instructions on telling us how we should handle this request. So in /var/etc/nginx/nginx.conf, no, we're not in Nginx sites available default, we're in nginx.conf. nginx.conf applies to all the servers you have running on your machine, rather than if I go into default, I'm editing specific server blocks that just represent specific domains.
+
+[00:06:14]
+It's a bit more advanced cuz we haven't covered how to run multiple domains on one server, but it's just adding another block to your Nginx configuration. It's actually pretty easy, but so let's take a look at our gzip settings, because in general, we want all of our requests to be gzipped.
+
+[00:06:30]
+So sudo vi /etc/nginx/nginx.conf.
+>> Speaker 5: Have a question in chat.
+>> Jem Young: What is X-Requested-With? Yeah, all right, Alex is asking, what is X-requested-With, that header? That is a great question. X-Requested-With just means, who made the request? So any X dash prefix is something that's not specifically used by any server.
+
+[00:07:05]
+It's just more of an information, just like X-Powered-With, not used by me, not terribly useful, but it's just saying Express is the server that's running on the node. We can make it not do that, we can make X say anything. But in general if you say, I want to pass some information back to the client, but I don't want Nginx to try to parse it or anything like that, just use an X dash whatever, and you'll be safe.
+
+[00:07:29]
+But great question, if you ever see X, it's usually just information, and we're gonna add in an X header ourselves to let us know about cache status, but we'll get to that in a minute. Great question though.
+>> Jem Young: All right, so we're in /etc/nginx/nginx conf.
+>> Speaker 3: I don't have etc folder in my-
+
+[00:07:50]
+
+>> Jem Young: I put that wrong. You don't have, there we go, sorry, apologies, I typed that incorrectly. So it's /etc/nginx/nginx.conf.
+>> Jem Young: So again, these are the settings that apply for every connection running through Nginx.
+>> Jem Young: And in general, this is where we do the fine-tuning, if we wanted to, but for now, we're just gonna do a gzip.
+
+[00:08:22]
+So I'm gonna search gzip at the bottom, and gzip is on right now.
+>> Jem Young: But if I say, I want the default level, cuz there's different levels you can compress things with, different strengths you want that algorithm to run against your file. You can turn that all the way up to nine.
+
+[00:08:44]
+Not generally recommended, because again, there's diminishing returns on, yeah, your files may be a couple of bytes smaller but it cost you 20 extra CPU cycles to do that. It's probably not worth it, you're not really saving any time. Whereas rookie Jim would have said, yeah, let's turn it up to nine, why don't we always do that?
+
+[00:09:02]
+But when you're dealing with hundreds of thousands of request, you have to be more careful with your CPU cycles. So we're gonna leave it on 6, actually turn it down to 5, you can turn it on whatever you'd like.
+>> Jem Young: And that's about it, all we can do for gzip, it's already on.
+
+[00:09:27]
+
+>> Jem Young: But while we're in this file, let's talk a little bit more about Nginx configurations. This is where all the things that the logging, how we work our processes, this is where this happening in this nginx.conf. We're not gonna touch that for now because there's better observations we can make, but let's say if we wanna change where the logs are, we change it in here.
+
+[00:09:48]
+An interesting optimization we can do is, instead of worker_processes auto, I can change that to 2. So what Nginx does, which makes it great, is it auto scales for you. So if you're getting a lot of connections and it's just slow, slow, slow, it'll spin up another process on your computer on another core, and just start handling traffic, and it scales out all the way.
+
+[00:10:10]
+It scales out as much as you want. Why wouldn't you want that though?
+>> Speaker 5: A DDoS?
+>> Jem Young: Yes, yes, DDoS, things like that. But mainly, if you're just running a web server that's also running a database server that's also running a node server, you don't necessarily want Nginx to be able to take over your whole machine if someone's sending you a bunch of requests.
+
+[00:10:33]
+So if you cap it at, say, one, you're saying no matter what, Nginx is only gonna run at one process. It could get slow if you're getting hammered with a lot of requests, so I'm just gonna leave it for auto for now, but in the future, you should know that Nginx will auto scale for you.
+
+[00:10:48]
+It's kind of something, if you notice Nginx running seven processes, something is probably wrong. All right, any questions about this?
+>> Jem Young: Awesome, and here is where the rest of the config files get put, which is why sites enabled default, sites enabled whatever you want to call it, they all get put into this block eventually.
+
+[00:11:11]
+And it's just included in your virtual hosts, that's by default. Awesome so, I'm gonna restart Nginx. So first let me make sure I didn't make any errors, sudo ngimx -t. Looking good, sudo service nginx reload, awesome. And we're all gzipped, why is it trying to print? Don't know.
+
+[00:11:44]
+
+>> Jem Young: And we can increase our compression level. At the bottom, I include a link to the gzip module for Nginx. If you wanna just dive into all the settings and tweak to your heart's content, you can do that. If you mess with gzip, you probably not gonna break anything.
+
+[00:11:57]
+So you're pretty safe on the crap scale, don't wanna touch it. Feel free to play around with it, try to tune as much as you can, but there are more efficient things we can do rather than trying to tweak gzip too much.
+

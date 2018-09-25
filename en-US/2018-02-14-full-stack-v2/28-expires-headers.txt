@@ -1,0 +1,165 @@
+[00:00:00]
+>> Jem Young: Let's do expires headers. So remember, we said the headers are the instructions on how to handle this particular request? What does an expire header do, or what do you think it does?
+>> Jem Young: Anybody?
+>> Speaker 2: Expire the cache.
+>> Jem Young: Yes. On which side, though? Client-side or server-side?
+>> Speaker 2: Client.
+
+[00:00:23]
+
+>> Jem Young: Yes, excellent. Because our content doesn't change that much, unless we have a lot of dynamic content. For the most part, you're just serving back some sort of static file. So why request that every time? If it hasn't changed, why should we have to do that every time?
+
+[00:00:38]
+We can set expire headers to say hey, instead of making this request, I'm telling you this content is so fresh, so fresh for a month or so, don't even make that request. So we cut down on bandwidth on the client side. Your page loads much faster cuz it's pulled.
+
+[00:00:52]
+We cut down on bandwidth on the server side cuz I don't have to handle those type of requests. Make sense? Expires headers are really powerful. But as we see involving anything with cacheing [LAUGH] you can get yourself into a whole, in a bad spot very quickly. Cuz it's a hard problem.
+
+[00:01:08]
+So let's talk about expires headers a bit.
+>> Jem Young: And if you look in the files that it's requesting, you'll see that it's sending down three or four not modified. That's because we're using the ETag header. Which I won't get into too much, cuz Nginx does that for you.
+
+[00:01:27]
+But ETag is just a quick hash of the file that says hey, it hasn't changed, don't even process this request. The difference is it's still, even with the ETag header, it's still hitting the server. And Nginx is still saying here's the ETag, nothing's changed. That's why it returns a 304, which is a not-modified response.
+
+[00:01:46]
+But what's the difference between that and expires headers?
+>> Speaker 3: You wouldn't even have to hit the server.
+>> Jem Young: Exactly. Exactly right. So ETags are good. By default, Nginx has them, they're running. It saves you a lot of processing power cuz it's just gonna return the ETag very quickly instead of the whole file back.
+
+[00:02:02]
+With expires headers, we don't even have to make that request. So let's add some expires headers, and see if we can make our site just a little bit faster.
+>> Jem Young: I don't know why I put var for all these. It must have been a late night coding session.
+
+[00:02:18]
+But it's not var, it's just etc, I apologize.
+>> Jem Young: So, in etc/nginxsites-available. Don't know why I did that too. That's right, there we go. etc/nginx/sites-available/default, the file you all know and love. Add a location block for static files.
+>> Jem Young: So what we're doing is for every request that comes into our server, for your domain, in this case gen.party, every request that's looking for slash static, slash something else, we're gonna add expires headers.
+
+[00:03:02]
+And we're gonna say this content is static, it expires in 30 days, don't even bother making that request. But we have to add proxy_pass to static again. Otherwise, we're just gonna a header, but it won't actually make the request in the node at that point. So that's where we add the proxy_pass to node/static.
+
+[00:03:20]
+[BLANK AUDIO]
+>> Speaker 4: And does this is need to precede location within default, does it-
+>> Jem Young: Doesn't have to be, but I found it good, it's good habit to have location slash at the very bottom. That's like, if everything else falls through, that's what it's gonna hit. But good question.
+
+[00:03:45]
+
+>> Jem Young: All right, so let me just add this sudo vi etc nginx, sites available, default.
+>> Jem Young: And
+>> Jem Young: Yeah, put them here.
+>> Jem Young: Right? Everybody have something that looks around something like this? Well, it should look exactly like this.
+>> Jem Young: And just gonna write quits. Sanity check myself.
+
+[00:04:59]
+Looks good. And we're just gonna reload nginx. Alex is asking for a website with about 10,000 requests per hour, what would be a good number process instead of auto? So that largely depends. On the machine we're using, you're probably using the default lowest end nginx blox, or digital ocean box, which I am, which only has one core.
+
+[00:05:22]
+And in general, you don't want more processes than you have cores. So if you had a 32 core machine, you could have 32 processes. If you're a one core machine but you say I can have five process, well, at that point you're gonna have lock. So Nginx is gonna be running, and then node's gonna be running, then MySQL's gonna berunning, things like that.
+
+[00:05:41]
+So the general rule is, yeah, don't have more processes running than you have processors. But if you're doing 10,000 requests per hour, which is a decent amount of traffic, you would have web server. You have your own stand-alone web server that only does Nginx, and it handles HPS and things like that.
+
+[00:05:58]
+And that points to another server, which is just running node. That way, you just let Nginx scale as much as you want. And that's a general breakdown of most server configurations, is you have web servers, then you have database servers, and you have servers that do everything. In our case, we're running it all in one because I don't want you to rack up a giant bill cuz we're running five different servers.
+
+[00:06:15]
+But in general, put Nginx on it's own server as a web server, and then let it scale infinitely.
+>> Jem Young: Good question, though. So now, let us request something interesting.
+>> Jem Young: Not modified.
+>> Jem Young: And if we take a look at the request, it should be from memory, if I did things correctly.
+
+[00:06:41]
+Yes, it's from disk cache.
+>> Jem Young: So you'll note your headers are, the first request, you won't get that because we haven't sent out the headers yet. The second request, it will not go out the server because our [INAUDIBLE] control is saying max age is 30 days. So it won't make this request anymore.
+
+[00:07:03]
+
+>> Jem Young: So what's something dangerous with setting your cache very, very long?
+>> Speaker 5: You update your website and no one can see the changes until I hard refresh.
+>> Jem Young: Exactly. That's exactly right. That's why cacheing is a hard problem in computer science. Cuz you want to serve the fast experience possible.
+
+[00:07:21]
+In this instance, this is pretty slow.
+>> Jem Young: This is pretty fast cuz pretty much an empty file. This file's pretty fast, but it returns in about a few milliseconds, two milliseconds, cuz that request doesn't even have to got out. It reads in disk cache. That's cool, it's a better experience for my users, which is what we want.
+
+[00:07:39]
+But if I update this file, but my caching headers are way too expired, well, you're gonna be in some trouble. And then try and explain to my dear sweet mom how to hard refresh the page, to clear the caches. It's not a good experience. So expires headers are not the cure-all, it's not gonna solve all your problems.
+
+[00:07:58]
+In general, you wouldn't set something for 30 days, that's a long cache. You'd set on the order of minutes. Cuz most people aren't coming back to your site over and over again within 30 days. And your content has changed.
+>> Jem Young: Yes?
+>> Speaker 6: Another question in chat.
+>> Jem Young: Alex is asking if I modify something in the app, how can I force the browser to request the file again?
+
+[00:08:21]
+Yes, we're gonna get to a bit more on cache control, cuz caching is hard. But if you want to, you can just, with developer tools open in Chrome, you hold down on the Refresh icon. We can say empty cache hard reload. It's gonna refresh a new file. As we see, it made the full round trip here.
+
+[00:08:42]
+
+>> Speaker 6: I think in his case, though, he's asking about the user on the other end, not for testing. So if he's updating the CSS, how can he make sure that they're always getting the latest, version of that. So if you're gonna go into that later, then that's fine.
+
+[00:08:55]
+
+>> Jem Young: I'll touch on that a bit later. But that more comes on you as the developer not setting your expires headers too long. You want it just long enough so they're getting the freshest version. Now, there's different ways of making your responses much faster. I like the Service Worker route.
+
+[00:09:10]
+There's a whole course on it, which I'll ink to at the end, about Service Workers. It's a two-day course that's pretty solid. But a Service Worker essentially can ask a cache sitting on the client. And that does all the handshaking for you. And you can send out expires headers to the service worker.
+
+[00:09:24]
+It gets all fun and complicated. But again, that's a whole nother course. Expires headers are probably the fastest and simplest way. It was just one line in our nginx configuration. But in general, don't overdo it with expires headers. It may seem faster now, but as a user, for instance, I don't have dev tool open, how would I know I'm not getting the freshest thing anymore?
+
+[00:09:43]
+You wouldn't know.
+>> Jem Young: And I will tell you more fun stories about dumb things I've done with the cache. Cuz we're gonna get a bit more in to caching, cuz it is a way of serving things very, very quickly if you do it right.
+>> Jem Young: I'm excited.
+>> Jem Young: So now, you should see, when you request something, let's try a longer URL.
+
+[00:10:07]
+
+>> Jem Young: This cat's behind
+>> Jem Young: Yeah, this is another example. Cats should be a bit faster now. There we go. Now, so as the demonstration of the power of headers, and this is a, I don't know, maybe a 10 megabyte file. Actually, it's probably like 20.
+>> Jem Young: It's pretty fast, but not fast enough.
+
+[00:10:30]
+That's eight, about eight milliseconds to load everything. It's pretty fast. But if we do it that, it's 200 milliseconds. Now, if you told me as an engineer, I can make your request cut down by 75%, I can make your site 75% faster, I'm all ears. That's great. That's the power of the expires headers.
+
+[00:10:49]
+We're gonna talk a bit more cuz we're gonna make an nginx cache. So rather than caching on the client side, we're gonna cache it on the server side.
+>> Jem Young: You should be excited. This is practical stuff that you can take home to your website today. And just by tweaking your headers just a little bit, you can make your site much more responsive to users.
+
+[00:11:13]
+
+>> Jem Young: All right, so you should see requests coming from memory cache, if you set your headers correctly, for all files that are under slash static. So we cached essentially on the client side. Well, we cached in a way. We just said hey, browser, use whatever you have already, don't make any new requests.
+
+[00:11:30]
+But what if that's not good enough? What if we want the browser to check every single time? But on the server side, we know that this request is particularly slow. We can cache it on that end, too. So we can make our slow file request much, much faster now.
+
+[00:11:42]
+Cuz right now, it takes about six seconds. That's how I configured it, it probably is. Let's take a look. Whoops.
+>> Jem Young: Up.
+>> Jem Young: And this is the repo that we're working in. So let's take a look at app js. Let's look in the server configuration a bit.
+>> Jem Young: And I'm using Express 3001.
+
+[00:12:14]
+
+>> Jem Young: Static, I'm just serving a static index. Send file. It's pretty static. Again, just sending the directory back down. Load, we're gonna play with in a minutes. Cats, we saw that. And slow file just says I'm putting a timeout around the response. So it's artificially slow. But let's just pretend it's a really long running database query, something like that, something that's computationally expensive.
+
+[00:12:36]
+So that's slow file.
+>> Jem Young: Actually, just give it a shot. So setting the expires header on slow file doesn't help because it still has to do some checking. At the root directory, it still has to check the server to say are you still around. Expires headers aren't the cure-all for everything.
+
+[00:12:59]
+It's still slow, even with our expires headers. So we're gonna implement caching on nginx side, so we can make even a slow query much, much faster.
+>> Jem Young: Everybody with me so far? Any question about caching? All right, let's make this fly.
+>> Speaker 3: I was just gonna ask is there anything I need to do, or I might have missed a step, to refresh the, to make it, the cached headers change?
+
+[00:13:23]
+I'm still getting max age zero for the cache control.
+>> Jem Young: Did you restart nginx?
+>> Speaker 3: Probably didn't.
+>> Jem Young: I do that all the time. Like why aren't you working, I know this is right. And it's just restarting nginx.
+>> Speaker 3: Is that the command, restart nginx?
+>> Jem Young: Sudo service nginx restart.
+
