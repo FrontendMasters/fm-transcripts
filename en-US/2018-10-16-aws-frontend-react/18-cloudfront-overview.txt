@@ -1,0 +1,87 @@
+[00:00:00]
+>> Steve Kinney: My superimportantwebsite.com is currently located in Virginia. We are currently in Minneapolis, that is not super far from Virginia, but there are places that are farther from Virginia. And so getting this website will take longer from England, it will take even longer from Melbourne, it'll take even longer from Mumbai, right?
+
+[00:00:22]
+The further you are from Virginia, the longer it will take. There's not only just physical distance, but it's not a straight line. It turns out that the Internet is in fact a series of tubes, right? [LAUGH] And you do need to go through all of those tubes and all the network stuff in the middle to get to the actual thing.
+
+[00:00:40]
+Yeah, and because of physics. One other thing I wanted to point out real quick is CloudFront is also good because when you make a network request, you go through the public tubes, right? You go through the Internet. CloudFront is also really useful for APIs and a whole bunch of other things, cuz Amazon has their own series of private tubes, right?
+
+[00:01:03]
+And once you've connected to CloudFront, if you're trying to get any other Amazon resource, it is faster for Amazon to go through its express lane to get stuff than it is to go through the public Internet. So you might choose to even put your APIs, which you don't really cache, right, behind CloudFront as well, cuz it's basically an express lane for doing that.
+
+[00:01:23]
+But we're focused on frontend apps today. So a way to solve the problem where an app is slower in Melbourne than it is in DC, is to just move the app closer to people, it's like an elegantly simple solution. Being far from a server makes it take longer, how do you solve this?
+
+[00:01:38]
+You move the servers closer to the people, right? And we did it, so our solution, cuz you could try and be really strategic, right? I've done metrics, I know that most of our users are in Germany, so I'm gonna get a data center in Berlin, neat. With CloudFront, you can just put it everywhere and you don't have to deal with that.
+
+[00:01:59]
+All right, so this, it's a little faded on the projector right now, this is a chart of all of the CloudFront edge nodes. So when I say everywhere, I don't really mean everywhere, I mean these places. In fact, the two in South Africa are new. I actually had to change the slide a few days ago because those were just added.
+
+[00:02:21]
+I'm gonna show you some matrix in a second, I actually had to update the matrix slides too because the response times was really slow when I first did all the metrics for a response time. And then, when I ran it again, because there's CloudFront nodes there now, it's fast, right?
+
+[00:02:38]
+So this graph is perpetually out of date, so if you're watching this later, there are probably more nodes. But there's a lot of them, there's one in Minneapolis, there's one in Denver, they're all over the place. Cool, so this is my S3 version of the site, as you can see, that was in Virginia.
+
+[00:03:00]
+And not so bad in the Eastern United States, but not even so great on the West Coast. Red definitely in Alaska, and then you can see, what is, I can't actually see what Denver is cuz it's covered by another one. But you can see what looks around Boston to be 14.3 milliseconds to get that first byte, is 250 in Southern Australia, right?
+
+[00:03:27]
+As well as South Africa, so on and so forth, right? So the further we get away, the worse it gets. So this is the same app. This is the app we're currently using, the previous version, right? So what happens when we move it to CloudFront and move it out to all those edge nodes, this is how the data changes, right.
+
+[00:03:51]
+You can see that now in western Austrailia it's 2.64 milli seconds, right. That is roughly, it wasn't even showing up on the previous one. But sometimes we're seeing it almost a hundred time improvement, right. Just simply by moving it closer to people, so I think this is super interesting and you can see, obviously you can run this test a few times.
+
+[00:04:12]
+You'll get slightly different numbers so I would pay more attention to the colors. But we can see we went from a lot of red as soon as we got far away from Virginia to pretty consistent green throughout the world, right? So very easy performance win that you don't need to do a lot of work for, right?
+
+[00:04:30]
+It's I would argue that there is no reason why you shouldn't be using a CDN. Other cool things is you get HTTP/2 out of the box. What is HTTP/2? It's the second version of HTTP, come on. Why is that important? So with HTTP/1 basically, you could make a single request and get a response back, right?
+
+[00:04:56]
+So okay, I wanna get this JavaScript file or this image asset, so on so forth, right? You'd request one, you get it back. Browsers cheat a little bit, they can open up up to six simultaneous connections to the same domain, right? Which is why an old tactic was to take your assets and spread them across many domains.
+
+[00:05:17]
+So browsers have a hack where they'll open up six connections at a time, and then people decided that to lay a hack on top of that hack. Where they would spread it out through multiple domains so they'd get another set of six, right? And then they reuse those connections, there's a whole bunch of trickery.
+
+[00:05:32]
+With HTTP/2, you can open up one persistent connection and it can basically send you pieces of all the files you want at the same time. The browser can get them all under a single connection, there's no more of this trickery and hackery. It's just basically, we're gonna stream you the JavaScript, the CSS, and all the stuff at the same time.
+
+[00:05:47]
+You get it all, put it all together and you're good to go, right? So by definition, HTTP/2 has wide browser support at this point and HTTP/1 is a fall back in CloudFront for those that don't that's why we kept that box checked. So you'll see a performance gain not just from moving it closer, but you'll also be able to get them those bits even faster as well.
+
+[00:06:11]
+There's a little bonus too which is remember, really early on in this workshop, I talked about how we pay for every request to S3. CloudFront caches this stuff at the edge nodes, right? Which means the first person to hit that South African edge node be, I don't know, I've never seen superimportantwebsite.com before, right?
+
+[00:06:34]
+So then it goes through Amazon's private tubes, right? And it finds that file, but then it caches it in South Africa. Which means that if a second person requests that file, we don't ask S3 for it again, right? Which means, you're now paying less to S3 because many fewer requests are actually going to S3, right?
+
+[00:06:56]
+And the requests to CloudFront are way cheaper, right? So it turns out you're getting a big performance gain, you're also saving some money, right? If you were hosting your own server, those are requests that are not going to that server at all. So if you're worried about being web scale, [LAUGH] it's easy, if the request never made it to your server, your server doesn't have to support nearly as many scaling issues.
+
+[00:07:20]
+So it's why it might make sense for certain things to even again, for more than just S3, CloudFront might be a really great choice worth looking into. At Sun Grid we have geopods which is effectively a reduced set of that for our back end services. We have a few mini data centers that do roughly the same thing, but we will likely switch to this as we move to AWS.
+
+[00:07:43]
+Cool, we talked a little bit about headers and the fact that by default they are ignored, right, and this is to improve caching. If you homogenized your requests, you can treat them the same, which means you can cache. The more headers you let through, the more different versions of that request there are, and so you could have to hit one of each one before you're cached.
+
+[00:08:07]
+However, there are the headers that you normally have, CloudFront adds a few, you just need to actually whitelist them. Before you saw the drop down, it was none and it improves caching, keep that one on, right? But CloudFront added some interesting ones that when we get to Lambda@Edge, you can kind of explore, that might be useful.
+
+[00:08:26]
+So these are the ones that it adds, I think there's one additional one which is what protocol, by the way HTTP or HTTPS. But it'll add the whether or not it's a desktop viewer, mobile viewer, the space on the user agent string. A smart TV viewer, a tablet viewer or from a particular country, all right?
+
+[00:08:43]
+CloudFront will let you say, no one from a given region, so you might be that's mean. But depending on if you are a media service, right, you might only have contracts with certain countries. One of the things I'm kind of interested in doing is trying to maybe when we fully support internationalization looking at the viewer country, trying to take a guess on which set of language is to load first in that case, right?
+
+[00:09:12]
+You should go by their client preferences in JavaScript cuz just cuz I am in Norway does not mean I a speak Norwegian, right? But in terms of which ones you might pre-load or something like that, being clever with that. These are ignored by default but you can add them to the whitelist, and when we get to Lambda@Edge, you would have them available to you.
+
+[00:09:32]
+One would argue if you do responsive design correctly, you don't need these, but yes, totally. But you could theoretically intercept requests for JPEGs and send smaller JPEGs to mobile devices, right? There's interesting things that you could do here. Probably all of them are somewhat a bad idea, right?
+
+[00:09:52]
+But again, falls under the, we're not gonna really cover it but I am going to expose this to you in case there is an interesting use case that you have. I don't wanna shadow it away.
+

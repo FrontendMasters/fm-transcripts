@@ -1,0 +1,172 @@
+[00:00:00]
+>> Steve Kinney: So the first thing I wanna talk about is fixing that routing issue that we've been having. First, we just blew up the page on a client-side route we didn't recognize. That wasn't great. Then, we set it so that, yeah, even if you get back a client-side route and it works, it's a 404.
+
+[00:00:20]
+That wasn't great. Then, we set it so, you know what? Everything's a 200. Also not great, right? All of these are varying degrees of sad. So, a lot of what we're gonna do, I haven't actually seen done a whole lot of places. And this, like most great technological decisions, this came out of me fighting with one of the architects.
+
+[00:00:44]
+Which is basically, he wanted us to use those, basically every client-side route starting with a hash, like hashbang, like Twitter did in 2012, 2014. Everybody's looking at me like, what are you talking about? Exactly, [LAUGH] nobody does that in 2018. We don't, we don't do that anymore. We have regular-looking routes and it's fine.
+
+[00:01:03]
+And he's like, well, those will technically be 200s from CloudFront and that means you're breaking the web. And I was not going to use hash-based routes. That was just not happening. So, a lot of this comes from basically me trying to figure out how not to have ugly URLs, while also appeasing.
+
+[00:01:20]
+As a front engineer I care very much about not breaking the web. And I had quietly just been breaking the web for the last year, and not talking about it. So, what we're going to do, is we're going to make a Lambda@Edge function. What this function's gonna do is, if it sees that it is a known good client-side route, right?
+
+[00:01:43]
+Then what we'll do, is we'll actually tell it to go get the index.html out of S3. So we will kind of white list URL's that we know are good. Now this is very easy to do with a simple application. It is a lot trickier to do when many URL's.
+
+[00:02:00]
+You do need some kind of manifest of declared good routes. Which is a little bit trickier but not un-doable. So we're gonna say hey, if you're looking for a known, good client-side route, we're gonna actually tell S3 to go get the index.html out of there instead. And then, we'll go back to treating actual 404s like 404s.
+
+[00:02:22]
+We'll still send them the index.html because we know react router is going to give them the correct, it's gonna give them a not found page. But at least it'll come back from the server as a 404. That way if the Google bot is crawling some bogus URL, it'll actually register as a 404, rather than a 200 that just happens to say not found on it, right?
+
+[00:02:44]
+This is probably an easy way to kind of get some SEO juice without having to do server side routing as well. I say that as somebody who does not know that much about SEO, because I work on an application that's not crawlable on the Internet, so don't take my word for that one.
+
+[00:02:59]
+All right, so, I mentioned before and I'll kinda just say it again, anything that is global for AWS is in us-east-1. So if you try to do what I'm about to do in a different region, we're gonna get to the point where it's like, and now we added Cloudfront, and you just won't see Cloudfront there.
+
+[00:03:21]
+So we do wanna make sure that we are doing this all on us-east-1.
+>> Steve Kinney: Let's see, I got, let's go to this one, and we're gonna go to Lambda.
+>> Steve Kinney: Cool, we'll go ahead and create our first function. We're gonna author from scratch. There's a bunch of blueprints here, I don't want to use any of them.
+
+[00:03:46]
+We'll call this one
+>> Steve Kinney: RedirectClientRoutes, obviously whatever you call it doesn't really matter. You can choose any of these languages you want. I'm gonna stick with the default which is Node 6. You can treat yourself to Node 8 if you want, but I don't know these other programming languages.
+
+[00:04:08]
+So that's, [LAUGH], my choices are relatively limited. We've talked a little bit about policies before. A role, again, is a set of policies that can be shared. So, we can call this one EdgeLambda.
+>> Steve Kinney: And there are some policy templates, depending on what you're doing. You might need to add more of these.
+
+[00:04:32]
+If you need to read from an S3 bucket, you're gonna need to give it read permissions. If you intend on hooking it up to an AWS IoT button, you have to give it those permissions. I am just going to use basic Lambda@Edge for a CloudFront trigger, cuz that is literally what I'm doing right now.
+
+[00:04:49]
+
+>> Steve Kinney: All right, so we'll go ahead and we'll hit Create Function
+>> Steve Kinney: Let it cook for a second there. The other kind of tasting note is, that when you have a regular Lambda you are able to have this idea of latest, which will just be whatever the latest code is to hit that Lambda.
+
+[00:05:12]
+With the CloudFront ones, you have to publish an actual version of it. Cuz again, it's not one Lambda sitting in one data center, it is one Lambda, distributed, right? So it can't really do latest, that's not really a thing. Because again, distributed systems are hard. Cool, so we have our Lambda function, and this is kind of what's in there by default.
+
+[00:05:38]
+That's not gonna really work for us. So what we wanna do is say, hey, we can now look at the requests, we can even modify the request object. We can also look at and modify the response, but only once we're in the response phase. This is actually, we're gonna get it before it gets to CloudFront and change what it's looking for.
+
+[00:05:59]
+So in those cases, this is gonna be a viewer request function, so we can't modify the response here, cuz there is no response yet. We can make one, but we'll get to that in a little bit. Cool, all right, so, the first thing I wanna do is I wanna get the request object.
+
+[00:06:16]
+And this is a little squirrely, so we're gonna say is, we know that notes/a number, or /notes/a number, is a valid route. So we´ll say cool, if.
+>> Steve Kinney: I'm gonna live code Regex, what could possibly go wrong here?
+>> Steve Kinney: This is also, if you don't want to type this, this is also in the setup guide.
+
+[00:06:54]
+Which, it was probably smarter than me trying to live code.
+>> Steve Kinney: So notes/a number.
+>> Steve Kinney: Cool, that should do the trick. We take that Regex, and we'll test it.
+>> Steve Kinney: Against the request URI. So, and that's test, not text. So, taking a Regex has a test method, which then takes a string and say, hey, does this string, which will be your request URI, match this Regex?
+
+[00:07:43]
+
+>> Steve Kinney: If so, let's change it to actually just look for index.html, right? Which is definitely not, since we're changing all of these client-side routes, they're gonna be cache hits. Cuz it's like, yeah, I know index.html, which means it'll be a legit 200. Which means that after we're done with this, we should be able to turn back on 404s as 404s, and our known client-side routes, assuming I didn't mess up this Regex, which is totally on the table as something that's gonna happen.
+
+[00:08:20]
+That those known client-side routes will get turned into index, which is totally valid, which will be a 200. And unknown garbage will be a S3 miss and will count as a real 404. So we can basically program our CDN to be smarter so that we don't have to do weird hacks to get stuff to work.
+
+[00:08:40]
+Cool, I'm gonna do a little console logging, like I said, in the event that I mess up. So I'll say before, and I'll log the request.uri. And I'll do a. Do after. And then, do you see that last option is callback? This does a very like Node style callback pattern, which is the error, which is null in this case, and then the request object.
+
+[00:09:19]
+You can also, if you want to actually move to sending a response back, you could actually pass in a response object as well here, and we will do that in a little bit. But right now we're just modifying requests.
+>> Speaker 2: Do you think that bottom one should be request.uri?
+
+[00:09:35]
+
+>> Steve Kinney: Yep, good catch. That was the other thing I was going to warn you about is that, having practiced this a bunch of times, I know that I will type request.url. That will not be the last time. This is a test, I'm testing all of you. Cool, we'll go ahead and we'll save that.
+
+[00:09:52]
+And then once it's saved, we actually have to go to Actions, and hit Publish new version. And you could give a description if you want. You can see how much confidence I have in my live Regex. Call it initial attempt. So now we're in version one. You can see that I can add triggers.
+
+[00:10:11]
+Again, if you don't see CloudFront, it's because you're not on us-east-1. We go down to CloudFront, and it'll say configuration required. And then if I click, it'll just give me those little arrows that showed up there for a second. Cool, you'll put in the CloudFront distribution you want to attach it to.
+
+[00:10:30]
+If you have a lot of these, you should go back to the CloudFront distribution and look at the one that you actually mean, right? Cuz trying to remember based on these very descriptive titles, not fun. Cool, and so we're gonna do this on Viewer request, and then we'll probably turn it on.
+
+[00:10:51]
+
+>> Steve Kinney: And we'll hit Save.
+>> Steve Kinney: So now we have this new client-side route viewer request. So we'll now change it as it comes in.
+>> Steve Kinney: Let's go to Chrome where I've got
+>> Steve Kinney: We'll open up the dev tools, we'll go to network. All right, we've made an error.
+
+[00:11:25]
+Now we'll play the game. Of hunt down the logs, figure out what the issue was. Now, my lucky guess is that they will be in us-east-2.
+>> Steve Kinney: So we can go here to Logs. And right now I'm in North Virginia, so you know I can't, there is nothing in this one, let's go to Ohio.
+
+[00:12:00]
+Hey, there they are. There's my Lambda function.
+>> Steve Kinney: You can see it's getting the bundle.
+>> Steve Kinney: There's the before and after.
+>> Steve Kinney: For those two, but I don't really have anything just yet in here. So that's not super helpful.
+>> Steve Kinney: Let's look at qualifiers, we'll go to Version, and then we'll go to 1.
+
+[00:13:02]
+I'm gonna take a look at the code real quick, see if I can see it.
+>> Steve Kinney: So one of the things we can do, if we're trying to debug this, is we can test it. Now, we hit this Test button. It's a little tricky because that's not my object.
+
+[00:13:26]
+If we go to the, one of the things that Amazon has done for us though, is they have a Lambda Edge event structure. And so this is roughly what a request object looks like. And this is roughly, there's a response object, I believe down below. Right, what a response object looks like, and all the things in it.
+
+[00:13:48]
+The thing is, you get a lot of information out of this. So what I'm gonna do real quick, is I'm gonna grab the request object.
+>> Steve Kinney: And now there are things about this I'll need to change, like the URI, for instance, will not be what I initially wanted.
+
+[00:14:09]
+But let's go ahead and give it a shot.
+>> Steve Kinney: So under the.
+>> Steve Kinney: Let's change this to.
+>> Steve Kinney: It looks like it is working.
+>> Steve Kinney: I think I see the problem. That needs to be /index.html.
+>> Steve Kinney: So, what I'm gonna do is, in version 1, I'm gonna take this one off and save it.
+
+[00:15:10]
+Let me, zoom in's all weird.
+>> Steve Kinney: And so the issue was I forgot a prefixed slash, right? So it's just going to index.html, when it is /index.html. So we'll go ahead and we'll change that. We'll go to Latest, you can only edit Latest. So it's a little tricky.
+
+[00:15:28]
+With a regular Lambda1, you can edit it and the events will flow through. Because these are distributed, you can only deploy a published version, and you can only edit Latest. So there is my amazing change. And what I'll do is, I will publish a new version.
+>> Steve Kinney: We'll go to version 2.
+
+[00:15:54]
+We'll set up CloudFront.
+>> Steve Kinney: We'll set it on the Viewer request.
+>> Steve Kinney: Enable it.
+>> Steve Kinney: And save it. Now, CloudFront and Lambda@Edge will only let you have one viewer request function. So if you have another one somewhere, you basically need to have one Lambda that will handle all of them.
+
+[00:16:20]
+But we only have one so far. Cool, and so you can see that our website is back, and we got a 200. Now if we add a whole bunch of 0s here, or zeroes in this case. It might take a while to distribute.
+>> Steve Kinney: We actually, we missed a step.
+
+[00:16:58]
+We had, the two things that we had to do if we go back to the slides, is do our awesome change, and then put CloudFront back. So if you don't do one of the two steps it doesn't work. Unless.
+>> Steve Kinney: Cool, we'll go here, change our Error Pages.
+
+[00:17:26]
+We'll edit it back to 404s.
+>> Steve Kinney: Sweet.
+>> Steve Kinney: I'm gonna fix this one as well.
+>> Steve Kinney: All right that will put my CloudFront distributions back into In progress. But we're gonna take it for a spin regardless, and if we need to give it a second or two then we'll do that.
+
+[00:17:52]
+But before we.
+>> Steve Kinney: That was pretty quick actually. Notes, or notes, like that melodramatic Darth Vader at the end of Episode III, is a 404. Someone got that.
+>> Steve Kinney: Well, notes.
+>> Steve Kinney: Is a 200. So we have fixed the client-side routing problem. That most people that have client-side apps that don't have server site rendering, just get hand wavy about.
+
+[00:18:28]
+Either you had to treat valid URLs as 404s, or you had to treat invalid URLs as 200s. And we've just been living like this. Like animals, honestly, for however many years that we've had fancy client-side routers. I mean, who amongst us hasn't?
+

@@ -1,0 +1,113 @@
+[00:00:00]
+>> Steve Kinney: So we have all of that in place, and we can see that we're now earning an A+. I had one little thing that I had to fix, and I'm not sure if it was a mistake I made when I set up, or something that I messed up along the way.
+
+[00:00:15]
+You may or may not have had this, where it was the /note/1 was a valid 200, but I was getting a 404 on the root. So I just handled that relatively easily by making that okay as well. So again, we can program everything along the request and the response.
+
+[00:00:38]
+Let's try one more, which is, one of the things that we, a lot of times, do with a server is redirects. Right, this is, again, we're talking about maybe, if they haven't logged in, redirecting them to the login page. The problem we have right now is, we've been able to serve different content, we've been able to change status codes.
+
+[00:00:55]
+Right, we've been able to show a different picture of Prince. But with a redirect, you don't wanna say, hey, you're at notes, four, five, six, when you're not actually logged in. We wanna actually change the URL, right, and that's a 302, and we need some other things in there as well.
+
+[00:01:10]
+So you kind of, last thing that we're gonna try out is, we're gonna go ahead and,
+>> Steve Kinney: We'll go ahead and basically make a redirect, right, and this'll happen on origin request. So as we go in, we leave CloudFront, we hit the cache. We're about to go to S3, rather, right, hey, if we see this is a URL, we can actually just generate the response from there.
+
+[00:01:39]
+And that'll get cached on the way out. So we'll make one more function together.
+>> Steve Kinney: We'll call it,
+>> Steve Kinney: I'm feeling less inventive with names all of a sudden, call it Redirect.
+>> Steve Kinney: And we'll go ahead,
+>> Steve Kinney: We'll grab our request object this time.
+>> Steve Kinney: So if you see me, no, yeah, this'll be the request.
+
+[00:02:13]
+Right, I'm gonna take the request, I'm gonna make a response. Now since this involves both a request and a response, you know that the chances of me typing the wrong one are pretty high. So this is basically a late afternoon way to see if everyone's paying attention, so we'll try it out.
+
+[00:02:33]
+
+>> Steve Kinney: We'll get, and again, if we looked in the Amazon docs for what the shape of these look like. If you ever forget, you can just look at the shape of the object and traverse to find what you need as well. But if you do it enough times, you just start remembering it, famous last words.
+
+[00:02:52]
+
+>> Steve Kinney: Cool, and then we can basically make our own response.
+>> Steve Kinney: And we'll say that the status, the status is actually the only required property on a response object.
+>> Steve Kinney: Say statusDescription: 'Found', and we'll give it some headers.
+>> Steve Kinney: I could probably clean that up slightly.
+>> Steve Kinney: This is gonna be our custom response, maybe I'll even spell response correctly.
+
+[00:03:42]
+
+>> Steve Kinney: Cool, and we'll say that the key is Location, and the value is,
+>> Steve Kinney: Very-secret. So just take them to wherever this really legit URL is. So we've got this response object, and we'll say if,
+>> Steve Kinney: request.uri,
+>> Steve Kinney: Is /secret, we will simply.
+>> Steve Kinney: With our response. Otherwise,
+
+[00:04:39]
+
+>> Steve Kinney: We'll pass the request along to S3. Right, so if it's this one that we're looking for, cool, we have a response ready to go for you, it's 302 and it's redirecting you. If not, we'll just keep passing that request along. You might be asking, how does AWS slam.edge tell the difference between a request and response, I have no idea, so.
+
+[00:05:06]
+
+>> Steve Kinney: Cool, and so we'll go ahead we'll and publish a new version.
+>> Steve Kinney: Initial version.
+>> Steve Kinney: And we'll grab that first version there. Add CloudFront, we'll do this at origin request.
+>> Steve Kinney: It should work out of the box, I am just gonna do an invalidation though, for funsies.
+
+[00:05:42]
+
+>> Steve Kinney: All right, let's see if CloudFront has distributed that yet. So if we go to notes, you should be at notes. If we go to Secret,
+>> Steve Kinney: Let's go ahead and turn my volume off.
+>> Steve Kinney: Apropos of nothing.
+>> Steve Kinney: Nope, not yet, hasn't distributed just yet, so we'll give it a few seconds.
+
+[00:06:11]
+Another thing, anything you console log will be put into CloudWatch. So if you wanna see if it's hitting at all, I probably could have afforded a console log in there. If it doesn't work in a few seconds, we'll go ahead and give it another shot.
+>> Speaker 2: Is there a way to automate deploys for after it's distributed?
+
+[00:06:33]
+Do you get a notification anywhere that it's been distributed?
+>> Steve Kinney: No, right, and so this is actually one of the problems we're trying to deal with. Cuz our staging enviorment is exactly the same as our production environment cuz it should be. Right, and so what happens if one of my queues deploys the new version of the app, and they see the same old bug?
+
+[00:06:58]
+Does that mean it didn't get fixed or that they were too fast, right? So that is unfortunately, now, one thing we can do for staging is to simply not deploy to CloudFront, or let everything pass through and not cache anything. So on and so forth, right, that would all theoretically work.
+
+[00:07:15]
+Except the fact that I just had the idea just now talking to you. So now it'll either have been magically deployed, or at least we should be getting consoles, so we can debug it.
+
+[00:07:27]
+>> [MUSIC]
+
+[00:07:30]
+>> Steve Kinney: It works, so if they go [LAUGH] to superimportantwebsite.com/secret, they will get Rickrolled, right, cuz we modified the requests. Apparently I was just impatient, it likely worked the first time. Cuz all I did was add console logs, and to my knowledge, console logs don't make code better. [LAUGH] Agree to disagree, [LAUGH] console logs make code great.
+
+[00:07:58]
+But yeah, so now we're able to do a lot server stuff. And again, we just kind of took three different angles, we looked at a viewer request, an origin request, and a viewer response. And we tried to solve things that, no, I would totally need a server now.
+
+[00:08:13]
+And we realized that we can program our CDN. Right, we can do a lot of these things at the CloudFront level, and this will be closer to the user as well. Right, that means, for the viewer request, we'll cache that, right, we're not going all the way to a single server.
+
+[00:08:27]
+We don't have to deploy this server around the world, right, it's already deployed everywhere. So when we modify that request, we do that at the edge node. And if CloudFront has that where we change the request to, for the notes for index.html, it's not gonna go to S3.
+
+[00:08:42]
+Right, they get that back immediately, so then we cache that 302 redirect, with the viewer responses potentially already coming from cache already. So we've just moved our entire client-side application closer to our users.
+>> Steve Kinney: So, if you think about it, all the problems we had with our initial deploy are gone.
+
+[00:09:08]
+The URL is wonderful, client-side routing works as it should. Right, what we think are valid routes count as 200s, and invalid routes count as 404s. We have a CICD pipeline so that basically, any time we write code and we push it out, we know it's going there as long as the tests pass.
+
+[00:09:28]
+And finally, it's hosted around the world. So we've solved, we've built ourselves, honestly, a world class infrastructure, for the smallest personal site to the largest client-side application. Right, so some additional things that you can do with Lambda Edge. And we talked a little bit about A/B testing, we did a little URL redirection as well, header normalization, we talked about.
+
+[00:09:52]
+Because if you do decide you care about certain headers with query strings, you can at least cut down on cache misses by making them all the same case, or format a theme different ways, so on and so forth. Redirecting unauthenticated users, right, you can do a lot of interesting things to save you, depends on your use case.
+
+[00:10:10]
+For us, I know that we don't check to see if they're logged in until our giant client side app has been loaded and parsed. That stinks, so the experience right now that we're trying to fix is, you go in, our cookies last for 24 hours. So you go and refresh your browser when you come into work the next day.
+
+[00:10:27]
+You see the UI for a second, [LAUGH] and then you get kicked back. I would love to rid of that experience, right, and so there's an opportunity to us do that as we rework a lot of our infrastructure.
+

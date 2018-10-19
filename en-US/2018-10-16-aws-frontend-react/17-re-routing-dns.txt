@@ -1,0 +1,92 @@
+[00:00:00]
+>> Steve Kinney: All right, so CloudFront.
+>> Steve Kinney: All right, so, if you've never used CloudFront before, this is what you should see. Which is this blue button here saying Create a Distribution. Distribution is basically in the same way you have an S3 bucket, you have a CloudFront distribution. All right, you have two options.
+
+[00:00:22]
+You have RTMP, which is for real time media, and you have Web. You wanna take a lucky guess which one we're gonna pick?
+>> Steve Kinney: You could have all trolled me and yelled out RTMP, but yeah, we're definitely gonna pick Web. All right, so we have some options. So it is very tempting to click one of these.
+
+[00:00:45]
+CloudFront can be used as three buckets. If you, right now have your static SS on some other server, you can put CloudFront in front of that as well, and it will do the same thing. So we're actually going to treat our S3 website as the actual website. So we're not gonna pick one of these, even though from a US perspective, it is very tempting.
+
+[00:01:09]
+And then you do it thinking it's the same thing, and then 40 minutes later you're wondering why your CloudFront distribution doesn't work. So we'll actually get the full version of this.
+>> Steve Kinney: And we'll paste that in. And you can see that Amazon clearly knows roughly what that is because it was able to fill in the origin ID for us.
+
+[00:01:34]
+
+>> Speaker 2: Where do you get that from?
+>> Steve Kinney: This is the full S3 one, I went to my browser history to get it, but if you just go into the Static Web Hosting option, in Properties, in your bucket, you could also get that URL as well. But spoiler alert, it's the name of your bucket.s3-website-theregion.amazonaws.com.
+
+[00:01:54]
+Cuz we can all remember that, right? [LAUGH] Hence I went to my browser history and found it. All right, so we have a viewer protocol policy. I'm gonna say, hey, anytime they even try to get HTTP redirect them to HTTPS. It is a static website, so we're only allowed GET and HEAD.
+
+[00:02:15]
+You can put CloudFront in front of an API even and be able to actually intercept post requests and stuff along those lines as well. We don't need any of that. Moving along, there's some stuff about cache headers here and which ones you want to let through. See, right now we're gonna have CloudFront ignore all headers, right?
+
+[00:02:39]
+If it ignores all of them, it can treat all GET requests the same, which means caching. Anytime someone asks for a given resource, it'll cache it. If you have stuff where you do care about one of the headers, you can whitelist just the ones you care about, right?
+
+[00:02:53]
+Because if you care about every single permutation of headers, right, then CloudFront will only be able to cache on that permutation of headers. If it ignores all of them, right, your caching is better. So my piece of advice, never pick all. [LAUGH] Pick none for as long as you can get away with it until you have a particular use case where you need to whitelist a header, right?
+
+[00:03:21]
+And there are some, right? Even CloudFront provides some reasons, but if you needed some, like an auth token. Okay, cool, that might be a good reason and we'll see some other ones that CloudFront inserts in as well that you might care about. But generally speaking, in our production app, we currently have none, because our API is a different end point.
+
+[00:03:41]
+So this is solely for our client-side assets. So I don't care what the headers are. I just basically want you to cache the strongest caching I can get my hands on. You have a minimum time to live, maximum which is this is a day. I think that's a year.
+
+[00:03:57]
+Don't quote me. Which is just how long that will stay in cache by default. And it'll be somewhere in between these two numbers if the minimum goes higher than the default, then the default is the new minimum. But why would you do that? Again these, turn them on if you need them, leave them off unless you have a good reason.
+
+[00:04:18]
+Again, okay, send all the cookies through. Now each cookie is going to be its own cache hit or miss, versus treating them all the same. At which point you would get better caching. The less unique you can make every request, the more generic they all are, the easier it is to cache them.
+
+[00:04:35]
+Same thing as query strings. This will just basically ignore query strings. If you use query strings for something in your application, go ahead and turn it on. But wait until you have the reason before you turn these things on. I'm basically only exploring this, I'm gonna put into your brain that they exist.
+
+[00:04:52]
+[LAUGH] And so, when you go where are my query strings? Hopefully, you remember this moment where I told you leave it off and then you can go turn it on but leave it off unless you have a good reason. All right, so remember I told you we're gonna G zip our assets?
+
+[00:05:07]
+Boom, we're done. We're now G zipping assets. Compress objects automatically? Yes. Lambda, we will get to in a little bit. This is important. I may or may not have lost 30 minutes of my life earlier this week when I mistyped the domain names in here, right? That way somebody else can't just wrap your thing, right?
+
+[00:05:34]
+So here we'll do superimportantwebsite. Your domain for your case. And we will do www.superimportantwebsite. Is someone making sure I didn't make a typo? Cool, if you didn't buy a domain, you don't put anything in there and you leave this option. Which is they have a cert for *.cloudfront.net.
+
+[00:05:58]
+So you will get a very glamorous URL at one point, which would be like d42ho7ntw.cloudfront.net that you can share with all of your friends and family. But we're also, we just did all that work to get superimportantwebsite.com, we're gonna wanna keep that. But we would need an SSL cert, but we made one and there it is.
+
+[00:06:25]
+So now when we hook this up, when we hook the DNS up to CloudFront, it will be HTTPS out of the box. Now they try to go to HTTP, remember we said hey, redirect them to HTTPS right? We will be secure out of the box. Everything else we're gonna pretty much leave as defaults.
+
+[00:06:45]
+We're gonna support HTTP 2 because HTTP 2 is great for reasons that I will explain in a second. And then the default root object will be index.html. So, they just go to superimportantwebsite.com, we want to show them index.html. And you can do all this and you can switch it to Disabled, which defeats the purpose, so just leave that as Enabled.
+
+[00:07:07]
+I actually don't know what Comment does. [LAUGH] Just fun facts that you can, I guess, have in there. Cool, and we will create a distribution. We're gonna do one other thing because DNS also takes time. We will also update our DNS records and hopefully, that will catch up with us.
+
+[00:07:25]
+So I told you that you would get a very aesthetically pleasing domain name. This will not be anything yet, .cloudfront.net, right? That is currently our beautiful CloudFront distribution. If you thought that S3 one was bad, this is worst. So let's go ahead, let's go back to route 53 and we will solve for that.
+
+[00:07:50]
+You can also see that the status right now is in progress. You know that it is globally distributed when it's complete. But sometimes you can jump the gun and get it a little bit early. In fact, out of pure curiosity. No, not yet.
+>> Steve Kinney: All right, I'm just gonna grab this officially, just to make sure that I didn't make a typo or miss a letter.
+
+[00:08:20]
+I'll grab that domain name. And we will go back to route.
+>> Steve Kinney: I love that one of the Google autocompletes was router login. [LAUGH] We're gonna change these.
+>> Steve Kinney: And we will swap it out.
+>> Steve Kinney: So it is an autocomplete there which if you don't see it in the autocomplete, don't worry about it.
+
+[00:08:49]
+In my experience, it takes time for the CloudFront distributions to end up in that autocomplete. That's why I copy and pasted it. I was shocked to find it there. Of all the times I've done it, this is the first time that I have seen my CloudFront distribution in there.
+
+[00:09:13]
+
+>> Steve Kinney: So eventually, I see it the next day but I've never seen it the first time. So if you don't see it, you have not done anything wrong. I was just surprised by something worked the first time out of the box.
+>> Steve Kinney: So we'll save both and all of that will take some time to propagate.
+
+[00:09:32]
+So in the meantime, we've set up CloudFront without actually talking about why CloudFront is great, even though we accidentally discovered some of those things.
+

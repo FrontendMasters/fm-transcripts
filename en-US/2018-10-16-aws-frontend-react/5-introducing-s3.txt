@@ -1,0 +1,78 @@
+[00:00:03]
+>> Steve Kinney: All right, let's talk a little bit about S3. First of all, this is the logo for S3, I'm glad we covered that. What does S3 stand for? It stands for Simple Storage Service. Along with EC2 this was one of the first services offered by Amazon Web Services.
+
+[00:00:20]
+Now we saw that like really overwhelming drop down, once upon a time there was just like one or two. So, what is S3 at a very high level? We have these things called S3 buckets and you can put objects into buckets and so we're gonna create one. We might create one for every site that we want to deploy, right?
+
+[00:00:39]
+Essentially we have a bucket for staging, we have a bucket for production, we have a bucket for end to end. So we might deploy the same application into each one of those environments so they're each configured a little bit differently. In this case, we're just gonna setup a production bucket.
+
+[00:00:53]
+One of the things that I aspire to do is basically create buckets on every poll request so we can have any given branch can have a testable version of the application, but we are not totally there yet. So we put objects into buckets, we can read files from buckets, and we can host web pages out of buckets, which is kinda what we're going to be doing today.
+
+[00:01:14]
+So, why is S3 awesome? One it is infinitely scalable, right? You don't have to worry, especially where deploying static assets, we don't have to worry about being on the front page of hacker news or like identifiable or something like that or getting taken down, right? It will scale along with anything that we can throw at it.
+
+[00:01:32]
+Files can be as small as zero bytes or as large as five terabytes. Well, there's a joke in here somewhere about client-side frameworks growing bigger and bigger. Ours are now gonna be five terabytes be significantly smaller than that. And the kind of really interesting things, is out of the box if you get the standard tier of S3 bucket, the durability is I believe is 11 nines, right?
+
+[00:01:58]
+So generally speaking, the files you put there are gonna be there. Availability is only four nines. Things can happen where a given region, so really quick regions in AWS, there are multiple data centers. You choose which one you wanna put your assets into. If you are really paranoid is not the right word, professional, how about that?
+
+[00:02:23]
+You might setup all of your services, even your back-end services in multiple regions, cuz if a region goes down, and all of your stuff was in one region, you've gone down. I think US East 1, which is the one we're gonna be using for most of the day, had an outage about a year ago.
+
+[00:02:40]
+The nice part is, like yes, your website will go down if AWS goes down in that region. Luckily, so will like most of the Internet. So, you'll be in good company, but a certain point deploying to multiple regions makes sense if you have a certain SLA with your customers, or something along those lines.
+
+[00:02:57]
+So it's not great for instance, all of our back-end services are multi-region or aspire to be multi-region, because that stuff is like databases and stuff like that. For us, CloudFront is actually distributed around the world. That's what makes it a CDN. So for the most part anything that was a cache hit would still work and at that point we can always, we deploy to a second bucket and we actually just switch to the DNS.
+
+[00:03:23]
+We don't worry about it so much, but it's definitely something to think about. Which is that the three nines of availability is a lot less then the eleven nines of durability. That's some math lessons for you all. Cool, and S3 has a lot of features. Many of them we don't need for deploying client side applications, right?
+
+[00:03:43]
+Yes, we're gonna put our static assets up there. Other use cases for S3 would be like, hosting, if you had like an image hosting website, you would probably put those images, right? When we send what we have, when somebody uploads an image to our marketing campaign editor, we put that file on S3 so that when they send the email, it's on the Internet.
+
+[00:04:02]
+Otherwise it'd just be a little broken image, and that would be sad. And so there's stuff like life cycle management, stuff coming into the bucket, out of the bucket. Versioning you can turn on for an extra cost, encryption, additional security. Most of those will cost you some amount of extra money.
+
+[00:04:18]
+We don't necessarily need those for what we're doing today. There's also different kinds of buckets, standard, which is what we're gonna use. And then effectively like cheaper versions, right? So infrequently accessed, let's say you were like building big CSV reports for like, let's say a medical company, insurance company, right?
+
+[00:04:39]
+Those might not be accessed all that often, right? And so we can kind of put it on the back shelves up high. It might take a little longer to get, but you pay a lot less especially if these are large files and then you, for that, yeah. It takes little longer to get it, but if this a CSV, it's only accessed once every like six months, that's fine, right?
+
+[00:04:59]
+It's not like a high frequency file. So this would be terrible for your client side application because ideally that is very frequently accessed, every time somebody visits your page. Reduced redundancy, this is good for anything you could afford to lose. Remember those eleven nines of durability? This is less than that and so an example, let's say you had a meme generator that you could generate the images programatically, right?
+
+[00:05:26]
+So that if you lost an image you could regenerate it. That would be a good use case for reduced redundancy. Again, we don't wanna be in the position where our client-side app went away. Yes, we could probably regenerate it, but I suffer pager duty, I don't enjoy getting paged in the middle of the night.
+
+[00:05:44]
+We have had fun things where someone set bucket settings to delete files, and so one night, our client-side application was gone. Because somebody, years before I started working there, had set what they thought was a really generous amount of time for a file to sit on the server.
+
+[00:06:02]
+And we were all surprised at the same. Glacier technically isn't S3 but it's basically it's very cheap. It's even less than infrequently access. This is like almost never accessed, right? Basically you can put in think of it as like cold storage. It is timely and expensive to get that data like out of glacier.
+
+[00:06:25]
+But you can like store lots of back up in there, right? We're sticking predominantly with the standard tier. So, S3 when we have buckets and when you put files in buckets it's easy to think about it as like a file system. Right, it'll even show you fake directories if you do that.
+
+[00:06:43]
+But effectively it is a single key value store. So that whole folder structure is the key and the value is the actual file itself that you uploaded, right? Cool, and a few things. I have never gotten bitten by this, but just in case you do get bitten by it this is a public service announcement.
+
+[00:07:01]
+Which is when you put a brand new object into S3, it is immediately available. It all happens through the API, you get back a 200, that file is there. Updating, which means if you replace an object with a newer version or removing object, this is eventually consistent, right?
+
+[00:07:20]
+In order to have that durability they're putting that file a lot of places. You might get back an old version, I say might. This is actually, I never had a deploy where we went to go check on it. And we had the old version of the app, and were confused for a second.
+
+[00:07:36]
+I have never personally experienced this, but if it ever happens to you, remember this moment, that it's not necessarily weird. It's part of what you were promised, but you may never see that or have to deal with that. Cool, uploading to S3 is free, so putting the files on to S3.
+
+[00:07:56]
+Is, they'll let you put anything, you upload stuff, yeah, letting it all in. You get charged for storing it there, which makes sense and then you get charged for requests. So, for instance, we know that S3 is infinitely scalable, but that doesn't mean it's free to do that.
+
+[00:08:14]
+That said, we're going to learn how to mitigate that, all right? Which is if we cache stuff then we don't have to necessarily hit the S3 bucket every time cuz especially the files haven't changed. So, that last one we will deal with in a little bit.
+

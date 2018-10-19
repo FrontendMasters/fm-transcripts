@@ -1,0 +1,95 @@
+[00:00:02]
+>> Steve Kinney: We've set up a CI/CD pipeline, we put our application on the Internet, globally distributed it, so on and so forth, right? Now we get to kind of the bonus round of all of this, right? Which is beginning to figure out, there's usually a point in time where you can serve just Static assets.
+
+[00:00:18]
+But all of a sudden you get to a point where, do I need to put a server in front of that to do URL rewriting or any kind of logic, right? It seems heavy to have to set up a node server or some other application server in front of that.
+
+[00:00:31]
+It also adds a decent amount of complexity that we might not really want. So a few years ago Amazon came out with AWS Lambda, and AWS Lambda is basically server less. By server less, I mean, somebody else's server, functions that you just pay on execution, right? So every time a certain event happens, this function fires and it can do stuff, right?
+
+[00:00:57]
+And those are really cool, and again, Frontend Masters has a whole course on AWS Lambda. That you should totally check out if you're interested on the server side implications. For this course, I am only concerned with how it fits into our current deployment layout. And so on top of Lambda there is also Lambda@Edge.
+
+[00:01:22]
+The major difference is your AWS Lambda functions exist in one of the data centers in one of the regions somewhere. So if you deploy it to US East 1, it's in Virginia, US West 2 is I think in Oregon. And I'm not going to play a game where I try to guess where all the regions are based out of, but you get the idea.
+
+[00:01:42]
+And you can even just do the multi-region if you want. But generally speaking, you deploy a Lambda function to a region that acts almost like a server. It can be with an API gateway, so on and so forth. There's also Lambda@Edge, which is a very similar concept to Lambda.
+
+[00:01:59]
+It's the same idea as Lambda, except that you can do it at each one of those Edge nodes that CloudFront provides. So all, over 100 plus Edge nodes can actually run a certain amount of code. And so you're like, well, why would I do regular Lambda if I could do Lambda@Edge?
+
+[00:02:17]
+I mean, there's a few reasons, right? One is that the Edge ones are much more limited than the ones that are in a data center for obvious reasons. There are hundreds of locations. When you're doing a regular AWS Lambda function, I think you have, your Lambda can take up to five minutes of time, right?
+
+[00:02:34]
+On a Lambda@Edge, depending on which one. And we'll talk about the different kinds in a second, gets between five seconds and 30 seconds, right? So that is way less, you get less memory, so on and so forth. We're going to use, if it's mostly like server side stuff, you'd probably want a regular Lambda.
+
+[00:02:52]
+Lambda@Edge is really useful when it comes down to taking any of the, coming into CloudFront. Any of the requests and responses that we're getting back and the client's interaction with our Static assets, right? If we need to do anything along the way, right? So if you're modifying requests and responses Lambda@Edge is a really good choice.
+
+[00:03:11]
+Because now you can deploy this all around the world and be able to solve a whole bunch of problems. And we're going to solve a few of them together today, but first let's look at exactly what Lambda@Edge is. So Lambda@Edge allows you to put Lambda functions at one of four locations.
+
+[00:03:26]
+Viewer request, origin request, origin response, viewer response. We're going to go over each of these in a little more detail in a moment, but let's just to do a high level first. Viewer request is from, it's basically the Lambda in between the user's browser before it hits CloudFront, right?
+
+[00:03:46]
+So it gives you an opportunity to modify stuff there. Now, if CloudFront has it in cache, it just ends up being a viewer response, right? That's leaving CloudFront and going back to the browser, right? Because we said the first time it gets a request, it goes all the way back to S3.
+
+[00:04:05]
+Which is our origin in this case, does everything, and sends it back. On repeat requests, it will actually go ahead and it will just immediately send it back because it has it in cache. So viewer request is browser to CloudFront, origin request is CloudFront to S3. Going the opposite direction origin responses, S3 back to CloudFront, and viewer response is CloudFront back to the user.
+
+[00:04:34]
+So let's take a look at what each one of those means in a little more depth, right? A viewer request is executed on every request before CloudFront even checks its cache, right? This could be used full for normalizing, right? We talked about like we wanted to ignore headers, right?
+
+[00:04:53]
+But if we need a given header we might want to put a Lambda to at least like normalize all those. So make them all lowercase, make them all capital. Don't have this thing where it's like, okay, I've got one header that's capitalized, and one that's not well those are different head, no.
+
+[00:05:06]
+Right? It's great for normalizing query strings, headers and stuff along those lines. Right now our current application, it's a react application and what happens is, we send you the application. It loads up, then it checks to see if you're logged in and kicks you back into the login page.
+
+[00:05:22]
+One of the things that I want to implement eventually is just checking if they do have an off cookie.
+>> Steve Kinney: On your way in, if not, we'll redirect you before we send you the entire payload. Wait for it to get parsed by the browser, all those kind of things.
+
+[00:05:35]
+It needs to make additional network calls, or if you need to generate responses, this is before it hits CloudFront. So none of these would be cached in this case. So if it hits CloudFront and CloudFront's like, I don't have this in cache, I need to go back to the origin, right?
+
+[00:05:49]
+We have another place where we can drop in a Lambda at the origin request. So when there's a cache miss, before we go to S3. The viewer request gets about five seconds to execute, the origin request gets a luxurious 30 seconds to execute, right? Not a regular Lambda's five minutes by any stretch of the imagination, but a little bit more time.
+
+[00:06:10]
+It can make external network calls. So if you want to even like go get something from a different bucket based on some conditions, so on and so forth, that's cool. Like I said, dynamically set in origin, so this is good for like if you want to A, B, test so on and so forth.
+
+[00:06:25]
+It can rewrite the URLs, and other cool stuff like that. Once we've hit S3 and we've either found it in S3 or not, it hasn't been cached yet so we can change stuff. So this is again how to go to S3 for these to get called. This can make more external calls, it can modify response headers prior to caching.
+
+[00:06:45]
+The second it gets back to CloudFront, CloudFront's going to be like, this is what I do when I get this kind of request. So this is an opportunity to change the response, right? It basically gives you pragmatic access to modify stuff as it enters CloudFront and leaves CloudFront.
+
+[00:07:01]
+Which is kind of cool, it means that your CDN is now programmable. It's not just like, my assets are there, and they're distributed, neat, you can actually do stuff with it. Finally, the viewer response, this is always executed, right? Because we are always gonna at least have the viewer request and then viewer response.
+
+[00:07:19]
+It's only if we have a cache or miss that we go all the way back to the origin. So it's executed on all requests after response is received from the origin or cache. We can modify the header's outcaching the result that you can make for more external network calls.
+
+[00:07:31]
+There is one drawback that, again, this is one of those things that's like, let me make this point now and put it into your brain. Because you will get tripped up by it eventually. Amazon has a lot of things that start with the word Cloud, they have CloudFront, as we saw.
+
+[00:07:51]
+There is CloudFormation, which is, again, the ability to write down your entire infrastructure as code. And then say, okay, I need a CloudFront distribution, S3 bucket, so on and so forth, and it will provision all of that for you. There's also CloudWatch, and there's probably two or three other things that start with the word Cloud, to be honest with you.
+
+[00:08:10]
+CloudWatch is their logging service, it collects a bunch of logs. Now, CloudWatch has regions, right? So if you set a regular Lambda function in US West 1, what region do you think you should be on to read the logs? US West 1, right? Makes sense, what happens if your application is distributed around the world?
+
+[00:08:40]
+
+>> Steve Kinney: They're not all going to be in the same region. So the tricky part, especially as you're trying to debug, is you kind of have to take a lucky guess what the closest region to you is. And that's where you have to go look for the logs, right?
+
+[00:08:55]
+And now, if you are in Northern Virginia, probably pretty easy. But as you get further from one of the actual region's locations, it becomes a little bit more guesswork. Particularly if you live in Denver, Colorado, or sometimes, like this week, my logs were in US East 2, which is Ohio.
+
+[00:09:14]
+Definitely a month ago they were totally in California [LAUGH], so that is a thing that I'm going to warn you of now. Like, is it that your thing isn't providing any logs, or are you not looking in the right place for your logs? These, again, distributed systems are hard, this is all cool, but there are some drawbacks in this case.
+

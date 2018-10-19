@@ -1,0 +1,69 @@
+[00:00:02]
+>> Steve Kinney: This is a course on deploying like rich client-side applications on AWS. And this starts from like how we did it at SendGrid. So, I'll tell you a little bit about the problem that we had. And then I'll tell you about the solution and then we'll spend the next little bit together getting to that solution together to figure out how we did it.
+
+[00:00:22]
+Cuz the really interesting part is the same architecture that we use for hosting, building and deploying a application that makes about $20 million dollars a year is relatively easy for you to get going for pretty much any project that you have. So it's the same thing that works for my personal homepage, or something along those lines, can also scale all the way up to a large enterprise application.
+
+[00:00:47]
+So let's talk a little bit about the problem that we had. The original version of our site, the version still in production today, was backed originally by a Ruby on Rails back-end sitting in a data center we call it NDW, which stands for the nearest airport. So somewhere in Chicago, I don't actually know the address of the data center, because it's not my job.
+
+[00:01:10]
+So the problem was a few steps. One is that all requests had to go to Chicago, which means if you were in Sydney, you still had to make a request to our server in Chicago. If you were in Ireland, the same case, right? If you're in Mumbai, you had to make a request to Chicago.
+
+[00:01:30]
+It also meant that every single time that we wanted to deploy our application, let's say, it was a React application on top of this Rail server. Originally, two versions of the application ago, it was jQuery and CoffeeScript served by the asset pipeline. The newer version was a React app kind of sitting on top of the Rails app and making Ajax calls to get the data.
+
+[00:01:52]
+So we usually worked on the React application separately from the Rails application. And for the most part, the number of changes we would make to the client-side React application was in the order of magnitude of honestly 100 times more common than us changing the Rails code base. So we had to deploy the Rails app every single time we made a client-side code change, right?
+
+[00:02:15]
+This involved building it, all sorts of fun Docker, Linux stuff, it took a really long time. And it wasn't lost on us that we didn't need to be doing that. So the first thing we did was take a lot of the process we're gonna talk about today and take our JavaScript and our CSS and host it on AWS.
+
+[00:02:34]
+The index.HTML page was still, at that point, hosted from Rails. So we didn't solve all the problems. But we're working on a new version of the application where even the index.HTML page is built by web pack, put onto S3, fronted by CloudFront, so on and so forth. And that's gonna be what we're talking about today.
+
+[00:02:50]
+So we got halfway with our current architecture. We're going all the way as we kind of move the entire company onto AWS. Cool, so just to show you some of the metrics. This is basically the only two changes we had made to the app to get this kind of performance change, performance gains really, is implement code splitting on a page level.
+
+[00:03:12]
+So, if you think about, think of Twitter has that kinda navigation on top. Facebook has the navigation along the side, we had one as well. So we basically code split based on each nav item in our sidebar. And then the other part was to put it on S3 fronted by CloudFront and distribute it around the world, right?
+
+[00:03:30]
+And we're gonna talk about how to do that. And we'll talk about what that actually means in a second. But from Denver, going to Chicago, we saw performance gains. But if you look as you get further and further away from Denver, the performance gains are increasingly dramatic. So users in Sydney saw a 1300% increase in time to first meaningful byte, right?
+
+[00:03:56]
+So that's gonna be what we look at today, and we'll see how you can do this. And for our $20 million a year application, it costs about $13 a month. For a personal website, you're looking at more along the lines of $0.60, and 50 of those cents come from Route 53, right?
+
+[00:04:13]
+So that's a static cost, so the actual S3 and CloudFront parts are going to run you about a dime a month, right? Unless you're like me and spin up a whole bunch of them as you're preparing for a workshop, and forget to shut them off. That's a different story for a different day, cool.
+
+[00:04:28]
+This is gonna be the app that we use. It is actually a hollowed out version of our production application, right? Taking away all the things that will get me a long talk with legal, but keeping the web pack, config and stuff along those lines. And what's important here is that it does have client-side routing.
+
+[00:04:48]
+It does have lazy loading of inputs, right? So it's supposed to be more of a real app that's not gonna get me in trouble. But not just a single HTML page, cuz then there's really interesting problems with client-side routing and not breaking the web. We will fight that battle around three to four times today, and only at the very end of the workshop actually win.
+
+[00:05:08]
+There's a different set of trade-offs that we have to make through the entire way. And we'll do this, and then we'll have this other bad part to it. So, it's got enough, it's got all the hallmarks of a real application, will not be overwhelming and contain too much of my company's intellectual property, cool.
+
+[00:05:27]
+Yep, so all the things, the big difference is obviously, it's a lot smaller. Cuz it's not a large application for creating HTML emails. And I switched it back to JavaScript instead of TypeScript. So it was a kinda major difference for the actual shell around the application is like I took the application out.
+
+[00:05:44]
+And I didn't make us all learn TypeScript today. But you should learn TypeScript, cuz it's great. So we're gonna build the infrastructure that we have at SendGrid. We will be able to do it all together pretty much the exact same way that we have it, right, over the course of a day today.
+
+[00:06:00]
+And it's actually a lot faster if there wasn't somebody walking you through and explaining everything step by step, right? So if you were to go sit down and try to do this on your application tomorrow, you could probably knock it out in a morning, right, which is kind of incredible, right?
+
+[00:06:12]
+If you think about how long it would take to provision a VPS server, it's not gonna take you a morning, trust me, I know. So, what are we gonna cover? We are gonna cover how to get our single-page application hosted on AWS distributed around the world, secured with SSL.
+
+[00:06:28]
+So it's an HTTPS domain, instead of just HTTP. We'll have that automatically deployed with CI/CD. So every time you merge to master, it will automatically deploy. Cuz I don't like manually deploying, it's not fun for me. And finally we will add a little bit of ability to dynamically respond to requests.
+
+[00:06:47]
+And we'll talk a little bit more about what that means when we get there. What we're not going to cover, we're not gonna cover servers, right? This is about getting a client-side application out the door. Also not gonna talk about serverless. Because there's a really great Frontend Masters course on that, where Scott goes into the deep detail on how to work with AWS Lambda.
+
+[00:07:08]
+So we have kind of supplementary or additional courses. If any of that stuff becomes really interesting to you, we will talk a little bit about using Lambdas to program our CDN. And that's a little bit what I talked about with things being dynamic.
+
