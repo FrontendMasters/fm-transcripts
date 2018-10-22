@@ -1,0 +1,125 @@
+[00:00:00]
+>> Richard Feldman: Which brings us to the final tactic for reuse which is html.map and cmd.map. So let's take that idea I was talking about a second ago, and let's kinda run with it. What if we have something that has a bunch of different messages that it needs to do?
+
+[00:00:14]
+And we want to accept these as configuration options like this. Will they tell me how to fave, and funky fave, and super fave, and maybe five others. At some point you realize that calling this thing becomes a pretty substantial burden. The caller has to add end messages to their message type for each of these different things that I need to be taught how to do and each of them needs to be wired up properly.
+
+[00:00:35]
+Like they need to actually do the right thing. It's not a big deal to say teach me how to message when I have one message. It's like, okay, this needs to be a fave [INAUDIBLE], we have another one. That's a grand total of 2 messages to add to your message.
+
+[00:00:47]
+Really not the end of the world. Not a big deal. But if we end up with considerably more than that, it could end up being that that's actually becoming a significant burden and a potential source of errors if you get the wiring wrong as the number of messages sort of pile up.
+
+[00:01:03]
+At some point, we normally switch over and say, you know what I'm not gonna ask you to teach me how to message. I'm gonna tell you how I message. And that's something that we're doing on this feed, the article feed. So the feed actually has a decent amount of complexity to it.
+
+[00:01:18]
+If we look, it has its own message type of four variants. So it's got its own notion of errors. So things can go wrong when you're loading the feed, because it's doing some HTTP. It's got Favorite and Unfavorite, which is, it's calling out to those other helpers that we just looked at.
+
+[00:01:34]
+It's also got CompletedFavorite, because it's also handling the HTTP requests that results from clicking Favorite. And handling what happens when it comes back and updating itself to render accordingly. So we go from the green heart to the outline and vice versa, depending on whether you favor, unfaved it.
+
+[00:01:50]
+So based on all of these things, there are some non-trivial logic going on here. We don't want to have everyone who wants to render a feed, needs to implement all four of these messages and then pass them in, so that we know how they work. Instead we're sort of flipping the paradigm and saying okay that was sort of the lightweight way of doing it.
+
+[00:02:06]
+But in this case doing it the lightweight way is just going to be really heavyweight by virtue of the fact that there are so many different messages that we need you to teach us how to do. So instead we're gonna expose. Okay here is my message, notice, by the way, that we're not exposing the variance here so message is opaque to everybody else.
+
+[00:02:26]
+Same thing with our model. This model is not actually a type alias. This is a model with its own internals so both the model and the message are opaque to everyone else who's using the feed. And what we're saying is essentially, okay, I've got an init function. If you want one of these, that's how you're gonna get a model, you need to call this init function.
+
+[00:02:46]
+Now model is opaque so there's no other way to get one. There's no other function in here that returns a model, so the caller, whatever page wants to embed a feed on itself, needs to start by calling init in order to get one of these. Once it does that, it says, okay, great, you've got a model, but it's opaque, so all you can do is hold onto it.
+
+[00:03:02]
+You can't actually reach inside of it, tweak it, mess with it, whatever. Nope. This is encapsulated to me. You can't see the internals. You can't touch the internals. Only I can do that. So if the page wants the model to actually do anything, or, I'm sorry, wants the feed to actually do anything, then it's going to need to call something like this Update.
+
+[00:03:22]
+So there's this feed saying, hey, I actually have some update logic of my own. It's gonna return a tuple of model and command message, this being the feed's model, and the feed's command message. And so it's got all of this logic implemented in here. So this is another benefit to doing it this way, is that I can also centralize the logic for how to handle each of these messages.
+
+[00:03:42]
+If I wanted to do this, I could also make that part of the configuration if I were using the same pattern that we did previously here. And I could say, not only do I need you to teach me how to message, but I'm gonna tell you how to handle those messages.
+
+[00:03:54]
+I'm gonna give you some functions, and you're supposed to call those. This is a way of sort of enforcing not only am I going to implement the way that these messages should be handled. But in fact nobody else has access to handle them any other way because message is also opaque.
+
+[00:04:10]
+
+>> Richard Feldman: Okay, so this update function is taking an opaque message and an opaque model, then returning another opaque model and a command with another opaque message, which is to say, yeah, all of this logic in here is completely opaque to the outside world. And all they can do is call update, passing the model that they got back from init.
+
+[00:04:28]
+And the only way that they can get a message in here is through calling view from this sucker.
+>> Richard Feldman: And essentially, we have this view function here that takes maybe cred and a time zone and an article and then returns html message. Again, this is the opaque message type.
+
+[00:04:47]
+So that's the only source of messages other than the commands themselves that come from update that anyone who's trying to embed what these feeds can do. So how do you actually build one, let's take a look at that. So this is being used in two different places, it's being reused on the homepage, as well as on the profile page.
+
+[00:05:03]
+So let's take a look at how it is on the homepage. So in the event that we actually have one of these feeds, so first we had to initialize it. This is the case where we've already got it initialized, and we're good. We're moving on. Essentially what we do is we call feed.update, which gives us back a new feed, which, remember, this is the Feed.model.
+
+[00:05:24]
+And then, we have this sort of sub-command, which is to say the Feed command. So this is, so command feed.message, and both of these are opaque so we can't really do anything with them. We've just got them now because we've called feed.update, passing the credentials as well as the sub-message that we got in here.
+
+[00:05:41]
+What's the sub-message? That's one of these, it's sort of a wrapper of our message type that's containing a feed message that came from the feed, and we can see one of the two sources of where we might end up with one of these got feed messages down here.
+
+[00:06:01]
+When we say okay, we've got this sub-command. I'm going to return that as what I'm going to actually do as the result of this branch of update. But I'm gonna call command.map on it to wrap it in a GotFeedMsg. So what this line is essentially doing is it's saying, hey, I don't actually know where this command is, because it's, you know, I got it from a stranger with an opaque type, but whatever it is, I would like the elm run time to execute it and to take whatever message it produces, which again is opaque to me, and whatever that message is, wrap it up in one of these gotFeed messages, which is to say it will come back here in this branch of update if it does come back, and we will once again, have this opaque submessage, which can go through the process again.
+
+[00:06:45]
+So effectively, what we're doing with this logic is we're saying, I want to delegate the notion of updating to this feed, and importantly we can't monkey with the feed while we're in here. All we can do is delegate because those types are opaque. We delegate the message, and then we also delegate the model itself.
+
+[00:07:01]
+We say I'm gonna write down the new feed that we got, that was returned by this update function. But again we can't really touch it, all we can do is write down that we have a new one, and then we can use it the next time that we need to update it.
+
+[00:07:14]
+Finally, we have a second source of potential feed messages over in the view. So that's right here. When we call feed.view articles, we're passing in the arguments that it needs. And then at the end, we're getting back a whole list of articles And we're mapping over that list with Html.map GotFeedMsg.
+
+[00:07:36]
+So Html.map and Command.map, again both do the same thing. They say, I've got either from HTML, that's some foreign message type that I don't know how to deal with, or I've got a Command with some foreign message type that I don't know how to deal with. In both cases, all I wanna do is wrap it in this GotFeedMsg, so whenever it comes into my update, it's wrapped up and I can just do this delegation logic and that's it.
+
+[00:07:57]
+So by using these things, I've effectively said, yeah, I am now delegating to this feed's update. I'm delegating to its view or wherever I want to render it in my logic, and it's in charge of whatever message it wants to have, whatever update logic it wants to have, whatever view logic it wants to have.
+
+[00:08:15]
+I don't actually have any idea what any of that stuff is All I know is how to deal with its messages, and just sort of pass them through. Additionally if we wanted to it could expose subscriptions. It could say yeah here's a subscription that I need. I do something every clock tick, or I do something on every animation frame.
+
+[00:08:33]
+And it could request that, and then say you need to wire that into your Subscription in which case you'd use sub.map. That's a lot less common. Typically you don't see those nearly as often as you see cmd.map and html.map. Worth noting that you don't necessarily need to have both.
+
+[00:08:48]
+Sometimes you might have a bunch of messages but honestly, it's not super critical that those things happen in one place so maybe you'll just see only Cmd.map or only html.map but that's pretty rare. Usually, they sort of go hand in hand. Most of the time it's either Cmd.map and html.map or using the much more light weight approach of this.
+
+[00:09:11]
+So in terms of what order I reach for these, I've sort of, I tend to reach for these in the order I just introduced them. So if I can get away with it, I'll just use HTMl with an unbounded type. That's the absolute easiest. I don't need to teach me how to message.
+
+[00:09:24]
+I don't even care. I just work everywhere. But if I can't get away with that and I still have decided that we use the correct choice here then I'm gonna say, yeah, you know what? Just teach me how to do whatever message is necessary. And that's what I'm gonna go with.
+
+[00:09:37]
+And if that's not gonna work because that's gonna require excessive configuration, because I just have so many messages that need to get handled. I have so much custom logic that needs to get run. And that's gonna be burdensome. Then I will do this because although this is pretty trivial, sort of boring code to right, it's fixed.
+
+[00:09:55]
+It's a fixed cost. I rate this once and I have now delegated all of the rest of that stuff to the theme. Now worth noting that you can go overboard with this, and that was a, especially a couple years ago, that was a pretty common problem that we saw a lot of beginners run into was essentially saying anytime I want to reuse anything.
+
+[00:10:16]
+I'm gonna give it it's own model, it's own view, it's own message, it's own inits. And I'm gonna do all of these stuff and all these wiring every single time across the board and basically never using these techniques. Instead. The result is that this sort of propagates and explodes, and you end up with a huge amount of wiring.
+
+[00:10:32]
+Because although this is only a fixed cost, if you're sort of using it to avoid an even bigger cost, because you actually have a whole bunch of messages, that this is sort of a blocking out of our needing to handle. If you don't actually have a bunch of messages that are necessary, then this just becomes a bunch of overhead for no reason, for no benefit.
+
+[00:10:49]
+And the result if you multiply that by like every single time you reuse something, that can really add up. So I definitely encourage only reaching for this if it's going to solve a problem with one of the two, more lightweight approaches, and that'll basically keep things sort of as lean and as light as possible.
+
+[00:11:03]
+Given your constraints on how you're building things. So to recap, we talked about helper functions, so those can be anything as simple as a function that we break out and only use once. doesn't necessarily a part of reuse, or it can be. It can be something that we're only using for two functions in the same module as we saw with the favorite button, and the follow button.
+
+[00:11:22]
+It could also be something that helps out with update as in the case of update form. It's not limited to any particular domain, this is a very straightforward technique for reuse. We talked about making sure things are actually the same, and not just similar. We talked about those three different flavors of status, each of which is a slightly different state.
+
+[00:11:39]
+And each of which makes sense to be tailored to that particular page Rather than attempting to reuse and introducing a bunch more configuration on top of them. We talked about HTML message with either the unbounded type or with receiving the message from whatever the thing is calling it.
+
+[00:11:54]
+And we talked about the. So the most powerful, but also the highest overhead at least from a fixed cost perspective way to reuse the view code, which is to say using Html.map and Cmd.map in conjunction with a custom message type and an update.
+

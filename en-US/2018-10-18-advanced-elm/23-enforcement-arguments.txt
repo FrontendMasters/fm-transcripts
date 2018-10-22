@@ -1,0 +1,81 @@
+[00:00:00]
+>> Richard Feldman: To go back to our overview. We said we were gonna talk about four things, so we talked about what fits in our head, we talked about narrowing types. And the two other things we talked about are enforcement arguments and using modules for modularity. So let's talk about enforcement arguments first.
+
+[00:00:15]
+So one of the things we talked about here was the idea of our arguments to these functions being used as a way for us to sort of traverse our code and understand the dependencies between different parts of our code base. So one of the ways we can do that is when we're debugging or making modifications, we can actually do that when we're creating things as well.
+
+[00:00:34]
+When we're setting something up new from the beginning, we can actually use that as a way to introduce intentional dependencies between parts of our code that are not necessarily related if we choose the narrowest possible types. So let me give you an example of this. The most canonical example of this is cred.
+
+[00:00:51]
+Now there are a couple of different messages in here that don't have any cred associated with them. In fact there's only one that does, it's called ClickedSave. The reason ClickedSave has cred associated with it is two fold. Number one, when we're in the article editor, we should be logged in as the user.
+
+[00:01:14]
+There is no possible way that we should be able to get to this page and not be logged in. And it's theoretically a possible in the sense that the compiler doesn't rule it out, but if we did somehow get to the new article or the editor article page without being logged in, something probably went wrong at some point.
+
+[00:01:33]
+So essentially, the point of having this argument in here is to say, when you click save, we need credentials. Even if on the rest of the page we don't have the ability to necessarily extract our credentials, because the session stores credentials as a maybe. In the sense that you may or may not be logged in, depending on what page you're on, or depending on whether or not you've logged in for any given page.
+
+[00:01:56]
+But in the particular case of save, in order to successfully make an HTTP post that's going to be authenticated on the server that's gonna succeed, you have to provide credentials to it. That's just part of the API. It's not gonna succeed if you don't provide those credentials. So putting it in a ClickedSave means that we don't have to look Into our model and try to extract credentials that may or may not be there, handle the case with maybe is nothing etc.
+
+[00:02:19]
+If we're in this state we know we've got credentials and so we're able to pull them right out the message and then just immediately call save which is the function that takes the credentials and the current status. And then actually results in firing off the HTTP request to record either the new article or the edit to the existing article, okay.
+
+[00:02:42]
+So that's sort of a convenience that prevents us from having to unwrap a maybe. But it does something else that's pretty important. The fact that ClickedSave has cred as one of its arguments, that variant, means that we're only capable of rendering a button that has this in its click handler if we're logged in.
+
+[00:03:02]
+In other words, we actually can't render a save button that uses this as its message unless we're logged in, and we actually have access to an instantiated cred value, not possible. So let's see if we can take that a step further. So the article page you have to be logged in.
+
+[00:03:20]
+What about a page where you don't have to be logged in? So a profile page is a good example of this. If I'm on the profile page, and I'm viewing someone's profile I don't necessarily have to be logged in. I may be logged in, but I might also not be.
+
+[00:03:34]
+Oop, that's not the profile page. I may or may not be logged in. And some of these operations only work when I'm logged in. But they're still part of the message type, because there's a whole bunch of stuff going on here that should work when I'm either logged in or not.
+
+[00:03:52]
+For example, when I'm on someone's profile page, there's a couple of tabs. I'm allowed to click the tabs if I am or not logged in. Also some errors could happened. There could be a loading error like if the person's articles didn't show up, the server was down. I can get those.
+
+[00:04:06]
+I can certainly dismiss those errors whether or not I'm logged in. But there are other things that explicitly do require being logged in. I can't follow someone unless I'm logged in. That doesn't make any sense. I should not be able to render a follow button without being logged in.
+
+[00:04:21]
+And the fact that we have cred in this message is an enforcement argument, it's an argument to this message that enforces that we can only use if we are logged in. It's not possible for us to have any kind of button on this page without passing it some cred.
+
+[00:04:46]
+So based on that, we're now able to look at these messages and tell exactly which of these things can be triggered from user interactions when you're logged in, and the ones that can't be. This is sort of a bridge between Update and View. It's connecting them by saying, yeah, this is something that Update's going to require if you want to instantiate one of these things in the View.
+
+[00:05:08]
+Update doesn't need necessarily to use it. As it happens, it's handy for the case of we saw previously where it sorts gives you access to it, you can use it right there update the passage to the http request. Because the HTTP request does actually credentials. But even if it didn't, this will be a way for us to enforce, hey I only want to be able to substantiate one of these things when you're actually on this page.
+
+[00:05:29]
+And we can take it a step further and, in fact, we do if you look at the author. So we talked earlier about how author has a couple of different enforcement techniques going on here. One of which is we have the notion of FollowedAuthors and UnfollowedAuthors, and we have this custom type that has these three possibilities of either I'm following them, I'm not following them, or it's me.
+
+[00:05:48]
+But there's another thing that we have here which is that this is viewer is using exactly the same technique as what we saw previously, IsViewer takes cred. That means that Isviewer can only be substantiated if you're logged in. And it takes it even a step further with the signature of the follow button.
+
+[00:06:08]
+And the unfollow button. So let's expand these out real quick. So the follow button accepts a two message function. In the next section on reuse, we're going to get into a little bit of the details of how these things work so let's not worry too much about the HTML message in this sort of technique for reuse for the moment.
+
+[00:06:26]
+But the relevant part is, all it needs, is it needs to be able to pass this button a message. This function absolutely could take this as an argument for this. No problem at all, it would still work. All it needs is some message that's just gonna get passed to a handler.
+
+[00:06:43]
+But it doesn't. Instead what it does is it says, give me a message that accepts Cred and UnfollowedAuthor, and then give me Cred and an UnfollowedAuthor, and then I will render this thing for you. It absolutely does not need to. The whole point of doing this is to enforce, you actually have a message that needs some Cred, that needs an UnfollowedAuthor.
+
+[00:07:03]
+Now, granted, this is a pretty weak guarantee as it's not a guarantee at all in the sense that I could absolutely pass this a function that it isn't a message variant but rather is just an anonymous function that accepts cred and UnfollowedAuthor. It just completely disregards them. But at least by putting this in a type like this, I make it so that it's quite convenient to pass it a message that has this type, a message that has the enforcement argument in it of cred.
+
+[00:07:35]
+And it's actually sort of less ergonomic to try and have a message that doesn't have that, because then in order to call this function, I would have to pass some anonymous function that disregarded it. So this is a way that I can sort of propagate this through and make it so that the happy path, the easy path, the most ergonomic way to use these things is to actually create that link between View and Update to say, yeah, this only should be possible if we are logged in, and otherwise it should not be possible to render one of these things.
+
+[00:08:06]
+Now worth noting that as previously discussed with cred as it happens the cred holds on to a token which then gets attached to the HTTP request. But let's say in the future we switched to a cookie based system where this is not actually exposed to the application at all it's just done transparently behind the scenes through the browser's cookie system.
+
+[00:08:24]
+Even in that world, I would still want to have these same types here. I would want to have this in place just to enforce the guarantee that I can't render one of these things when I'm not logged in, because that would be messed up. If the user saw that, they would be like what's going on here, a follow button?
+
+[00:08:40]
+What does following even mean when you don't have an account or you're not logged in?
+

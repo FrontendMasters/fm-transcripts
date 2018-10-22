@@ -1,0 +1,114 @@
+[00:00:00]
+>> Richard Feldman: We'll see how to actually make one of these. So, the way to do this is using the port keyword on the Elm side and we're gonna make some changes directly to index.html on the JavaScript side. It's worth noting that technically on the JavaScript side if we wanted to we could use like a .js file and stuff like that.
+
+[00:00:14]
+But we're just gonna write the JavaScript side of this code directly into index.html because that way, we don't have to introduce a new file. Okay, ports, if you're gonna use the port keyword, which is the keyword that you use to talk to JavaScript, you have to do it inside a port module.
+
+[00:00:29]
+Which basically means, at the top of your module where you say module article exposing whatever, or module main exposing whatever. You add that port keyword at the top, and this means that any time you're wondering whether a given module does or does not do JavaScript interrupt, you can tell that from the very first line of code.
+
+[00:00:45]
+You just glance at it, if it says port module, then yes, it's doing JavaScript interrupt. If it doesn't, then it's not. So here's how we would create one of these things. We would say, port storeSession and that's gonna take in our particular example a maybe string and that's gonna return a command message.
+
+[00:01:05]
+So this port key word essentially says, hey, Elm make this function exist for me. This is one of the only cases in Elm where we don't actually write out the definition of this function. We just write the type and Elm will generate a function that does that thing for us.
+
+[00:01:24]
+So the port keywords says I wanna make something called storeSession. This gonna be a function. I want it to accept a Maybe string and we'll get into why a Maybe string later, and then what it's going to do is just going to send that Maybe string out to JavaScript.
+
+[00:01:38]
+And it's then it's gonna return a command which says okay, this is a command which when executed will send that value to Java Script and then do nothing. We're not gonna get any message back because this is fire and forget, just send it across the wall. The reverse of that is onSessionChange, so this is the sort of the inbound port, this is when JavaScript sends a value to us.
+
+[00:02:02]
+And it has a slightly different syntax. First it accepts a message that says okay, we're going to get in a string from JavaScript and we're going to convert that into a message. And that'll give us back a subscription with that particular message. So between the two, we now have Elm creating the implementations for both of these.
+
+[00:02:24]
+And we have, in the first case, a way to generate a command that will say, okay, update. We are going to send this value out to JavaScript, this Maybe String. And on the flip side we also have a way to say, hey, whenever JavaScript sends us one of these strings, wrap it up in this message type.
+
+[00:02:40]
+And then that's gonna be what gets send to update as our subscription. So as long as we are subscribed to this thing, we will get those messages flowing into update every time JavaScript sends us one. And with this one every time we want to send something to JavaScript we can do so using that command.
+
+[00:02:58]
+Okay, so here's the Elm side. On the JavaScript side, we're gonna start with this one line of code which is basically what we always do to start up and Elm application, we call Elm.Main.init. We're not really gonna talk too much about flags, but essentially flags are our way to get some initial value from JavaScript into Elm on start up.
+
+[00:03:17]
+So this is not done with ports, it's done with a separate mechanism, but essentially it follows the same characteristics as these. These are made available to Elm, these flags, sort of in the same way as when you start up a command line application. You get those flags that are only available on startup, and then if they want, they can use them to get going.
+
+[00:03:35]
+In our case, this is just an example of passing in the initial session so that the very first time the page renders, we can know if the user is logged in. So what we're doing here is we're describing a way to storeSession information. Which is to say the authentication information, the current users username, their avatar, stuff like that and dealing with when it changes using a library known as local forage.
+
+[00:03:58]
+So localForage is a wrapper around local storage and indexdb and a couple of different technologies. And were going to assume that we have some business requirement to store our session in that. Now in the actual example of this thing, the SPA example, the real world application, it uses local storage.
+
+[00:04:16]
+But for purposes of this exercise we're gonna be using local forage and we're gonna be talking to it using these APIs right here. Okay, so this right here, starts up our Elm application, and here's how you subscribe to this storeSession command. So we say app.ports which is basically an object containing all of the ports that we've defined anywhere on our Elm application.
+
+[00:04:40]
+.storeSession which is to say that name corresponds the name of the Elm function. .subscribe and then we pass it a function that says okay, give me a string and I will do something with it. So then right in here, we write some js code. And then, every time that command gets run, this JavaScript code will get executed.
+
+[00:05:05]
+And it will get executed being passed the string that was passed in to this command. Now, you might notice that on the Elm side this is a maybe string, whereas on the JavaScript side, we just said str. Now the reason for that is that if we want to send a null value into JavaScript, this is how we do it.
+
+[00:05:23]
+So when we're storing the session, there's really two different use cases that we have there. One is we want to say, I just logged in, or maybe I just signed up and I want to store this user as, yeah, this is the new session. This is their authentication token, this is their username etc.
+
+[00:05:38]
+Please go persist that so that it will still be around when we refresh the page. We also might want to use this for logging out. So we log out we might wanna say, hey,, just clear that sucker out. Well, I don't wanna store that anymore, we're logged out, we're all done with that.
+
+[00:05:53]
+So in that case we would send nothing. And say, yeah, we're just logged out, just don't do anything more with that, just please clear that out. So on the JavaScript side we can now compare this to null or not depending on what Elm sent us. But this is essentially the way to specify, hey, I wanna send a null value from Elm to JavaScript, even though Elm doesn't have a concept of null.
+
+[00:06:13]
+The way that the port keyword works is it knows when you send them Maybe, and then a primitive like a string, then it means I might be sending it null. If I see nothing send null, and I don't see nothing, if I see just, then send that value unwrapped.
+
+[00:06:28]
+The same thing on the other side, if we wanted to we can accept a Maybe string from JavaScript and say, perhaps JavaScript is going to send us a null session, which we can convert into nothing in the case of Maybe. Okay, so that's setting the thing in the session.
+
+[00:06:42]
+So taking that command and then on the JavaScript side every time that command gets run from Elm this callback will fire and we can do whatever JS code we want. We could write arbitrary JS code here. It can do all the side effects in the world, it can do all the HTTP requests and anything you want.
+
+[00:06:57]
+And it's all fine because essentially we've said yeah, well, this is the command, commands can do that, commands can actually do whatever. Except in this case, whereas usually it's the Elm run time executing the side effect or whatever else. In this case all the Elm run time is doing is it's firing a JavaScript callback, and it's up to JavaScript to do whatever else it wants.
+
+[00:07:16]
+But the fundamental characteristics are still the same. Finally, we have onSessionChange and here we say app.ports.onSessionChang.send and we pass in some string. This is JavaScript saying hey Elm, here's a piece of information. I'm gonna pass this string into you and then Elms go say great, I've now got that string.
+
+[00:07:35]
+Fortunately, I have this handy dandy function that converts from a string to a message, so I'm gonna call this function to convert it into my particular message type. And then that message is gonna go straight into update with the current model and then from there update being brains of our application it's gonna do it's thing.
+
+[00:07:50]
+It's gonna handle that message and it's gonna resolve based on whatever we want JavaScript to do. So in the exercise that we go through, we're gonna use localForage to detect whenever the session changes. Which could be because it changed in a different tab. That's something that can happen with browser persistence, is you have multiple tabs open.
+
+[00:08:11]
+Somebody logs out in one and you wanna be logged out in all of them. And then, since each of those are going to be subscribed to changes in the session, that's gonna be immediately reflected as soon as the logout actually happens. Okay, cool, so that's what we're sort of building up to is storing session data in localForage.
+
+[00:08:30]
+The localForage API is very simple, so I'm just gonna cover it very quickly. Here's how it works, you say localForage.getItem, which is to say, some key value, localForage is a key value store. So you parse it the key which in our case, is gonna be the string session.
+
+[00:08:47]
+And then it runs a callback that says, I obtained the value at that key, which might be null, if it was missing and then you run the code in that callback. So that's, in here, that's where we would say, app.ports.onSesionChange.send. Also, you can setItem, very similar API except here we're giving in the key and the value that we want to store inside the storage system.
+
+[00:09:09]
+And that also takes a callback which will execute based on whatever it's doing. I've already written these into index.html. So there's no need to actually change these things. But if you wanna go look inside index.html, you can do that just to see how things are wired up. And that'll be important to know what names to use for the ports, because the port names need to correspond to the names being used on the JavaScript side.
+
+[00:09:36]
+Okay, one last note about JavaScript interrupt via ports. There's a very important question to ask, which is, who owns this particular piece of state? We're gonna cover this topic in more depth in the advanced course. But it's very important not to have multiple sources of truth as to who's in charge of that state.
+
+[00:09:53]
+We really want it to be either Elm's in charge of this particular piece of state or JavaScript is. In the case of our session, we've made a conscious decision, we say you know what, this session lives in localForage. It is localForage's job to manage that session. We're gonna just sort of cache the current session in the model, because we don't want to have to go and make a round-trip and say, hey, JavaScript, what's the current value, what's the current value, what's the current value.
+
+[00:10:17]
+But is just a cache on top of that, we view the source of truth as localForage. And it's important to pick one. If you sort of try to pick two and say, well, Elm kind of in charge of it, then also, JavaScript's kind of in charge of it.
+
+[00:10:29]
+You can end up with some really unfortunate bugs. So definitely important from a design perspective to sort of pick one or the other. Okay, in the case of localForage, JavaScript owns the state and Elm is just going to cache it. Cool, so we talked about subscriptions which look like this.
+
+[00:10:45]
+They're sort of like the inverse of commands. They look like sub messages instead of command message. We talked about some of the important guarantees that Elm wants to preserve such as that all functions are pure. And we wanna preserve those guarantees while we are inter-operating with JavaScript which has a different set of guarantees that it abides by.
+
+[00:11:02]
+We talked about how to send data to JavaScript using a port that results in a command message that will send that data out to JavaScript. And if JavaScript has wired up a callback to that then that callback will execute receiving whatever value that we sent over the wall to it.
+
+[00:11:16]
+And finally, we talked about how to receive data from JavaScript by specifying a port that deals with a function that returns a message based on whatever value we got from JavaScript. And then a subscription which in turn says every time we get one of these from JavaScript, we're going to feed that to update, then update's gonna do its thing.
+

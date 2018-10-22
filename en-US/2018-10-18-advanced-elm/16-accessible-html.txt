@@ -1,0 +1,63 @@
+[00:00:00]
+>> Richard Feldman: Type Parameter Design. So here are three different ways we could write a function to take a list of attributes, and they all have different tradeoffs. So one is taking a list of attributes with an unbound message type. The middle one is taking a list of attributes with a concrete message type that is our actual message type.
+
+[00:00:20]
+And the third one is taking a list of attributes with the Never type. If you're not familiar with Never, fear not, we're about to get into it. Okay, so here's a sort of a motivating use case for why we might choose one of this three things. So let's say I'm at my REPL and I put in a HTML.text Hi.
+
+[00:00:37]
+And it says okay, that's Html message with an unbound type variable, no big deal. Here's another Html function, this is the paragraph tag. So if we're gonna make an Html paragraph, so it takes a list of attributes, a list of Html and returns list of Html. And they all share a common messaged type variable there.
+
+[00:00:55]
+So I can put that into the REPL, say paragraph and not give it any attributes. Say text Hi, it says cool, Html msg is the return value because I gave it unbounded list right here because it's any empty list. I gave it a list of Html message right here.
+
+[00:01:09]
+As we saw for the previous example, that's also Html with an unbound message type. So if I give it a list with unbound type and then another list which has HTML with an unbound message, the result is we still have HTML with an unbound message type at the end of all that.
+
+[00:01:24]
+That’s why this paragraph returns as Html with still an unbounded message type. Okay, we can also put our onClick handler on there. So onClick has this signature. It takes a message and then returns Attribute message. So that is not unbound, that's bound to the message argument that it receives.
+
+[00:01:39]
+So as soon as I give this paragraph onClick of absolutely anything, whatever I pass to onClick in there is going to be something concrete. So onClick's gonna give me that thing back. And then we're now gonna have Html paramaterized on that. So now we've ended up with Html Message with a capital M, which is to say a concrete type, it's no longer unbound.
+
+[00:01:57]
+Now all of this works. All of this compiles. All of this is perfectly functional. The only problem with it is it's not very semantic. Why does your paragraph have a click handler? What are you doing? That's something that's totally valid. The browser will accept it, it'll work. But from an accessibility perspective, how is someone supposed to guess that's going to be clickable?
+
+[00:02:15]
+That's very non-semantic html. Wouldn't it be nice if we could rule that out, and sort of say, hey, you know what? That's not what paragraphs are for. They're for other stuff, don't do that. If you you wanna put an onClick handler, do it on a button or something like that, where it's actually semantically intended to be used that way.
+
+[00:02:32]
+So my coworker, Tessa Kelly, has a library, and actually she gave a talk at Elm Conf US last year about this library called accessible-html. And that's exactly what it does. So her library is essentially a drop in replacement for the basic html library and it implements certain constraints like this based around accessibility best practices.
+
+[00:02:52]
+One of which is that paragraph has a slightly different type than the one in the normal Elm Html package. So it takes as its second argument a list of children, which works the same as before. And then it returns Html message, which has the same type variable as that list of children, but the attributes are a little bit different.
+
+[00:03:11]
+The attributes, instead of taking List Attribute message, like we did before, now it takes List Attribute Never. So again, we'll get into what Never is in a moment. But the important thing is that it's a concrete type, and it's not our message type, it's a third thing. So going back to this example that we had at the REPL before, paragraph, empty list, text Hi, that'll still compile.
+
+[00:03:35]
+It will give us back HTML message with an unbounded type just like before. And the reason for that is that the first argument we're passing is an empty list, which is a list with an unbounded type, which means that yeah, that'll absolutely unify. The constraints will unify with attribute never because this sucker unifies with anything.
+
+[00:03:53]
+So although it's demanding an Attribute with Never as it message type, it says, you must give me an Attribute that has this Never type. It has to produce a message of that type. It's only kind of saying that because really with the way that Elms type inference works and can string unification, it'll accept something that unifies with anything.
+
+[00:04:11]
+Even though we actually don't have the ability necessarily to produce one of these things. So this'll work. It'll give us back HTML message, still an unbound type variable, just exactly like before. So so far, so good, so far, we're using it exactly the same way as we would in either library.
+
+[00:04:29]
+Now, let's try to put a click handler on it. Well now, we have a problem because this produces, this right here, this is a list of Attribute message with a capital M as we saw before. That is a bound type variable, it is a concrete type, it is our message type.
+
+[00:04:43]
+It is most emphatically not Attribute Never, which is what this type demands. So this will be a type mismatch. I tried to put a click handler on my paragraph and it did not compile. Ouch, but good for accessibility, that was the whole goal. However, I can still put other attributes on there.
+
+[00:04:59]
+For example, I can put a class on there, like if I want to style my paragraph, that's totally fine. Because there's a whole set of attributes which return unbound attributes. So class returns and actually, with an unbound message, which means that it produces a list of attributes of that unbound message.
+
+[00:05:16]
+I could put class on there, I could put id on there, I could put any number of accessibility attributes on there. All of those things are totally fine because they return attribute with an unbound message, which we'll unify with attribute never. Because they'll unify with anything. So in this way we've specifically ruled out with sort of like laser precision only things that are interactive.
+
+[00:05:35]
+Things that actually can produce a message that gets sent to update which is exactly the point. One way you can think of this type is, this is a paragraph that takes a list of inner attributes. Attributes that do not produce any interaction. In other words, paragraphs are static.
+
+[00:05:52]
+You can style them all you want. You can add accessibility attributes all you want. You can give them whatever children you want. The only thing you can't do is put event handlers on them.
+

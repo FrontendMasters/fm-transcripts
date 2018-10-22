@@ -1,0 +1,75 @@
+[00:00:00]
+>> Richard Feldman: So we're gonna add a few things here. One is helper functions. A pretty broadly applicable concept in Elm. The concept of similar versus the same. HTML message with an unbound type as a source of reuse. And finally, HTML.map and command.map. That's sort of the most powerful tool for use we have.
+
+[00:00:20]
+Okay, like the previous section, this is gonna be the second of three where we have immediately going to the code, and looking into the examples there. Okay, so when we talk about reuse, we're talking about essentially the notion of identifying some code where we're like, you know what?
+
+[00:00:37]
+I wanna use exactly this code in multiple different contexts. That could be a piece of the view, maybe we have some UI elements that we want to share, some UI logic. It could be just some business logic, something that update does that we want to do in a couple of different places.
+
+[00:00:51]
+There's a few different boundaries across which we can share things, we can share within a particular module. We could have some code that only exists in that particular module, and is used elsewhere in multiple places in the module. We could have some code that exists across modules. Maybe it's on a separate module and it exposes some stuff that several other modules import and then reuse.
+
+[00:01:10]
+Or even at the package level, we could have a package that has a bundle of reusable things that we will import and maybe use some of them. Fundamentally though, the toolset that we're going to use for each of those is sort of the same no matter how we're doing it.
+
+[00:01:25]
+The sort of bread-and-butter most basic tool that we have at our disposal is the helper function. So helper function essentially means I've got some code that I want to write. And in the course of writing that code I realized, you know what? There's a subset of this code that would do better if I were to split it out and make another function whose sole purpose is to help me out with the function I was originally trying to write.
+
+[00:01:49]
+So that term can apply to all sorts of different functions. But the general gist of it is that it's not something that I am exposing directly for others to use as sort of a first-class part of the API. Rather, it's sort of an implementation detail of something else that I'm doing.
+
+[00:02:03]
+Now in a lot of cases, helper functions have nothing to do with reuse, they're just something that's helpful for implementing one function, they're not used anywhere else. But a good example of when they can come up in cases like reuse is when we have two things that are quite similar, and all that's different about them is a little bit of configuration.
+
+[00:02:25]
+So for example, we have this Favorite button. So the Favorite button works on a couple of different pages. This is when you want to be able to click, this is a favorite article of mine and I want it to show up in my Favorites. So I can render one of these things, and the only real difference between the two is in terms of their styles.
+
+[00:02:44]
+So one of them looks like a dark green, the other has sort of a white with light green outline type thing. And the way that we specify the one or the other is by giving it a different CSS class. Everything else about these things, the favorite button or the unfavorite button, is exactly the same.
+
+[00:03:01]
+So we sort of consolidate all that logic in this helper function, which deals with putting that class together with this like onClickStopPropagation thing that we're doing. And also the HTML structure of this thing is, needs to be at a particular configuration where it's a button on the outside and an iTag on the inside in order for the CSS to work out.
+
+[00:03:21]
+So this is a very basic example of the helper function. We've split out this function just for the purposes of helping out these two other functions, favoriteButton and unfavoriteButton. This is the type of helper function that is only used in this one module, it's only used in those two places.
+
+[00:03:35]
+But it does its job well enough, and it prevents us from having to maintain these two things separately, or worry about the implementation details being different. That's sort of a way of saying, yeah, we have decided that these things should share a good enough chunk of code that we're gonna split out a separate function to do it.
+
+[00:03:51]
+And that's all there is to it. Another common use is for dealing with update. So let's say we're over here on the Settings page and there's a pretty common operation that we're doing, which is we are updating a form. So there's a lot of form fields on this.
+
+[00:04:06]
+There's email, username, password, bio, avatar, and all of those have a pretty common operation that they do. Which is that the user types some piece of text into a text field or a text area, and we just wanna write it down in the model. Later on we'll validate it, we'll send it to the server, do all kinds of nice stuff like that, but for now all we need to do is write it down.
+
+[00:04:25]
+And since the operation of writing it down essentially involves just taking the form out of the model, updating one field in it, and then putting it back in the model. We've written a helper function here that does not only that, but also, as a convenience, returns Cmd.none because all these things don't do any effects.
+
+[00:04:42]
+All they do is update one model in the form. This is a one-liner. It's doing nothing more than saying, update this one field in the form based on the transformation function that you've given me. And I will return that inside of a tuple with a Cmd.none so that we don't have to write that every time up here.
+
+[00:05:01]
+Worth noting that there are some interesting trade-offs around this as far as some of the stuff we talked about in the previous section. So this updateForm function, on the one hand tells us that we are returning a model and a Cmd.none which is pretty broad. But there's actually an interesting opportunity here to say we can actually promise that this does not return a command that has a message associated with it.
+
+[00:05:23]
+We can say, yeah, this returns a command, but guess what? That command still has an unbound type variable, it's not actually going to produce any messages. It's not quite the same as saying it's doing nothing because this command right here could potentially be, for example, a port command.
+
+[00:05:39]
+There exists commands that do something, they just don't produce a message. So if we wanted to, we could actually narrow this type a little bit further. So that's an opportunity for a refactor there. But in general, the fact that we are returning this does mean that this is sort of a less narrow type than it could be.
+
+[00:05:55]
+So if we're looking for culprits and we're trying to debug something and figuring out why some weird thing is running a command that we didn't expect, this is a potential culprit because we've chosen to do it this way. Now, the trade-off there is that if we didn't put it inside updateForm, we'd have to put Cmd.none in each of these.
+
+[00:06:11]
+Now, the advantage of doing it this way is they're all sort of centralized. So I know for a fact just by knowing what update form does once I can say okay, all of these lines of code, without even glancing at them, I know that they're not running any commands at all.
+
+[00:06:24]
+Otherwise, I would need to say okay, I'm trying to figure which branch of update is resulting in commands. I have to now scan through each of these. So it's a trade-off. On the one hand, I've made this helper function less narrow than it could be, but I'm doing that because I expect it's more likely to come up that I'm trying to search through all the branches of update for our particular command.
+
+[00:06:42]
+And I think it's going to be more helpful to me to say okay, each of these is running that thing, I can just glance at the implementation once, see that it doesn't have any conditionals here. It always returns to Cmd.none. So I can very quickly answer the question of what do each of those branches do just by going one hop away.
+
+[00:06:58]
+So it's a trade-off. It's not necessarily objectively correct or incorrect to go either way, but it's something worth thinking about when you're splitting out helper functions. Sometimes you want them to be as narrow as possible, other times it can actually potentially save you time to do something like this.
+

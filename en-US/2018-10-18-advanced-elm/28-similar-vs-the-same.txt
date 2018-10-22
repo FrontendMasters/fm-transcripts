@@ -1,0 +1,78 @@
+[00:00:00]
+>> Richard Feldman: Second thing we're talking about is similar versus the same. So this is a it of trap that is pretty easy to fall into as programmers just in general, Elm or otherwise. Here's the trap. So we've got something here on this article page, [COUGH] called a status. And the purpose of status is to record in what state, these two different HTTP requests are.
+
+[00:00:27]
+So we have a status for loading the comments that come along with this particular article. So there's a little list of comments. And separately, we fire off another HTTP request to load the article. Now these are running concurrently, so it's possible that one of them's done, the other one's still loading.
+
+[00:00:43]
+It's possible that neither of them are done, or it's possible that both of them are done. Every combination of those is possible. We've also got a separate distinction here between Loading and LoadingSlowly. LoadingSlowly means we've passed the 500 millisecond threshold, and is now considered to be a slow loader.
+
+[00:00:58]
+And we're going to show a loading spinner to the user at that point. So we have these four different states, and they are sort of independent. Either of these can be in either state with any combination. Okay, so this then leads to sort of a natural question which is yeah, don't we have this in a bunch of different places?
+
+[00:01:18]
+Don't we have this on a bunch of different pages? Isn't this an opportunity for reuse? We've done a tiny bit of reuse here within this module. We're using this type in two places in this module. But couldn't we be using it in more? Why don't we use this thing on the profile page, also, which also has two different HTTP requests that it's doing?
+
+[00:01:37]
+Why don't we use it on the editor, which also is in the same boat of at least needing one HTTP request? We might as well have it load this thing up so that it can use it for the sake of DRY, don't repeat yourself, as they say. Well, let's take a look at those and see what we actually ended up doing instead just by doing nothing else rather than saying, okay, let's start by figuring out the type that works for this page.
+
+[00:02:00]
+And then see if it turns out that those needs are actually the same. In other words, we successfully can reuse this thing because the needs are the same, or if actually the needs are similar but not quite the same. So here's what we ended up with on Profile.
+
+[00:02:16]
+So on Profile, we also have a type called Status, and it works very similarly. We have author and feed, those two different HTTP requests that are loading concurrently with one another. But it's not quite the same. If you look at these two types, here we have Loading, Loading Slowly.
+
+[00:02:30]
+Okay, we also Loading and LoadingSlowly here, but here each variant stores a username. And failed, also stores a username. This is an important distinction. So on the profile page this is again, getting into a concept, [LAUGH] that we're gonna talk about in a little bit in a different section.
+
+[00:02:46]
+But we wanna have a single source of truth to answer the question, what username are we looking at? What is the current user? Who's profile is this? And the trick with that is that we need to store that information before we actually load the thing. If I wanted to transition between these states I potentially need to have that information written down.
+
+[00:03:08]
+But actually once we're loaded, I don't care anymore. Once we got the profile, it's not longer important. But up until that point, it still is. Now that's not true on the article page. The article page doesn't have that same design consideration. It's not important for it to store any additional information in the status.
+
+[00:03:23]
+It can just get away with Loading, LoadingSlowly, and Failed. No additional info needed. Let's look at the editor. Now this one, we saw in the previous exercise, this is actually even more complex. Yeah, it's still got Loading and LoadingSlowly, much like Profile, it's also storing the slug, which is to say the article that we're currently viewing, so it shares that design consideration.
+
+[00:03:43]
+But man, it doesn't even share anymore stuff than than that. Here it starts to get into a serious departure. So we now have this split between Edit Article and New Article, and each of them have different shapes of statuses. It's not just that each of them could have a separate status, it's that the very notions of statuses that they have are different.
+
+[00:04:01]
+Edit has this whole series of statues that have to do with loading, whereas new doesn't. When you're in the New Article state you're either editing it, in which case you've got potentially a list of problems in the forum. Or you're in the process of creating. Now the distinction between these two is when you hit the Create Article button, we've validated your form, and confirmed that there are no problems right now.
+
+[00:04:21]
+Everything's cool, we validated it, we sent the HTTP request off to the server, so there are no problems store in there. In contrast, editing has the same kind of situation there with saving, but it now has a slug associated with that. Because when you're editing the article, you need to know what the slug is of the article that you're editing.
+
+[00:04:41]
+That's an important piece of information for the code that's gonna run in there. When you're a new article, you don't have a slug yet. It doesn't exist. The whole point of this is we're trying to create a new article from scratch and the server tells us what the slug is.
+
+[00:04:52]
+We don't have one yet. So we can see that although in all three cases we happen to have a type called status that effectively does the same job in all three cases. We don't actually really have a good argument that we should be trying to do reuse here.
+
+[00:05:09]
+Imagine if we tried to extend this initial status type to be flexible enough to accommodate all three use cases. How much configuration will we have to introduce to this thing to make it capable of supporting this? Really, what we'd end up doing is we'd effectively end up taking this, adding even more configuration on top of it so that we could use this for that as well without having to handle all of those extraneous cases.
+
+[00:05:34]
+It's actually much better to just repeat yourself, as it were. [LAUGH] To go against the wisdom of that acronym, or the advice of that acronym and say, yeah, actually these are similar. They do a similar job. They look similar. They have the same name, but they're not the same.
+
+[00:05:51]
+They actually do things differently enough that it really does make sense not to reach for reuse here. It makes sense to say, yeah, these are just different things. They do the same job but they're different. We're just gonna have different types for each of them. And that's something that I think I sort of had to learn the hard way over the course of my years using Elm is that, yeah, reuse is not necessarily the first thing to reach for in all cases.
+
+[00:06:14]
+In a lot of cases, it's better just to say, no, these are different. We're just gonna have a different thing here. I think there is a meaningful difference when it comes to testing. So I think one of the reasons that I reached for reuse as often as I did in JavaScript, and I noticed that.
+
+[00:06:30]
+I believe DRY comes from the Ruby community, which is, of course, extremely big on testing, is that, in JavaScript, I needed to lean on tests a lot to believe that my code was actually going to work. I had a very low level of confidence in my code actually working unless I had tests around it.
+
+[00:06:44]
+And one of the things about writing code and then reusing it is that you also get to reuse all the tests. The thing is, in Elm, I have confidence in this code, not because of the tests, but because of the way that I've typed it. The way that the compiler's going to interact with my system and sort of check everything out for me.
+
+[00:07:00]
+And that's gonna happen whether or not I'm re-using it. This thing right here gets just as much love from the compiler as this thing, and just as much from this thing. In all cases, I'm writing the same number of tests around these pieces of code which is to say, none.
+
+[00:07:14]
+And if I were going to write tests around this, I would actually want the test for the state-transitions between these different statuses to be pretty different from the tests I would write for this one or for this one. In fact, if I were to look for any opportunities for use most likely it would be in the tests.
+
+[00:07:29]
+I would probably wanna write some helper functions that would say, okay, I wanna look at if I've got a Loading, or LoadingSlowly, or Loaded, or Failed the transitions between those two should be the same regardless of username versus not. So if anything, I think that’s the opportunity to reuse would be in testing, and it would be do through doing a helper function rather than by trying to reuse the type itself.
+

@@ -1,0 +1,85 @@
+[00:00:00]
+>> Richard Feldman: Which gets us into module structure. So one of the things that sometimes comes up in Elm is you have sort of folders in your module structure for use as namespaces. So an example of this is we have viewer.cred. So basically, credentials only have to do with the current logged in user, it's their credentials.
+
+[00:00:17]
+So I chose the namespaces under viewer to sort of indicate that link. And these credentials only exist for the viewer. This is a sort of inextricably linked concept there. We also have a number of things that need page namespace. We have page.article, page.blank, page.home. All of these sort of are coupled with that page module that we just saw.
+
+[00:00:37]
+They need that page module in order to render. They need to call page.view to get the header and footer.
+>> Richard Feldman: Also, we have page.article.editor, which is sort of a special case of the article. This is the article editor. I could also see, in the case of this, saying page.articleeditor, that would also be fine, and not putting another namespace.
+
+[00:00:55]
+But it seemed like a reasonable choice in this case.
+>> Richard Feldman: So typically speaking, L namespaces, I like to make as flat as possible. I used to do this a little bit differently in the previous edition of the single page app. I actually had a top level thing called data, a folder called data, where I put all of my articles and profiles and users-related stuff in there.
+
+[00:01:17]
+And those were all just plain data structures, and they didn't have any view logic, they didn't have any HTTP in them, it was just the data structure itself. But what I found was that I actually inadvertently encouraged myself to have sloppy module boundaries. Because, when I got rid of that, and I said, what if I just didn't have data.article, and requests.article, and views.article?
+
+[00:01:36]
+What if I just put those together inside article, and tried grouping them around the type, rather than saying the type is gonna be isolated in its own thing. What I found was that, previously, I had been needing to expose a bunch of stuff that was only being consumed by the other article, or whatever dot article modules.
+
+[00:01:52]
+It was like data.article, requests.article, and whatever the third one was, abuse.article. All needed to expose more stuff just for the benefit of one of the other two. Now, soon as I put them together in the same module, because they were all related, and all needed to do that stuff, I found that I needed to expose a total of less stuff.
+
+[00:02:09]
+I could keep more stuff confined within that module. And, those dependencies, which already existed for those modules, now no longer existed with all the rest of the modules.
+>> Richard Feldman: So in terms of how to structure your models, I think this is an important thing to be aware of.
+
+[00:02:23]
+Although these folders are extensively just namespaces and don't really technically mean anything, they do certainly encourage a certain style of organization. So I think it's important to be really sure that, this is a common boundary that you really want to have before making a new folder like this and inserting a new namespace.
+
+[00:02:40]
+So in the case of page, yeah, I'm quite sure that each of these pages is going to want to have its own module. Like page.article, page.blankpage.home, each of those, definitely I mean, I've never seen a single page app where you didn't wanna have one module per page. It's not inconceivable, but I think it's a safe enough bet, that it's probably what you're going to want to do.
+
+[00:03:00]
+But, I would caution against trying to put more divisions in than that, at least at first. If you find something, you identify something where you have this really kind of set of abstractions, they all want to go together. For example, we have article that has body, and comment, and feed, and slug, and tag it.
+
+[00:03:17]
+All of those are coupled with the concept of an article, I think that's reasonable. But I would caution it against having a top level namespace like data or request or any of those things. Having done that experiment myself, I wasn't nearly as happy with that as I have been with doing it this way.
+
+[00:03:33]
+Where I just have a top level thing called article, called author, called avatar, comment ID, etc. One other thing that I would note is that, speaking of comment ID, I've also sort of gotten in the habit of saying, I will make an opaque type out of pretty much anything at the drop of a hat, ID's in particular.
+
+[00:03:52]
+So I used to just do it like a type alias CommentId equals int, that works perfectly well with the the one problem, that if I ever accidentally have a function like this where it is says foo, and it takes a CommentId, and a UserId, and does something else.
+
+[00:04:09]
+If those are just both type alias to int, once again, I can mix up the order and potentially mess them up. And I've come to realize that this is an unfortunate downside of using type alias to make things that have slightly more readable names, which are not actually different types.
+
+[00:04:24]
+It sort of messes with my heuristic of looking at this and not seeing a red flag of saying, wait, that's too ints back-to-back. Wait a minute, I probably need somebody to disambiguate those. So since we've gotten out of a habit of doing that and I've said, you know what, I'm gonna make this custom types so that they're different, they're incompatible.
+
+[00:04:39]
+And while I'm at it I say, you know what, I might as well also restrict how these things are created. Once I'm gone out of my way to make a custom type, so that much more work to throw it in the module and then only select to the expose things.
+
+[00:04:50]
+So cool thing about these CommentId right here is that just from the module and what is exposing, I can tell a couple of things. One is, it's opaque, it's not exposing, it's variant. Two is, the only way to get one is through a decoder, that's actually the only way to extentiate a comment.
+
+[00:05:06]
+Which tells me that I can't have any pages on here that are, or at least I guess I technically could if I wanted to go way out of my way and say I'm gonna make a JSON string, encode it and then decode it. But I think at that point, I deserve whatever I get.
+
+[00:05:20]
+[LAUGH] I don't have at least anyone non-maliciously creating one of these things except from the server. So this ties into our notion of single sources of truth from earlier. This is basically saying, hey, you know what, the source of truth for CommentIds is? It's the server. You should only ever decode them from the server.
+
+[00:05:38]
+You should never ever be writing one out by hand for any reason. That shouldn't be happening, these should always come from the server. And this is a pretty concise way to express that. At the same time, it also gives us a handy Decode.map so we don't have to bother doing that map to convert it to the CommentId when we're actually using a decoder.
+
+[00:05:56]
+So, by doing this, I've just sort of gotten in the habit of saying, yeah, you know what, whatever I got one of these CommentIds and I'm building a decoder around it, I'm just gonna say commentId.decoder, rather than Decoder.int. And, yeah, that's worked out pretty much fine for me.
+
+[00:06:11]
+So you can see up here at the top level, we have CommentId, we have Emails, and other opaque type that again, doesn't necessarily need to be but it is. And all the other IDs, like Username, it has its own opaque type, etc., etc. I've also used in some cases, used these as a way to group, things that I want to reuse a lot of these things.
+
+[00:06:34]
+So for example, username.toHtml as opposed to toString, which is just, it comes up quite often that I'm rendering a username to the screen, so this is a convenient way to do that so I don't have to call two functions here, I can just call the one.
+>> Richard Feldman: One other note on this is that, I tried out doing IDs as comment.Id which sounded like a better idea in my head than it turned out to be in practice.
+
+[00:06:59]
+The problem with this is that, I can't actually do it that way and end up writing out this type the way that I thought I might be able to. So I can't, for example say, foo takes a Comment.Id and then whatever. The problem here is that this module's name is Comment.Id.
+
+[00:07:19]
+So I would have to say, Comment.Id.Id, which is kind of weird, that's not really what I wanted. Also, if I want to import this as an alias like I say import comment.Id as Id, well now I potentially have a namespace conflict with the actual comment module itself. So in the end I decided, you know what, as neat as this looks, I don't think it's actually the right choice.
+
+[00:07:44]
+I think I'm just gonna name my module CommentId and leave it at that.
+

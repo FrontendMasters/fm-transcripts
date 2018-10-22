@@ -1,0 +1,89 @@
+[00:00:00]
+>> Richard Feldman: So let's say we've got our decode.map3 implementation up here. We could also do it like this, this is the pipeline version. So instead of decode.map3 instructor, we're saying Decode.succeed Instructor. And instead of calling field three times, and getting three different decoders, we're instead calling required, but giving it similar looking arguments.
+
+[00:00:23]
+In both cases we got the same set of strings which correspond to the fields on the JSON object and we've got the same set of decoders specifying what value types we expect to be there corresponding to those field names. So what are similarities between the two? Of course the purpose of the decode pipeline version is that this doesn't stop at three.
+
+[00:00:43]
+We don't have to change the function that we're calling here if we wanna have 20 of these. We just need to make sure this function takes 20 arguments and we've piped it 20 times to required or optional or hard coded or something like that. Now, the types here are a little bit less obvious than what they are over here.
+
+[00:01:03]
+In this version, we saw the type of map3, and we saw that it took three decoders, and we knew how to make those decoders. And that was all there was to it. But in order to make this trick work, where it's flexible, and you can have it be as long or as short as you want, as long as it's the same length as the function, we have to have slightly more complex types.
+
+[00:01:21]
+So let's kind of break down what's going on here. So first, we have Decode.succeed. This is its type. It takes a value, and then it returns the decoder of that value. In other words, it returns a decoder which always succeeds no matter what the input is, and succeeds with that value.
+
+[00:01:41]
+So the whole goal of Decode.succeed is to say, yeah, I'm not even gonna look at that JSON, I don't care what's in there. I'm always gonna succeed with this particular thing. Now, typically, this is used in the same way that sort of hard-coded is used in JSON pipeline.
+
+[00:01:53]
+It's used to say okay, when we get to this particular situation. You know what, I don't actually wanna run a decoder, I need to have provided a decoder here, but I don't actually wanna do any decoding, so I'm just gonna Decode.succeed. However, in this particular case, we're using it in an unusual way.
+
+[00:02:08]
+We're using it as a starting point for our pipeline. So when we say Decode.succeed Instructor, let's look at the types there. What does Decode.succeed take? It takes an a, and it returns Decoder a. So what's this gonna return? Well, Decode.succeed takes an a which in this case is the instructor.
+
+[00:02:26]
+And instructor is a type alias for a String to Int to Bool to Instructor. So that means we're gonna get back at decoder of String to Int to Bool to Instructor. Which is a very weird thing to be working with? What does that even mean? Well what that means is this is a decoder, which always succeeds, and what it succeeds with is here's this function, again, kind of a weird thing to do.
+
+[00:02:49]
+Which is why the types of this library are kinda weird looking. What does it even mean to say I have a decoder of a function? Well, it basically means, in this case, whatever JSON you give me, I'm going to completely disregard and hand you this function. Again, kind of a silly thing to do, but at least we can understand that one step.
+
+[00:03:05]
+If we run this decoder on any piece of JSON, no matter what the fields on it, if it's an object, it's a string, whatever, this decoder will ignore it and say here is a function. Okay, so that's gonna be our starting point. Decode.succeed Instructor gives us back a decoder of String to Int to Bool to Instructor.
+
+[00:03:23]
+Now, the next thing we're going to do, is we're going to start calling required on it. We're gonna say Decode.succeed Instructor, pipe it to required "name" string, and then pipe it to required "name" string and required "courses" int. Now, the types here start to get a little more interesting.
+
+[00:03:38]
+So here we see that the second one is a decoder of Int to Bool to Instructor, ha. So essentially what required did there is it said I'm going to take this decoder and I'm going to apply it with one argument. As we know it supports partial application. So anytime you have a function with three arguments like we have at the top there.
+
+[00:04:00]
+You can always call it passing the first argument, and then you'll get back a function that's a partially applied version of that, which is to say a function with one fewer argument. And that's exactly what required does. It says, I'm gonna take this thing that you're decoding, then I'm gonna map over it, then I'm gonna say, hey, I've got this function inside there.
+
+[00:04:18]
+What am I gonna do with it? I'm gonna call it passing the result of my successful decoding. So in other words, if I'm successful, I'm gonna have a string. The first argument to this function is a string. So if I'm successful at decoding, I'm gonna take that string, I'm gonna take that function and I'm gonna pass it to it.
+
+[00:04:35]
+
+>> Richard Feldman: Which gives us back a decoder with that string missing from its function argument because it's now been applied once. So we still have a decoder which always succeeds no matter what happens. Except, with one exception that now it additionally is going to check for name. So whereas before, we would always succeed with this function.
+
+[00:04:55]
+Now it only succeeds with the function if we looked for a field called name on the JSON object, and it was there and it was a string. In which case, we will take that string and apply it to this function. So if this decoder succeeds, meaning the name was there, we're still gonna say we've succeeded, here you are, it's a function.
+
+[00:05:12]
+But now it's a different function, it's an Int to Bool to Instructor function. And as you might guess, this pattern's going continue with the next one. Except we've applied it once more. This is an Int to Bool to Instructor function. And the next required does exactly the same thing as the previous one did.
+
+[00:05:28]
+It said I'm gonna, okay, if this succeeds, I'm gonna say, great, I've got this function. I'm going to apply this int to it that I got from the courses field, assuming that succeeded as well. And we can take this one step further, Decode.succeed Instructor required "name" string, required "courses" int And required active bool.
+
+[00:05:46]
+And as you might guess now you've got this function from bool to instructor. If we now apply a bool to that, we just have decoder instructor.
+>> Richard Feldman: So that's how the pipeline types work. You start off by saying I'm always gonna succeed and with this weird function. And then each of these required things, it sort of peels things off of that layer and says, okay, we got to function with these many arguments.
+
+[00:06:09]
+I'm just gonna apply one argument to it based on what I decode if I'm successful. So by the end of it, we've ended up with essentially the same thing as what we had with map3. We're looking for name and courses and active. If we find all three of those, they're going to get applied one at a time to this function.
+
+[00:06:26]
+Which is going to be the resulting decoder, but we did it in a way where the pipeline just needs to be the same length as the function that we're decoding into. And then we're all good, we're all set, everything's gonna work out. We don't need to have a map three and a map four and a map five etc.
+
+[00:06:42]
+Based on the length, this pattern will work no matter the length.
+>> Speaker 2: So if you left one off, or get the order wrong, then this particular function call wouldn't error, but it would error when you actually tried to use the decoder?
+>> Richard Feldman: Right, yeah, exactly. So let's say I only called required twice.
+
+[00:07:03]
+We can actually see exactly what that would do right here. So if I left off the required active at the end there, this expression right here would totally be fine. It's just that it would produce a Decoder of Bool to Instructor. So if I'm later on trying to use this as though it's producing an Instructor, it's not gonna compile because it's like, well, no, that's a function, that's not actually an Instructor, so you gotta resolve something somewhere.
+
+[00:07:23]
+Likewise, if I provided too many arguments, if I tried to tried to call required one more time at the end there, it would say, you've got a value that's not a function, and you're trying to apply function arguments to it? That won't work. So that's how it works out that you have to have exactly the correct number of things in the pipeline that correspond to the number of arguments in the function that you're passing to the Decode.succeed.
+
+[00:07:47]
+
+>> Richard Feldman: This also reveals something that we did in one of the exercises earlier on, where we didn't pass a record constructor to this, but rather we passed a variant to it directly. So as you can imagine, this whole pipeline strategy, and in fact, the map3 strategy, or map2, or however many you wanna use it with, only relies on functions.
+
+[00:08:07]
+It doesn't actually care if this function happens to be a record structure, or happens to be a variant function, or happens to be an anonymous function that you just decided to write in line. All it's going to do is it's going to apply these arguments to it one at a time.
+
+[00:08:22]
+So you can put whatever you want in there, as long as it's a function and that function's type correspond to the different things that you're using with required, and the decoder is just supplying to required. It's gonna work out, and it's gonna do its thing.
+

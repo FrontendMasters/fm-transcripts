@@ -1,0 +1,78 @@
+[00:00:00]
+>> Richard Feldman: Single page apps. All right, we're going to talk about a few things here. First is routes. Second is pages. Third is loading and persisting data. And fourth is module structure. Okay, this is the third of three sections by process of elimination in which we're immediately going to go to the code and poke around in it.
+
+[00:00:20]
+All right, let's take a look. So we'll start with talking about routes. So routes essentially are the conceptual idea of, what is our URL space? We've got all these URLs that we potentially do or do not handle, and URLs each map to a particular route. Now, we have a few routes that look sort of familiar.
+
+[00:00:39]
+We've got Home, I'll get to Route in a second. Login, Logout, Register, Settings, Article. Notice that the Article route is parameterized on a slug. So you can't be on a particular viewing an article page unless you also have a slug which identifies which article we're viewing. You have a profile which has a username that corresponds to it, in other words, whose profile are we viewing.
+
+[00:00:59]
+We have NewArticle and EditArticle which are a little bit different in that EditArticle has a slug associated with it and NewArticle does not. Under the hood, these amount to a single page which we've been editing throughout the day. But as we will see later, pages and routes are slightly different concepts.
+
+[00:01:15]
+So this is our route, and it sort of determines, logically speaking, what are we doing right now? What are we on at this exact moment? These are the ones that we care about. If the URL is something that does not map to one of these, then that's going to be an error state.
+
+[00:01:31]
+That's something we just don't have a concept of in our application. We do have a parser. So this is a URL parser, it comes from the URL parsing library, the URL package. And it's got a couple of handy things in here. If you have seen this before. So this is basically infects operated use for DSL for specifying URL strings.
+
+[00:01:54]
+And then it's gotta a couple of different combiner here parser one of essence string which we'll look at the moment. So here's how we write a URL parser that maps URL strings directly to these routes. So we start off with parser.oneOf, which is basically going to say, run each of these in order, and the first one that succeeds, that's what we're gonna use.
+
+[00:02:13]
+Just stop going through the list. We'll just disregard the others. So first, we have Parser.map Home to Parser.top, which essentially says, if we get empty URL, the top of our hierarchy with nothing else on top, totally great. Then, we're gonna just succeed with Home. Then, we have Login, which is /login, logout, which is /logout, settings, profile, register, etc.
+
+[00:02:36]
+We can see the little slash infix operator here, which is basically saying, when we have a profile here, which is to say, one of these, that's gonna have two pieces to it. First, it's gonna have /Profile, and then it's going to have the results of a Username.URL parser.
+
+[00:02:54]
+So it's gonna look for a profile and then it's gonna parse whatever comes after the slash, after a profile as a username. And it's gonna put both of those into this profile right here, okay. So using this we have this sort of concise DSL to show these mappings between URLs of various shapes and sizes, in some cases with extra slashes and strings and so forth.
+
+[00:03:13]
+And they're mapping to routes. Worth noting that sometimes we have routes that do a different, we have a different route depending on whether or not the URL does or doesn't have a slash after it. So for example, we have Parser.map NewArticle. This is the case where we have just the editor and we don't have a slash after it.
+
+[00:03:30]
+Followed by the case where we do have an editor followed by a slash and then we do the slug dot URL parser. As we see noted, good module organization strategies for elm it typically our each module revolves around the particular type. So this is the router module and it has a couple of different functions here.
+
+[00:03:47]
+Notice that we don't actually expose that parser directly, we use it as a helper to something else. Namely, the from the URL function. So this says give me a URL, and I may or may not give you back a route. Now, this is a little bit of extra logic in here, that has to do with the fact that the real world spec doesn't deal in terms of actual URLs look like slashes in them directly, rather it does sort of builds like an extra layer on top of them based on the hash.
+
+[00:04:16]
+So if you look in here, you notice that we're not actually on the root here, we're on localhost.300/pound. And if I go to new host we're going to pound/editor. If I go to settings that's pound/settings. Essentially I wanted to work as though we were not dealing in those terms.
+
+[00:04:34]
+So what I did is I essentially wrote a little helper here that says I'm going to actually take the fragment, and pretend that's our actual path. And then use that, and then parse as normal as though it were a regular path. So this is sort of a little extra step that I took to make sure it feels like using the path because that’s really what they’re going for with this spec.
+
+[00:04:55]
+They want the hash routing for various reasons, but I wanted to sort of pretend that it’s a path because that’s what it most closely resembles by design. Okay, so that's how we go from a URL to a route. And it's a maybe route, because again, this could maybe not map to any of these.
+
+[00:05:12]
+If this one of fails and we go through all of our known routes and we don't see it, then it's like, yeah, I'm just gonna give you back nothing because that URL that you're visiting does not map to any of these routes that we know about. Then ultimately, that's what's gonna lead some other logic to render a page not found.
+
+[00:05:27]
+Okay, so that's how we go from URL to a route. What's arguably more useful is the other way around, is this Route to String function. Now, what this does is it takes a route and it returns a string. And essentially what it does is it uses this URL builder, sorry, this string.join to build the URL with the hash in front of it.
+
+[00:05:47]
+And essentially, I am making this my single source of truth for how to generate links throughout the application. So anywhere I wanna put a link, I’m not going to call href directly. What I wanna use instead is this little helper we have here called route.href. And route.href doesn't take a string, it takes a route and gives you back an attribute.
+
+[00:06:11]
+So through out the application, this is what we're using whenever we wanna link to something. So rather than linking to it a hard-coded string which could potentially get out of sync, could potentially get a typo in it. We're instead passing it one of these custom type values such that if we're ever giving it an invalid route, it just won't compile.
+
+[00:06:32]
+Not only that, but also are always because we're passing it about, forcing us to specify, not only is this an article, but also this article has to have a slogan associated with it, but we can't forget that or it won't compile. So having this route type, actually helps is us out in two ways.
+
+[00:06:45]
+It helps us when parsing URLs because it gives us a way to map so that route and say, okay, this is actually part of the set of things that we recognize as a valid URLs. And it also helps us go to the other way around. And to say, when you want to get a URLs too something.
+
+[00:07:01]
+Just work only in terms of the route, and leave all of the URL specific logic inside of this module. So actually outside of this route module none of the rest of the application should have any business dealing with URLs directly. It should all be in term of routes for them.
+
+[00:07:16]
+So essentially, route is an abstraction on top of valid URLs, URLs, that we actually know how to work with in our application. Now, granted, there are not guarantees around this. So it's encouraged to use routes.href, but the plain HTML href still exists. If pages want to, they can continue to use hard-coded strings.
+
+[00:07:34]
+If we wanted to actually rule that out, we could do something like what Tesla did and make sort of a drop in replacement for HTML which includes the route module inside of it. And then also drop in replacements for all the issue or functions, except for that one.
+
+[00:07:46]
+Well, that seemed like overkill. So, instead it's just something that is encouraged but which, there's an escape hatch if people want to use the other thing. Hopefully, we could train our team, if I had a team of people working on this code base to use route. And when we do it at work, this is basically how we do it.
+

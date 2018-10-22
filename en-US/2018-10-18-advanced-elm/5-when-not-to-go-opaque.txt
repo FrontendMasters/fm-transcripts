@@ -1,0 +1,101 @@
+[00:00:00]
+>> Richard Feldman: So this is the edge case that I ended up realizing that I had. When you render a follow button, there's actually three possible states. One is I'm following this person, another is I'm not following this person, and a third is it's me. I should never render a follow button for myself, if I'm viewing my own profile, if I have a follow button there, that's a mistake, that just doesn't make any sense.
+
+[00:00:20]
+So I asked myself the question is it possible to rule that out a compile attempt to make it actually impossible to render a follow button for myself. It turns out, yes it's possible and here's how. So let's say we have a type called author and author is a non opaque type with three variants.
+
+[00:00:39]
+So it's got Isfollowing, which means I am following this author, it's got Isnotfollowing, means I'm not following this author, and Isviewer. Viewer is the term I've used here to refer to currently logged in user, it's because it's one word instead of three and essentially, this is the one that says it's me.
+
+[00:00:57]
+Now notice that each of these has different types that of data that they are storing along with the variant. So Isfollowing stores FollowedAuthor is an opaque type. It holds on to user name and profile, those are the two pieces of information we have about every author. So FollowedAuthor has one variant which is also called FollowedAuthor.
+
+[00:01:18]
+This is a pretty common pattern if you have a single variant to just give the variant the same name as the type itself. So it's a little bit confusing the first time you see it. But over time you realize that well it isn't really a better name for this thing if there is only one variant.
+
+[00:01:31]
+So people end up typically using the same name as the type of one variant when you're doing that. So we have FollowedAuthor which has using your profile and UnfollowedAuthor which has a username profile. Now if I go up and stop here we can see that sure enough I am in fact exposing the variance for author.
+
+[00:01:48]
+We'll talk about why momentarily, but not for FollowedAuthor, and not for UnfollowedAuthor. So the only way that I can actually get one of these FollowedAuthors or UnfollowedAuthors, is by using functions like the ones down here. I can do things like follow someone, which takes me from UnfollowedAuthor to FollowedAuthor.
+
+[00:02:05]
+I can unfollow someone, which takes me from FollowedAuthor to UnfollowedAuthor. I can request a follow which is to say, go tell the server I want to follow this person or I want to unfollow this person. And in either case I'm always being very explicit about whether I am currently following or not that person.
+
+[00:02:22]
+Another thing to note is that this is a nice handy trick when you have a single variant custom type is you can actually destructure it in line. So this is effectively the same thing as if I had instead said name this unfollowedAuthor, and I'd said down here, case unfollowedAuthor of, and then I just had the one case down in here.
+
+[00:02:47]
+So instead of doing that, it's a lot more concise to just do it in line. And that allows you to do that, because it's essentially an in-line pattern match, where there's only one pattern. And since, with a single variant custom type, there's only one possible pattern, the compiler accepts this and, knows what to do with it.
+
+[00:03:03]
+Okay, so now that I've got my FollowedAuthor and UnfollowedAuthor, which are opaqu. How do I actually obtain one from the get go? Well if you notice, we can request to follow and unfollow people. But the only way we can actually get an author in the first place, is to get one from one of these Http.Request.
+
+[00:03:24]
+Like I can do an Http.Request that will give me an author, author back. But once I have one, all I can do is destructure it into one of these three possibilities. Either I'm following them, in which case I get a FollowedAuthor, I'm not following, in which case I get an UnfollowedAuthor, or it's me and I get sort of myself back.
+
+[00:03:42]
+Now, the fact that this is not opaque doesn't really harm me in this cause because how could I possibly construct one of these authors? Well, there are three variants here, one of them is, contains an opaque type. So I need to already have a followedAuthor in order to construct one of those.
+
+[00:03:57]
+The other one is also opaque so I need an UnfollowedAuthor to be able to construct one of those. And the final one is me which means I can construct an author that is me if I am me, which okay, fine, I can do that. But I narrowly getting a new information there not only breaking any in variance, I am able to just say this is an author that is myself which is information that I already had.
+
+[00:04:15]
+So the fact that we are exposing these variance isnt really costing us any guarantees, it has kept the same set of guarantees that if we did not expose those variance. But we're exposing them does turns out to be pretty cool.
+>> Richard Feldman: So let's take a look at the profile page.
+
+[00:04:31]
+So here's what goes on on the profile page. I want to render a follow-unfollow button. I do a case expression on my author and I've got these three branches. One is it's me and say, well, we can't follow ourselves. So here I rendered nothing. If I am following this person, then I render an unfollow button and if I am not following this person, then I render a follow button.
+
+[00:04:54]
+Now, what's cool about this is that, I can't actually write this code without writing the case expression. I can't call unfollow button without having a FollowedAuthor, and I can't call follow button without having an UnfollowedAuthor. Because each of those.
+>> Richard Feldman: Requires passing the other one. Follow button requires taking an UnfollowedAuthor, unfollow button requires taking a FollowedAuthor.
+
+[00:05:20]
+And the only way that I can obtain one of those if I've got an article is to actually enumerate all three of these cases. I have to write a case expression, I have to handle all three types. So because of the way we set up the variants and which of these types are opaque, it ends up being the case that the only way to render a follow and unfollow button.
+
+[00:05:37]
+Is to render a follow button for someone I'm not following, to render an unfollow button for someone that I am following, and I can't render either of them if it's me. So it successfully turn this edge case from something where I have to remember to do it all the time.
+
+[00:05:51]
+Or I have to document to do it and hope that the present joins the company 12 months from now and it's the first week on the job and it's going to render to follow. But they remember that into something where you kinda can't mess it up, or at least you can't mess up the part where you need to know how to handle it properly.
+
+[00:06:09]
+This isn't to say that you can't make other mistakes, I could still render something incomprehensible here or I could choose not to render an unfollow button here. But at the very least the edge case of forgetting to handle this is no longer really possible to ignore. Questions on that?
+
+[00:06:23]
+Yeah?
+>> Speaker 2: So to that point about, kinda like sharing knowledge, when you get a code review. If you see somebody expose something new, would that, like, be a red flag, like, maybe they didn't get it and they kind of dove into that opening type and.
+>> Richard Feldman: For sure, yeah.
+
+[00:06:38]
+[LAUGH] So, like, if somebody makes a pull request and they do this. Yeah, that's usually a red flag. If you're going from unexposed constructors to exposed constructors, probably, there should be a name change going along with that, because it probably means you're doing something fundamentally different than what you were doing before.
+
+[00:06:54]
+Yeah, I would definitely consider that a pre. It's essentially the equivalent of, if you're working in Ruby or Java, and someone takes all the stuff that was in private and just moves it to public. It's like, wait, wait, wait. [LAUGH] Why are we doing this? This seems like a bad idea.
+
+[00:07:10]
+
+>> Speaker 3: In the case statement you are returning html and then just returning an empty text, [INAUDIBLE] it looks like.
+>> Richard Feldman: Yeah.
+>> Speaker 3: Yeah, that's pretty common.
+>> Richard Feldman: Yeah, that's, so, another way you can do it, this is a short hand I like to use for essentially saying I don't wanna return any virtual download because an empty text node is essentially Invisible in the DOM to the end user.
+
+[00:07:33]
+Another way you can do it is you could have this return a maybe, or you could have it return a list of HTML, and then concatenate them on other things and return empty lists there. But often enough I just tend to go with this, any of those three ways work.
+
+[00:07:49]
+We're done with to the code, all right, so let's review. We started off by talking about module boundaries, the idea of being able to selectively expose our variants such that we don't expose everything by default but rather we choose to only expose variance when it sort of makes sense.
+
+[00:08:06]
+We talked about the idea of opaque type, which is to say types where the implementation, details are hidden. The variance are not exposed or maybe it's not even a custom type under the hood at all, in the case of some of the things that are built in to the core library.
+
+[00:08:19]
+We talked about the idea of validated data, we talked about the email type, where we could guarantee that the email had at least been validated if you were to obtain one of those values. Then we showed how to do that with a wrapper called valid, which the other way to obtain one of those was to run it through a validation function.
+
+[00:08:33]
+And it would guarantee that whatever type you had, had been run through a validator of some sort. And finally we talked about when not to go Opaque, we saw the example of the author where we had three variance. Which was totally fine to expose based on the way that we were ending up using it, it wasn't actually breaking any guarantees and it did require that the end user needed to handle all three of those cases.
+
+[00:08:52]
+And in fact there, the fact that you had the full pattern matching abilities without losing any guarantees turned out to be beneficial.
+

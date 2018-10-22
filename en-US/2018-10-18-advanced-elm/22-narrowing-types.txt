@@ -1,0 +1,85 @@
+[00:00:00]
+>> Richard Feldman: Whenever we're trying to narrow down our list of potential culprits, the first thing we're gonna look at are the types, because in Elm, all functions are pure. So there's no possibility that any of these functions are interacting with one another, except by passing arguments and then accepting return values from other functions.
+
+[00:00:16]
+So when we're trying to decide who's the potential culprit for this form bug, we can narrow it down very quickly by looking at the types if they're sufficiently narrow. So let's take as an example, when I'm looking at this function right here, initEdit. This is a function that's designed to be setting up the page for the first time.
+
+[00:00:35]
+So it takes a Session, which includes the current authenticated user. It takes Slug, which is sort of the ID, the identifier for the article that we're editing. And returns Model and Cmd Msg. That is a very broad type to return. We know that this function can potentially do anything to the model.
+
+[00:00:54]
+It can potentially run any command, absolutely any. And unfortunately, it sort of needs to have those types because this is init. I mean, its job is to setup the model from scratch. It needs to be able to return the whole thing because we don't have one yet, it needs to establish one.
+
+[00:01:08]
+It also needs to run a couple of commands. It needs to go fetch the actual article. It needs to run the task for the slow threshold for our loading spinner. So in order for it to do its job, it has to return this fairly broad type. Okay, fair enough.
+
+[00:01:22]
+But that does mean any time we're dealing with this form-specific bug, we have to consider initEdit as one of the possibilities just by looking at the type. But let's keep going. We're gonna skip over the view, let's just assume this has something to do with modifying data. Okay, all of these view functions are potentially not culprits because all they ever return is HTML.
+
+[00:01:43]
+If we're worried about some modifications happening to the form data, well, the HTML values don't have anything to do with that. So it's not so much that these have Button in the title or View in the title as it is that I can just look at their types and say, yeah, none of these are culprits.
+
+[00:01:57]
+I can safely rule out all these view functions. Well, what about some code that actually does modify stuff? Well, update, much like init, returns the entire model and the entire command. So yeah, anything in update is fair game, we have to potentially consider this as a culprit. What about this one, save?
+
+[00:02:16]
+Well, save takes Cred and Status, and then returns Status and Cmd Msg. Does Status hold onto the form? Yes it does, as we saw earlier. This is exactly where it's held onto. So the model itself does not directly hold onto the form, we only have a form once we're done loading the data.
+
+[00:02:31]
+So we have it in these four variants of Status, but it's still there, which means, yes, this function, too, is a potential culprit. So save is a potential culprit, update is, and initEdit is. But we have already ruled out all those view functions, so that's progress. savingError, again, potential culprit because it has Status in it.
+
+[00:02:51]
+updateForm, yep, definitely a potential culprit. Again, a little bit more of a narrow type. It doesn't have Status, it doesn't have Model, but it still has Form, and it actually ends up returning the entire Model and Cmd Msg. So now we have four culprits. So the question is, how can we actually narrow these things down?
+
+[00:03:09]
+Well, the answer is by finding functions like this. This returns a list of problems, that's it. If we have an issue with the form like the user name field is not working properly, I can rule this function out just as quickly as I was able to rule out all those view functions just by looking at the return type.
+
+[00:03:28]
+I'm like, yeah, this thing can't possibly affect the form because it doesn't work with the form. All it does is return problems. That's a good thing to know.
+>> Richard Feldman: This one, TrimmedForm, that could potentially affect it. HTTP, this one returns an HTTP request that produces an Article Full.
+
+[00:03:46]
+Could that possibly be the culprit? No, definitely not. And so by doing this, I can actually chop this file down to a list of potential culprits from this entire list of 600 some-odd lines down to a much, much smaller set of lines that I need to consider. And when I'm debugging, this is exactly the process that I wanna go through.
+
+[00:04:03]
+I wanna start with saying, okay, I know the problem is coming from somewhere within the model. Somewhere within the model, something is going wrong. What are all the functions that affect the model? And then I can narrow that down and say, actually, it's more specific than that, it's something is going wrong with the form.
+
+[00:04:20]
+What are all the functions that interact with the form? Well, all the ones that interact with Model, or that return Model, they're potential culprits. All the ones that return Status, they're potential culprits, cuz that's where the form lives. All the ones that return Form, they're potential culprits. But everything else, just by looking at the type, doesn't matter how long this function is, I can't even see it, it's not on my screen right now.
+
+[00:04:41]
+And I already ruled it out without even looking at the entirety of the function, let alone walking through and figuring out what the implementation does. So much like in the way that if you're doing a binary search through a tree, you can benefit from the tree being sorted a certain way.
+
+[00:04:54]
+You can go down pathways more effectively and say, I can rule out this entire half of the tree because the thing that I'm looking for I know has to be in this part of the sorted tree. Having narrower types gives us the ability to traverse our code much more quickly and rule out things that we don't need to load into our brains as we're going through this process of debugging something.
+
+[00:05:13]
+And it's not just for debugging. It's for all sorts of different things. Any time we're making a modification, I'm wondering, hey, what are the things that are potentially impacted by this? Ideally, we've been using some of the techniques that we've talked about earlier in the workshop, such that if I make a modification, and there is some edge case, the compiler's gonna tell me about it.
+
+[00:05:30]
+But assuming that I didn't successfully do that, which, let's be fair, not all edge cases can be represented in a way where the compiler will help us out and tell us about it, I wanna be able to do this. I wanna be able to say, okay, what are the things that are possibly affected by this change I'm about to make?
+
+[00:05:45]
+And just do a very quick search through and see who's potentially affected. With a change like that, where I'm looking for something to change as opposed to looking for the culprit for a bug, now the arguments come into play, it's not just the return values. So if I'm saying, I'm making a change to the way credentials work, for example, we talked about Cred earlier.
+
+[00:06:04]
+All the functions that accept Cred are potentially affected by that change, but the ones that don't accept it I know are not affected. tagsFromString, not affected by that. create is affected by that. trimFields, not affected by that. So there are all these ways that I can segment my program, and as I'm running these queries and thinking about what things affect what other things, because all functions in Elm are pure, they can't possibly interact with one another in any other way other than calling and returning.
+
+[00:06:30]
+Which means that of the lines of code in this file, when I'm thinking about, how is a change going to impact these things, or how am I going to find a bug that impacts these things? The number lines of code is actually extremely small, it's just the type annotations.
+
+[00:06:45]
+Everything else I can pretty much ignore. Until I get to the very end. Once I finally narrow it down, and I say, okay, I finally narrowed it down to just this one particular set of functions, maybe we had a running tally earlier that was around four or five of them.
+
+[00:07:01]
+Eventually we get it down to just the set of ones that could actually potentially be culprits for the bug, and then we say, okay, now I'll actually look at the implementation of these things. And it's a much, much smaller set of things that I have to look at at that point.
+
+[00:07:14]
+
+>> Richard Feldman: Questions about that idea of narrowing types? Yeah.
+>> Speaker 2: So that's really useful. Could you actually build a tool or something to help you with this? Say, I have a bug in this part of my model, and show me all the type signatures that?
+>> Richard Feldman: Yeah, you totally could.
+
+[00:07:33]
+Question was, is there tooling you could have that would show you, like you say, I have a bug in this part of my model, show me all the dependencies of that. Definitely, I mean, the information's there. I've never heard of a tool like that, but it sounds awesome.
+

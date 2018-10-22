@@ -1,0 +1,77 @@
+[00:00:00]
+>> Richard Feldman: So let's see about using Cmd to do an actual Http request. Http.getString is sort of the most basic simple version of how to do Http in Elm. So this is close to what Elm's Http.getString function looks like, but not quite. Let's just imagine hypothetically, what if it did look like this?
+
+[00:00:22]
+So it's a getString, so it's gonna take a string for the URL, okay, that part's actually how the real API looks. And then, what if it just gave us back a command that said, hey, I'm gonna give you back a command. And it's got a string that's the response that comes out of that.
+
+[00:00:37]
+So fundamentally, getString is saying give me a URL and I'm just gonna do a get request to some server that's at that URL. I'm just gonna give you back the raw string that comes back. The problem here is this is something you're pretty serious assumption that this is gonna work.
+
+[00:00:51]
+Like random number generation, yeah, okay, that's gonna work. We can have a command that just says, tell me what I wanna pick from these greetings. That is 100% of the time gonna work, it's always gonna send a message back to update. Http, though, a lot of stuff can go wrong, right?
+
+[00:01:09]
+There's a bazillion things that can go wrong, like this really always gonna produce a string? What if the server's down? I mean, what if the server's up, but I gave it an invalid URL, and it's pointing to the wrong server? What happens if I get a 401, cuz I had to log in, or a 403 because this is some secret government website that I'm just never gonna have access to.
+
+[00:01:28]
+There's so many things that can go wrong, it could time out because I'm on a super slow connection. Where it is not necessarily actually ever going to give me back a string. So to do this, this is the actual API forward, the Http request. When I say getString, it says okay give me the URL and I'm gonna give you back a request value.
+
+[00:01:48]
+And that request value, is just a description of, okay here is the sort of parameters for this HCDP request. But we haven't yet specified how we're gonna handle, all the things that could go wrong with it. So this is sort of an intermediate value on the way to a command.
+
+[00:02:04]
+It's a representation of, okay, here's what I want to happen. But I haven't specified the details of how I'm going to handle all the possible things that could go wrong along the way to a command.
+>> Richard Feldman: So this type parameter on request, this is only the result if the request succeeds.
+
+[00:02:21]
+So if the request succeeds, great, we will get back our string. We know that from getString, and we'll see fancier things later that give us more direct things and string, or like closer to what we actually want, like articles and stuff. And if it fails, HTTP has a custom error type, that can model all those different scenarios for things that can go wrong.
+
+[00:02:41]
+The way we actually go from a request to a command is using the Http.send function. So sends job is basically, it accepts arguments that describe how we can translate failure into a message. And also, how we can translate success into a message. So send says, give me a function that's gonna translate a failure into a message, and give me a function that's gonna translate a success into a message.
+
+[00:03:08]
+And then what I'm gonna do is, I'm gonna perform the Http request, so I'm just gonna hold on to those two functions, and then we're gonna see what happens. And if it fails, I'm gonna call the failure one, and then great, I now know what message to send to update, and then update knows okay, it failed.
+
+[00:03:20]
+I'm gonna handle that. And if it succeeds, great, then I'll call the other function. Now I've got a message. Send that message to update, and then, again, update will be able to handle that. So this is a way of essentially specifying update is going to need to handle both of these possibilities, in a way that's sort of baked into the API for Http.
+
+[00:03:38]
+So just an example of sort of using it in action. Call Http.send. And we're gonna kinda clean up this in a little bit. It's gonna be a little bit less code than this, but I'm gonna write it all out for this first one. So the first argument, is here is how I'm gonna translate failure into a message.
+
+[00:03:58]
+I'm gonna say I get a result, and this by the way is the same type of result that we saw when we were dealing with JSON decoders. Which is to say it's either an okay or an error, it's that custom type that has those two variants. We're just gonna have a message that holds onto that result.
+
+[00:04:14]
+So we're gonna call it, CompletedLoadFeed. So this is what happens when LoadFeed finishes. It's that HTTP request has completed, it's gonna hold onto that result, which either has the error case, in which case the request failed, or the okay case, which means that we actually got a feed to work with.
+
+[00:04:32]
+And then the other argument to Http.send, is the actual hey here's the request that describes what I want to go and attempt to do and that's gonna drive this result. By the way, any time you notice this pattern, where you see an anonymous function that takes one argument, and then passes that as the argument to another function.
+
+[00:04:52]
+You can just collapse that into the function itself. There's no need to write this whole thing out. We can just say Http.send, CompletedLoadFeed and just sort of condense that, right, like this. So it's a little bit more concise. And also, the way that I would typically write this, is I would actually just reorder those and do it as a pipeline.
+
+[00:05:14]
+So this is essentially the same thing as what we had before, but written in a pipeline style, because I like to think of this as, okay, I wanna do Http.getString on this URL. And then I wanna pipe that to Http.send, and then here's what I wanna do to handle the failure and success possibilities.
+
+[00:05:30]
+So this is typically how I would actually do some Http requests in Elm. Start by saying, here's the request I want. And then pipe that to Http.send which says, here's the message that I want to get sent to update that will translate failure and success into a message so an update can handle both possibilities.
+
+[00:05:47]
+Questions on that at a conceptual level?
+>> Speaker 2: So getString is taking something and it's just gonna turn it into this request object. Take a string that's gonna turn into a request object.
+>> Richard Feldman: Right, so the string that it takes is the URL to go and hit, and it's gonna produce a string which completed load feed will hold on to.
+
+[00:06:10]
+So the type of that is, it's result,and there's an Http.error, so that's what it will get if it fails. That would be in the error branch. In the okay branch, it would be a row string of just actual string that came back from the server. So we're gonna get one or the other.
+
+[00:06:25]
+If it succeeds we'll get back a string, that's why it's called getstring, cuz it just gets the raw string from the server. And if it errors, then we're gonna get an Http error. Now we're gonna see in a second, the fancier version of this that's going to take that string and actually like do something with it, like decode it from JSON, or something like that.
+
+[00:06:44]
+But fundamentally, getString is sort of the simplest way we can ask a server for something.
+>> Speaker 2: Okay, so it's specifically a way to request, knowing you're gonna get a string that?
+>> Richard Feldman: Exactly, right, yeah. So this is, Http requests, hey server, what's in this URL, and server says, barf, here is this whole string, deal with it.
+
+[00:07:04]
+Not as useful as were about to work up to, but starting simpler. [LAUGH] So Http.send returns the command, at this point we have a command. Update can return it, and everything else is going to work the same way that it has up to this point.
+

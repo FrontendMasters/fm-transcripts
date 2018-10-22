@@ -1,0 +1,91 @@
+[00:00:00]
+>> Richard Feldman: So let's say we want to specifically decode this into a user record, which we've given a type alias with ID, first_name, and last_name. Note by the way, that when you're decoding from JSON, which perhaps has this structure, you don't need to have the same field names as you do in the JSON.
+
+[00:00:18]
+So I actually chose slightly different names here, this has user_id, but I don't really wanna use underscores because camelCase is kind of the convention in Elm. But maybe my back end's in Ruby which is actually at work this is true of us. Our back ends in Ruby tends to be the case that the back end provides things with underscores, but we tend to use camelCase, totally fine.
+
+[00:00:38]
+Also worth noting that we don't even need to have the types line up necessarily. So maybe it's coming back from the server as a string but maybe we want to actually map that into a custom type and we wanna say, there should be exactly one of these three particular set of strings.
+
+[00:00:51]
+And I want to map that to a particular custom type variant as I'm decoding. And if I can't map it to one of those variance, I wanna error out and fail the decoding because that's how I want to represent it in my code. So it's important to think first in terms of how do I want this to look in my Elm code.
+
+[00:01:10]
+And then second be like, okay, now how do I get from whatever serialized representation I'm getting from the server, be is JSON, XML, whatever the case may be, protocol buffers. I'm going to map that into the type that I want to use for my front end code. Okay, so to do this, we're going to write a JSON decoder that's going to decode a user, so this is gonna have the type decoder user.
+
+[00:01:34]
+And just like we saw previously with int, which was a decoder int, this is going to be something that we can pass to that decode string function to say, decode this string as if it were a user. And the purpose of this decoder is to specify sort of a schema for how we expect this JSON to look.
+
+[00:01:50]
+It's gonna say, I expect this to have this shape and here is what I want you to do with these values. So we'll say user =, we always start off with Json.Decode.succeed when we're doing things in the style that we're about to. Now there's something sort of subtle to notice here, the first thing is that, we are actually passing it a value called User.
+
+[00:02:13]
+What is that value? So we haven't defined, sorry, usually up to this point, whenever we see a capital letter at the beginning of a name like this, its because its been a custom type variant. That's the only time we've seen a value that has that upper case first letter.
+
+[00:02:33]
+There is one other case in Elm where that comes up which is specifically when you have a type alias of a record. And here's what that does in that case, when I do a type alias of a record which is what we have here, Elm says you know a pretty common use case for records is wanting to populate all the fields in that record.
+
+[00:02:53]
+So a user in this case is actually a function, which takes three arguments, an int, a string, and a string, and returns one of these records. So if I were to call user passing int of five and then a string of Richard and lastName a Feldman. It would give me back one of these records, it will just drop those arguments into the slots in the order which I have to find in the type alias, and give me back a record.
+
+[00:03:20]
+So this was also known as a record constructor, it's purely a convenience, if we wanted to I could have written that function by out hand. But in practice, this comes up so commonly that people tend not to write out those functions by hand. They tend to use a type alias for the record and then use that thing as representation of the function we want.
+
+[00:03:39]
+So succeed is essentially being passed a function that says, if decoding succeeds, I want you to use this function to build the result.
+>> Richard Feldman: Then we're gonna pipe that to something called required, this is coming from a library. And required says, give me the field name, so in this case, user_id.
+
+[00:04:02]
+And then give me a decoder describing the type of value you expect to find at that field. So, it says, ok, this is a required field, it's called user_id and its an int, here's another one. We also require a first_name field which is a string, and we require a last_name field which is a string.
+
+[00:04:23]
+So if you compared these three, you can see that this is sort of a schema mapping from the expected JSON structure, to the expected record structure. The way that it corresponds to the record structure is this function right here. This user function accepts these fields in this order, so an int, a string and a string.
+
+[00:04:45]
+And as you can see, we've defined these as an ent and a string and a string. So if all of these pass, if this user_id field is present and it is an int, and this first_name field is present and it's a string. And this last_name field is present and it's a string, then that's going to be a successful decoding and it's going to succeed by passing each of those as arguments in order to this function right here which is gonna give us back a record.
+
+[00:05:12]
+So this is very much a DSL that's designed to look like a schema so that we can glance at it and say, okay, I understand that the structure of my JSON is going to look like this. And the structure of my Elm record is going to be the fields are organized with these types in this order.
+
+[00:05:28]
+And if all goes according to plan, when I feed my JSON string to this decoder, passing it to decode string like we did a moment ago with the int. Even though this structure is much more complex, even though the field names are different over here than they are over here, I'm going to end up with exactly the same outcome I did before.
+
+[00:05:45]
+We're either gonna have okay, in which case decoding succeeded and now I have one of these users. Or an error describing what went wrong along the way, and there's a lot more that could go wrong with this than there was in the integer case. For example, one of these fields could be missing that's gonna fail decoding one of them could have a different field name that won't be expected that's gonna fail decoding.
+
+[00:06:05]
+They could have a different type than what we expected this is supposed to be an Int if it's float that will fail decoding. So the end result is that, this boils it down to one of two possible outcomes. Either it succeeds, in which case we have the user we wanted, or it fails, and we will get an error message explaining what went wrong.
+
+[00:06:22]
+Questions about the concept of JSON decoders as a schema mapping between in JSON and Elm type of some sort, in this case, a type alias for a record?
+>> Speaker 2: So are instant strings supposed to be uppercase there?
+>> Richard Feldman: Good question, so these come from the Json.Decode module. So I could have written it out as Json.Decode.ent, Json.Decode.string, etc.
+
+[00:06:46]
+It's pretty common to import these into the current scope, because it's intended to be used kinda like a DSL. So much like the HTML, we tend to import those and reference them unqualified without mentioning the module name. Same thing with decoders, it's pretty common to reference them unqualified like that.
+
+[00:07:03]
+Worth noting that decoders are composable, so this last argument to required, in each of these cases, is a decoder. We're using them to build up a decoder, so it stands to reason that if inside this user, we had another record that we also wanted to decode. If we had a record for that and we wanted to pull that off of this object, we could do the same thing without having to duplicate that logic across the two.
+
+[00:07:27]
+Decoders are powerful enough that we can basically decode any combination of JSON, whatever the shape is, even if it has absolutely nothing to do with the representation we want in Elm. And we can still make sure that it always ends up either succeeding and giving us exactly what we wanted, or failing and telling us what went wrong.
+
+[00:07:45]
+We're not gonna get into all the different ways you can do this, because there's a potentially infinitely large number of ways people can structure JSON. And especially when you are doing a third arty API they often structure it infinitely in complex ways. But, its worth noting this is especially powerful that it can cover all those use cases.
+
+[00:08:04]
+Although granted there is some more learning to do before you can sort of harness that power and understand how to use it in different cases. The critical thing is no matter what, not only could it handle all of those cases, but under no circumstances will it give you an invalid value like undefined, or will it give you something that is incorrectly typed.
+
+[00:08:21]
+It will always either succeed and give you exactly what you wanted or it will fail, and the compiler will make sure of that. Yes, so we have a string which is a decoder string, that's sort of like a built-in primitive, we have user which is a decoder user.
+
+[00:08:35]
+Another way that we can combine decoders is using the list function, so this is json.decode.list. And when I pass it a decoder, it says, okay, I'm going to decode a list of those. So this essentially says, given a decoder user, I will give you back an decoder of lists of users.
+
+[00:08:58]
+So this comes in handy when you have json that has an array in it. So let's say I have a list of users in my model that I want to decode out of an array of user objects in JSON, this function would do that. There's quite a few functions like this in decoder that sort of take one particular decoder and then turn it into a collection such as a list, or a dictionary, or any of the other types of collections that you can use in Elm.
+
+[00:09:23]
+
+>> Richard Feldman: Int Decoder is another example that we saw early like the String.toint.
+

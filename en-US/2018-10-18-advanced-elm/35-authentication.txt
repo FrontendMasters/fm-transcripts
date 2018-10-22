@@ -1,0 +1,61 @@
+[00:00:00]
+>> Richard Feldman: Now let's talk about authentication and JavaScript. And for that, we're gonna go to the code. All right,
+>> Richard Feldman: So we've talked about a couple of different sources of caching. Another really common source of caching is authentication, so we go to the server. When you log in, you type in user name and password, the server says, great, I accept that authentication information.
+
+[00:00:23]
+I will give you back some sort of token that will identify you from now on. We want to cash that. It's very important that we cash that because if we did not, once again, every single time the user wanted to do anything that required authentication, they would have to type in their username and password again.
+
+[00:00:36]
+That would be a miserable user experience. Much, much, better to actually cache that token locally, so that we can just send it back to the server and say yep, I still am who I said I was earlier when I actually typed in those credentials. So, as we've seen elsewhere in the workshop.
+
+[00:00:49]
+The way that we do this is with this cred value. This is the thing that we sort of cache in our model as the source of truth for where those credentials live. But, this is actually not a cache of the credentials that are in the database. The database can have a log of which sessions are allowed, which tokens are valid, and it can invalidate those at any time.
+
+[00:01:11]
+They can say, you know what? This user's account was compromised. We got a support email from them. We're deactivating all their tokens and clearing them out. And now, none of them work anymore. And that token is not necessarily the ones that are on model, the tokens that are on our models actually cache of another cache which is the one that's resisted on the browser.
+
+[00:01:29]
+So the way that this works in this particular application, there's lots of different ways to authentication but the way that we do it is we store it in local storage. And the code for that looks like this. So we have inside index.html, we have Elm.Main.init. And we pass in flags of localStorage.session.
+
+[00:01:47]
+We just store it directly in localStorage. A lot of different ways you could do this. If you do it with cookies, you don't actually need to write any JavaScript or any other code to persist this stuff. And then if we listen to app.ports.storeSession, whatever Elm sends from a port, like after the user logs in it says, hey, we got a session, then we put that into local storage, then we'll come back to this line in a second.
+
+[00:02:10]
+And we also have a separate one that adds an event listener for whenever a storage event happens. That is to say, this fires when a different tab modifies local storage for the same domain. Then we check to see if this was a change to the session. If so, then we wanna send this into Elm and say hey, one of these or your tabs, did something with the session.
+
+[00:02:30]
+And you ought to know about that. So the classic example, this is logging out. So let's say I have three tabs open and I log in on all three of them. And on one of them, I log out and then I forget about the other two. If we don't have some logic like this, I can potentially come back to the other two tabs later.
+
+[00:02:47]
+It appears to be, I've logged in, it's got my profile picture in the upper right corner, everything looks fine. And then as soon as I go to do anything I start getting errors, because I've actually logged out, my token has been invalidated on the server, it's no longer going to be accepted, because I pressed the log out button.
+
+[00:03:01]
+But unfortunately these tabs didn't know about that, because their caches had become stale. This is a way of at least removing that middle layer of caching, that persistent layer in the browser such that every single time this changes in another tab, we immediately update our cache in the model and say, yeah, we got a new information about the session.
+
+[00:03:24]
+This is the new source of truth. So we sort of have three tiers here. Ultimate source of truth is once again the database on the server and then inside local storage we have a cached token from that which can get stale. And then on top of that, we have our cache on the model, which is the value that we actually use to attach HTTP requests.
+
+[00:03:41]
+So this code right here along with right after, we'll get back in a second. This code right here, the primary parser of that, is to make our cache in the model as unstale as possible. Now, it's important to think about these in terms of these caching dependencies and what the function of these is.
+
+[00:03:59]
+Because it'd be pretty easy to say, if you can only think about it, it's like, well I just didn't write that code, yeah, why bother? Yeah, I mean, I've got it right here, I'm saving it in the model, it's gonna be in the model, it's gonna be accurate.
+
+[00:04:11]
+But the reality is, it's not necessarily gonna be accurate. The model can be stale relative to the cache, which itself can be stale relative to the server. Now again we can't really do much about if the server gets out of sync with our local storage, but we can do something about our model.
+
+[00:04:25]
+So right here, I am consciously making the decision to say, I am aware that my model is in a cache of what's in local storage. That should be the single source of truth, at least once we get to the client. So anytime I have a disagreement about what's in local storage, local storage is right I'm just gonna agree with it.
+
+[00:04:43]
+So that's why I have this logic setup this way. And this has one other implication, which is that I actually don't have any logic in the application to say set the session directly on the model. The only way I change this session on the model is through this stuff right here, is coming from local storage.
+
+[00:05:02]
+To the point where, after we say, hey we just logged in. I got a new session token. Hey, go put this in local storage. After we store it in local storage, the next thing we do is we send it back into the port. And say hey, go through the normal process of pretending that we got this from some other local storage events and send it through the usual pathways to store and update it in the model.
+
+[00:05:29]
+And the reason I'm doing it that way is because I don't actually want to have any code where the model is directly setting the session because that means that's just a source of my cash potentially being out of date. With this cache that's just a bug waiting to happen.
+
+[00:05:43]
+So even though it seems a little silly, like hey I've already got this data why don't I just write it down, I got it. I would rather maintain the variant that this is the source of truth. I only ever get information from here. Which means I can rely on knowing that if nothing else I'm at least as up to date as this cache is or at least I'm trying as hard as I can not to be out of date with it
+

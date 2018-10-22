@@ -1,0 +1,66 @@
+[00:00:00]
+>> Richard Feldman: We'll start with the author decoder. We're going to use this profile and this user name to decode an author. Hint decoderHelp will help here but slightly altering it's type may make things easier. Let's take a little bit of decoderHelp here. So decoderHelp takes maybe cred takes the profile, and it takes the user name, and it then proceeds to use them to decode stuff.
+
+[00:00:23]
+So if we have credentials, if we, sorry, if we don’t have credentials, then it says okay, if I’m logged out then I’m definitely not following you. So this is where we get the unfollowed author. If we are logged in, then we might be following you. But we might also be this is me.
+
+[00:00:40]
+So this is sort of that three way split that we talked about earlier with the author. Where it's either I'm following this person, I'm not following this person, or this person is me. So we're starting off by detecting, okay, is this me? If so, then great, then we will succeed with IsView, IsViewer, and otherwise, we will be like, okay, I'm gonna use the non-viewer decoder, which is another helper that essentially checks to see whether or not we are following them, in-according to the json and then succeeds or fails accordingly.
+
+[00:01:09]
+Worth noting that this is actually optional. So, if the following is not there, then we say okay, if there's no info on whether we're following this person, that means that we are not following them. And depending on how this thing is being used, it's used in a couple different places, that may or may not be present on the JSON object we're getting back.
+
+[00:01:26]
+Worth noting, that because of the way that this is doing these things it actually doesn't even bother decoding the following field unless it's already checked to see if we're logged out in which case no need doesn't matter we're definitely not following them and we've also checked to see whether we're the viewer or not.
+
+[00:01:42]
+If we are the viewer, then again it doesn't matter we don't need to bother decoding it. Okay. So that's what decoderHelp does. Now what's this bit about this would be useful, but with a slightly different type. Well, what are we going to decode into when we want to make this author.
+
+[00:01:58]
+I mean, decoderHelp will ultimately give us an author. But it's not quite what we want because, essentially at this point we've got custom Profile.decoder And they've also got required user name decoder. So let's say that I were to put decoderHelp right into here. Well, that's clearly not going to work because the first argument is it needs to take those credentials so that it can do the logic to branch on these things.
+
+[00:02:22]
+Let's say that we took it a little bit further and we said, decoderHelp may be cred
+>> Richard Feldman: Let's run L make on this.
+>> Richard Feldman: Actually let's just run L make on author.
+>> Richard Feldman: So we don't see any of the other mistakes. Okay, something is off with the body of the decoded definition.
+
+[00:02:44]
+The body is decoder of decoder author, but the type of annotation that decoder says it should be decoder author. What's going off that? Well it's interesting, the problem here is that what we've said here is I'm giving this a decoder. But what it wants is it actually wants some sort of other thing, like it wants like something that's actually going to resolve.
+
+[00:03:04]
+It wants, not a decoder author, but rather an actual author. That's not gonna really work out for us because what we have here is we have potentially success, and we have potentially failure. We have decode dot sixteen in some branches and failure in other branches. Mm, if only we had a way to take a decoder and then bridge it into either success or failure, depending on what happened, which of course, we do.
+
+[00:03:26]
+We have a decode dot M den. So let's hold off on figuring out what's gonna go here for a second and say, well ultimately, after we successfully decode the profile and the user name Let's say that we want to continue on with Decode.andThen decoderHelp. Okay. So if we were able to do that, or, sorry, decoderHelp passing maybeCred.
+
+[00:03:48]
+If we were able to do that, then we'd be all set. We would be able to successfully continue the decoding process and it could potentially fail if the decoding succeeded or, sorry, if the decoding failed somewhere later on in the pipeline. So how would we possibly go about doing that?
+
+[00:04:04]
+Well, decoderHelp takes one argument, which is maybeCred, and then it takes two more arguments. But it doesn't have to. I mean, Decode.succeed could be, for example, Tuple.pair. And then inside decoderHelp, we could say I actually just want these two to be stapled together. And then, I can destructure them in line in the arguments.
+
+[00:04:26]
+And now, we've got something that's actually quite convenient to work with. So we start by succeeding it to tuple.pair which is going to just staple these two together. It'll give us a profile as well as a username inside of a tuple and then it's going to call Decode.andThen passing that tuple as the other argument to decoderHelp.
+
+[00:04:43]
+At which point we destructure it, move along, and Bob's your uncle. So, let's take a look at what that does. It compiles. So we've downloaded successfully decoded the profile, decoded the user name, and then gone on to decode the rest of the author, potentially failing along the way, depending on what happens in these various different branches.
+
+[00:05:06]
+So that's the first of two, but we had another to do, which was over here in timestamp. So this is our ISO-8601 decoder, and this one we're going to use Decode.andThen more directly. So it says, use the following function to decode this Time.Posix value. Iso8601.toTime That takes a string, followed by a result, and we don't care about the error type here.
+
+[00:05:28]
+So, we're just gonna ignore that, and then a time.pause for the success value. All right. So, the way I like to start off by writing things like this is, just focus on what's the first thing we want to decode. In this case that's a string. So, I say decode.string and once we've got that, then we're just gonna pipe it to Decode.andThen.
+
+[00:05:47]
+And I'm just gonna call this decoderHelp. So what is decoderHelp gonna do? Well, and, then always takes a function which starts by taking this incessantly decoded value, which in this case is going to be a string. And then returns a decoder of the desired value. We'll just say a Time.Posix.
+
+[00:06:07]
+Okay, now that we've got the types written out, we know that we're gonna get a string and we want to use this somehow to either return a success decoder or a failure decoder. So we're gonna call Iso8601.toTime on the string. That's gonna give us back as we can now see here, a result so we're gonna do a case on that if the result was successful, then we've got sometime.
+
+[00:06:30]
+And we will decode .succeed with .time. And if it failed, we're gonna ignore the error message and say, NO IT DIDN'T WORK. All right, let's see if that compiles. You know what? I think I can just go back to compiling main now because, author, we already know, works.
+
+[00:06:53]
+Hey, success, it compiles.
+
