@@ -1,0 +1,181 @@
+[00:00:00]
+>> Scott Moss: So hope everyone had a chance to make some progress on fixing this static access server. And if you got it done, even better, that's awesome, without looking at the solutions. Obviously the solution is there and it's tempting. But that's fine as long as you can understand what's happening.
+
+[00:00:16]
+I'm gonna go through it and if you had any questions, any roadblocks that you were stuck on, please bring them up, and we'll explore this together. Cool, so a few things happening here. So what I'm gonna do is I'm gonna start the server to kind of see where we left off.
+
+[00:00:32]
+Again, so a couple of issues where is if I start this, and I go to localhost:3000,
+>> Scott Moss: The HTML seems to get rendered just fine, right. And I could verify that if I go look at the network tab in Chrome, and I click on Doc and hit a refresh.
+
+[00:00:58]
+It broke cuz the server just restarted. Let me restart that. There we go. So here we go. So it looks like it resolved the HTML correctly, right? I can look at the response, the correct HTML. But then what happens is that in that HTML file, there is a link tag, right, and if you know how the browser works, it's gonna parse this HTML.
+
+[00:01:21]
+Then it's gonna look for other URLs for link tags, other script tags, images, anything that's in here, and it's gonna send off requests for those assets. So one of the assets is style.css, because that's not an absolute URL, it's a relative URL, it's gonna go to the same origin that this index file came from, so your server.
+
+[00:01:38]
+And it's gonna say, hey, get request style.css mime type whatever, right? It's gonna go to the server, and in our servers, it doesn't handle that so it just freaks out and crashes, and then the whole app breaks. So kind of a really bad experience, definitely don't want that.
+
+[00:01:54]
+So we need to fix it. And then the other thing was that the findAssets was synchronous. This is blocking. I mean, there's problems with reading a file over and over and over again for the same file that doesn't change. That's one problem. We're not gonna about that problem.
+
+[00:02:07]
+That's just a performance thing. But two, it's synchronous as in it's blocking. If I load tested this with like a million hits and started hitting this over and over and over again, then it's definitely gonna slow down. Yeah, so if I was hitting the findAsset function over and over again because it's using fs.readFileSync, then this would definitely slow down, this would be a bottleneck.
+
+[00:02:27]
+And if you did any type of load testing, you would see the problem would definitely be here. So you have to fix this. Or you want this to go in the background because if this is synchronous, so if this reads and it hits it and another request comes in, then the other request can't even be registered until this one's done.
+
+[00:02:43]
+And if there's a queue, if you already got into the back of the line of this queue and there's already like 1,000 in front of you then now you're just waiting. And eventually the server will just be like [SOUND], I'm done. I can't handle this. I ran out of memory.
+
+[00:02:53]
+I ran out of resources or whatever. I'm done. So you don't want to do that. So we need to make this asynchronous. So let's start with that. We'll make this asynchronous first. So there's a couple ways we can do it. I demonstrated a little bit of it when you started the exercise, but my approach is I like to use async await so I'm gonna use async await.
+
+[00:03:12]
+So the first step is for me to convert readFileSync into a promise. So I need to permissify that. I was gonna do it the manual way. So first thing I'm gonna do is I'm just going to copy that, get rid of it. And then I'm just gonna return a Promise, a new Promise, which takes a callback of resolve and reject.
+
+[00:03:32]
+This is how you make a Promise out of anything. And then I'm going to paste that back in here. Change it to readFile without the Sync. Get rid of this .tostring and then readFile takes a third argument, which is a callback. Remember I said the callback pattern in node is always error first, result second.
+
+[00:03:53]
+That's how it always is, so this callback takes those two. I didn't even have to look cuz that's just how it works. So now that I have those two things, I was going to say if(error), then reject(error). And that's just how you do things for promises. You reject errors and you resolve,
+
+[00:04:11]
+
+>> Scott Moss: Your data if there is any data, so in this case, Result. So there we go. So now I just made findAsset an asynchronous function that returns a promise. So that's good. That's step one. So now that it's an asynchronous promise, I got to go to where I'm actually calling this function, findAsset, and make sure it handles it accordingly.
+
+[00:04:29]
+Cuz right now it still thinks it's synchronous. So because it's a promise, I have to resolve it. I have to do a .then or something like that. So what I'm going to do now is, the findAsset function is right here. It's inside of res.writeHead. And I kinda like the way it sits in here.
+
+[00:04:47]
+I don't wanna have to do a .then and put all the rest of the code inside of the .then. I kinda just like it here on one line. And this is why I wanna do async await. So if I wanna put await here, I have to go up to the function that this code is in and put an async in front of it.
+
+[00:05:01]
+And that function is here. So I put async here on this callback function like that. I can now just go ahead and just put await right here. And then I'm done. Now that's an async function. That's pretty cool that you can put await right there? You didn't have to do it on just the other side of the equal sign.
+
+[00:05:19]
+You can put it anywhere. So yeah, now I didn't really have to change my code. This still looks synchronous, but it's actually asynchronous and all I had to do is change the async in front of this callback function here and make this a promise. So let's start that.
+
+[00:05:31]
+Let's see if it didn't break anything. So the CSS file will still break, but hopefully, yeah, this still seems to, wait. Here we go. Yeah, so the CSS file still broke, but it looks like it was able to get the HTML file, but then it just broke on the CSS file, so.
+
+[00:05:52]
+And you can see now, instead of it just breaking and saying an error, you get this weird thing, UnhandledPromiseRejectionWarning with an Error. The reason that's the case is because whenever you put async on any function, it basically turns that function into a promise. And because I just randomly threw an error, I didn't catch it, I just threw it, that's why Node's freaking out and saying, hey, you had an UnhandledPromiseRejectionWarning.
+
+[00:06:21]
+So this function, which is now a promise, cuz you put async in front of it, had an error called route not found and you did not handle it. So that's the warning that it's telling me. It's like you had an error that was thrown during some asynchronous thing and you didn't handle it.
+
+[00:06:35]
+So you probably wanna know about that and that's what it's saying right now. So that's a really good tool to let us know. So that's step one. So the next thing we wanna do is we wanna create some type of router to be able to handle all different types of assets.
+
+[00:06:53]
+And then just silently fail if they don't exist, so that's what we're gonna do. So my little quick router is just gonna be something like this. So I'm gonna say router. It's gonna be an object. And then if you ever built a router, you know there's usually a combination of at least two things you want to do for a router.
+
+[00:07:11]
+The route and then there's the verb, right? So you have, like, I did a git request to /users or I did a post request to /users. So there's a combination of a route and a verb. So I just wanna optimize for an efficient lookup, so that's all I'm gonna do.
+
+[00:07:26]
+So I have two assets here, I have an index.html asset and I have a style.css asset. So I'm just gonna create routes for those. So my convention is, if you do a request to this path with a slash, with this verb, GET, then I'm just gonna put some stuff here.
+
+[00:07:46]
+If you do a request to style.css with the verb GET, then I'm gonna do some stuff here. So for this stuff here, I just need two things. I need the path to the asset so I can have read file find it, and then I need the mime type.
+
+[00:08:07]
+Anyone not know what a mime type is? A mime type is basically information about what type of file that your server is sending, so the consumer in this case, a browser, knows how to render it. If we didn't tell the browser what the mime type of an HTML was, it wouldn't know to render it as HTML, it would just think it was a string.
+
+[00:08:29]
+If we didn't tell it that the mime type was CSS, it wouldn't know that it was CSS and it would just render it as a string. So we have to give it a mime type. Every file has a mime type, so those are the two things that are needed.
+
+[00:08:38]
+So I'm just gonna say asset, and the path to index.html is just gonna be or the name's gonna say index.html. And then I'm just gonna say mime. I don't wanna have to think of what the mime type is. Actually I know what the mime type is. I've done this so many times with HTML files.
+
+[00:08:58]
+But it's kind of annoying to think of it. So this is where NPM comes in, super legit. I'm just going to install something to help me out. So as an exercise, this is what I would do. I would literally just type in mime npm on Google and see what comes up.
+
+[00:09:16]
+Man, look at that. I'm gonna go here.
+>> Scott Moss: Yeah, seems pretty legit. Six months ago, it's not that popular, but I mean, it's a Mime library, who uses this? Still, the publish this year, yeah, sure, I'll go ahead and install this. So I'm just gonna say npm install mime, and I'm gonna save that.
+
+[00:09:40]
+So I'll let that install, and then I'm gonna go ahead and use it. So I'm just gonna say const mime = require('mime'). And if you look at the documentation, there's a function here called getType, and I'll just put the type of it and it'll return the mime that I need for it.
+
+[00:09:56]
+So that's exactly what I'm gonna do. So for the mine type of an index.html file, I'm gonna say mime.getType. And I'm gonna say it's html. So it'll put the right mime type there for me. The same thing for the CSS, asset, it's gonna be style.css.
+>> Scott Moss: And then it's mime, it's gonna be mime.getType, and css, or whatever that is, which is text/css, this was text/html.
+
+[00:10:28]
+So now I got the mimes, I got this stuff. So now all I gotta do is just look it up down here. So we already have the method, that's gonna be here. We already have the route, now it's gotta create some type of key. Which basically is just the route plus the method with a space in between, that's it.
+
+[00:10:47]
+So what I'm gonna do is I'm gonna say key =, actually I'll just do this, found, or I'll just call it match. So a match is gonna be router with the method.
+>> Scott Moss: And a space. I'm sorry. Not the method, but the route.
+>> Scott Moss: With a space and then a method.
+
+[00:11:19]
+
+>> Scott Moss: There we go, cuz again, it's the route with a space and then the method. That's the key. So boom, that'll give me a match. And then what I'll say is if not a match, this is where we handle stuff that's not a match. I'll just copy this, paste it here.
+
+[00:11:39]
+And then I'll say 404 and I'll just say, I don't really need it.
+>> Scott Moss: Mime type there, definitely not sending back anything there, I'll just say 404, and I'll just log this 404, there we go. And then I'll just make sure I do return so it doesn't continue.
+
+[00:12:04]
+
+>> Scott Moss: So I got that part.
+>> Scott Moss: And then everything else, I don't have to do this check. I just get the match so I can get rid of this if and this else.
+>> Scott Moss: And instead I can just say 200 and then for the mime, which is Content- Type, I'll just say match.mime.
+
+[00:12:27]
+And then for the findAsset I can just say match.asset and that's it. Now have a router that can serve different things. So let's test this. So we'll start the server. Didn't break, if something broke, it would have blew up right now. So that's good. And then we'll refresh this and boom.
+
+[00:12:51]
+You can see the CSS loaded up and you can see it formatted and everything looks good. There aren't any errors. So if we look at the Network tab, local host loaded just fine, got the document. See the CSS file, that loaded just fine. So it seems to be working which is good.
+
+[00:13:04]
+And if we go look at the server, you can see we did a GET request, looked for a robots.txt. That's not there, clearly. Did a GET request to index, got a 200. Did a GET request to style.css, got 200, and looked for the robots.txt again and that's not there.
+
+[00:13:19]
+So it looks like our server started serving our starting assets. So if we try to ask for something that's not there, like something like that. You can see, I get back a 404. But the server's still running, it didn't crash. So we're good and we can test that out, if I just go back to here, and it still works.
+
+[00:13:42]
+
+>> Scott Moss: Any questions on that? There's obviously some things you can do here for a better user experience like if there's an error, instead of sending back just a 404, sending back a not found page, right, an HTML page that's a 404 page, right? You would do something like that instead.
+
+[00:13:56]
+Or if you're doing a single page application, you would just send back the index.html for every single request and have the browser take care of the routing for you. But honestly, you probably won't even build a static server in Node, although it's good at it, it's not its job.
+
+[00:14:12]
+You'll probably use something like a CDN or something like that, or put NGINX in front of Node or you just use a CDN. Only time you ever use Node for static assets now is probably almost never, to be honest. Yeah, maybe for an IoT thing, maybe that makes sense.
+
+[00:14:28]
+If we're doing universal, you do some type of processing on the server, that makes sense, but everything else, just use something that's better. Specifically a CDN, don't serve your static assets from a origin server somewhere in Canada, just put it on a CDN so it's fast and cachable.
+
+[00:14:46]
+
+>> Scott Moss: And a CDN can be written in JavaScript. So I guess technically you can do it in Node? [LAUGH] Any questions on this? Anybody do this differently? I'm very interested. How'd you do it?
+>> Speaker 2: I used the Promisify utility.
+>> Scott Moss: Nice.
+>> Speaker 2: And wrapped the file read in that.
+
+[00:15:06]
+I just said if you're looking for slash, then you're looking for index.html, and let the response figure out the mime type, cuz-
+>> Scott Moss: There you go.
+>> Speaker 2: Just under CSS.
+>> Scott Moss: Let it do its job. Yeah, yeah, I like that, cool. Anything else? Who else did something a little different?
+
+[00:15:25]
+
+>> Scott Moss: No, everything was just like this? Exactly like this? [LAUGH] That's all right. Any questions? Is anybody just really stuck on something and they just couldn't get past it? What was the biggest challenge?
+>> Scott Moss: Was it the router or was it the asynchronous non-blocking stuff?
+>> Speaker 2: My first attempt was to turn the findAsset call into an asynchronous function and then try and kind of wait inside that and then return the result.
+
+[00:15:56]
+
+>> Scott Moss: Yeah.
+>> Speaker 2: And that always returned an unsettled promise.
+>> Scott Moss: Right, because then you got to handle that too, right? Because, if findAssets is waiting on something asynchronous, then now it too is asynchronous. So now even though it's waiting on something asynchronous, you still have to wait for that down here because at the end of the day, it is asynchronous because it's waiting on something asynchronous.
+
+[00:16:21]
+So yeah, when you put async in front of anything, it'll be asynchronous, or if you return a promise from anything, that function is now asynchronous. There's just no way to avoid it other than to await it or resolve it with .div.
+

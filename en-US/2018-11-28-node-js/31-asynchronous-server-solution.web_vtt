@@ -1,0 +1,1428 @@
+WEBVTT
+
+1
+00:00:00.130 --> 00:00:04.806
+&gt;&gt; Scott Moss: So hope everyone had
+a chance to make some progress on fixing
+
+2
+00:00:04.806 --> 00:00:07.061
+this static access server.
+
+3
+00:00:07.061 --> 00:00:09.095
+And if you got it done,
+even better, that's awesome,
+
+4
+00:00:09.095 --> 00:00:10.410
+without looking at the solutions.
+
+5
+00:00:10.410 --> 00:00:12.650
+Obviously the solution is there and
+it's tempting.
+
+6
+00:00:12.650 --> 00:00:16.060
+But that's fine as long as you
+can understand what's happening.
+
+7
+00:00:16.060 --> 00:00:19.653
+I'm gonna go through it and if you had any
+questions, any roadblocks that you were
+
+8
+00:00:19.653 --> 00:00:22.690
+stuck on, please bring them up,
+and we'll explore this together.
+
+9
+00:00:23.850 --> 00:00:26.950
+Cool, so a few things happening here.
+
+10
+00:00:26.950 --> 00:00:31.880
+So what I'm gonna do is I'm gonna
+start the server to kind of see where
+
+11
+00:00:31.880 --> 00:00:32.816
+we left off.
+
+12
+00:00:32.816 --> 00:00:39.169
+Again, so a couple of issues where
+is if I start this, and I go
+
+13
+00:00:39.169 --> 00:00:46.524
+to localhost:3000,
+&gt;&gt; Scott Moss: The HTML
+
+14
+00:00:46.524 --> 00:00:48.616
+seems to get rendered just fine, right.
+
+15
+00:00:48.616 --> 00:00:53.152
+And I could verify that if I go look
+at the network tab in Chrome, and
+
+16
+00:00:53.152 --> 00:00:55.340
+I click on Doc and hit a refresh.
+
+17
+00:00:58.014 --> 00:00:59.323
+It broke cuz the server just restarted.
+
+18
+00:00:59.323 --> 00:01:00.550
+Let me restart that.
+
+19
+00:01:03.560 --> 00:01:04.840
+There we go.
+
+20
+00:01:04.840 --> 00:01:05.500
+So here we go.
+
+21
+00:01:05.500 --> 00:01:07.930
+So it looks like it resolved
+the HTML correctly, right?
+
+22
+00:01:07.930 --> 00:01:10.497
+I can look at the response,
+the correct HTML.
+
+23
+00:01:10.497 --> 00:01:15.596
+But then what happens is that in
+that HTML file, there is a link tag,
+
+24
+00:01:15.596 --> 00:01:21.720
+right, and if you know how the browser
+works, it's gonna parse this HTML.
+
+25
+00:01:21.720 --> 00:01:25.800
+Then it's gonna look for other URLs for
+link tags, other script tags, images,
+
+26
+00:01:25.800 --> 00:01:29.831
+anything that's in here, and it's gonna
+send off requests for those assets.
+
+27
+00:01:29.831 --> 00:01:33.393
+So one of the assets is style.css,
+because that's not an absolute URL,
+
+28
+00:01:33.393 --> 00:01:34.484
+it's a relative URL,
+
+29
+00:01:34.484 --> 00:01:38.790
+it's gonna go to the same origin that this
+index file came from, so your server.
+
+30
+00:01:38.790 --> 00:01:44.525
+And it's gonna say, hey, get request
+style.css mime type whatever, right?
+
+31
+00:01:44.525 --> 00:01:47.606
+It's gonna go to the server, and
+in our servers, it doesn't handle that so
+
+32
+00:01:47.606 --> 00:01:50.176
+it just freaks out and crashes,
+and then the whole app breaks.
+
+33
+00:01:50.176 --> 00:01:53.000
+So kind of a really bad experience,
+definitely don't want that.
+
+34
+00:01:54.020 --> 00:01:56.099
+So we need to fix it.
+
+35
+00:01:56.099 --> 00:01:59.449
+And then the other thing was that
+the findAssets was synchronous.
+
+36
+00:01:59.449 --> 00:02:00.572
+This is blocking.
+
+37
+00:02:00.572 --> 00:02:03.461
+I mean, there's problems with reading
+a file over and over and over again for
+
+38
+00:02:03.461 --> 00:02:04.850
+the same file that doesn't change.
+
+39
+00:02:04.850 --> 00:02:05.806
+That's one problem.
+
+40
+00:02:05.806 --> 00:02:07.022
+We're not gonna about that problem.
+
+41
+00:02:07.022 --> 00:02:08.411
+That's just a performance thing.
+
+42
+00:02:08.411 --> 00:02:11.280
+But two,
+it's synchronous as in it's blocking.
+
+43
+00:02:11.280 --> 00:02:14.955
+If I load tested this with like a million
+hits and started hitting this over and
+
+44
+00:02:14.955 --> 00:02:17.912
+over and over again,
+then it's definitely gonna slow down.
+
+45
+00:02:17.912 --> 00:02:21.128
+Yeah, so if I was hitting
+the findAsset function over and
+
+46
+00:02:21.128 --> 00:02:24.077
+over again because it's
+using fs.readFileSync,
+
+47
+00:02:24.077 --> 00:02:27.910
+then this would definitely slow down,
+this would be a bottleneck.
+
+48
+00:02:27.910 --> 00:02:29.399
+And if you did any type of load testing,
+
+49
+00:02:29.399 --> 00:02:31.399
+you would see the problem
+would definitely be here.
+
+50
+00:02:31.399 --> 00:02:32.403
+So you have to fix this.
+
+51
+00:02:32.403 --> 00:02:36.280
+Or you want this to go in the background
+because if this is synchronous, so
+
+52
+00:02:36.280 --> 00:02:39.281
+if this reads and it hits it and
+another request comes in,
+
+53
+00:02:39.281 --> 00:02:43.730
+then the other request can't even be
+registered until this one's done.
+
+54
+00:02:43.730 --> 00:02:46.726
+And if there's a queue, if you already got
+into the back of the line of this queue
+
+55
+00:02:46.726 --> 00:02:49.931
+and there's already like 1,000 in front
+of you then now you're just waiting.
+
+56
+00:02:49.931 --> 00:02:51.895
+And eventually the server will
+just be like [SOUND], I'm done.
+
+57
+00:02:51.895 --> 00:02:52.940
+I can't handle this.
+
+58
+00:02:52.940 --> 00:02:53.980
+I ran out of memory.
+
+59
+00:02:53.980 --> 00:02:55.800
+I ran out of resources or whatever.
+
+60
+00:02:55.800 --> 00:02:56.620
+I'm done.
+
+61
+00:02:56.620 --> 00:02:58.160
+So you don't want to do that.
+
+62
+00:02:58.160 --> 00:02:59.360
+So we need to make this asynchronous.
+
+63
+00:02:59.360 --> 00:03:00.250
+So let's start with that.
+
+64
+00:03:00.250 --> 00:03:02.310
+We'll make this asynchronous first.
+
+65
+00:03:02.310 --> 00:03:03.917
+So there's a couple ways we can do it.
+
+66
+00:03:03.917 --> 00:03:07.945
+I demonstrated a little bit of it
+when you started the exercise, but
+
+67
+00:03:07.945 --> 00:03:12.360
+my approach is I like to use async
+await so I'm gonna use async await.
+
+68
+00:03:12.360 --> 00:03:16.476
+So the first step is for
+me to convert readFileSync into a promise.
+
+69
+00:03:16.476 --> 00:03:17.915
+So I need to permissify that.
+
+70
+00:03:17.915 --> 00:03:20.010
+I was gonna do it the manual way.
+
+71
+00:03:20.010 --> 00:03:23.790
+So first thing I'm gonna do is I'm just
+going to copy that, get rid of it.
+
+72
+00:03:23.790 --> 00:03:28.498
+And then I'm just gonna return a Promise,
+a new Promise,
+
+73
+00:03:28.498 --> 00:03:32.258
+which takes a callback of resolve and
+reject.
+
+74
+00:03:32.258 --> 00:03:35.221
+This is how you make
+a Promise out of anything.
+
+75
+00:03:35.221 --> 00:03:37.486
+And then I'm going to
+paste that back in here.
+
+76
+00:03:37.486 --> 00:03:42.180
+Change it to readFile without the Sync.
+
+77
+00:03:42.180 --> 00:03:45.341
+Get rid of this .tostring and
+then readFile takes a third argument,
+
+78
+00:03:45.341 --> 00:03:46.760
+which is a callback.
+
+79
+00:03:46.760 --> 00:03:53.080
+Remember I said the callback pattern in
+node is always error first, result second.
+
+80
+00:03:53.080 --> 00:03:55.620
+That's how it always is, so
+this callback takes those two.
+
+81
+00:03:55.620 --> 00:03:58.450
+I didn't even have to look
+cuz that's just how it works.
+
+82
+00:03:58.450 --> 00:04:01.134
+So now that I have those two things,
+
+83
+00:04:01.134 --> 00:04:05.443
+I was going to say if(error),
+then reject(error).
+
+84
+00:04:05.443 --> 00:04:06.949
+And that's just how you do things for
+promises.
+
+85
+00:04:06.949 --> 00:04:11.914
+You reject errors and you resolve,
+&gt;&gt; Scott Moss: Your data
+
+86
+00:04:11.914 --> 00:04:14.120
+if there is any data, so
+in this case, Result.
+
+87
+00:04:15.300 --> 00:04:16.518
+So there we go.
+
+88
+00:04:16.518 --> 00:04:19.882
+So now I just made findAsset
+an asynchronous function that returns
+
+89
+00:04:19.882 --> 00:04:20.488
+a promise.
+
+90
+00:04:20.488 --> 00:04:22.060
+So that's good.
+
+91
+00:04:22.060 --> 00:04:22.880
+That's step one.
+
+92
+00:04:22.880 --> 00:04:26.271
+So now that it's an asynchronous promise,
+I got to go to where I'm actually calling
+
+93
+00:04:26.271 --> 00:04:29.164
+this function, findAsset, and
+make sure it handles it accordingly.
+
+94
+00:04:29.164 --> 00:04:31.458
+Cuz right now it still
+thinks it's synchronous.
+
+95
+00:04:31.458 --> 00:04:33.741
+So because it's a promise,
+I have to resolve it.
+
+96
+00:04:33.741 --> 00:04:37.781
+I have to do a .then or
+something like that.
+
+97
+00:04:37.781 --> 00:04:42.431
+So what I'm going to do now is,
+the findAsset function is right here.
+
+98
+00:04:42.431 --> 00:04:44.180
+It's inside of res.writeHead.
+
+99
+00:04:44.180 --> 00:04:45.840
+And I kinda like the way it sits in here.
+
+100
+00:04:47.010 --> 00:04:49.320
+I don't wanna have to do a .then and
+
+101
+00:04:49.320 --> 00:04:51.360
+put all the rest of the code
+inside of the .then.
+
+102
+00:04:51.360 --> 00:04:52.560
+I kinda just like it here on one line.
+
+103
+00:04:52.560 --> 00:04:54.490
+And this is why I wanna do async await.
+
+104
+00:04:54.490 --> 00:04:58.710
+So if I wanna put await here,
+I have to go up to the function
+
+105
+00:04:58.710 --> 00:05:01.520
+that this code is in and
+put an async in front of it.
+
+106
+00:05:01.520 --> 00:05:03.260
+And that function is here.
+
+107
+00:05:03.260 --> 00:05:05.840
+So I put async here on this
+callback function like that.
+
+108
+00:05:07.270 --> 00:05:11.230
+I can now just go ahead and
+just put await right here.
+
+109
+00:05:11.230 --> 00:05:12.300
+And then I'm done.
+
+110
+00:05:12.300 --> 00:05:13.380
+Now that's an async function.
+
+111
+00:05:15.380 --> 00:05:17.230
+That's pretty cool that you
+can put await right there?
+
+112
+00:05:17.230 --> 00:05:19.720
+You didn't have to do it on just
+the other side of the equal sign.
+
+113
+00:05:19.720 --> 00:05:20.890
+You can put it anywhere.
+
+114
+00:05:20.890 --> 00:05:22.700
+So yeah, now I didn't really
+have to change my code.
+
+115
+00:05:22.700 --> 00:05:25.890
+This still looks synchronous, but
+it's actually asynchronous and
+
+116
+00:05:25.890 --> 00:05:29.355
+all I had to do is change the async in
+front of this callback function here and
+
+117
+00:05:29.355 --> 00:05:30.390
+make this a promise.
+
+118
+00:05:30.390 --> 00:05:31.520
+So let's start that.
+
+119
+00:05:31.520 --> 00:05:32.760
+Let's see if it didn't break anything.
+
+120
+00:05:34.570 --> 00:05:39.023
+So the CSS file will still break,
+but hopefully,
+
+121
+00:05:39.023 --> 00:05:42.750
+yeah, this still seems to, wait.
+
+122
+00:05:42.750 --> 00:05:44.138
+Here we go.
+
+123
+00:05:44.138 --> 00:05:48.510
+Yeah, so the CSS file still broke, but
+it looks like it was able to get the HTML
+
+124
+00:05:48.510 --> 00:05:52.020
+file, but
+then it just broke on the CSS file, so.
+
+125
+00:05:52.020 --> 00:05:55.248
+And you can see now, instead of it
+just breaking and saying an error,
+
+126
+00:05:55.248 --> 00:05:56.472
+you get this weird thing,
+
+127
+00:05:56.472 --> 00:05:59.310
+UnhandledPromiseRejectionWarning with
+an Error.
+
+128
+00:05:59.310 --> 00:06:03.000
+The reason that's the case
+is because whenever you put
+
+129
+00:06:04.080 --> 00:06:08.670
+async on any function, it basically
+turns that function into a promise.
+
+130
+00:06:08.670 --> 00:06:12.580
+And because I just
+randomly threw an error,
+
+131
+00:06:12.580 --> 00:06:17.340
+I didn't catch it, I just threw it, that's
+why Node's freaking out and saying, hey,
+
+132
+00:06:17.340 --> 00:06:21.340
+you had
+an UnhandledPromiseRejectionWarning.
+
+133
+00:06:21.340 --> 00:06:25.474
+So this function, which is now a promise,
+cuz you put async in front of it,
+
+134
+00:06:25.474 --> 00:06:28.839
+had an error called route not found and
+you did not handle it.
+
+135
+00:06:28.839 --> 00:06:30.650
+So that's the warning
+that it's telling me.
+
+136
+00:06:30.650 --> 00:06:34.230
+It's like you had an error that was
+thrown during some asynchronous thing and
+
+137
+00:06:34.230 --> 00:06:35.340
+you didn't handle it.
+
+138
+00:06:35.340 --> 00:06:39.072
+So you probably wanna know about that and
+that's what it's saying right now.
+
+139
+00:06:39.072 --> 00:06:42.140
+So that's a really good
+tool to let us know.
+
+140
+00:06:42.140 --> 00:06:45.380
+So that's step one.
+
+141
+00:06:45.380 --> 00:06:50.278
+So the next thing we wanna do is we wanna
+create some type of router to be able
+
+142
+00:06:50.278 --> 00:06:53.059
+to handle all different types of assets.
+
+143
+00:06:53.059 --> 00:06:57.210
+And then just silently fail if they don't
+exist, so that's what we're gonna do.
+
+144
+00:06:58.740 --> 00:07:02.450
+So my little quick router is just
+gonna be something like this.
+
+145
+00:07:02.450 --> 00:07:03.828
+So I'm gonna say router.
+
+146
+00:07:03.828 --> 00:07:05.290
+It's gonna be an object.
+
+147
+00:07:05.290 --> 00:07:09.255
+And then if you ever built a router, you
+know there's usually a combination of at
+
+148
+00:07:09.255 --> 00:07:11.880
+least two things you want to do for
+a router.
+
+149
+00:07:11.880 --> 00:07:14.237
+The route and
+then there's the verb, right?
+
+150
+00:07:14.237 --> 00:07:19.404
+So you have, like, I did a git request to
+/users or I did a post request to /users.
+
+151
+00:07:19.404 --> 00:07:21.460
+So there's a combination of a route and
+a verb.
+
+152
+00:07:21.460 --> 00:07:26.010
+So I just wanna optimize for an efficient
+lookup, so that's all I'm gonna do.
+
+153
+00:07:26.010 --> 00:07:30.330
+So I have two assets here,
+I have an index.html asset and
+
+154
+00:07:30.330 --> 00:07:32.810
+I have a style.css asset.
+
+155
+00:07:32.810 --> 00:07:35.500
+So I'm just gonna create routes for those.
+
+156
+00:07:35.500 --> 00:07:41.580
+So my convention is, if you do
+a request to this path with a slash,
+
+157
+00:07:41.580 --> 00:07:46.140
+with this verb, GET,
+then I'm just gonna put some stuff here.
+
+158
+00:07:46.140 --> 00:07:50.554
+If you do a request to
+
+159
+00:07:50.554 --> 00:07:57.230
+style.css with the verb GET,
+then I'm gonna do some stuff here.
+
+160
+00:07:57.230 --> 00:08:00.540
+So for this stuff here,
+I just need two things.
+
+161
+00:08:00.540 --> 00:08:04.785
+I need the path to the asset so
+I can have read file find it,
+
+162
+00:08:04.785 --> 00:08:07.007
+and then I need the mime type.
+
+163
+00:08:07.007 --> 00:08:10.266
+Anyone not know what a mime type is?
+
+164
+00:08:10.266 --> 00:08:15.460
+A mime type is basically information
+about what type of file that your
+
+165
+00:08:15.460 --> 00:08:21.923
+server is sending, so the consumer in this
+case, a browser, knows how to render it.
+
+166
+00:08:21.923 --> 00:08:24.997
+If we didn't tell the browser what
+the mime type of an HTML was,
+
+167
+00:08:24.997 --> 00:08:29.480
+it wouldn't know to render it as HTML,
+it would just think it was a string.
+
+168
+00:08:29.480 --> 00:08:31.210
+If we didn't tell it that
+the mime type was CSS,
+
+169
+00:08:31.210 --> 00:08:34.050
+it wouldn't know that it was CSS and
+it would just render it as a string.
+
+170
+00:08:34.050 --> 00:08:35.570
+So we have to give it a mime type.
+
+171
+00:08:35.570 --> 00:08:38.970
+Every file has a mime type, so
+those are the two things that are needed.
+
+172
+00:08:38.970 --> 00:08:45.032
+So I'm just gonna say asset, and
+the path to index.html is just gonna be or
+
+173
+00:08:45.032 --> 00:08:48.030
+the name's gonna say index.html.
+
+174
+00:08:48.030 --> 00:08:50.752
+And then I'm just gonna say mime.
+
+175
+00:08:50.752 --> 00:08:54.860
+I don't wanna have to think
+of what the mime type is.
+
+176
+00:08:54.860 --> 00:08:55.990
+Actually I know what the mime type is.
+
+177
+00:08:55.990 --> 00:08:58.089
+I've done this so
+many times with HTML files.
+
+178
+00:08:58.089 --> 00:08:59.644
+But it's kind of annoying to think of it.
+
+179
+00:08:59.644 --> 00:09:02.620
+So this is where NPM comes in,
+super legit.
+
+180
+00:09:02.620 --> 00:09:05.800
+I'm just going to install
+something to help me out.
+
+181
+00:09:05.800 --> 00:09:09.436
+So as an exercise,
+this is what I would do.
+
+182
+00:09:09.436 --> 00:09:16.434
+I would literally just type in mime
+npm on Google and see what comes up.
+
+183
+00:09:16.434 --> 00:09:18.175
+Man, look at that.
+
+184
+00:09:18.175 --> 00:09:19.003
+I'm gonna go here.
+
+185
+00:09:22.841 --> 00:09:24.540
+&gt;&gt; Scott Moss: Yeah, seems pretty legit.
+
+186
+00:09:25.890 --> 00:09:28.930
+Six months ago,
+it's not that popular, but I mean,
+
+187
+00:09:28.930 --> 00:09:30.940
+it's a Mime library, who uses this?
+
+188
+00:09:30.940 --> 00:09:34.140
+Still, the publish this year, yeah,
+sure, I'll go ahead and install this.
+
+189
+00:09:34.140 --> 00:09:40.140
+So I'm just gonna say npm install mime,
+and I'm gonna save that.
+
+190
+00:09:40.140 --> 00:09:43.160
+So I'll let that install, and
+then I'm gonna go ahead and use it.
+
+191
+00:09:43.160 --> 00:09:48.292
+So I'm just gonna say const
+mime = require('mime').
+
+192
+00:09:48.292 --> 00:09:52.528
+And if you look at the documentation,
+there's a function here called getType,
+
+193
+00:09:52.528 --> 00:09:56.970
+and I'll just put the type of it and
+it'll return the mime that I need for it.
+
+194
+00:09:56.970 --> 00:09:59.910
+So that's exactly what I'm gonna do.
+
+195
+00:09:59.910 --> 00:10:05.332
+So for the mine type of an index.html
+file, I'm gonna say mime.getType.
+
+196
+00:10:05.332 --> 00:10:07.330
+And I'm gonna say it's html.
+
+197
+00:10:07.330 --> 00:10:10.639
+So it'll put the right mime type there for
+me.
+
+198
+00:10:10.639 --> 00:10:15.627
+The same thing for the CSS,
+asset, it's gonna be style.css.
+
+199
+00:10:18.487 --> 00:10:23.598
+&gt;&gt; Scott Moss: And then it's mime,
+it's gonna be mime.getType, and css,
+
+200
+00:10:23.598 --> 00:10:28.913
+or whatever that is,
+which is text/css, this was text/html.
+
+201
+00:10:28.913 --> 00:10:31.970
+So now I got the mimes, I got this stuff.
+
+202
+00:10:31.970 --> 00:10:34.910
+So now all I gotta do is
+just look it up down here.
+
+203
+00:10:34.910 --> 00:10:38.630
+So we already have the method,
+that's gonna be here.
+
+204
+00:10:38.630 --> 00:10:42.070
+We already have the route,
+now it's gotta create some type of key.
+
+205
+00:10:42.070 --> 00:10:47.590
+Which basically is just the route plus the
+method with a space in between, that's it.
+
+206
+00:10:47.590 --> 00:10:52.188
+So what I'm gonna do is
+I'm gonna say key =,
+
+207
+00:10:52.188 --> 00:10:59.280
+actually I'll just do this, found,
+or I'll just call it match.
+
+208
+00:10:59.280 --> 00:11:03.716
+So a match is gonna be
+router with the method.
+
+209
+00:11:09.442 --> 00:11:10.260
+&gt;&gt; Scott Moss: And a space.
+
+210
+00:11:11.450 --> 00:11:13.564
+I'm sorry.
+Not the method, but the route.
+
+211
+00:11:15.364 --> 00:11:17.861
+&gt;&gt; Scott Moss: With a space and
+then a method.
+
+212
+00:11:19.727 --> 00:11:23.628
+&gt;&gt; Scott Moss: There we go, cuz again,
+it's the route with a space and
+
+213
+00:11:23.628 --> 00:11:25.330
+then the method.
+
+214
+00:11:25.330 --> 00:11:26.740
+That's the key.
+
+215
+00:11:26.740 --> 00:11:29.190
+So boom, that'll give me a match.
+
+216
+00:11:29.190 --> 00:11:32.730
+And then what I'll say is if not a match,
+
+217
+00:11:32.730 --> 00:11:35.020
+this is where we handle
+stuff that's not a match.
+
+218
+00:11:35.020 --> 00:11:39.939
+I'll just copy this, paste it here.
+
+219
+00:11:39.939 --> 00:11:47.067
+And then I'll say 404 and
+I'll just say, I don't really need it.
+
+220
+00:11:49.130 --> 00:11:54.155
+&gt;&gt; Scott Moss: Mime type there, definitely
+not sending back anything there,
+
+221
+00:11:54.155 --> 00:11:59.566
+I'll just say 404, and
+I'll just log this 404, there we go.
+
+222
+00:11:59.566 --> 00:12:01.465
+And then I'll just make sure I do
+return so it doesn't continue.
+
+223
+00:12:04.555 --> 00:12:05.695
+&gt;&gt; Scott Moss: So I got that part.
+
+224
+00:12:06.742 --> 00:12:09.318
+&gt;&gt; Scott Moss: And then everything else,
+I don't have to do this check.
+
+225
+00:12:09.318 --> 00:12:12.900
+I just get the match so
+I can get rid of this if and this else.
+
+226
+00:12:15.034 --> 00:12:21.244
+&gt;&gt; Scott Moss: And instead I can
+just say 200 and then for the mime,
+
+227
+00:12:21.244 --> 00:12:27.601
+which is Content- Type,
+I'll just say match.mime.
+
+228
+00:12:27.601 --> 00:12:34.110
+And then for the findAsset I can
+just say match.asset and that's it.
+
+229
+00:12:36.230 --> 00:12:38.470
+Now have a router that can
+serve different things.
+
+230
+00:12:39.800 --> 00:12:41.485
+So let's test this.
+
+231
+00:12:41.485 --> 00:12:45.171
+So we'll start the server.
+
+232
+00:12:45.171 --> 00:12:47.600
+Didn't break, if something broke,
+it would have blew up right now.
+
+233
+00:12:47.600 --> 00:12:49.614
+So that's good.
+
+234
+00:12:49.614 --> 00:12:51.728
+And then we'll refresh this and boom.
+
+235
+00:12:51.728 --> 00:12:54.443
+You can see the CSS loaded up and
+you can see it formatted and
+
+236
+00:12:54.443 --> 00:12:55.620
+everything looks good.
+
+237
+00:12:55.620 --> 00:12:56.498
+There aren't any errors.
+
+238
+00:12:56.498 --> 00:13:00.560
+So if we look at the Network tab, local
+host loaded just fine, got the document.
+
+239
+00:13:00.560 --> 00:13:03.060
+See the CSS file, that loaded just fine.
+
+240
+00:13:03.060 --> 00:13:04.650
+So it seems to be working which is good.
+
+241
+00:13:04.650 --> 00:13:08.180
+And if we go look at the server, you can
+see we did a GET request, looked for
+
+242
+00:13:08.180 --> 00:13:09.530
+a robots.txt.
+
+243
+00:13:09.530 --> 00:13:10.950
+That's not there, clearly.
+
+244
+00:13:10.950 --> 00:13:13.798
+Did a GET request to index, got a 200.
+
+245
+00:13:13.798 --> 00:13:17.493
+Did a GET request to style.css, got 200,
+and looked for the robots.txt again and
+
+246
+00:13:17.493 --> 00:13:19.000
+that's not there.
+
+247
+00:13:19.000 --> 00:13:22.472
+So it looks like our server started
+serving our starting assets.
+
+248
+00:13:22.472 --> 00:13:27.212
+So if we try to ask for something that's
+not there, like something like that.
+
+249
+00:13:27.212 --> 00:13:30.699
+You can see, I get back a 404.
+
+250
+00:13:30.699 --> 00:13:33.500
+But the server's still running,
+it didn't crash.
+
+251
+00:13:33.500 --> 00:13:38.281
+So we're good and we can test that out,
+if I just go back to here,
+
+252
+00:13:38.281 --> 00:13:39.799
+and it still works.
+
+253
+00:13:42.885 --> 00:13:44.903
+&gt;&gt; Scott Moss: Any questions on that?
+
+254
+00:13:44.903 --> 00:13:48.538
+There's obviously some things you can do
+here for a better user experience like if
+
+255
+00:13:48.538 --> 00:13:52.540
+there's an error, instead of sending back
+just a 404, sending back a not found page,
+
+256
+00:13:52.540 --> 00:13:54.877
+right, an HTML page that's a 404 page,
+right?
+
+257
+00:13:54.877 --> 00:13:56.396
+You would do something like that instead.
+
+258
+00:13:56.396 --> 00:13:58.316
+Or if you're doing
+a single page application,
+
+259
+00:13:58.316 --> 00:14:01.100
+you would just send back the index.html
+for every single request and
+
+260
+00:14:01.100 --> 00:14:03.688
+have the browser take care
+of the routing for you.
+
+261
+00:14:03.688 --> 00:14:08.734
+But honestly, you probably won't
+even build a static server in Node,
+
+262
+00:14:08.734 --> 00:14:12.028
+although it's good at it,
+it's not its job.
+
+263
+00:14:12.028 --> 00:14:15.553
+You'll probably use something like
+a CDN or something like that, or
+
+264
+00:14:15.553 --> 00:14:17.943
+put NGINX in front of Node or
+you just use a CDN.
+
+265
+00:14:17.943 --> 00:14:20.536
+Only time you ever use Node for
+
+266
+00:14:20.536 --> 00:14:25.725
+static assets now is probably
+almost never, to be honest.
+
+267
+00:14:25.725 --> 00:14:28.440
+Yeah, maybe for an IoT thing,
+maybe that makes sense.
+
+268
+00:14:28.440 --> 00:14:32.410
+If we're doing universal, you do some
+type of processing on the server,
+
+269
+00:14:32.410 --> 00:14:35.560
+that makes sense, but everything else,
+just use something that's better.
+
+270
+00:14:35.560 --> 00:14:38.873
+Specifically a CDN,
+don't serve your static assets from
+
+271
+00:14:38.873 --> 00:14:43.686
+a origin server somewhere in Canada, just
+put it on a CDN so it's fast and cachable.
+
+272
+00:14:46.536 --> 00:14:48.833
+&gt;&gt; Scott Moss: And
+a CDN can be written in JavaScript.
+
+273
+00:14:48.833 --> 00:14:51.464
+So I guess technically
+you can do it in Node?
+
+274
+00:14:51.464 --> 00:14:55.003
+[LAUGH] Any questions on this?
+
+275
+00:14:55.003 --> 00:14:56.139
+Anybody do this differently?
+
+276
+00:14:56.139 --> 00:14:57.050
+I'm very interested.
+
+277
+00:14:57.050 --> 00:14:59.566
+How'd you do it?
+
+278
+00:14:59.566 --> 00:15:02.853
+&gt;&gt; Speaker 2: I used
+the Promisify utility.
+
+279
+00:15:02.853 --> 00:15:03.429
+&gt;&gt; Scott Moss: Nice.
+
+280
+00:15:03.429 --> 00:15:06.884
+&gt;&gt; Speaker 2: And
+wrapped the file read in that.
+
+281
+00:15:06.884 --> 00:15:10.976
+I just said if you're looking for
+slash, then you're looking for
+
+282
+00:15:10.976 --> 00:15:14.774
+index.html, and
+let the response figure out the mime type,
+
+283
+00:15:14.774 --> 00:15:15.538
+cuz-
+&gt;&gt; Scott Moss: There you go.
+
+284
+00:15:15.538 --> 00:15:16.320
+&gt;&gt; Speaker 2: Just under CSS.
+
+285
+00:15:16.320 --> 00:15:17.120
+&gt;&gt; Scott Moss: Let it do its job.
+
+286
+00:15:17.120 --> 00:15:19.088
+Yeah, yeah, I like that, cool.
+
+287
+00:15:19.088 --> 00:15:20.510
+Anything else?
+
+288
+00:15:20.510 --> 00:15:22.051
+Who else did something a little different?
+
+289
+00:15:25.895 --> 00:15:28.903
+&gt;&gt; Scott Moss: No,
+everything was just like this?
+
+290
+00:15:28.903 --> 00:15:30.542
+Exactly like this?
+
+291
+00:15:30.542 --> 00:15:32.336
+[LAUGH] That's all right.
+
+292
+00:15:32.336 --> 00:15:34.401
+Any questions?
+
+293
+00:15:34.401 --> 00:15:38.000
+Is anybody just really stuck on something
+and they just couldn't get past it?
+
+294
+00:15:38.000 --> 00:15:39.779
+What was the biggest challenge?
+
+295
+00:15:43.631 --> 00:15:48.014
+&gt;&gt; Scott Moss: Was it the router or was
+it the asynchronous non-blocking stuff?
+
+296
+00:15:48.014 --> 00:15:52.045
+&gt;&gt; Speaker 2: My first attempt was to turn
+the findAsset call into an asynchronous
+
+297
+00:15:52.045 --> 00:15:56.653
+function and then try and kind of wait
+inside that and then return the result.
+
+298
+00:15:56.653 --> 00:15:57.207
+&gt;&gt; Scott Moss: Yeah.
+
+299
+00:15:57.207 --> 00:15:59.473
+&gt;&gt; Speaker 2: And
+that always returned an unsettled promise.
+
+300
+00:15:59.473 --> 00:16:01.643
+&gt;&gt; Scott Moss: Right, because then
+you got to handle that too, right?
+
+301
+00:16:01.643 --> 00:16:07.162
+Because, if findAssets is waiting
+on something asynchronous,
+
+302
+00:16:07.162 --> 00:16:10.020
+then now it too is asynchronous.
+
+303
+00:16:10.020 --> 00:16:12.950
+So now even though it's waiting
+on something asynchronous,
+
+304
+00:16:12.950 --> 00:16:16.214
+you still have to wait for that down
+here because at the end of the day,
+
+305
+00:16:16.214 --> 00:16:19.620
+it is asynchronous because it's
+waiting on something asynchronous.
+
+306
+00:16:21.090 --> 00:16:24.273
+So yeah, when you put async in front
+of anything, it'll be asynchronous,
+
+307
+00:16:24.273 --> 00:16:27.576
+or if you return a promise from anything,
+that function is now asynchronous.
+
+308
+00:16:27.576 --> 00:16:32.360
+There's just no way to avoid it other
+than to await it or resolve it with .div.
+
