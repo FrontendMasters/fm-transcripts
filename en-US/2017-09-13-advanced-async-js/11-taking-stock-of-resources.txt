@@ -1,0 +1,108 @@
+[00:00:00]
+>> Jafar Husain: So this was a real problem we had to solve at Netflix and for a while, it took a long time so you shouldn't expect that you're gonna just fix and be able to solve this problem. I like it cuz it's a really hard one and we can start to think and learn about how we can solve seemingly hard problems by just composing operations together.
+
+[00:00:16]
+So how do we go from this to this? So in general when you're problem solving, when you're solving problems with observable the first thing you do is you think to yourself, what streams do I have? What sources of data do I have? What event streams do I have?
+
+[00:00:35]
+Well, in this case we've got one, it's pretty straightforward right, tasks. And then you think, well, what do I want? In this case we think, well I want this stream that tells me whether animations are allowed or not. And then, the last step is to figure out how to get from what you have, in terms of streams, to what you want by using the functions that you guys have learned in the previous class, map, filter, reduce, merge, zip.
+
+[00:00:58]
+Once you've finally created that stream of data that you want, the last step is to just subscribe to it, and use the data, all right? Does that make sense? So when you're going from this, to this, you're doing it lazily. You're just creating a new stream that hasn't really done any work, and only when you've got exactly the stream that you want, do you subscribe to it and you get the data out.
+
+[00:01:24]
+And that's the last step, so my last step I would do something like this.
+>> Jafar Husain: And then I might set some global flag for example.
+>> Jafar Husain: Then later on in the program, whenever I'm about to start up an animation, I would look at this global flag, for example, and I would say, should I just place this where it's gonna be or should I animate it smoothly?
+
+[00:01:59]
+Does that make sense? So our task is to go from this to this. And we're gonna do it gradually, little bit by little bit. So does anybody have any suggestions? Actually, before we jump into how we're gonna do this, I'm gonna give you guys some helpful functions which we can use during this process.
+
+[00:02:20]
+So let's have a quick look at these functions. The first one is just a factory function. It takes on a raw value, it puts it into an observable that just unnecks that value and then completes. That's it. So we see that. So I'll clear how to take a simple value and make it into an observable of that value, not unlike putting two square brackets around a value and making it an array of that value.
+
+[00:02:44]
+Then we have concat. Concat you can take two arbitrary observables [SOUND], stick them together, just like a string where you're concatenating two strings together, and, by the way, you can pass comcat as many observables as you want. So then this would go like that. Does that make sense?
+
+[00:03:11]
+So I can concatenate as many observables together as I want. And this is a helpful little function, which we'll use later, distinctUntilChanged. I think this pretty much says it all. Yeah.
+>> Speaker 2: I have a question about concat. So the way you have it represented, I assume the dots are over time.
+
+[00:03:30]
+So is it that looking at it visually that you have them stacked on top of each other?
+>> Jafar Husain: RIght.
+>> Speaker 2: I would assume that two would happen first and then you would have two fives and then a four, a seven, and a nine. And the way that you represent it there, it's like one completes then the other one iterates, then that completes, and then the third-
+
+[00:03:51]
+
+>> Jafar Husain: Great question, and the reason for that is I'm gonna assume that all the observables, all these observables in this example anyway, are culled. So they're a lot like the set timeout observable that we created initially, which means time's not gonna start counting until you subscribe. So just like we didn't kick off the set timeout until you subscribe, we can assume the data in these observables isn't gonna start being produced until you subscribe.
+
+[00:04:14]
+And that's why instead of falling down and all happening simultaneously they all happen back to back. So the way the concat works, and actually maybe this is a good opportunity for us to try out, to actually write concat to understand how it works in our observable implementation, is that all it does is it subscribes to an observable, and when that observable completes, it subscribes to the next observable.
+
+[00:04:39]
+And when that observable completes, it subscribes to the next observable. Do you guys wanna write that? Or do you feel like you've got a good handle on it? Quick show of hands, who wants to write it? Who feels like they've got a good handle on it?
+>> Speaker 2: Write it.
+
+[00:04:53]
+
+>> Jafar Husain: Write it. All right, okay.
+>> Jafar Husain: So it's a static method, right? And we're gonna take a bunch of observables and we're gonna return a new observable. So I don't think I've ever written this operator, so this is gonna be a, we're gonna do it live, it's gonna be fun.
+
+[00:05:32]
+
+>> Jafar Husain: All right, [LAUGH] well, one thing I could do is I could loop over all the observable and subscribe to them, right? I can do this,
+>> Jafar Husain: Is this gonna work? No, yes?
+>> Speaker 2: You're not waiting.
+>> Jafar Husain: I'm not waiting, right? In this way I'd subscribe to all three of them at the same time, and then they'd all kind of be flinging data at me at the same time.
+
+[00:06:15]
+I don't want to do that. So how am I going to do it?
+>> Speaker 2: Use a reduce function. But-
+>> Jafar Husain: A reduce.
+>> Speaker 2: You take your a and your b, and then once a completes you run b?
+>> Jafar Husain: Yeah, I like where you're going there, we can probably do this with a reduce, yeah.
+
+[00:06:34]
+The reduce, reduce might be a little tricky. We definitely need some asynchrony in here, because we need to wait until the complete method is called before we jump to the new one. So what I'll do is here I'm going to use a lot of state here actually. I'm going to keep track of how many observables I have on any given moment.
+
+[00:06:57]
+I'm going to have an array of them, and I'm going to keep removing them. Does that make sense? So we'll try just popping it off. We'll try, there might actually be a better way of doing this, but this is my best guess at the moment.
+>> Speaker 2: Would you want to shift instead of pop?
+
+[00:07:17]
+
+>> Jafar Husain: Shift would be better, thank you, yes. That's absolutely right. I wanna pull it off the front and not off the top. So as soon as somebody forages I want to try and shift and call the observable and subscribe to it. I wanna get a value out of the current observable what am I gonna do here?
+
+[00:07:38]
+So at the moment I've picked the first observable off the front of the array, I've subscribed to it, and when I get a value, what do I want to do?
+>> Speaker 2: Observer.next?
+>> Jafar Husain: Yeah, I want to send it to my observer, right? So I'm gonna call observer.next. And I need to also handle errors.
+
+[00:07:57]
+So if I get an error, what am I gonna do? Okay, if any of these five or three observables where I'm kind of contanonate errors together, what do I want to do?
+>> Speaker 2: Pass along the error?
+>> Jafar Husain: Pass along the error, yeah absolutely.
+>> Jafar Husain: Now what happens if it completes?
+
+[00:08:16]
+So I'm not doing something I should be doing here, which is unsubscribing from the observable, so,
+>> Jafar Husain: Sees that error I wanna unsubscribe.
+>> Jafar Husain: And I'm actually not gonna make this a constant, I'm gonna make it a let, cuz I might change it over time. Now what happens when this observable completes?
+
+[00:08:50]
+
+>> Speaker 2: Get the next observable.
+>> Jafar Husain: You get the next one, okay. I could get the next one. But in theory, I could sort of, [LAUGH] I could copy this whole thing and I could put it in here, right?
+>> Jafar Husain: All right? That's kinda what I wanna do almost, when this completes, I want it to start this all over again.
+
+[00:09:10]
+Does everybody see what's happening when it completes and I want it do the same thing again? How do I avoid copying and pasting this code?
+>> Speaker 2: Putting it into a function?
+>> Jafar Husain: Put it into a function. And then I'm gonna call that function recursively, all right?
+>> Jafar Husain: So I'm gonna create a function right in here.
+
+[00:09:53]
+
+>> Jafar Husain: And, actually gonna put this out here, I think it might be useful. I shouldn't leave it in there for now. And here, now I can call processObservable recursively, right?
+

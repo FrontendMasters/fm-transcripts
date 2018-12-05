@@ -1,0 +1,119 @@
+[00:00:00]
+>> Jafar Husain: Cold server back to our time out, right? Which is now not racy, it's an ice cold observable no matter when we subscribe, we're gonna get the notification. But notice that what if we subscribe three times, we're gonna get three notifications and three different set timeout handlers. So instead of all three of those notifications coming [SOUND].
+
+[00:00:20]
+Back to back, it's all going to depend on when we subscribe. Each one is gonna start a separate timer at a separate time. And I asked earlier, why would we even want this behavior? Why wouldn't we always want the behavior that I shared a moment ago where no matter when you subscribe, you just get the same timeout result?
+
+[00:00:37]
+So if I subscribe, five seconds later [SOUND] instantly, it's gonna fire. Because I've saved that fact that I've fired. And then I on next.
+>> Speaker 2: Real time data? Like mouse moves?
+>> Jafar Husain: Mouse moves.
+>> Speaker 2: Similar to what happened moments ago.
+>> Jafar Husain: Right. Well so, yeah. Sometimes I definitely would like, I would like, I don't want all the mouse moves that ever happened from the past in eternity.
+
+[00:01:02]
+I want the latest stuff. But what if I'm doing, say, a network request, right? If I have three people here interested in the result of a network request, three different observers, do I want three separate network requests? Maybe not. We'll get into this a little bit later, and figure out how we avoid this.
+
+[00:01:19]
+But I want to kinda help you guys understand, that this is closer to observe both natural state, which is that every time you false subscribe, you can expect that subscription to fire. Now we're gonna see how you can amortize the work over multiple observers later on. So we've seen an example of a cold observable, we turned a cold observable into a hot observable.
+
+[00:01:39]
+Now let's try taking a hot data source, so one of the ways in which creating a hot observable is to adapt a hot data source. An example of a hot data source as you pointed out, is an event stream. And this is a very important part of any kind of RX programming.
+
+[00:01:55]
+Is to find a way to take all those DOM events and turn them into observables. So let's make ourselves a static fromEvent function. Now, what do we think is going to be in fromEvent function? Remember, our fromEvent is gonna create an observable. That's gonna on next all of the event objects and the DOM event.
+
+[00:02:15]
+
+>> Speaker 2: The DOM ele, event, sorry. A DOM element and an event.
+>> Jafar Husain: DOM element, and an event name, right? So given these two things and given the example we have up here, help me out, guys. Yell it out. What am I gonna do? This is audience participation. How am I gonna do this?
+
+[00:02:34]
+So first of all, what's fromEvent gonna return?
+>> Speaker 3: An observable.
+>> Jafar Husain: An observable, right? That's gonna be a real common answer. In fact, it's almost always true that every function returns an observable. Except for one, what's the only function on an observable that doesn't return yet another observable?
+
+[00:02:52]
+
+>> Speaker 3: Subscribe,
+>> Jafar Husain: Subscribe. And that's how we know we're done being lazy. We're done, just creating another observable, which as we know, it's just a function waiting to be called, hasn't done anything, right. We're done creating all these observables, and we're ready to get the data out. So the answer is almost always, except if you're defining a subscribe that we're returning in other observables.
+
+[00:03:13]
+So that's a good heuristic, as we're trying to figure out what to do here. So now we know that creating an observable is really just defining one function, and that is subscribe. So looking at the set timeout example, somebody brave help me out. What I'm I gonna do here for fromEvent?
+
+[00:03:32]
+
+>> Speaker 2: Add an event listener.
+>> Jafar Husain: Add an event listener, absolutely, to our DOM element, right? So we wanna add the event listener here or here? 25 or 27? And why?
+>> Speaker 2: 25.
+>> Jafar Husain: 25, okay.
+>> Speaker 2: The reasoning being that you don't want to attach a new event listener every time that you subscribe.
+
+[00:03:57]
+
+>> Jafar Husain: Okay, okay, that's a good thought here. It's absolutely true that one way, we can basically do this the same as we did with the timeout. We can put it outside, so that as soon as you call fromEvent, you attach an event listener, because we don't want to attach a bunch of event listeners.
+
+[00:04:13]
+So that's actually a great idea, but what I'm gonna do here is I'm actually gonna wait to do it until the subscription, and we'll talk about why. So you will definitely get multiple handles being attached to the subscription, but there's actually this pattern of moving data out from in subscribe, and out into the operator to kinda get basically make sure we turn it into a hot observable, and share work.
+
+[00:04:36]
+There's actually a constant pattern we can use so we can take observables that are lazy or cold, and make them hot. And so instead of having to make individual observables hot, later on we'll write a function. It can turn any cold observable into a hot one. Does that make sense?
+
+[00:04:54]
+So from now on, we're gonna try and build cold observables. Well, excuse me, cold is the wrong word to use here, basically, there's lazy and eager, and that's two separate things. A lazy observable is one that doesn't do any work until you subscribe to it. In this context, if we were to do work up here, we would be eagerly doing the work before, it's actually a separate distinction between hot and cold.
+
+[00:05:15]
+Remember, hot and cold just means, hot means no matter when you subscribe, you might get different data. So if you subscribe five seconds later, you might miss some click events. But cold means no matter when you subscribe, you're going to get the same results. That's a slightly different access than eager and lazy.
+
+[00:05:30]
+Here we're gonna wait to do any work until subscribe's actually called. And then later we'll talk about how to take a cold observable, make it into a hot one.
+>> Speaker 2: Why is that? Why do we wanna wait?
+>> Jafar Husain: Why do we wanna wait? It's a good question. And this is a good question, really, that goes to the heart of why be lazy, right?
+
+[00:05:47]
+If you know you're gonna do the work, why build up a bunch of functions and then eventually just call them? Why not just do the work, right? Well, a good example of why you'd wanna be lazy is to give more power to the consumer. So the idea here is, let's say, can anybody build me an array of all the natural numbers?
+
+[00:06:10]
+How would I build all the integers, can I do that?
+>> Speaker 2: With a generator?
+>> Jafar Husain: With a generator, well, I still can't build an array with a generator, but that is a good example of a way in which I could create a stream of all the integers. By using something like a generator in Javascript.
+
+[00:06:30]
+And for those of you who don't know, a generator is a little like an iterator in other languages. The idea is, it's lazy. It doesn't produce a new value until you ask for one. So you could produce all the integers using a generator in Javascript. But I can't create an array of all the integers.
+
+[00:06:46]
+And the same likewise with observable. Let's say I create an observable of all of the numbers. Can I do that? Can I create an observable of all the natural numbers ever? Maybe we can build one right now.
+>> Jafar Husain: How would I do it?
+>> Speaker 2: You might want to start by keeping track of what your initial number is.
+
+[00:07:16]
+
+>> Jafar Husain: Yeah.
+>> Jafar Husain: I'll just do that a while, yeah. Observable of all the natural numbers, right? Well, the reality is I'm gonna run into an integer overflow problem, but assuming this was Python or some language which didn't have this problem, is that an observable of all the natural numbers?
+
+[00:07:57]
+
+>> Jafar Husain: Is it especially useful? Could it be? Well, I don't know. Well, the reason why something like this might be useful, although you probably would implement it slightly differently is that in the end, you could build this array of, or sorry, not array, but a generator or an observable of all the natural numbers.
+
+[00:08:15]
+And in the end, the consumer might just simply say, I just need ten. And they might do something like.
+>> Jafar Husain: So the idea of being lazy is that we don't wanna make decisions until we absolutely have to. So in the end I could build this huge, huge dataset.
+
+[00:08:38]
+But the consumer at the very end, because they know best, they'll say, you know what, I only need a page of ten. And so that's why we want to be lazy. If I was to build an array and do all the work up front, then frankly, the program would never terminate.
+
+[00:08:52]
+So that's why it's sometimes good to be lazy, and that's one of the things about observable that we like, the fact that we can be lazy is more flexible. Than be eager cuz in the end, who knows? We might decide not to run it at all based on some incoming conditions that happens, or it might decide to stop after getting five values because we got an event.
+
+[00:09:10]
+So thing like takeUntil for those of you who are familiar. There's ways of listening to an observable until another observable fires. And that's why being lazy is so powerful. It's usually a good idea to be lazy, because you can always turn a lazy computation into an eager one just by running it.
+
+[00:09:26]
+But can I do the reverse? Can I turn something eager into something lazy? I can, but it's more difficult. [LAUGH] The idea here is, not really. Once you've run a function, you can't really stop that function from running. You've run it, the cat's out of the bag, right?
+
+[00:09:42]
+You can always kinda take a function and wrap it in another function and make it lazy, but that's, you still haven't run the function yet. Once you've run a function, it's running. Once I start running that function to create an array of all the numbers, well, all I can do is pretty much shut down my browser, right?
+
+[00:09:58]
+Does that make sense, why laziness is a powerful thing? It's because of things like TakeTen or the ability to do paging, where the consumer can just gradually just take what they want and then they can say, stop, I'm done. Makes sense? So good question. Really good question, actually.
+
