@@ -1,0 +1,96 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:04]
+>> Kent C Dodds: But yeah, the next thing we're going to do is create a browser build. So if we were to, let's say somebody wanted to use this. We'll rerun the build, actually, let's run the whole thing. Validate, make sure everything's working. So if somebody wanted to consume this in the browser they would presumably just copy this code, they'd pull open another browser tab, and paste it in and they're like export's not defined.
+
+[00:00:31]
+Well great, I can't use this library in the browser. There are a couple of things they can't use in the browser, this require statement being probably the main culprit. Basically CommonJS modules being the main problem. So what we need to do is as somehow resolve these require statements to be something that maybe can happen at runtime.
+
+[00:00:51]
+Or just make it so that the browser can understand what these require statements are supposed to do. And that's where webpack comes in. So there are actually a couple ways that you can distribute your JavaScript, in a way that the browser can understand it. And actually, for people who are consuming the library and using a bundler, they won't need you to do any of these work.
+
+[00:01:16]
+This is pretty much only the people who aren't using a bundler already. And those people probably should be using a bundler it just makes life a lot easier. But it's not a good idea for the library author to say for you to use this in the browser you must use a bundler like webpack or something.
+
+[00:01:38]
+If you intend to have people use your library on a given platform, they shouldn't have to do any work to do that. Yeah, it should just happen. So, yeah, that's why we're going to add webpack stuff. I probably should have had a branch for this because I am not here to teach you about webpack, we're just gonna use it and you can learn about webpack elsewhere.
+
+[00:02:11]
+I will create a new file here called webpack.config.js. And then I'll gonna actually just copy and paste the config and you can look into that a little bit more at another time. This is for libraries, the webpack config it's not 100% straight forward, but it's something you can totally copy/paste and not worry too much about it.
+
+[00:02:38]
+It's when you get into applications that you should probably understand everything that's going on. So, we're going to go to this and gitdif and click on view. And I have this cool Chrome extension that adds a copy button here, but if you don't have that, you can click on raw and just copy that.
+
+[00:03:04]
+
+>> Kent C Dodds: So I'll just explain what's going on here really quick. So we can actually use ES6 inside of this webpack file because the filename is webpack.config.babel, and we have babel installed in our project. So it will use babel to transpile these ES6 modules into CommonJS, and then webpack can use that.
+
+[00:03:29]
+So we're pulling join out from path, and we're using it to create our context and to create our path here. And it's just a whole bunch of webpack jargon to say that basically the context of our lib lives inside of src, our entry so like our main method for library is the index file.
+
+[00:03:49]
+Where we want the resulting bundle to go, or the resulting library to go is in the dist directory. That's the absolute path to the dist directory, that's why we're joining the dirname to dist. And then the library target is umd. Does anybody know what umd might stand for?
+
+[00:04:08]
+
+>> Kent C Dodds: Heard of umd before? So umd stands for Universal Module Definition. And, let me see, if we go to npmcdn.com, Aphrodite.
+>> Kent C Dodds: No, that is not, actually, I've got a good one, Geniejs. So this is the first library I ever wrote. The last substantive commit was probably two years ago.
+
+[00:04:40]
+The last time I released anything was two years ago. This was back in the day when I used to commit files to Master. Yeah, fun stuff. But actually in this dist directory, we have this genie.js file. And right here is umd, that's what this is all about. This is an important part of creating libraries, so it's important you understand what umd is.
+
+[00:05:05]
+So sorry, before I explain this code, let me explain the why of umd. We want to have our library consumable in multiple environments. And each of these environments has a different module style. So some environments, like Node, use CommonJS, and that's the module.export, and require statements and stuff.
+
+[00:05:30]
+Other environments are still using AMD, that's Asynchronous Module Definition. So define, and then give me an array of your dependencies, and then give me a function which returns your module and then still others are using globals. And so you just stick a script in the browser, and suddenly you have something on your root scope, or on the global.
+
+[00:05:55]
+So umd is designed to solve that problem, where it can detect what environment it's in and export itself in a way that works for that environment. So that's what this is. So the main library code all lives inside of this function. Yeah, this is before I knew how to use modules and stuff.
+
+[00:06:18]
+But the interesting stuff as far as umd is concerned is in this function right here. So it's an immediately invoked function, so the actual function is right here. And then it's invoked with this, which would be the global, and then the function definition, so it calls up the factory.
+
+[00:06:38]
+So this would be mapped to the root, and then the factory is the function and that's what returns my module, the genie module. And so then, what it says is, okay, if define is a function, and define.md exists, then I'm going to, I create this as an AMD module, so I'm gonna say define.
+
+[00:06:57]
+And because genie doesn't have any dependencies at all, it calls into that API. If it had dependencies, then it would say, define, given an array of all the dependencies it had. And then those dependencies would be injected into this function call. Fancy stuff. And then, so if defined is not a function and there isn't an amd on define, then we're gonna check if the module is undefined or if it's not undefined and if a module has exports.
+
+[00:07:26]
+If that's the case and we're in CommonJS land. And so, we'll just say module.exports = factory. So go get me what I should export and I'll export it as module.exports. Otherwise, we're not in amd land, we're not in CommonJS land, so we must be in some global environment.
+
+[00:07:43]
+And so, I'll just take that, stick this on the root and I'll call it genie, so then people can say window.genie and they can use this library. We're gonna do the same thing with our library except back in the day when I did this, this is how I developed my code.
+
+[00:08:00]
+I'm pretty positive, actually 100% positive that this is actually the original code, I'm not doing any transplation or anything here. So, we're going to make this all automatic, T, that's the role that webpack is going to serve for us. Probably should explain that right from the get go.
+
+[00:08:16]
+So that's what umd stands for. LibraryTarget is umd and then the library name is starwarsnames. So that, if it goes on the global, this is what it's going to be called on the global. So in the other one there, that was called genie. For us, it will be called starWarsNames.
+
+[00:08:30]
+Then devtool: 'source-map' is just saying create source maps for this thing cuz they're handy. And then module loaders, this is a whole concept of loaders that's very specific to webpack. But we basically are saying, take any file that ends in .js and pipe it through Babel. And only transpile the stuff that's in the source directory.
+
+[00:08:53]
+So it's not gonna transpile our node modules because those should be ES5 compatible anyway. And then for anything that's JSON, load it through the JSON loader and we'll see what that actually does here in a second. And only include stuff that's in our source directory as well. So before we start adding some scripts to make this run, I'm gonna stop and let people ask questions.
+
+[00:09:16]
+So any questions about why we're doing this or what we're doing?
+>> Kent C Dodds: Okay, so again, this tool is valuable. I'm not convinced that it's a 100% important for you to understand exactly how to use the webpack API specifically. Because this is pretty much a basic copy paste job for any library that you're gonna create.
+
+[00:09:46]
+There are some cases, like if you wanted to include CSS and stuff, then maybe it kinda depends on how you wanna distribute your CSS for your library. Like, you might have it bundled with your stuff. But, you might also just like copy that over to your dist directory using like Sass or something.
+
+[00:10:05]
+But, let's go ahead and add a couple of scripts and we'll see what the results of this webpack build is. Let me just double-check. We are definitely going to need a couple dependencies, first of all we're gonna need. Yeah, sorry.
+>> Student: Just came in.
+>> Kent C Dodds: Instead of npm script, can we do it all with webpack?
+
+[00:10:34]
+So we're actually going to use npm scripts with webpack, and so we're gonna use npm scripts to run webpack. Npm scripts are fantastic because they're actually coded into your project. And so anybody coming into help you maintain the project or contribute can just come in here and look at the scripts and know exactly what common scripts you have.
+
+[00:10:58]
+Rather than having to know any cryptic things that you have with Webpack or Grunt or Gulp or whatever. They just look right there and they know exactly what they can run.
+
