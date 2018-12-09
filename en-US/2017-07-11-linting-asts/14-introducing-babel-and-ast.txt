@@ -1,0 +1,165 @@
+[00:00:00]
+>> Kent C Dodds: That is ESLint. There are more things about ESLints. Like I said, I'm not giving an exhaustive list of every feature of these tools. But hopefully you can take that back or like, you're learning back to you teams and improve the code quality of your projects with the ESLint.
+
+[00:00:20]
+And lots of the same concepts apply with Babel. It's just a couple of differences in the API, and Babel you'll find is a lot more powerful, especially with regard to actually manipulating the AST. So let's close my Twitter and stuff. And let's see, we have slides over here.
+
+[00:00:43]
+Okay, so let's look at a Babel example, Babel plugin.
+>> Kent C Dodds: So right here, we have, I'm in AST Explorer, and when you go into AST Explorer again, you'll wanna switch from the espree parser to babylon6, and your transform will be babelv7, or sorry, v6, v7 is not out yet.
+
+[00:01:11]
+And with that, you'll be presented with kind of a default that will plug in and some code, yours won't look exactly like this. So I've got some code here, I have this git version from a where I pass a version string, like 3.4.5. And I expect to get a major minor in patch here, and you probably wouldn't actually want to do this in real life.
+
+[00:01:42]
+But what were going to do is anytime that I have a RegExpLiteral inside of a loop or inside of a function somewhere, I just think to myself, wouldn't it be nice if I just had it up there, then I don't have to reallocate memory every single time I call that function or something like that.
+
+[00:01:59]
+I expect that JavaScript engines are smart enough to basically do that for you under the hood. But there are some things that JavaScript engines can't determine statically that we could that could library-specific like if you call this function a million times, it's always gonna give you the same thing back.
+
+[00:02:17]
+And so you cache that in some way or something. Or evaluate it or something. So, anyway, the idea of hoisting stuff, though, is not near like React. There's a plugin for React that will hoist your JSX that's not dynamic to, say if I were to do a little better performance.
+
+[00:02:40]
+So anyway, we're gonna just write a little plugin that will hoist any reject or reject p literal to like the read of our program, and make sure that it doesn't conflict with any variables or anything like that. So let's look at a couple of the differences of the API.
+
+[00:03:01]
+Before we did module.exports, now we're doing export default. So as I mentioned earlier, your Babel plugins will be transpiled by Babel. And so you can use whatever you want. And I'm 99% confident that the way it's transpiled is based off of your configuration in your projects. So you can use whatever your project's configured with the Babel RC.
+
+[00:03:26]
+So for us, we can use CSS modules. Another difference is instead of exporting an object that has metadata on it and stuff, you're exporting a function. And this function returns an object that has some metadata on it. And one of those properties is the visitor. Similar to ESLint, you do provide a function that they call with a utility library.
+
+[00:03:50]
+And ESM provides context and Babel provides Babel, and this is actually the same thing that you would get if you were to require Babel Core. So these are the exactly the same. One thing that's really common to use from Babel Core is Babel Types, and I'm gonna get the documentation for this in the chat, because it is really, really useful.
+
+[00:04:20]
+And this is enormous, but it lists not all but most of the, well, it lists out all of the node types that Babel supports and many of the functions that you can call on this babel.types, which we're destructuring and assigning to t. That's a really common thing to just assign babel types to t in your plug-ins.
+
+[00:04:47]
+And we'll definitely be using those. And then you can provide a name, it's not required. And then this is your visitor. From visitor on down, there's only one other slight difference. Everything else is just nodes and things, so. Well, two slight differences, and we'll see both of those later.
+
+[00:05:13]
+Well, actually we'll see one of them right now. So the first one, we're gonna be wanting to hoist, or any RegExpLiteral we find, we wanna hoist it to the top. And so I'm gonna create a visitor for that. And with ESLint, this visitor would be passed the node, but with Babel, this is passed the path.
+
+[00:05:33]
+And the path is a special object that has a lot of context and a lot of utilities on it. So let's go ahead and console log that. So the path has a ton of and really I don't even know what hub even means, or data. Lots of this stuff I haven't even bumped into because it's just so full featured, it has so much stuff on it.
+
+[00:06:04]
+We'll be looking at Scope eventually. Scope is similar to that get declared variables thing where it'll give us some scope of our variables. It does have access to the node. So this node here is what we would get in ESLint so instead of just getting the node, we get a path that has a node.
+
+[00:06:28]
+And we'll definitely be referencing this. And then if you look at the prototype of the path, it has tons of utility methods on it. And many of these, actually, are the same that you have from types, except these will be evaluated on the path, so if I say path.isClassProperty, that'll tell me whether or not this path that I have is a class property.
+
+[00:06:56]
+Yeah, who would've thought there was so much stuff in JavaScript. There it is. Lot of node types. And then you also have a parent here, and this is the parent node. But if you want to have all this context and stuff for the parent node, then you would look at the parent path.
+
+[00:07:16]
+And you can keep going up in the parent path chain. Yeah, I think that pretty much explores most of the differences in the APIs. Anybody have questions about differences in ESLint versus Babel? Okay, cool. Yeah, lots of the knowledge is transferable, which is nice. So yeah, what we want to do is find any RegExp that is a RegExp literal, and we found it here.
+
+[00:07:53]
+We could potentially have a situation where something that's not assigned to any variable, and we could probably hoist that But we'll just skip over that for now. You've seen how we can solidify things a little bit further, but we'll not do that. Okay, so we want to get a couple of things off of this path, and because, what we need to do, if we were to do this manually ourselves, well what do we do?
+
+[00:08:26]
+We would say, okay, I'm gonna copy this, I'll paste it up here, and just in case there was some other version RegEx in this scope, I'm gonna give this a unique name. I'll say _versionRegEx, okay, now it has a unique name. And then I'm going to go down back in here, and I'm going to find any instance of where versionRegEx was being used.
+
+[00:08:49]
+And I'll replace it with my new one that's at the root scope, and then I'll remove the declaration of that variable. So that is kind of the process that we want to do, just automatically using Babel. So let's first generate, or let's see. Yeah, let's first generate the new identifier, the unique identifier, for our new variable that we're gonna create.
+
+[00:09:21]
+And to do that we're going to get a new identifier. And we need to get a new identifier that's unique to the whole program as well as, yeah, so yeah. So we need to be able to somehow get a reference to the whole program so that we don't conflict with any other variables that exist in the program.
+
+[00:09:49]
+But in addition to that, it also needs to be unique to this function. So let's say we had a, well you'll see why that's important here in a second. So we're going to take the path,
+>> Kent C Dodds: And we're going to use that scope property that we were looking at earlier.
+
+[00:10:08]
+And we're gonna ask the scope to generate a NewUidIdentifier, and I think I'm spelling something wrong. Yeah, it's not new, it's just generateUidIdentifier. Then if we console.log the newIdentifier, then we're gonna see an object, and this is a node. Its type is identifier, its name is temp, _temp.
+
+[00:10:35]
+And if we actually look at our node types here, this is type is identifier, the name is versionRegEx. It has a couple extra properties, but for all intents and purposes, other than those location in the code properties, what we just created with this generate UID identifier is exactly the same.
+
+[00:10:55]
+It is an identifier node, it's what we made. Okay, great. But _temp isn't very useful if we're looking in our debugging or something like that. So it is nice to be able to give it some sort of name to base things off of. So I'll just say hi really quick.
+
+[00:11:17]
+And it's gonna base its generated ID off of what I provide. So let's go ahead and get the name of this declared variable. So let's console log the path. And we'll see if we look at the parent, that's our variable declarator. And look at the ID is gonna be our identifier which has the name.
+
+[00:11:41]
+So we'll say path.parent.id.name, and that is the version RegEx that we want to use to generate our identifier. Great, so now we've generated a unique identifier. And,
+>> Kent C Dodds: [SOUND] This is hard because small screens. If we had a versionRegex here, then it's gonna create a versionRegex2. So that's one really really handy things about Babel, is that it's able to understand the whole scope of the program statically so that it doesn't generate any code for us that's broken.
+
+[00:12:25]
+Okay cool. So we have an identifier. Now we need to basically take this node and move it because here we're not just inspecting things, we're actually making things and moving things and removing things, manipulating this AST.
+>> Kent C Dodds: So let's go ahead and we'll take this new identifier and basically make a variable declaration out of it.
+
+[00:12:58]
+
+>> Kent C Dodds: So if we look at this versionRegex, that's a variable declarator, and we have a variable declaration. So how do we create a new variable declaration? This is where types come in. So Babel types allows us to create new nodes. So we're gonna see our VariableDeclaration = t.variableDeclaration, Declaration, okay.
+
+[00:13:27]
+Now this is where you can look in the docs and see what that does. VariableDeclaration,
+>> Kent C Dodds: And this is the API. You pass in a kind, so var, let, or const, and then you pass in your declarations. It's an array of variable declarators. And the t.variableDeclarators, here we go, that's how you create a variableDeclarator, you give it an identifier and an init.
+
+[00:14:00]
+So what to initialize it to, an expression to initialize this, so the right side of the equal sign. So let's go ahead and do that. The kind that we want, we'll just start with const here. And we could expand this further to say, okay, I want to use the same one that the original variable was declared as, and we can do that here in a little bit.
+
+[00:14:28]
+And yeah, then we'll pass an array of variable declarators, so t.variableDeclarator. And that is gonna take our new identifier that we just created and an expression. So I'll just do one really quick and than we can do a real one. So a t.string literal high, and I think missing, yeah.
+
+[00:14:56]
+Okay, so then we have this variable declaration that's console.logthat.
+>> Kent C Dodds: And see what we're looking at. So we still haven't actually manipulated data. See, we're just, based off the AST we're generating some new nodes ourselves. So we have this variable declaration, it is a constavariable declaration, it has a few declarations.
+
+[00:15:17]
+And we have an init, and we have an id, so we've created a node, cool. So how do we manipulate a JavaScript AST? Well you kind of just manipulate it. So where we wanna put this is in our program. So we need to find that program node, and we need to stick something into its body.
+
+[00:15:43]
+And we'll just stick it right at the top. So let's find that program node. One of the cool things that the path allows us to do is find a parent. And this takes a function so, which it calls on every parent. It's very much like jQuery, where you can find dom notes further up the tree.
+
+[00:16:07]
+We can say t.isProgram(parent), and this will find us the parent node, so const program, the parent node that is the program, console.log(program). We found it, hooray! So just as kind of a shortcut, because t.isProgram just accepts a parent parameter. You'll often see code that just looks like this.
+
+[00:16:39]
+So find me the parent that isProgram.
+>> Kent C Dodds: So we found the program, now if we look at the program.node.body, that's gonna be our array that has all of our entries. Or all of our code, and we want to tack something onto the front of it, and it's just an array.
+
+[00:17:00]
+So how do you tack something onto the front of an array? If you're gonna put something on the back, you push, on the front it is-
+>> Class: Unshift.
+>> Kent C Dodds: Unshift, exactly. Yep, so we will say unshift, and what are we unshifting? This variable declaration we just created. So now if we look we've actually manipulated the ISD.
+
+[00:17:25]
+Ta-da! That's cool, but is not what we want quite yet, so let's go ahead and take this a step further. We can take this version regex and the parent is the original variable declarator so we'll say path.parentPath.remove we want it out, it's gone.
+>> Kent C Dodds: But there's still two important things missing, the one that we're creating isn't the redjacks.
+
+[00:18:04]
+And all the references aren't being updated to our new variable name. So let's fix those things really quick.
+>> Kent C Dodds: We'll do the renaming first. We'll say path.scope.rename. So and lots of these things, I'll show you, there's the Babel handbook. I'll just copy that over here really quick.
+>> Kent C Dodds: Common things like rename and findParent, and some of these things.
+
+[00:18:41]
+Over time, you'll learn about these things. And the Babel handbook has a lot of these, but something I find something really useful is just to log it, and then look at the prototype. And just read the functions, and then if it looks interesting, I'll go try and find some docs or something.
+
+[00:18:57]
+But rename is one thing that you can do and it's super duper awesome. And I'm gonna actually rename all instances of our version regex name to something else. So first let me take this and make this a variable. And then I'm gonna rename all instances of that name, with our newIdentifier.name.
+
+[00:19:27]
+
+>> Kent C Dodds: And you can't see that because we commented that out but, we leave that where it is. It is our new name. Both the exec and the instantiation. Pretty cool, so we just have one thing left right? Just need to initialize this with the same thing that's with our original reg XP.
+
+[00:19:48]
+And we can actually do that pretty easily because the reg XP is what we're visiting, so we just say path.note.
+>> Kent C Dodds: And now this code functions basically the same, except for the fact that I recently found out exec is stateful and, yeah, keeps track of when it was called.
+
+[00:20:09]
+And if you call it once with one thing and then call it again with something else, I'm pretty sure it returns where the one thing was. It's weird, JavaScript, it's kind of funny stuff. So instead you might do something like test or matches or something like that. But anyway, yeah, we've written Babel plugin that hoists our regex.
+
+[00:20:31]
+And it wasn't the most terrible experience of our lives right? It was better than visiting the dentist hopefully? So just to recap on things, differences from ESLint, you're exporting a function, not an object. That function accepts the Babel core object. The Babel core has a bunch of things on it that are useful, and one of those things is types.
+
+[00:20:54]
+You use that quite often to create new nodes and to test whether nodes are what you expect. And then what you return from that function, I don't need this. What you return from that function is a name for your plugin, and I think that's for debugging purposes, and visitor object.
+
+[00:21:15]
+And from there, it's pretty much the same except instead of a node, you get a path. And that path has a ton of useful functions you can call.
+

@@ -1,0 +1,72 @@
+[00:00:00]
+>> Kent C. Dodds: Great, so now we're gonna be talking about codemods. Codemods are awesome. This is where I think, things start to get really practical because codemods are often pretty domain specific. It's like, we have this internal company module and we're upgrading from version one to version two. And the API changed from callbacks to promises.
+
+[00:00:23]
+So now we need to find all of the instances where we're using old API and change that from callbacks to promises. It's something you can totally do. Pretty much everything about code mods, so I should step back. Codemods started gaining popularity in the last year or two. And the tool that is kinda the de facto for codemods is called JS code shift.
+
+[00:00:52]
+And I will paste a link to this in the chat here really quick. So this is a really awesome tool, it's a CLI and you provide a codemod which you can create even in share choose JS code shift and it has a pretty different API from what we've seen before.
+
+[00:01:14]
+It still exports the function and gives you a file and an API. The API has JS code shift on it and this is your jQuery thing right here. So you select the file source and then you do find and for each and all kinds of interesting things to make changes.
+
+[00:01:33]
+I love the people who build this tool and I love that this tool exists but I've tried like six or seven times to use this tool and I can never figure it out. So, to me it's just hard. I like the visitor pattern of Babel a lot. I think it's a really nice way to manipulate and look at ASTs.
+
+[00:01:58]
+And so there's recently, I actually gave my beginners AST talk. And as part of that, I decided to see what would the tooling like to use Babel to do codemods. And it turns out it was really easy. I've got a little ten-minute video on YouTube that I think I linked here at the end where I demonstrate how to do this.
+
+[00:02:19]
+And then somebody at Square built this babel-codemod tool. And so now you can just use codemod --plugin, you'd specify your plugin, and then your path to your files. And you can even use like Babel in your plug in and it'll require Babel register and stuff. But here, this would run the my-plugin against the whole source directory.
+
+[00:02:49]
+And what happens is for each file in the source directory, it will run your plug-in on it and take the output of that and save it to the file, and so where Babel plug-ins are generally for compile time. They don't actually finish the source, they just change what you're shipping.
+
+[00:03:12]
+Codemods are intended to change the source code so that you can migrate away from an old API, or something like that, old testing framework, whatever. And they're super duper cool. And because it uses babel, or because we can use Babel to do this, you pretty much know every thing you need to know about building this, it's just taking the time getting used to the APIs and that kinda thing.
+
+[00:03:38]
+And so, instead of doing a full-on AFC Expo Demo, I have for the other two concepts, I'm just going to show you one briefly, I'm not gonna show you how it all works, but just give you an idea use case that is pretty cool to codemod. So last night I rewrote all of these demos and exercises.
+
+[00:04:04]
+And they're so much better than what you would have had to endure. It still would have been cool, but it would have been maybe more confusing. But one of the demos, or actually I think it's one of the exercises, the very last exercise is a really cool codemod that I think we should probably open source.
+
+[00:04:23]
+And what it is is I can show you the text fixtures. Here we have this file here, our main.js. And it's importing some things from the file system, or from the like corn node modules. This is commonjs module but it's still using ES6 imports. This is another commonjs module.
+
+[00:04:54]
+This one actually uses both commonjs and ES modules. So we have this big mix of commonjs and ES modules. And the way that things are developing, it appears to be like 99% sure that when ES modules land into node, you will not be able to do this. You can only do a default import and that default import will have like a resolve so the way that you'd have to write this is it'd have to be path and then you'd say const {resolve} = path.
+
+[00:05:35]
+Or you just do path.resolve everywhere. So that's kind of unfortunate, especially since there's tons of code out in the world that's doing this pattern where you have common JS modules, and you're importing them like they're ES modules with import specifiers and all that stuff. So this is great use case for us to build a codemod that can upgrade the entire community.
+
+[00:06:01]
+And what's cool about this codemod and one of the reasons why I wanted to show you is that the power of Babel is not limited to your little function that you provide it. It's running in node. And one of the requirements is that it runs synchronously. You can't do any asynchronous stuff.
+
+[00:06:19]
+But outside of that, pretty much anything's game. And we kind of abuse that for our purposes here. So really quickly I'll just show you th, actually I can't. I can't show you the result, cuz I deleted the snapshot. But I think you get the idea of what is supposed to happened here.
+
+[00:06:36]
+So I'll show you what the plugin actually looks like. So we visit import declarations. All those things were import declarations. And, actually, I should have that open just to reference. So, all these things, import declarations. And we split them up to default, name, spaced, and named. So this is default, this is named, and this is namespaced.
+
+[00:07:01]
+Split those up, and we also get the source. So this would be the source. And then we determine whether or not, let's see, I'll skip over that. We determine whether or not the module that these are being imported from is a common JS module. The way that we do that, I won't show you, but the way that that happens is first we see is this a built-in module?
+
+[00:07:28]
+And there's a known module that has a function that says whether or not something's a built-in module, which is kinda cool. If it is then that's definitely CommonJS. If it is like a relative mantra or something, we actually read the file. I'll show you, it's kinda cool. We read the file in and right here we get the contents and then I use Babel to parse the contents and I get the AST and then I traverse the AST.
+
+[00:07:57]
+So I'm doing, inside of my Babel plug-in, I'm starting a whole new traversal. And this right here is the visitor pattern over again. Pretty wild, I love that this is possible. And if it has an export specifier of any kind, it's using ES modules. And that means that exports as an ES module, so it's not CommonJS.
+
+[00:08:23]
+And then there's the concept of mixed and stuff like that. None of this stuff is super pregnant, but hopefully you're following along pretty well to get an idea of what's possible here. And so based off of whether there's a default specifier, we'll use that variable name. Otherwise we'll make a new one.
+
+[00:08:44]
+And then for each one of our coingest modules that are using import specifiers or name spaced imports, we're gonna go update not only the import itself but also any code that's using those names. And so this is where we're getting reference paths from the binding of that name.
+
+[00:09:03]
+So this is similar to the ES int stuff we did with the git two card variables. We're getting all the references to this import and updating them all to use this, our new finangled thing. So anyway, if you didn't really totally follow what's going on here, don't worry too much about it.
+
+[00:09:26]
+Just know that doing pretty complex transformations is a lot easier when you can use ASTs. And it's really fun and exciting and yeah, ASTs are awesome.
+

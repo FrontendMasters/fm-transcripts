@@ -1,0 +1,218 @@
+[00:00:00]
+>> Speaker 1: You just wanna watch it? Yeah, okay, cool. Because we don't care about the config or anything. We can now copy this into that AST explorer and we will, I'm just gonna I'll leave the other examples in there but I'm just gonna pull this in here as well as another invalid example.
+
+[00:00:36]
+And we'll know our rule is working as soon as we see this line getting an ESLint error.
+>> Speaker 1: Okay, so here's, yeah, let's just go ahead and give this a shot. We're gonna run into a problem that we'll have to address, and that will drastically change how we accomplish this task.
+
+[00:00:58]
+Well, not drastically, but it'll change it quite a bit. So we have all the identifiers and we know in their console. But for this console all these other requirements are not going to pass, because this console doesn't have a parent that's a member expression or any of that.
+
+[00:01:20]
+It's not part of a call expression. And so we need to find all nodes that are console, and then find out if it's being assigned to a variable. And then track that variable, and all that variable's usages. The same thing actually would apply if we said, = require {'console'}, which you can totally do in Node.
+
+[00:01:41]
+Which is kind of weird because console is global, but you can do that. And I've actually done it to make it easier to mock, which is kind of interesting too. But yeah, so we're just gonna handle this case and what we're gonna need to do is simplify our looks like thing to what we had before node.name.
+
+[00:01:59]
+Oops, is equal, or not equal to console.
+>> Speaker 1: Then we'll return.
+>> Speaker 1: Otherwise, we're going to, yeah, so we need to get all the references to the variable that this is being assigned to. And so we're going to, here let's just console.log the node really quick. I'm gonna comment out all this stuff, just so we only have one node to worry about for right now.
+
+[00:02:34]
+And we'll pull up our console and see, okay, so this has a parent that is a variable declarator. Okay, that's good. So we'll take that variable, or, let's see. We're gonna that open again, look at the parent. You see that variable declarator? That variable declarator has a init, which is the console that is our node.
+
+[00:03:04]
+The init node is us. And it has an ID. And that is the thing we need to find all the references to this variable, whatever it is called.
+>> Speaker 1: So,
+>> Speaker 1: Sorry, yeah, so we're gonna use context from ESLint to get all references to this node. So we don't have to traverse it ourselves and find out all the references, with babel you have a similar thing where you can say, okay, I have this variable I want to find all the references to that variable in our program which is really, really nice.
+
+[00:03:41]
+And to do this I should just leave the console open here. I'm going to say context.getDeclaredVariables and pass in that node.parent. So this getDeclaredVariables accepts a variable declarator, and that's that node.parent, or it also accepts a variable declaration, which can have multiple declarators. And because it accepts a variable declaration, it will return an array.
+
+[00:04:17]
+Because of variable declaration can have multiple declarators and so our array is always gonna be one because we're just passing in a variable declaration or declarators. Lots of words so is that confusing? That, so it's giving us back a single a single item because we only we're passing it a single variable declarator.
+
+[00:04:38]
+And that single item has all the information for where that variable is being used in our code base. As you can see, this is why this exercise would have taken a little bit of time. Because it's, this is where you start getting into a little bit more confusing stuff.
+
+[00:04:53]
+And it's only just begun.
+>> Speaker 2: Sorry, a declarator is like one binding, one variable binding declaration could be multiple on the same line.
+>> Speaker 1: Yeah, yeah, let me show this.
+>> Speaker 2: I already showed them.
+>> Speaker 1: In the AST really quick, yeah. That's exactly right. So we have a variable declaration, on the left side you see the highlight when I hover.
+
+[00:05:12]
+And a variable declaration has a declarations property. And that can have any number of variable declarators. So when we pass, get declared variables, a variable declarator, then it's just gonna give us back all the references to that variable that was declared. If we gave it a whole variable declaration, then it will give us an array of all of the ones that variable declaration is declaring.
+
+[00:05:43]
+Okay, cool, so we only care about this first item, so we're gonna just pop off the first one, right one, pop out the first, and this has a references thing that is very useful to us. So we'll see the first item in reference is an identifier. That is the name, CSL, that identifier has a parent.
+
+[00:06:07]
+And that is the variable declarator. So what we're looking at right now, is the variable declaration itself. So it's referencing itself, it includes itself in it's own references. And so then the second item is what we're more interested in. And that is an identifier. If we look at the parent, it is part of a member expression.
+
+[00:06:27]
+If we look at that parent, it's part of a call expression. So we're looking at this node here. And if I did a couple of these, we'll look at, yeah, we'll just pull up references, and we're gonna see all of the references. Every single time I use CSL, I'm gonna see a reference there, okay?
+
+[00:06:47]
+So here's where things start to get a little bit trippy, if they haven't gotten already. So we're going to, yes?
+>> Speaker 2: Question, are the references scoped?
+>> Speaker 1: Yes, so if I were to, here let's do that actually. We'll just have one, and then we'll make a function called scopedThing.
+
+[00:07:08]
+And inside of here we'll say constCSL = CSL. And now if we look in our reference there's still only two, even though there are three CSLs. Yeah, that's thank you, ESLint, for making that possible. Okay, and this is why regex just is not as good [LAUGH] for doing stuff like this.
+
+[00:07:33]
+Okay, so let's get the references here. We're gonna get to. We'll look at that, we'll look at the second one. And then we'll get the ident, or, yeah, the identifier. And the parent. And we're gonna get undefined here. This is where things are a little bit tricky. So let's just walk through what.
+
+[00:07:59]
+what nodes we're touching here. So we get the references. These are the two references here. We're gonna grab index one, so we'll get this one. So this reference right there. And we get the identifier from that reference. So that's the CSL right here. And then we get the parent so that we can get this full member expression.
+
+[00:08:21]
+The problem is that this relationship hasn't been established at this point of ESLint's traversal. And so the identifier, even though it exists, that relationship between the identifier and it's parent hasn't been established at this point. And we need to have ESLint finish traversing everything so it can establish that relationship, which make things a little bit complicated, but it's pretty straightforward to do that.
+
+[00:08:54]
+Basically what we need to do is keep a record of all of the usages of console that we're interested in looking at later. And then when the program has finished being traversed, then we iterate over those because, at that time, we'll have access to the parent. We can validate things.
+
+[00:09:15]
+And this is why this exercise would have taken a little bit longer. But you're learning this now, and so next time you have to face something like this, you'll know exactly what's going on and you don't have to deal with that which is pretty nice. So how do we know when ESLint is finished traversing our program?
+
+[00:09:35]
+Well, by default when ESLint hits a node, it's going to do what's called it enters traversing the node. And then when it's finished reversing that node and finished dealing with all the other plug-in's that are using it, then it's going to exit the traversal of that node and start traversing more nodes.
+
+[00:09:54]
+And in our case, we know that it's finished when it exits the program, and so we're going to make a visitor for the program. But we want our visitor to be called when it exists, so when it's done. To do that there's some special syntax for our visitor.
+
+[00:10:14]
+And it is Program:exit and this visitor will only be called when the program is done. So here we can console.log('done') And console.log('Identifier'). We'll see all the identifiers are logged, and then done is logged. Okay with that, we need to inside of this Program:exit, the visitor, we need to have access to all of the declared variables for the console nodes that we are interested in.
+
+[00:10:56]
+
+>> Speaker 1: So let's go ahead and do that. So I wanna keep all the logic all together, and so what we're gonna do is I'm gonna move all this reporting stuff into this Program:exit. And what we're gonna do instead is we'll have an array up here called consoleUsages.
+>> Speaker 1: And If it is an identifier called console, then we're going to push the node onto the console usages, and I'll just comment this stuff out really quick for reference later.
+
+[00:11:38]
+So then if I console.log the consoleUsages,
+>> Speaker 1: We're only gonna get one, which is totally weird. Why is that happening? Right, because I commented all the other ones out, yeah, that's why. So we only have one reference, we'll uncomment those later. Just make things a little bit easier.
+
+[00:11:59]
+And now at this point I'm gonna take this big consult log that we had before,
+>> Speaker 1: And we'll say consuleusages.forEach(consoleUsage, or let's see, we can call that identifier.
+>> Speaker 1: And say identifier. And now, before, here let's take that out.
+>> Speaker 1: Lots and lots of consoles all over the place, but before it was undefined.
+
+[00:12:41]
+Now that we're done, all those bindings and relationships have been established, and so now it's actually a number expression, so we're good. From here on out, pretty much everything is the same. You don't need to worry about whether relationships have been established or anything like that. It's just verifying the AST looks the way that you want it to.
+
+[00:13:04]
+So let's go ahead and move this stuff to where it was before, just inside of here. And instead of, let's auto format that a little bit. Instead of node we're gonna reference identifier,
+>> Speaker 1: And put that there. And then let me uncomment this stuff and just make sure that all of our other stuff is still working, which of course it's not.
+
+[00:13:35]
+And that is because of this line, we'll just comment that out really quick.
+>> Speaker 1: Hold on, references, event define, let's just get rid of all this extra nonsense, too, except for that really important piece.
+>> Speaker 1: There, so we essentially, so far, just refactored it so that our code runs at a point in time where any variables that have been assigned to console have all of their references' relationships established.
+
+[00:14:16]
+So far we haven't actually effectively done anything. Okay cool, so now in addition to if it looks like these other invalid use cases, we're also going to check the reference here to see if that looks like this other use case as well. Yeah, so everything about this piece right here looks a lot like this, except the name here is different.
+
+[00:14:45]
+So we want the name for our identifier to be dynamic in some way. And what we can do, is we're going to take most of this stuff inside of our looksLike, and pull that out into a function called isDisallowedFunctionCall. That'll take an identifier,
+>> Speaker 1: And this is going to return a looksLike from that identifier, and we'll remove the console.
+
+[00:15:24]
+So if everything else, it doesn't matter what it's called and at this point it can be like foobar.info. And if we were to pass this identifier in to isDisallowedFunctionCall, then that would also be reported. But that allows us to share this logic between when we're specifying console and when it's a totally dynamic thing altogether.
+
+[00:15:54]
+So I'm going to say that this looks like It has the name of console so we're still just refactoring, he re. Well, we kinda wanna merge these two things. Well, actually, sorry, at this point we know that, sorry, sorry, sorry. I am in the wrong context. We want to do this, here.
+
+[00:16:31]
+
+>> Speaker 1: Sorry, nevermind, I've lost myself. So we could this a couple of ways. What I'm gonna do is Just probably what's the simplest. Let's say identifier.name is console.
+>> Speaker 1: And is looks like.
+>> Speaker 1: Is disallowed function call. Sorry, no, no, isDisallowedFunctionCall, there we go. Hold on a minute, that's not defined, sorry, so we're gonna need this to be in scope of our options.
+
+[00:17:15]
+
+>> Speaker 1: Right here, there we go, and is totally busted.
+>> Speaker 1: Okay, sorry about that.
+>> Speaker 1: Now it's still just a re-factor here. So what we have effectively done, Is we simplified this. This looks like to not verify whether the node name or the identifier name is console, it can be anything.
+
+[00:17:48]
+And we moved that logic to just a regular part of our if statement test.
+>> Speaker 1: So the reason that we did that is so that we can verify that this also is a disallowed function call.
+>> Speaker 1: Okay, cool, so now let's actually do something Kind of useful.
+>> Speaker 1: And add more stuff to what we're trying to accomplish here.
+
+[00:18:30]
+
+>> Speaker 1: The reason I keep stopping is, I keep on thinking of a better way to do things than I did before. But okay, so for every one of these identifiers we have all of the references to console. And so that includes these as well, and these haven't been reassigned.
+
+[00:18:48]
+And that's when we were making this call to Get.DeclaredVariables. we were getting this error because the declared variables of this member expression. There are none it's not a variable declarative. So we're gonna wrap this, and if identifier.parent is equal to a variable declarator.
+>> Speaker 1: Then we'll do this console log here, great.
+
+[00:19:19]
+
+>> Speaker 1: And in that case, let's just pop open this. Sorry, this needs to be dot type. So the type if parent is variable declarator. So now we can start checking the shape of this identifier to see whether it is using a disallowed function. And if it is then we can report that.
+
+[00:19:45]
+Or sorry, of usages of that identifier and we get those usages from the references. So because there could be multiple references, we're going to be iterating all over all of these references and doing this checking also. The also nothing. We'll just talk about that, here in a second.
+
+[00:20:10]
+So we'll get the references. Declared variables dot references, and we're starting at one here. Because the first index zero of these references will include the variable declared during the first place and we don't care about that. So I'm going to slice zero, or starting at one, so we just get the, everything from, just skipping the first one.
+
+[00:20:40]
+So now if we console a log, the references
+>> Speaker 1: Well see we only have one. If I add a couple more than that, it should work just fine. Have two, and then three, okay? Cool, so with these references, we can iterate over them for each, and get the reference console.
+
+[00:21:07]
+Log the reference dot identifier and we have these identifiers that are referencing those 3 CSL. And from here we can verify that this is a disallowed function call. So it's part of a disallowed function call. So let's just verify that manually. This identifier that we're looking at here has a parent.
+
+[00:21:34]
+That parent type is remember an expression that we're looking at here. And that member expression has a parent that's a call expression, so so far so good. That member expression also has a property that has a name of log. So we're, yeah, it looks like it's going to pass this is disallowed function call test here.
+
+[00:21:58]
+So we can pass that there, we'll console log that. We're going to get three trues. Let's change this one to stuff. We'll get two trues and a false because that's not a disallowed function call. Great, so now we turn this into an if statement.
+>> Speaker 1: And we do the same thing in this case that we did for this.
+
+[00:22:23]
+I'll just copy that for now.
+>> Speaker 1: Except the note that we're gonna report on is going to be the reference dot identifier dot parent to get. So we get the reference identifier dot parent to get the whole member expression. Dot property to get the property side of the member expression.
+
+[00:22:51]
+So we're reporting it on the right side.
+>> Speaker 1: So I'm glad that I didn't have you do this exercise, cuz it probably would have taken forever. And I think it's more valuable for you to just see that doing something like this is totally possible. We're just dealing with JavaScript objects.
+
+[00:23:13]
+There is a little bit of quirks with the fact that we had to wait for the traversal to finish, before we could actually see all these relationships. But outside of that from then on is just more Java scripts stuff to make sure you're checking for the right stuff.
+
+[00:23:31]
+And as wild as people's code gets, most of the time you should be able to track everything when people have issues, yeah.
+>> Speaker 2: So I'm trying to follow all that. I kind of just spaced the why you needed to wait. For the end of the traversal, could you just reiterate again?
+
+[00:23:49]
+
+>> Speaker 1: Yeah, yeah, sure, I can demonstrate that problem again, here. So if I put this down in here, out here, we'll need to put this inside of a check
+>> Speaker 1: So if it's part of a VariableDeclarator, then we can get the references. Or sorry, we would expect that we could get the references if these didn't blow up.
+
+[00:24:23]
+It's not Identifier, it is node here, okay. And we can get the references we get all the references. But if let's just pull off this first one and than get the identifier from that cause that's the actual node that it's referencing. And then try to get the parent from that.
+
+[00:24:48]
+We don't get the parent and it's because that relationship between the identifier reference. And its parent hasn't been established at this point of the traversal. So you have to, so that's why we store this node in console usages. And then when the program is exiting traversal, all those relationships have been established.
+
+[00:25:10]
+And we can iterate over console usages and do that verification at that point. We'll find the same problem in Babel that we have to overcome. And we do it in basically, the same way. It has a slightly different API, but it's basically the Same concept. And maybe we'll have time to do that exercise so you can do this yourself.
+
+[00:25:34]
+
+>> Speaker 1: Okay, any questions? Anything from online?
+>> Speaker 1: Where can we find context? Yeah, so think, if you scroll up you should find it but it is here. And I will give it to you right now.
+>> Speaker 1: There is context. Thank you.
+>> Speaker 1: Okay, great, let's just go ahead and make sure that this works, I hope it does.
+
+[00:26:08]
+That would be really sad if I just went through all that, and it doesn't work on our tests. Yay, it does. That's great.
+

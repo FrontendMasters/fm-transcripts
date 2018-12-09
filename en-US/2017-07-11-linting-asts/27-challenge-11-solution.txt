@@ -1,0 +1,75 @@
+[00:00:00]
+>> Kent C Dodds: Okay, so I'm gonna copy this into our AST Explorer and take our test cases, and also bring those into AST Explorer. And to simplify my life a little bit I'm just comment out everything for the one that we want, for right now.
+>> Kent C Dodds: And that way we only go through stuff once.
+
+[00:00:29]
+
+>> Kent C Dodds: So here we go, let's go ahead and look at the, yeah, Dane. This would take a while for me to write up and I don't think that you would get a whole lot more out of it to watch me do it. So I'm gonna just take you through the finished code, that's all right?
+
+[00:00:54]
+Okay, also I think our brains are fried, so I think we'll be okay.
+>> Kent C Dodds: So this is what we've got going on. In our call expression, now this looks like is much simpler we can probably just do away with the looks like entirely and just do path.node.callee.name is $.
+
+[00:01:19]
+And the reason for that is because this code is using dollar and we wanna catch those, as well. That we wanna be able to hang onto those references. And so if it's not using dollar sign then we don't care. It could be a call to any other function.
+
+[00:01:37]
+And then we can check if it's a supported jQuery function call. So for our other cases where, like for this case for example, like this we can still do right now. We don't have to wait until the program exists or anything like that. And so if it's not a supported jQuery function call, which is just doing the rest of our like thing that we had before, so if it's not, then we'll see, okay, is this a variable declator?
+
+[00:02:09]
+Is this part of a variable declaration? If it is, then I'm going to keep track of this path. Now with our ESLint plug in, we did things differently. We created a variable up here at the top to keep track of everything, and the reason that we can't do that here is because the way that Babel works as far as the API goes.
+
+[00:02:31]
+If I were to do const myCollection as an array and just add stuff to that, then every file that this plugin runs across is going to have nodes added to this list. Things aren't scoped to the file, whereas with ESLint you're doing module.exports an object, and you have a create(context), and this function is called for every file.
+
+[00:02:59]
+And so you can have stuff scoped down, collection, down to this function, and that's new for every single file. But we can't do that with the API that Babel gives us, and that's okay though because one of the things that Babel will give us. I'm sorry, one other thing.
+
+[00:03:20]
+One other difference that's useful is Program.exit was what you had to do for ESLint. And for Babel, it's actually, I think this is a little bit nicer. If you want to be specific about enter or exit, then you can make it an object and have it enter or exit.
+
+[00:03:39]
+So by default, it'll be enter, but if you make it an object you can specify which one you want. And so on the enter, we're going to set assignedJQueryEls to a new set that we can add stuff into. And so we get a bunch of like kinda contextual information like some options and stuff like that as a second argument to all of our visitors, and file's one of those things and you can set things on the file.
+
+[00:04:10]
+So that way, things are scoped to the file. So down here, if it's not a supported jQuery function call like this, it's not actually a function call and it is a variable. The parent is a variable declaritor so this thing, then we're going to get the assigned jQuery L's set that we created and add the pack to that.
+
+[00:04:35]
+And then we'll return because we can't do anything with this anyways. We have to wait until the rest of the program's been traversed. Otherwise, if it is, a supported jQuery function called and we'll continue. And we'll get the jQuery function, we'll get the path to replace, and let's see right.
+
+[00:04:56]
+Right here would be the path to replace, that was the overall path that we had before. And then we'll get element that is being selected on, so the thing that we need to call our raw dom APIs on. And then we'll handle support to jQuery function. So if that jQuery function is addClass, then we'll update addClass, otherwise we'll update this way, with addTemplate stuff.
+
+[00:05:25]
+So, so far most of that's refactor and storing a couple of things for those that are variable assignments. So once our program is finished reversing, we'll hit this exit, and we're gonna get that set that we created, and that's gonna be a collection of all the jQuery el variable declerators.
+
+[00:05:49]
+And we'll turn that set into an array so we can call forEach on it. And for each assigned call expression, we'll get the declerator path. So here, what we have in our collection are these. Let me just expand that just a titch. So we have a bunch of these dollar Ls'.
+
+[00:06:10]
+So we're gonna get the parent path, so that'll give us this and with that declared a path we can get all the bindings. So with ESLint, you would just give context.get declared variables, you give that a variable declerator and that would give you all the an object that had bindings on it with the ESLint.
+
+[00:06:32]
+You take a pass. And you get the scope from that patch. And you call get binding and provide it a name, a variable name. In our case, that's gonna be myEL. So it will take the path that this line of code is in, whether that is in a bunch of closures or the root level of the module.
+
+[00:06:56]
+And give us this binding object that has a bunch of information about how this variable is used. And one of those things is reference paths. And so the reference path would be this identifier right here, the path to that identifier. So for each one of these reference paths, we're gonna make sure that it looks like a call expression, or that it's part of a member expression that's a call expression.
+
+[00:07:26]
+So here's our identifier, that identifier is part of the member expression that's part of a call expression. And if that is the case and it's not a jquery supported function called, like this myOtherEl.unsupported function, then we're gonna return, we'll exit early. Otherwise, in this case, where it is a supported jQuery function call, then, we're gonna get all the things that we need to handle that supported jQuery function.
+
+[00:07:57]
+Whether that be hide or show or add class. And we'll pass in the argument. So in our case, this is the assignedCallExpression, so that is this thing. And we're gonna get the node for that and the arguments. And we'll pop off the first one, so we're getting el.
+
+[00:08:17]
+We'll pass that in and, in addition to that, we'll take the reference path, so that is this thing right here. Come on, that reference path. We'll take the parent and the property is this. And the name is add class. And so we pass that in for the jQuery function.
+
+[00:08:37]
+And then the last piece is the path to replace and the path we want to replace is this line. Well, pretty much all of this stuff which is kind of interesting. Yeah, so, actually, this is not quite finished as far as implementation goes, cuz I'm fairly certain that when we're done, we still have, no, we don't.
+
+[00:09:01]
+How do we do that? That's right, that's right. So what we wanna replace here is this call right there. And then we replace that with the new ROM, DOM, API call and then we remove the declaratory path. So we remove this guy and that's it. So, sorry, that would've taken quite awhile to type all out.
+
+[00:09:27]
+I would encourage you to try and do this exercise. It will teach you a lot.
+
