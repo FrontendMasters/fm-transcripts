@@ -1,0 +1,99 @@
+[00:00:00]
+>> Lukas Ruebbelke: This next module is going to be a little tricky. And I would say, out of ngrx, dealing with asynchronous operations is quite possibly the most complicated piece. And so, let me earmark or even put, maybe, a line in the sand or a flag post, is that at this point, we understand or we have covered the basic fundamental shape of Redux in NgRx.
+
+[00:00:39]
+We understand how to set up the store, through the reducer around it. We understand actions, strongly typed actions, how to simplify your reducer with entity and how to do basic selectors. And so at this point, where I'm like, this is amazing, like I'm all in, the very next question that I had is well, okay, what if i need to actually call the server and do something?
+
+[00:01:09]
+And so this is where effects come in, so this is, I think the first challenge is understanding Redux in that shape. The next piece is, so, safe flows down and events flow up. The next, very next question I had is, well, what if I need to do something that's asynchronous?
+
+[00:01:29]
+I need to call a server or something. So, as an event flows up, we use an effect as middleware. To capture that operation to handle it and then delegate control back into NgRx. And so, when I talk about effects is that comes from side effects, and is in that creates a side effect, and it is nothing more than middleware that sits in between your application and the reducer.
+
+[00:02:02]
+And so, you'll register it, just like the store. But, and it will listen to events the same way. The difference is that, as actions are fired, typically, you'll split your actions into half. Or, I think of it as splitting to an initiation kind of action, like an event trigger, and then like an event completion.
+
+[00:02:27]
+And so some stuff will go right into the reducer, and that's totally fine. But if you need to have some side effect or some asynchronous thing, is that instead of having for instance, if we go to our actions, where we have like low projects, AddProject that day, DeleteProject.
+
+[00:02:47]
+Well now we split this into kind of incoming action or an incoming event and an outgoing event. So what I'll do is. We'll just break, I'm gonna build up two and then we'll kind of go, we'll see, maybe I'll do a little bit more or maybe not. So, if we have LoadProjects, this is the command.
+
+[00:03:12]
+
+>> Lukas Ruebbelke: Then we could do ProjectsLoaded. And so this would be the completion.
+>> Lukas Ruebbelke: So Projects, as you can see here that we're just kind of.
+>> Lukas Ruebbelke: Flipping this around. So AddProject would be.
+>> Lukas Ruebbelke: ProjectAdded.
+>> Lukas Ruebbelke: Data Added.
+>> Lukas Ruebbelke: Does it make sense so far? Yep, okay?
+>> Lukas Ruebbelke: And so, we'll do these two and then we may just paste the rest in for time.
+
+[00:04:01]
+Yes?
+>> Student 1: So, what's the point of clarification? We have these two actions and one of them is operated on by middleware?
+>> Lukas Ruebbelke: Mm-hm.
+>> Student 1: Do all of the actions also go all the way through the reducer, or the middleware is handling something that's sub dev, does that makes sense?
+
+[00:04:19]
+
+>> Lukas Ruebbelke: So I believe, and this is something I would probably clarify, that all middleware, so all effects and all reducers have the opportunity to respond to all actions. As a result, you separate that by having very specific action types. And so, I have always operated under the assumption that everything responds to everything, as a result, how you keep that from happening is you are very precise about the actions that you trigger.
+
+[00:04:57]
+So that is an excellent question. And I actually believe, one of my friends may have gotten burnt by that. He was expecting it to actually stop into the effect and he had it listing on the reducer. And I think it was hitting both places.
+>> Student 2: They were both operating on that same action.
+
+[00:05:12]
+
+>> Lukas Ruebbelke: Yep, yep. And so this is something I would have to confirm but. And I must be willing to put at least a red bull on that, they all listen to it. Which is why, you separate these in terms of load projects. This will get captured by the effect, and then when the operation is completed, then it dispatches this one.
+
+[00:05:35]
+Or the projects loaded, so, just think of it as kind of command and then completion. Actually, that is how I would probably reference this from now on unless you have a kind of the initial command, then you have a completion event on the back side of it. So from here, let's create, our action objects for this, so ProjectsLoaded implements Action, readonly type.
+
+[00:06:22]
+
+>> Lukas Ruebbelke: Now what's interesting here is LoadProject, LoadProjects rather, willl no longer have a payload, because it's just a trigger event.
+>> Lukas Ruebbelke: But, on the other hand, ProjectsLoaded will have.
+>> Lukas Ruebbelke: Which is going to be an array of projects, like cell. And if we go down here, this, on the other hand, will be, will also take a pay load and then on both cases.
+
+[00:06:59]
+Let's just send one in. Something will happen at the server.
+>> Lukas Ruebbelke: And then you want to return that. And this will may vary depending on your API. But ProjectAdded, here we go. So just created the events. And then what.
+>> Lukas Ruebbelke: ProjectLoaded.
+>> Lukas Ruebbelke: ProjectAdded.
+>> Lukas Ruebbelke: This is plural.
+>> Lukas Ruebbelke: There we go.
+
+[00:07:41]
+
+>> Lukas Ruebbelke: Now what we're going to do, is we're going to create our effect. Now a bit of, kind of a helpful snippet here, cuz if we go down.
+>> Lukas Ruebbelke: To actions, there is, I've kind of fleshed out the basic structure of this, just because there is a lot that is going on here.
+
+[00:08:11]
+
+>> Lukas Ruebbelke: So in effects, we'll just paste this in, and basically what we're doing is, we're importing project state from the reducer. Let me see here.
+>> Lukas Ruebbelke: Yeah, we'll get to that in just a second. So ProjectsEffects, and it's going to take a couple parameters. We're injecting a couple things.
+
+[00:08:44]
+So one, its actions, data persistence, and I'll explain what that is in a moment, and projects service. And so obviously, if we're going to do an asynchronous callback to the server, then we need the project service to handle that for us.
+>> Lukas Ruebbelke: And so let's define our first effect.
+
+[00:09:13]
+
+>> Lukas Ruebbelke: And we'll call this loadProjects, like so. And, we're going to use data persistence to do this. And so this is a slight variation of kind of a standard effect sequence. But there's a good reason for this. So, we'll go this data persistence fetch.
+>> Lukas Ruebbelke: And we're going to go ProjectActionTypes.
+
+[00:09:51]
+And so notice, I'm passing in well the very first parameter is the action type, and then from here we have.
+>> Lukas Ruebbelke: An object that's going to handle or respond to this action, which has two kind of, there may be additional properties you could put on this object. What we care about is run and onerror.
+
+[00:10:30]
+
+>> Lukas Ruebbelke: So, I'm just going to leave these as empty functions for just a moment.
+>> Lukas Ruebbelke: Let me go ahead and do one more for addProjects.
+>> Lukas Ruebbelke: AddProject.
+>> Lukas Ruebbelke: And from here, I think we have this fetch up, so we can do LoadProjects and addProjects. The difference is that on one, we're going to do a fetch, and the other one, we're going to do rather, an optimistic update but a pessimistic update.
+
+[00:11:14]
+I'll break this down onto another line, just so this is a little easier to read just because the font's pretty big. All right.
+
