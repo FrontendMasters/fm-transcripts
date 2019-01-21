@@ -1,0 +1,130 @@
+[00:00:00]
+>> Scott Moss: Cool. Welcome back. I hope everybody had a challenging time trying to get those controllers done. There was a lot there to sink in, because it's kinda like what I said before, we left off. If you can read the notes, I said, we need a way to hook our routes up to our models, so we can perform CRUD on the models based on the routes verbs, and that's exactly what controllers do.
+
+[00:00:24]
+So controllers are the crossroads between the routes that we've been doing, and the models and schemas that we've been creating, and combining them. So this is a lot of context to soak in to get it right. Cuz you gotta understand the routes and the verbs. And then you gotta understand the models and the schemas.
+
+[00:00:41]
+And then, you gotta build the controller. So there's just a lot to dig in. And these are just generic CRUD ones. So if you're building a different business case specific ones, they can get even more complicated. So there's a lot of context here. So you gotta look at a lot of places to understand what the tests are written out, in such a way that you can look at them to understand what's expected, and then, try to walk backwards from there.
+
+[00:01:04]
+All right, so I'm gonna go through the solution. As I'm going through the solution, feel free to interrupt me, ask questions. There's not one right way to do this. Even with the test you can do this a lot of different ways, cuz the tests are very generic. They're not even super strict test.
+
+[00:01:16]
+I would actually write way more tests from our controllers than I did. So I'm going to tend to do that. So we start with the CRUDS back here, and we'll head over to crud.js. And we'll start with getOne. So getOne inside of our CRUD, which is what we're doing for a REST, that's gonna be a read.
+
+[00:01:38]
+And we know for read, we can use, what do we have here? We have find, findOne, and findById, so those are some of the methods we can use on this model that we're given. If we look at the test for CRUD spec, the getOne, it's expecting to find one by an ID from a user, and then, a parameter, because getOne actually uses /id, right?
+
+[00:02:04]
+So if we look at the router, we know that getOne has an ID unit, and an ID parameter. So we have that one parameter, but also, because this is gonna be an authenticated API, we need to search for, not only for this ID, but for the user's one, as well.
+
+[00:02:18]
+What are the chances that two different users will have an item with the same id? Hopefully, none, cuz your database doesn't give out conflicting IDs. And that would be really bad. But we should still namespace our query with a user id anyway, just to guarantee that somebody isn't getting something that doesn't belong to them.
+
+[00:02:35]
+That's just what you should do anyway. So that's why we're doing that.
+>> Scott Moss: So we head over to CRUD. We have a model. The first thing is, let's just grab the id from the request. So that'll just be rec.params.id. And we know that because a getOne, if we go look at the router, has this id in it.
+
+[00:02:56]
+So we got that. The other way you might have known that, is if you looked at the test, you can see that I'm passing it a request object here that I made, and it has a params.idproperty on it. Which is exactly what express would do if you were to run the server, so that's why I mocked it out like that, it's the same thing express would do.
+
+[00:03:14]
+So we have that. And then for the user, the user would also be req.user. And the only way you would have found this out, is if you looked at the test. There's an underscore id for this use here, so rec.user._id.
+>> Scott Moss: So now, we have our user, I'm just gonna say user id, and our ID.
+
+[00:03:41]
+So now we wanna perform a getOne. So a getOne will look like this, I'm just gonna call it a document. It's gotta be an await model, so whatever the model is. I have no idea what this model is going to be. It could be a list, it could be an item.
+
+[00:03:53]
+It could be whatever database model we have. I have no idea what it's gonna be. It doesn't matter, cuz we're gonna do a getOne on it, with these parameters, and that's it. So for getOne, remember, we can do findById, but we're not gonna do that because we have two parameters, we have to search by.
+
+[00:04:07]
+So we can't do a findByID, so we need a findOne. And at findOne, you can pass as whatever field you want. So the first field we wanna search is gonna be _id. Underscore id is, and when you create a document in Mongo, it always gives it an _id.
+
+[00:04:26]
+That's how it ids things in Mongo in database, it makes an _id. So that's what we're gonna search for, and that's gonna be whatever id was passed to us through the parameter. That _id is gonna be the same thing as the ID that's here in the parameter. So when someone asks for a task with an ID of ABCD123, that's the ID that they're gonna be passing, that _id for it in the database.
+
+[00:04:49]
+So that's the first thing. The second thing is the user, so the only way you would have found this out, is if you looked at our schema that you created, and item or even list, and you would've seen that in the model itself. They both have users on them that are on the createdBy field.
+
+[00:05:07]
+That's where this comes in at. So we only wanna get the item or the list from the authenticated user. And how do we know it's theirs? Well, they created it. There's a createdBy field on it. So that's what we're gonna search for here, createdBy.
+>> Scott Moss: And then, we're gonna pass in the userId there, so we get that, so userId.
+
+[00:05:26]
+And then, I'm just gonna do .exec, cool, so that'll give us a document. And then, the test, if you ran it or you looked at it, it's expecting, or another text is, if there is no document, if it wasn't found, then, it should 404, send back a status of 404.
+
+[00:05:46]
+So that's what I'll do. So I'll say, if not a document, so if nothing was returned from the database, then resource.status(404). And then, you have to end it, because a status doesn't send back a response, it just sets the status. You still have to do a dot send or a dot in, at some point, which is what I described to you all before.
+
+[00:06:09]
+And I'll put a return here. But if it does, if it is there, then I'll just go ahead and say res.status. Actually I don't have to set a status, it's 200 by default. I'll just do a dot json here. With a data property and a doc.
+>> Speaker 2: If you were to do a res.send, you'd have to set the response types and stuff?
+
+[00:06:39]
+
+>> Scott Moss: No, the only reason you can't do a res.send here, is because the test isn't looking for it, that's it. It would work in Express. It's just that's what the test is looking for. You could do a res.set in Express, totally works. If you ran this with a rest.send, it would work, but the test is looking for a res.json, and I specifically asked for that.
+
+[00:07:00]
+
+>> Speaker 2: [INAUDIBLE]
+>> Scott Moss: Yeah. [LAUGH] If that's all that you messed up on, you did fine. But, in the other way, you can say, that is if you go look. Remember, I mocked out this object. These objects are mocked out, request and response, right? If you go look at this test, you can see literally right here, response.
+
+[00:07:16]
+There's a RES. There's a status and there's a json. There's no send method on here. So if you try to call send, that function doesn't exist. So I did that to force you to use the other method, json, because we've been using send this whole time. So I want you to use another one, and that's why I did it that way.
+
+[00:07:34]
+And that's why you're all like, well, we've been using send, what's going on? Yeah, I wanted you to use JSON. But, yeah, that's how you can test, so remember, if you can't really figure out what's going on, the test always tells the truth, so look at the test.
+
+[00:07:47]
+Cool, so now if we run this test,
+>> Scott Moss: Yarn test, or I'll do mpm run tests models, I believe. Some of the route tests might fail. They might run, because the route's messed up with the controllers now, but that's fine you can ignore them. It's not models, what is it?
+
+[00:08:11]
+Controllers, see, I'm sorry. Okay, so let's see what happened here. Okay. Guess I do have to put a status here, guess you're right. [LAUGH]
+>> Scott Moss: Let's see, did I write it that strict? Man, I'm a jerk.
+>> Scott Moss: Okay, it looks like that passed half the tests, yeah, okay, so yeah, yeah, you do have to explicitly set the status.
+
+[00:08:46]
+All right, guess I wanted you to explicitly set the status and not unintentionally set the status, so-
+>> [INAUDIBLE]
+>> Scott Moss: Yes, set the status, but I actually wanted you to call the .status method itself, versus having to implicitly do it, so that satisfy that one. And then, for the-
+
+[00:09:02]
+
+>> Speaker 2: Are you saying that your assertions look for that, or-
+>> Scott Moss: My assertions look for that.
+>> Speaker 2: So if your assertions work, [INAUDIBLE].
+>> Scott Moss: Yeah, yeah, it would work in Express for sure.
+>> Speaker 2: And it's
+>> Scott Moss: Yes, exactly. Yep, I'm mocking it out, that's for sure, yep. And then 404, if no doc was found, so for that one, if we look at what it's expecting, it looks like it's expecting us to call status, and then call end, or it says 400 here, it should be a 404.
+
+[00:09:32]
+So if you ran into this problem, that's because, yeah, it looks like I fact figured that one, that should be a 404, and not 400. So that should be 404 in the test.
+>> Scott Moss: And then setting a 404 here would fix that. So run that.
+>> Scott Moss: And it looks like that one passed as well.
+
+[00:09:57]
+So we got that, and then we got the 404. Okay, let's do a getMany. So for a get-
+>> Speaker 2: Just out of curiosity, so I made my, I sent back 400s, cuz it said 400 in the test. I mean, what's the difference between those two?
+>> Scott Moss: That's a good question.
+
+[00:10:15]
+
+>> Speaker 2: 404 is document, not found or something.
+>> Scott Moss: Right, so technically, what's the difference? Nothing, you're just a number. The only difference is, is how the requester handles it, right? A browser handles a 404 different than it handles a 400. So it really depends on what's making the request-
+
+[00:10:32]
+
+>> Speaker 2: What it's gonna do with it in the browser?
+>> Scott Moss: Right.
+>> Speaker 2: Or wherever you are.
+>> Scott Moss: Exactly, as far as the server's concerned, doesn't really matter. I mean, you might have something on your server, like, that's watching your API, watching for errors, and it does something different for different status codes, as well, but as far as Xpress is concerned, it's just a number.
+
+[00:10:49]
+I mean, you can set it to what you want honestly, it doesn't care. But if you're doing RESTS than yeah, you do a 404, you do a 200's, your 201's, and your 401's, and stuff like that. So yeah, not really a big thing. Most different, modern, I would say modern, anything after REST, API interfaces, like GraphQL or whatever, they don't even care about status codes.
+
+[00:11:12]
+Everything's a 200, even an error's a 200, it doesn't matter. So it really depends on what your clients are doing.
+
