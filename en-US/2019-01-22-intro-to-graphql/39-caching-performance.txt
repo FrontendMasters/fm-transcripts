@@ -1,0 +1,72 @@
+[00:00:00]
+>> Any other questions?
+>> How do you handle caching?
+>> All right, how do you handle caching? Okay, there's a lot of different ways, when you talk about caching, there's a lot of different meanings of caching. So let's start in the resolvers. So one way you can cache is cache the response from the database, the query that you did, and that way, there's something that's called- DataLoader.
+
+[00:00:24]
+So DataLoader is also created by Facebook and it works for GraphQL and it's basically an in-memory store for your request. So it's basically a cache that it's only per request. So every time a request is made to your server, this cache gets created and then it gets destroyed.
+
+[00:00:43]
+So it's not going to cause memory leaks. But basically, this DataLoader is something you would use to cache the revolvers inside your GraphQL server. There's plugins to allow this to hook into Redis or MIM SQL or other things that you are using. So you could check that out, but DataLoader is one that you can use to cache the results of a database query.
+
+[00:01:05]
+You can also use traditional Redis if you want to cache those, even Mongo, if you index things right, everything is in memory. So that's just caching resolvers, and that one's pretty simple, then you move on to the next layer. It's like, okay, how do I cache at the network layer where I want to cache the results?
+
+[00:01:22]
+Well, there's a couple ways you can do that, it depends on your infrastructure. Because by default, if you use GraphQL, it's going to do a post request, and then the query's in the body. Most traditional caching strategies cache on some URL-verb combination with some headers. And then that's how they know how to cache.
+
+[00:01:40]
+Well, if the URL is always the same and it's opposed by that, how do you do that? So that's where it depends on your infrastructure. If you have an infrastructure where you're creating your own CDN, in today's world, which is pretty easy. If we're using AWS Lambda@Edge, if we're using Cloud for our workers.
+
+[00:01:53]
+If we're using something like fast.io or fly.io, and you can create your own CDN with JavaScript. Then you can just create a digest yourself from the postbody, which is a unique URL, then you can cache on that key. So you can cache on your own key that you created from the digest there and you can cache on the network level.
+
+[00:02:11]
+The problem with that is, as soon as somebody changes one field, that whole cache is invalidated. So the cache hit ratio might not be that high depending on what your API's used for. If it's an internal API, for your dashboard, you're probably not changing requests all the time, so that's fine.
+
+[00:02:24]
+But if it's a developer API, and requests are coming in all the time. Then the cache hit ratio is probably going to be low, and it's like, what's the point? The next step up from that is, using some of the built-in tools that Apollo has. And they have something called, man, their website, sheesh.
+
+[00:02:43]
+Okay, well I'm just going to type this in, Apollo Engine, there we go, cool. So they have something, well I guess it's called the Apollo Platform now, but it used to be called Apollo Engine. It looks like the engine is just one part of it. But basically what this thing allows you to do is to cache, you can set cache control on a certain level as far as like fields and types.
+
+[00:03:06]
+And then you proxy all of the requests through their network. Or you host it on your own infrastructure and they give you a sweet dashboard to see what that caching looks like. And they take care of the caching for you, so that's one way you can do it.
+
+[00:03:20]
+I've never used Apollo Engine, they have an open source component. I've never opted in to use it, so I can't speak if it's good or not. As far as Graph QL goes, these guys are pretty much experts so I trust their product and yeah, this is like a step up.
+
+[00:03:36]
+But if you have control over your own CDN, there's nothing stopping you from just caching it yourself in the network layer. By creating a custom digest, that's basically what we do. We write our own CDN in JavaScript and we just cache it based on the postbody and we kind of go from there.
+
+[00:03:51]
+So it's not too difficult and then if you add caching on the resolvers side, I mean, you're always going to be in memory anyway. So you can keep things pretty fast, so that's caching. The other thing is just optimizing for performance, optimizing for performance is basically not doing things like this.
+
+[00:04:09]
+So we have this createdBy that like hits the database again, but that was after it already hit this database for this product. So that keeps going and hitting the database all the time, even if that's cached, that's ridiculous. So eventually what you do is you just resolve everything in a top level resolver.
+
+[00:04:26]
+So instead of passing everything down like this, you can look at the info object inside of one of these top level queries of mutation. To see exactly what they want and then do the entire database query right there in that one resolver. And that way you don't have to go down to the other ones and then that's the way you do that.
+
+[00:04:41]
+So that was little more tougher because you obviously have to look at the info object and determine what fields are being what. And you have to develop a database query that satisfies that, but that's a preferred method because that's less work on your database. So I highly recommend doing that, yeah.
+
+[00:04:58]
+
+>> So along the lines of REST. And REST with e-tags, where you have preps tagged, cache, version cache, and then versions in your database. Do you have a way of doing that in GraphQL?
+>> Yeah, that's what this Apollo Engine is for, I was trying to find a good example of it, but all right.
+
+[00:05:18]
+
+>> So you just put the version in the model then?
+>> Right, they have, I don't know their exact syntax, I've never used it. But they have something like this, where, actually no, I'm just going to show it, I don't want to show something that is not right.
+
+[00:05:32]
+Apollo cache server, okay, bring it back to Apollo Engine, okay, let's see here. Cache hints, here we go, cacheControl, that's what it is. So you can do stuff like this on the schema level using Apollo Engine. Where you can define whether it's on a type, whether it's on a field, you can define the max age and scope and stuff like that.
+
+[00:05:59]
+And that's how you determine, and then what they do is they used to, like I said, you send your stuff to their proxy. And they will help take care of it, there's nothing stopping you from doing this yourself. This syntax right here, like the cacheControl directive, these are just directives, you can use them, they are open source.
+
+[00:06:11]
+You can make them yourself, but you just have to have the infrastructure that looks at this and knows what to do with it, so yeah. Is it given to you for free? No, can you make it? Yes.
+

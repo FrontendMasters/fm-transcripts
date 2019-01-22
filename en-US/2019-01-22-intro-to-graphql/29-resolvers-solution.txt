@@ -1,0 +1,90 @@
+[00:00:00]
+>> Scott Moss: All right, so welcome back. Hopefully, everybody had enough time to get all those excess to turn to green checks. Let's just walk through some of these solution here. So I already have in my solutions the products queries. So I'm gonna go ahead and finish the product query and get that going.
+
+[00:00:15]
+So I'll say, const product = I know it's gonna take an arg for and ID cuz that's how you get one, as I takes an ID. So I'll just return Product.findByid(args.id). And the reason I know there's a args.id there without having to look at the test, is because that's what the query says right here.
+
+[00:00:43]
+It's got to be an ID. And if that ID was not passed, this resolver would not even run, it would error out because this ID is required. Now if I got rid of that and ID was not required, then that ID may or may not be there. But because this is required, if that ID is not passed in the query, then the resolvers won't even execute.
+
+[00:01:02]
+So the resolvers are guaranteed to have that argument, every single time. So that's why I know it's there. I'm fairly confident. So args.id and then we'll just do .lean .exec
+>> Scott Moss: .lean just converts it to JSON and not a Mongoose document.
+>> Scott Moss: You don't have to do this, but yeah.
+
+[00:01:27]
+So we got products, we'll add product down here to our query because it is a Query. And we know that because it's a Query here, and it's the same name, product product, same name, so we'll run that test.
+>> Scott Moss: Cool, looks like that one passes. So now we have a new product mutation, so I'll say newProduct, giving it the same name as I see down here, newProduct.
+
+[00:02:05]
+And I know cuz I'm creating something, there definitely has to be args there, so I'm gonna go ahead and accept those args. And if I just go look at the product model right quick, so these args should be passed up with our input. So if we go look at NewProductInput, the resolver should concern themselves with what's happening.
+
+[00:02:28]
+But just for you as a sanity check, you can see that we got name, we got price, we got image. We got type, we got description, which is optional, we got liquidCooled, which is optional, bikeType, which is optional. We got all that stuff, but then there's just createdBy, and createdBy is not on the NewProductInput.
+
+[00:02:47]
+So I'll show you how you can get around that for now until we get to authentication. So for a newProduct, we're gonna go ahead and we're gonna say return Product.create. And we're gonna go ahead and pass in. We are gonna spread an object, and we're gonna say args.input.
+
+[00:03:08]
+And I know it is input because if I go look at newProduct, it's a variable called input. And its value is gonna be this NewProductInput which is required. And if I go look at NewProductInput, it's an object type with these fields. So I know this is an object, and I know it's there cuz it's required.
+
+[00:03:24]
+So then I know it's called input, so GraphQL query, save the day again. I know exactly what's happening. I know exactly what's coming. And then for the createdBy, because you can't create a product without createdBy because it's required. If you were to look at the context object, I'm passing in a user in the context object in the test.
+
+[00:03:41]
+You can use that if you want to. You could also just make a fake id right click and satisfy the test. It's totally up to you. I am just going to go ahead and use the context object here, and I am gonna say createdBy: = CTX.user._id. Which if I go look at the test here, product resolvers, or,
+
+[00:04:07]
+
+>> Scott Moss: Inside of newProduct, I can see that, yeah, there's a user._id and its values a ObjectId, so I'm using that one. And we'll get more into that one against authentication. But again, if you didn't look at that, then you could have just mocked it out with ObjectId. If you got really frustrated, you could have just went into the model and took off required true on creative i and it still would have worked.
+
+[00:04:31]
+So it's up to you. So you got newProduct, the last thing we need to do is register it as a mutation. So we'll say newProduct. Boom, got that, make sure the names match, newProduct.
+>> Scott Moss: newProduct, looks good, so we'll run a test.
+>> Scott Moss: Cool, so that passes. So now we'll do update product.
+
+[00:05:08]
+
+>> Scott Moss: And I know updates definitely gonna take args, cuz what are you updating? So I'm definitely gonna accept those args, and if I go look at update, it takes two args. So it takes an ID, which is a required ID type and an input, which is a required UpdateProductInput type.
+
+[00:05:27]
+Okay, cool, then I'll just use those two arguments, and that's exactly what I need. I need an ID to find the thing that I wanna update, and then I have the input, which is the actual update itself. Perfect, that's all I need, return Product.findByIdAndUpdate. And I'll pass in args.id as the ID, first argument.
+
+[00:05:48]
+The second argument is args.input as the update. And then the third argument, I'm just gonna pass in the option for new: true, which if you don't know what that means, that basically means I want the return value of this query to be the product after I update it, and not the product before I update it, which is the default.
+
+[00:06:07]
+So I definitely want the post update product. So I'll just lean this, which turns it into JSON, and then execute this, which means I'm done and return a real promise. And then we'll add updateProduct to a mutation. And run the test.
+>> Scott Moss: So that passed the UpdateProductTest. So the next thing we have is the remove product test.
+
+[00:06:42]
+So we'll come here and say const removeProduct. And I know for sure by looking at my query, that it takes an ID to remove a product. So I'll say args and I'll just return Product.findByIdAndRemove(args.id.lean().exec and that's it. Now I've removed my product. So then I'll go ahead and add that to the mutation.
+
+[00:07:23]
+Bam, rerun the tests.
+>> Scott Moss: And the last one that we have to do is product created by gets resolves. Okay, so we want to resolve the createdBy field on a product. So if we look at product, it has a createdBy field And it's typed as user. So that means it's an object type.
+
+[00:07:47]
+We have to resolve that type because by default in the database, it's an ID. We wanna turn that ID into a user object. So basically, if you go look at the product model, you can see that the createdBy is a ObjectId type that's referencing a user. So we need to create for the user based on this ID.
+
+[00:08:07]
+And traditionally, what you would do is you would just use use Mongoose's population, which is basically like a joint table. It's like, given this ID, let me find the user. But the reason why it's hard to do that here in GraphQL because where do you do that? You don't know if they're even asking for these.
+
+[00:08:23]
+The only way you would be able to know to do that is if you look at the info object. So if you look at the info object on Product, if you look at the info object on products, then you can see that they ask for a createdBy. And then you can say, okay, go ahead and populate that createdBy field to be a user.
+
+[00:08:37]
+But looking at the info objects is really tough, so you're better off just letting GraphQL do its job and just write a resolver for it. That's all you gotta do. So in this case we'll say, okay, it's cool. So in this case to resolve the createdBy field, we'll come down to the Product resolver cuz it's gonna be Product.createdBy.
+
+[00:08:53]
+We'll write a resolver for the createdBy field, like this. And because this resolver is gonna be ran after the product resolver is executed, that means it's first argument is gonna be whatever the query before it returned. So in this case if we go look at our queries, every single mutation in Query always returns a product.
+
+[00:09:22]
+There's a product here, there's a product here, there's a product here, there's a product here, and there's a product here. So that means, every single possible value before createdBy there's always gonna be a product. It's always gonna be this. So it means the first argument's always gonna be your product that came out a Mongo.
+
+[00:09:39]
+Cuz this createdBy belongs to the product type. So the object that was resolved before it is always gonna be a product. It belongs to the product field or the product type. And every single one of these resolves a product type. So this is pretty much guaranteed, this is always gonna be a product object.
+
+[00:09:57]
+This is always gonna be something that's returned from here, something that's returned from here, something that's returned from here or here. It's always a product. So knowing that, that it's always a product, I can go ahead and just return User.findById(product.createdby).lean().exec. And that will find a user by the products createdBy field.
+
