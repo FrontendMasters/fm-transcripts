@@ -1,0 +1,93 @@
+[00:00:00]
+>> Steve Kinney: So in the event that your epic test suite doesn't totally work, or doesn't catch something, we want to know where. On one hand, Electron's great, because you're shipping a version of Chrome, and a version of Node, which is better than all the browsers out there and all the intricacies.
+
+[00:00:17]
+On the other hand this is a desktop application that you are distributing. It's not just like deploy a new version of your client-side code and wait for the cdn cache to run out. It is very much this is an application, like let's hope it works on whatever operating system with whatever other things installed.
+
+[00:00:37]
+So you might wanna collect crash reports. Collecting crash reports in Electron is deceptively easy. There is a built-in mechanism for doing that, right? How you collect those is gonna be very specific to where you work. We're gonna make a very simple express server that can collect the crash reports.
+
+[00:01:00]
+But for wherever you work it might go into, you could be using some tracking software for this stuff, so on and so forth. I'm not gonna make any assumptions about what you use and what you choose to use. I'm going to make a very simple server to collect the crash reports that just writes them to the file system or console logs them, right?
+
+[00:01:19]
+Cuz we do need a server that can go ahead and receive them in the event that it does happen, right? So we'll spin that up. Let's take a look at the code real quick. I'll spell code correctly.
+>> Steve Kinney: So this is my server, it looks more complicated than it is,
+
+[00:01:43]
+
+>> Steve Kinney: This is basically an express server that can take multi-part requests and it's going to write them to the file system. So I've got one path for where I'm gonna store crashes. I've got another path where I'm gonna store uncaught exceptions. And basically it's gonna use this mini dump file which is kind of a pain to read.
+
+[00:02:09]
+So basically you need to have a server that conforms to what the built-in crash reporter is going to send. So here I have, it's gonna send a post request. I'm gonna let it send to this. Or it's gonna send to this crashreports. And when that happens, I'm gonna grab the request.body.
+
+[00:02:26]
+I'm gonna grab the filename that was sent along with it in that mini-dump. And I'm going to create a new JSON file. And I'm gonna write to it with the crash report itself, right? And so as long as you have a server that can accept POST requests with attachments at a /crashreports end point you're ready for crash reports in Electron.
+
+[00:02:51]
+I also have a fun one here for uncaught exceptions. This is not built into electron. This is one we're gonna do just to find some. So let's talk about the difference between a crash and an uncaught exception. A crash is like it literally melted down, right? it completely, it crashed in a big way.
+
+[00:03:09]
+Uncaught exception is like a JavaScript error was thrown and you didn't catch it. Different, right? The built-in crash reporter is only going to send you complete meltdowns. It is not going to send you the, two string is not defined right? And so we've kinda built this to take both.
+
+[00:03:33]
+This is gonna be our own bespoke thing, and the crash report Is going to be very simple. So let me go ahead and start this up. And so crash report server running on Port 3000. And we'll go ahead, let me just check out master on this.
+>> Steve Kinney: As you can see there is a crash reporting branch if you wanna.
+
+[00:04:05]
+
+>> Steve Kinney: Cool and so here we've got a main process. This is a version of Fire Sale that we can take a look at, and what we are going to do is we are making a file called
+>> Steve Kinney: Crash-reporter.js. It doesn't matter what you call it. We will require, no, we don't need to do it just yet.
+
+[00:04:33]
+So we've got the crash reporter, we want to set up where we want to send these to. So I'll just store that in a variable. Now, ideally, you should have some server on the internet.
+>> Steve Kinney: But we're not going to. We're just going to run locally. Cuz crash reporter running on just local hosts are not going to collect too many crash reports.
+
+[00:04:52]
+But this will be one so we can kind of see it in action and we'll create a configuration. Cool, and so this is basically some of the information that we want to include in the crash report. So let's say product name
+>> Steve Kinney: Is Fire Sale, the company name.
+
+[00:05:11]
+Let's blame other people for our errors.
+>> Steve Kinney: Cool, and where to actually submit it to. So you saw we made that crash reports endpoint before. This can really be anything you want, but I'll say host.
+>> Steve Kinney: Put the trailing slash, let's just do trailing slash here.
+>> Steve Kinney: /crashreports and then we'll do uploadToServer: true, cool.
+
+[00:05:52]
+And then really all we need to do after that is crashReporter.start with that (configuration).
+>> Steve Kinney: Now this file, all we'll simply do is require it in main.js cause this will run the file and start up the crash reporter. So we can go back in here and we say.
+
+[00:06:16]
+
+>> Steve Kinney: Require
+>> Steve Kinney: You might decide to say like okay only if you're running in production or something like that. But we're not so we're just going to run it right like this. And so let's go ahead and I will start up this application. The server is still running.
+
+[00:06:43]
+And the big question is, how do you make your app crash? Right, cuz that's kind of important for testing out a crash reporter. So we can say process.crash.
+>> Steve Kinney: Yeah, cuz it took the entire app down. And hopefully, let's go to the other one, no.
+>> Steve Kinney: Let me play with this one second to figure out why its not working, and then we will, there it is.
+
+[00:07:28]
+All right, let's make believe that first part didn't happen. Mark loves it when I do that. That's his favorite. [LAUGH]
+>> Steve Kinney: Okay, so we had one small issue which is originally I got very secure and typed https instead of http. The problem with the crash reports is that when it fails your app has crashed.
+
+[00:07:55]
+So there's not really a great console log that you can throw in there. So I took off the https just for http in this case, cuz it's just running on localhost. And we fire up the application now.
+>> Steve Kinney: We can go ahead and open up those developer tools.
+
+[00:08:22]
+
+>> Steve Kinney: We'll crash the process.
+>> Steve Kinney: Oops, it's probably important to have that server running.
+>> Steve Kinney: I'll crash it one more time for our fun.
+>> Steve Kinney: Cool, you can see that it received a crash report and it just wrote that one over into the crashes folder. You can see that I have a JSON file telling me about the crash report.
+
+[00:08:57]
+And then I also have this mini dump file, which is big and gnarly as well. You need custom software to open it. The crash reports in my experience even for the applications I've shipped, is I don't get necessarily a ton of crash reports. What I get It's stuff like uncaught exceptions.
+
+[00:09:13]
+And I wanna know about those more. If this application is truly crashing and burning on a particular operating system, that's interesting to know. But generally speaking the level of bugs that I'm causing are more like the level of bugs while I was live coding. I misspelled a variable or something along those lines.
+
+[00:09:34]
+There are the ones that didn't generate any errors, those are the worst kind. But for the ones that do, it'd be cool if this error is completely uncaught. I'd like to know about it.
+

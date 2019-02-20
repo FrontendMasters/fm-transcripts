@@ -1,0 +1,72 @@
+[00:00:00]
+>> Steve Kinney: We figured out how to talk from the renderer process back to the main process. That was that remote module, right? It can call any of the modules available to the main process. It can also require files in context of the main process and run that code. When it does that, it's basically, you're not actually calling getFileFromUser in that renderer.js file.
+
+[00:00:23]
+You're telling main process to do it, right, and it does it from there. The main process can send data out to renderer processes. In this case, we have one renderer process, but theoretically, any given renderer process could talk back to the main process, and then the main process could send messages to any given browser window instance, right?
+
+[00:00:47]
+So for us, this is kind of our flow, which is, we've got the renderer process, it uses remote to call getFileFromUser, and then from there we're gonna send a message, right, we're gonna use an open file to actually read it and send it off. And we'll send that data back to the renderer process.
+
+[00:01:04]
+Again, not a server, not a client, but kinda like what we're used to in sending an AJAX request, right? You send a request to the server, server does stuff, sends you the result, right? That's not what's happening here, but it's a decent metaphor. So let's go ahead and we'll implement that one.
+
+[00:01:23]
+Cuz right now, logging's a console, not great. So we'll quit this, we'll head back over to VS Code, and we'll go ahead and try it out. So we now know that console logging here is not gonna be good enough. I, personally, wanna separate the idea of triggering the file dialogue from opening the file and sending it to the main process, right?
+
+[00:01:50]
+Which is, with the file dialogue, let them pick the file, tell my other function which file, and let that one handle everything else. So I'm gonna make a new function called,
+>> Steve Kinney: OpenFile. OpenFile will go ahead and take a file path.
+>> Steve Kinney: Say file.
+>> Steve Kinney: And it's gonna go ahead and do this part, the reading from the file system.
+
+[00:02:21]
+It can go ahead and do that.
+>> Steve Kinney: Right, and so the console login, what we'll do is we'll say openFile with that file. So, let's review. GetFileFromUser is going to do what it says on the tin. It's gonna ask the user what file they want, and its gonna get the file name, and it's gonna pass it to this other function called openFile, which is gonna go ahead and read the file.
+
+[00:02:52]
+So once we have the content of the file, what we're gonna do is we'll take the main window and we're gonna send it a message. So mainWindow.webContents, which is the kind of renderer process there, and we'll send it a message. And this will take,
+>> Steve Kinney: N plus one number of arguments, right?
+
+[00:03:09]
+The first one is what channel you wanna send out, what kind of message, right? So this is an arbitrary string. This is basically saying, what kind of thing just happened? Because on the renderer process, you're gonna listen for messages from the main process, but depending on the message, you're gonna do different things, right?
+
+[00:03:28]
+What you do on a file opened message is gonna be radically different than if it's gonna be on a save file message, or on a open new window message, or whatever, right? So this is just an arbitrary string that identifies what kind of message you're sending to the renderer process.
+
+[00:03:45]
+So we'll say file-opened, and then you can give it an arbitrary number of additional arguments which is just the extra stuff that you wanna send along with it. So effectively, this is the subject line of the email, and the rest of all the different attachments that we wanna send.
+
+[00:04:01]
+So we'll send them the name of the file and the content, right? So hey, okay, here's /users/stevekinney/desktop/grocerylist.md, and here's the contents of that file, right? Have them both do what you need to do. So if you send a message and no one is listening for it, does it really matter, right?
+
+[00:04:28]
+Arguably, no. And so we need to use, we need to listen for that. And there are two modules, right, one is called ipcMain, the other one is called ipcRenderer. IPC stands for Inter Process Communication, right? And so we are sending a message, but now we need to listen for it in the renderer process.
+
+[00:04:50]
+So in renderer in JS, I can go ahead and say something along the lines of, let's actually require ipcRenderer, so say remote, I'll say ipcRenderer.
+>> Steve Kinney: We'll acquire that from Electron. You can guess which one is available in the main process and which one is available in the renderer process.
+
+[00:05:09]
+IpcMain, main process, ipcRenderer, renderer process, seem legit. So we'll say ipcRenderer, and that's an event listener, or event emitter, right? Say on, and then whatever the channel was, right? What did I make the channel in my main process?
+>> Steve Kinney: I see lips parsing, it's file-opened, file-opened, right? So whenever you get a message on the file-opened channel, this is the function that I want you to call,
+
+[00:05:40]
+
+>> Steve Kinney: Right? And the first argument will always be the event itself, and then there'll be an arbitrary number of arguments that match up with what we had in the main process. So here, when we said send, we gave it a channel as the first argument, and then we passed it the file name and the string contents of the file.
+
+[00:06:01]
+So on the listener, it'll be the event, and then the argument after that will be the file, and then the content, right?
+>> Steve Kinney: Cool, so now I have all of these. I can even go ahead, and let's just start off by console logging the file and content, just to verify that it works.
+
+[00:06:31]
+
+>> Steve Kinney: I'd also like to open file. Actually, hold on, let me open up the dev tools now.
+>> Steve Kinney: Open File, go to the the Grocery List, right? You can see I've got the file, which is /Users/stevekinney/Desktop/Grocery List And then the content, right? So those are both being sent from the main process, to the renderer process, and now we're ready to go ahead and try to put it into our user interface.
+
+[00:07:00]
+So instead of console logging it, what we'll simply say is markdownView.value, cuz of the text area is the content, and we'll call renderMarkdownToHtml with that content, as well. So we'll set that text area with the content, and we'll also trigger the other side to render it to HTML.
+
+[00:07:29]
+
+>> Steve Kinney: Open the file, Grocery list, and you see it render, right? So yeah, We're reading and writing, well we're reading from the file system, let's not get ahead of ourselves. We're reading from the file system now, we're displaying it in the UI, we're communicating between processes. We've got kind of the basics of the application in place.
+

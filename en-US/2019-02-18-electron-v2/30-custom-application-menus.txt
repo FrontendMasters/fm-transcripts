@@ -1,0 +1,109 @@
+[00:00:00]
+>> Steve Kinney: This whole time we've had a menu up here, and it's done pretty well for us. It has most of the default things. On macOS it has this application menu. We've got an edit, a view, where we can toggle the developer tools. You might not wanna have the developer tools.
+
+[00:00:18]
+You might wanna have any of these buttons that are up here, you might wanna have just in the actual application menu, right? On macOS it's along the top, on Windows and Linux is part of the window itself. We open up Visual Studio code, you can see that we have custom menus here that are very pertinent to Visual Studio.
+
+[00:00:36]
+If we flip over to the GitHub app, there is a GitHub specific application menu. If I switch over to Hyper, it is slimmed down, but again, custom to that application. So clearly, we know this is something that's possible to do an Electron, we just need to do it.
+
+[00:00:58]
+So we have two modules, you'll really only be using one of them. Menus are built out of menu items. You can theoretically extentiate a whole bunch of these menu items and put them all together. That is really tedious and I wouldn't necessarily recommend it. I would treat menu item as a implementation detail.
+
+[00:01:15]
+The one we care about is this menu module, which we'll pull in in our main process. So bring in,
+>> Steve Kinney: Menu, as well. So you can see there's menu and menu item. A menu has many menu items, right? But Electron gives a syntax where can basically take objects in arrays to define the structure of our menus, and then Electron will go ahead and create all the menu items on our behalf, and wire it all up.
+
+[00:01:50]
+So the one that we're gonna use in this case, if we scroll down to the bottom. We can type menu and we can see that there's a bunch of methods. The one that I'm kind of interested in is buildFromTemplate. This is where you give it an object, or an array objection of basic JavaScript data structures, and then it will go ahead and build the menu out of that for you, and then you can set an application menu, or whatever.
+
+[00:02:14]
+Kinda you actually create context menus, we'll see later with this as well. It's for creating any type of menu that you wanna create, we can use this menu constructor. So let's make a really, really, simple menu template, just to try it out for a spin. So we'll say, template.
+
+[00:02:32]
+We could do this all inline. We'll see in a second why I'm making it its own object. And we'll go ahead and we'll make that an array.
+>> Steve Kinney: And we'll put the first object in it. This is gonna be our first kind of menu item. And we'll it give the label of file.
+
+[00:02:52]
+
+>> Steve Kinney: And then we could also give it, another property that it'll take is the sub menu, right? Cuz we know we have the menus along the top here, and then there's a sub menu, and sub menus can have more sub menus, and so on and so forth. So I'll say submenu, which is another array.
+
+[00:03:05]
+And we'll give that one a label of Open File. And they can take methods, click in this case, and we'll just say console.log, Open File, right? So a very simple menu, it's just a file menu, which has one item on it that doesn't really do anything, and right now it's just an array of JavaScript objects.
+
+[00:03:31]
+To turn that into a menu, we'll say, const applicationMenu = Menu.buildFromTemplate, I'll pass it that template. Okay, So we've took a template, we turned that into a menu, but it doesn't really know what that menu's for yet. Again, that could be a context menu from when they right-click.
+
+[00:03:51]
+There's various places we can put menus in an Electron application. We wanna set it as an application menu. And,
+>> Steve Kinney: You can see that there is a method called setApplicationMenu, so that seems good. We have an application menu, we have a method called setApplicationMenu, I can see where this is gonna come together, right?
+
+[00:04:11]
+We do need to wait for the application to be ready. So we can do all this, we can do the setup at the top level. What we'll wanna do is app.on ready. We'll say,
+>> Steve Kinney: Menu.setApplicationMenu, applicationMenu, nope.
+>> Steve Kinney: Got a little carried away with auto-complete there. Okay, this'll change the main process, so I will need to kill it and restart it.
+
+[00:04:47]
+So depending on what operating system you're on, you're gonna see something slightly different. If you look at the data structure that we created, the first menu is File. If you're on Windows or Linux, you're like, yeah looks good to me. I see a file menu. I don't see what your problem is right now, everything's great.
+
+[00:05:06]
+If I switch back over in macOS land, you can see that it's called Electron. It does have the open file there, but it totally ignored the fact that the first menu should be File, and this is because in macOS the first menu is the application menu, right? So for everyone else this is great.
+
+[00:05:25]
+For MacOS, we need to make a new first menu that is the application menu. So that's slightly problematic, and this comes the for the first time in this workshop where we're gonna have to kind of have a diversion code path for one particular operating system. When we passed in main window into the show open dialogue or show save dialog, right, Windows and Linux users were like, it didn't matter, right?
+
+[00:05:50]
+We didn't have to do a conditional in there. When we set it, the represented file, or set document edited, that didn't matter for Windows or Linux, it just was an extra little bell and whistle for macOS. This is the first time where we are going to have to write a conditional to see what platform am I on, and depending on that platform, I need to do something slightly different.
+
+[00:06:09]
+Cool, so the big question is, what platform are we on? Luckily, Node already has a way of telling what platform it's running on, so we can hook into that. So what we'll do is,
+>> Steve Kinney: We'll write a conditional. If process.platform, and this will give you, I think, either Win32, I don't remember all of them, they're in the note documentation.
+
+[00:06:36]
+The one we care about is Darwin, which is the kind of underbelly of macOS. All right, so the platform will be Darwin if we're on macOS, it will not be Darwin if we're on Windows or Linux. At one point in my younger years, I knew what the other two were, but that has long gone from my brain.
+
+[00:06:53]
+So if that's true, then we're gonna need to kind of put something at the beginning of the array, that's gonna be that application menu, right? So we could say something like const applicationName, I'll call it Fire Sale. This won't really matter right now. It'll only matter when we package the application, because that's when we build.
+
+[00:07:15]
+Right now we're using a version of Electron that's kind of in our node modules folder. When we actually build the application, that'll be when we actually re-brand Electron. That's why we've always gotten the Electron icon. So you can call it whatever you want. It's still gonna say Electron up in that menu until we actually build our own bespoke version.
+
+[00:07:31]
+So we'll say const applicationName. And we'll take that template, unshift is the array method that puts something on to the beginning of an array. Push we use all the time. Push puts stuff onto the end of the array, unshift will put something onto the beginning of the array, shift will take it off the beginning of the array, so on and so forth.
+
+[00:07:51]
+So we'll actually push one more item on there, and we'll go ahead and we'll just make another menu item in this case. And this one will be a label of that application name.
+>> Steve Kinney: Cool, and that'll give us a sub menu,
+>> Steve Kinney: And we can say, give another one of,with a label of.
+
+[00:08:19]
+If I flip over to the general application, it's About, and there's Quit. That has the name of the application in there, so let's do that. We give it a label of About applicationName.
+>> Steve Kinney: We're gonna leave that for now, and then we'll add another one of label Quit applicationName.
+
+[00:08:58]
+
+>> Steve Kinney: Cool, so we'll push that on to the beginning of the array if we are on Darwin, or macOS, in this case. Currently in macOS, what we'll do is we'll put a new menu item before. That'll be some of the things we normally find in this application menu.
+
+[00:09:16]
+Right now, we're just gonna start with About and Quit, but clearly, we could put the rest of these in place as well. They don't do anything yet, and we'll talk a little bit about how to wire them up, but let's actually go ahead and just verify that they show up at all.
+
+[00:09:35]
+So, we've got a menu, and you can see now there is About and Quit, and the file menu shows up. If you're on Windows or Linux, you should see no change from the previous thing that we did, because that was a conditional path only from macOS to put that window in place.
+
+[00:09:50]
+Now, you might choose to have a quit menu in file whatever you wanna do. You might have to write more conditional code for those other operating systems, if there was stuff in here that you want somewhere else on Windows or Linux, but generally speaking, this'll work. Now, these menu items don't do anything yet.
+
+[00:10:06]
+Well, this one will console log, right, you can see it in the window behind me. It will console log, even though, is it really click? Cuz I'm dragging it, releasing, I don't know. So we could, for instance, add a click here, and we'll say when they do that we'll say app.quit
+
+[00:10:34]
+
+>> Steve Kinney: So now, we can quit the app with that menu. What I can't do however,
+>> Steve Kinney: Is hit Cmd+Q or Ctrl+Q. No hot key works. In fact, it's even worse. I can't select all. If I do select all, I can't copy and paste. Why can't I copy and paste?
+
+[00:10:59]
+Because when I dismissed Electron's default menu, I took away those menu items. I took away the keyboard shortcuts associated with those menu items. So should you decide you're gonna build your own custom application menu, this is a, unfortunately, an all-in kinda endeavor, right? It's that you need to effectively take over.
+
+[00:11:18]
+They gave you one, you said you didn't want it, so now it's on you to build your own.
+

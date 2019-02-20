@@ -1,0 +1,105 @@
+[00:00:00]
+>> Steve Kinney: We have the ability to open files. We can edit files. We can see if they're edited, [LAUGH] right? This is all great and wonderful. Would anyone like to venture a guess what the next logical feature to implement is? Saving, right? So we wanna go ahead and implement the ability to save a file.
+
+[00:00:22]
+Now a lot of this will not be particularly controversial. In the same way that we have a showOpenDialog, we've got a showSaveDialog, right? There will be one difference, which is there is a difference between opening this app, typing and hitting Save. And opening this up, opening a file, typing and hitting Save, right?
+
+[00:00:49]
+Which is they've opened a file, we know the file they're working with, we don't wanna show them that save dialogue, right? We could eventually implement maybe a save as, right? And that would totally necessitate a dialogue. But in this case, we're like, if they are opening a brand new buffer, okay, prompt them.
+
+[00:01:08]
+If they are not, overwrite the current file, right? And so there's a little bit of nuance. And so I'll walk us through that one. And then, after that, that export HTML. You'll implement that one, that will have a little few of the edge cases, right? In that case, no matter what prompt them, right, because they might want to export multiple versions.
+
+[00:01:28]
+We don't wanna overwrite the previous one, so that one will always basically save it to the file system. But this one will handle a little bit more of the edge case of what to do in the event that they have a file, they don't have a file, so on and so forth.
+
+[00:01:41]
+So in our main process we have something very similar to the showOpenDialogue. So go ahead and make a new function called saveMarkdown, again, you can call it whatever you want. I'm actually calling it exports.saveMarkdown, right? Because we're gonna need to eventually wire it up to the save button just like we did with the get file from user function that we made earlier.
+
+[00:02:11]
+And this one's gonna take an argument which is the file path which we have in our renderer process. Remember, we're storing it in that top level variable. So we'll kind of pass that back in. Either it will be the file that's currently open or that it is set to null by default, right?
+
+[00:02:28]
+So if it's a brand new file it's null, okay, and if they've opened the file previously it is the file path. So we'll go ahead there and we'll say,
+>> Steve Kinney: Well, we actually will start out with the simplest possible thing, right? We'll just say fs.writeFileSync. You could use the asynchronous API, arguably you should.
+
+[00:02:53]
+Go ahead, we'll save the file or actually send the content to. We're gonna need to save that as well. So we'll say file and content and then we'll go ahead and we'll write that to the file system,
+>> Steve Kinney: And let's just start with that, right. Now this has got a whole bunch of problems.
+
+[00:03:16]
+It's got the problem of if they have not opened up a file that would be null and then we'll try to write to null as a first argument fs. Yeah, it's not good. But like I said proof of concept, let's try it out. So we've gathered these exports.saveMarkdown in the renderer process we will go ahead and we will,
+
+[00:03:41]
+
+>> Steve Kinney: Put it right here we'll say, saveMarkdownButton.addEventListener('click', ()=>{});. And we'll say mainProcess.saveMarkdown and we'll give it that filePath,
+>> Steve Kinney: And we'll give it the markdownView.value. All right, so whatever is currently in that text area we'll save that as the content. We changed the main process which means we can't just hit refresh and hope for the best.
+
+[00:04:20]
+It means that we have to go ahead and kill the app and start it back up again.
+>> Steve Kinney: Cool, so if you just try to type and save a file, it's gonna be bad news bears. So we'll go ahead, do a grocery list. We'll get ourselves a tofu steak as well,
+
+[00:04:44]
+
+>> Steve Kinney: Save the file, let's see what we got. If I open it from the file system, we've saved the tofu steak, right? We have successfully written to the file system, right? It took a little while to get the opening of the file, but now we're cruising. We've got edge cases galore that we're gonna need to start dealing with, so let's do that.
+
+[00:05:08]
+If the case the file is null, that's a false E-value, let's go ask the user where they would like to save it. So let's check that out. We'll go back to main.js.
+>> Steve Kinney: And we'll say, if there's no file,
+>> Steve Kinney: We'll ask them for a file. So we'll say file = dialog,
+
+[00:05:35]
+
+>> Steve Kinney: .showSaveDialog.
+>> Steve Kinney: And we'll give a title of save Markdown. This is where you get to get back at the Mac users cuz they'll never see it. Now, there's a few other things that I didn't show you. These actually all apply for open file dialog too, which is, you can specify a defaultPath.
+
+[00:06:08]
+
+>> Steve Kinney: And you might be, well that's perilous, right? I don't know the difference of where desktop is on MacOS versus Windows versus Linux, so on and so forth, right? I don't wanna put a defaultPath in there. I don't know how these things work. Luckily, electron actually has a whole bunch of really useful aliases for you as well.
+
+[00:06:30]
+So on the app module, there's this getPath.
+>> Steve Kinney: And it has paths that will resolve for most operating systems. So if I say, getPath ('desktop'), right, that will be the appropriate desktop folder on MacOS, on Windows, on Linux, so on and so forth, right? Now we're just showing a file dialogue.
+
+[00:06:56]
+If we get this wrong it's not the worst thing in the world. But, where this becomes more interesting later when we make a SQLite database, you don't wanna put that in the application bundle cuz that's shared on all users. You probably wanna put that in a user's specific settings directory, right?
+
+[00:07:12]
+On Mac OS it's the library folder in your home directory, Window is app data. So on and so forth, right? There's also really useful shortcuts for all of that. You can check the documentation. There's a bunch. There's desktop. There's documents. There's, yeah the user specific settings, a whole bunch of them that you can use.
+
+[00:07:31]
+We're gonna go with desktop. If you wanna use documents, go for it, but some of us have their screen on a projector, so. And the other one that we'll use is filters. You might be like, I don't need to filter. Filters is useful because it will give you, in this case, we're just gonna say markdown files.
+
+[00:07:47]
+And that means by default, it will try to save it as a markdown file, right? So you don't have to put the file extension on Mac OS or anything along those lines. So we'll say filters and we'll say name.
+>> Steve Kinney: Markdown Files. We'll say extensions, whatever you want that first extension to be.
+
+[00:08:13]
+I'm gonna go with 'md',
+>> Steve Kinney: 'markdown' 'mdown',
+>> Steve Kinney: 'markdown', cool. So we've got the basic file dialogue rocking and rolling. The value there will be either be wherever they choose to save it or, in this case, it's not an array cause they can only save to one file which is slightly certainly confusing that showOpenDialog gives an array of file names.
+
+[00:08:53]
+And showSaveDialog gives you a single one. I get it, I don't make these choices, my job is just to tell you about them. And so if they choose a place, we're gonna get that string back as the file name. And if they don't choose a place, then we'll get undefined.
+
+[00:09:08]
+So we do need to give ourselves a guard clause cuz that being undefined instead of null is not doing us any better than our original implementation. So we'll say, there's still no file, right? If they didn't pass as a file and they didn't pick a file, just return, like we're done here.
+
+[00:09:25]
+We tried, we're trying to work with people here, so on and so forth. Cool, so let's give this a shot and see how it goes. We changed the main process so we gots to leave.
+>> Steve Kinney: All right, Open the file, Grocery List, tofu steak, anyone else need anything from whole foods?
+
+[00:09:49]
+Broccoli, did you have to pick one that I'm not totally sure how to spell? No.
+>> Steve Kinney: Anyone know how to spell broccoli?
+>> Speaker 2: Two L's.
+>> Steve Kinney: Two L's, I was right the first time.
+>> Speaker 2: I would go with two C's.
+>> Steve Kinney: Two C's? [LAUGH] Whatever, we'll probably [LAUGH] well, we have a thing that we can fix during the break.
+
+[00:10:10]
+
+>> Speaker 2: [LAUGH]
+>> Steve Kinney: Where's the chatroom when I need them, cool. So we'll go ahead and we'll Save this file.
+>> Steve Kinney: Make sure that it still works. My potentially misspelled broccoli is on there.
+
