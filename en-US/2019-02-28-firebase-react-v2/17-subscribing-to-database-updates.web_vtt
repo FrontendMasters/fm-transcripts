@@ -1,0 +1,390 @@
+WEBVTT
+
+1
+00:00:00.300 --> 00:00:05.548
+&gt;&gt; Steve Kinney: All right, so
+we can create, we can read and delete.
+
+2
+00:00:05.548 --> 00:00:08.719
+We can't update just yet, and we will, but
+
+3
+00:00:08.719 --> 00:00:11.990
+I feel like refreshing
+all the time is no fun.
+
+4
+00:00:13.720 --> 00:00:15.922
+So what we'd like to do is get it so
+
+5
+00:00:15.922 --> 00:00:19.840
+that when the database changes
+our UI changes, right?
+
+6
+00:00:19.840 --> 00:00:21.660
+And that will make it a little easier so
+
+7
+00:00:21.660 --> 00:00:25.560
+we don't have to keep re-fetching
+from the database every time.
+
+8
+00:00:25.560 --> 00:00:28.986
+Before we put one in the database
+when we created one,
+
+9
+00:00:28.986 --> 00:00:31.361
+then we immediately got it back out.
+
+10
+00:00:31.361 --> 00:00:34.064
+As this application grows,
+I'm gonna be really honest,
+
+11
+00:00:34.064 --> 00:00:36.190
+I don't wanna do that anymore.
+
+12
+00:00:36.190 --> 00:00:39.679
+So what we're gonna do is say, hey,
+whenever the database changes,
+
+13
+00:00:39.679 --> 00:00:40.577
+tell me about it.
+
+14
+00:00:40.577 --> 00:00:43.503
+And we'll update the UI to reflect that,
+
+15
+00:00:43.503 --> 00:00:47.773
+which is gonna involve a little
+bit of refactoring our code.
+
+16
+00:00:47.773 --> 00:00:50.971
+And instead of get,
+which will get you everything one time,
+
+17
+00:00:50.971 --> 00:00:55.236
+we're gonna do an on snapshot, which
+will be every time,whatever that query,
+
+18
+00:00:55.236 --> 00:00:57.197
+whatever the scope of that query is.
+
+19
+00:00:57.197 --> 00:00:58.570
+In this case, it's all posts.
+
+20
+00:00:58.570 --> 00:01:03.063
+But if I limited it to ten,
+it would be just the first ten.
+
+21
+00:01:03.063 --> 00:01:06.304
+Any time that data set changes,
+we'll get a new snapshot, and
+
+22
+00:01:06.304 --> 00:01:08.090
+we can update the user interface.
+
+23
+00:01:09.570 --> 00:01:12.310
+Each change counts as a database query.
+
+24
+00:01:12.310 --> 00:01:16.381
+Right, so
+just something to kinda keep in mind, but
+
+25
+00:01:16.381 --> 00:01:20.924
+like I said, we're not gonna
+get anywhere close to that.
+
+26
+00:01:20.924 --> 00:01:24.782
+I think it takes,
+I don't wanna quote numbers, but
+
+27
+00:01:24.782 --> 00:01:29.530
+it's pretty hefty before you
+actually blow past the free plan.
+
+28
+00:01:29.530 --> 00:01:32.456
+So what we'll do is when
+the component mounts,
+
+29
+00:01:32.456 --> 00:01:36.810
+we will subscribe to the changes
+to the post collection.
+
+30
+00:01:36.810 --> 00:01:41.948
+And this is the application component,
+so it'll theoretically always be there.
+
+31
+00:01:41.948 --> 00:01:46.498
+So we don't necessarily need
+to clean up after ourselves,
+
+32
+00:01:46.498 --> 00:01:49.413
+but we're going to cuz it's polite.
+
+33
+00:01:49.413 --> 00:01:53.643
+And if you use this in some lower level
+component, you could have the problem
+
+34
+00:01:53.643 --> 00:01:58.290
+where, okay, when the components mounts,
+you start listening for the changes.
+
+35
+00:01:58.290 --> 00:02:01.864
+And then the user navigates away,
+you never stop listening,
+
+36
+00:02:01.864 --> 00:02:04.214
+which means that that's still firing.
+
+37
+00:02:04.214 --> 00:02:07.712
+And it means that we have a whole bunch
+of JavaScript objects that can't get
+
+38
+00:02:07.712 --> 00:02:09.610
+garbage collected, so on and so forth.
+
+39
+00:02:09.610 --> 00:02:11.800
+It's effectively a memory
+leak at that point.
+
+40
+00:02:11.800 --> 00:02:15.226
+So what we'll do is when the component
+mounts, we will start listening.
+
+41
+00:02:15.226 --> 00:02:17.748
+And when the component unmounts,
+we will remove the listener,
+
+42
+00:02:17.748 --> 00:02:19.390
+we'll unsubscribe from those changes.
+
+43
+00:02:20.660 --> 00:02:21.357
+Cool, so
+
+44
+00:02:21.357 --> 00:02:27.379
+what we'll do is we need to hold on to the
+function that we wanna unsubscribe from.
+
+45
+00:02:27.379 --> 00:02:33.421
+So we'll give ourselves just this
+class property called unsubscribe.
+
+46
+00:02:36.412 --> 00:02:37.646
+&gt;&gt; Steve Kinney: And
+we'll set that to null, for now.
+
+47
+00:02:37.646 --> 00:02:39.990
+And that's just to put
+it in the class scope.
+
+48
+00:02:41.890 --> 00:02:45.420
+Now when the component mounts,
+I can get rid of this code here.
+
+49
+00:02:50.920 --> 00:02:58.070
+&gt;&gt; Steve Kinney: We'll say
+firestore.collection('posts').
+
+50
+00:02:58.070 --> 00:03:04.790
+This time, instead of get,
+we're gonna say onSnapshot.
+
+51
+00:03:04.790 --> 00:03:06.850
+And that's not going to return a promise,
+it's gonna take a callback.
+
+52
+00:03:06.850 --> 00:03:12.268
+Give me a function that you want me
+to call every time the data changes.
+
+53
+00:03:12.268 --> 00:03:13.717
+So we'll take the snapshot, and
+
+54
+00:03:13.717 --> 00:03:16.268
+we'll do something very similar
+from what we had before.
+
+55
+00:03:16.268 --> 00:03:23.811
+We'll say const posts = snapshot.docs.map.
+
+56
+00:03:23.811 --> 00:03:24.311
+We have that,
+
+57
+00:03:31.956 --> 00:03:35.470
+&gt;&gt; Steve Kinney: this.setState to posts.
+
+58
+00:03:35.470 --> 00:03:40.659
+Now this onSnapshot returns a function
+that you can call to unsubscribe.
+
+59
+00:03:40.659 --> 00:03:42.669
+So that's where we'll say,
+this.unsubscribe,
+
+60
+00:03:46.559 --> 00:03:49.846
+&gt;&gt; Steve Kinney: Equals this subscription.
+
+61
+00:03:53.790 --> 00:03:56.226
+&gt;&gt; Steve Kinney: So
+when the component will unmount,
+
+62
+00:03:56.226 --> 00:03:59.056
+we'll call just this.unsubscribe, and
+
+63
+00:03:59.056 --> 00:04:03.074
+that will unsubscribe our listener so
+that we are good to go.
+
+64
+00:04:07.050 --> 00:04:09.479
+&gt;&gt; Steve Kinney: Awesome, so this'll
+get us a little bit of the way there.
+
+65
+00:04:09.479 --> 00:04:12.682
+You're gonna see, we do need to
+do a little bit of clean up, but
+
+66
+00:04:12.682 --> 00:04:14.270
+it's the best kinda clean up.
+
+67
+00:04:14.270 --> 00:04:17.238
+It's the kinda clean up where
+you delete code, right?
+
+68
+00:04:17.238 --> 00:04:20.542
+Those are my favorite refactorings,
+I don't move anything around,
+
+69
+00:04:20.542 --> 00:04:21.945
+I just start deleting stuff.
+
+70
+00:04:21.945 --> 00:04:25.035
+And that's pretty much
+the best feeling in the world.
+
+71
+00:04:25.035 --> 00:04:26.479
+So let's go ahead, and
+
+72
+00:04:26.479 --> 00:04:31.577
+what we will do is I'm gonna actually,
+&gt;&gt; Steve Kinney: I'll
+
+73
+00:04:31.577 --> 00:04:32.727
+actually go make a new tab.
+
+74
+00:04:37.143 --> 00:04:38.967
+&gt;&gt; Steve Kinney: I don't know
+about the rest of you, but
+
+75
+00:04:38.967 --> 00:04:41.912
+nothing makes me happier than
+seeing two windows stay in sync.
+
+76
+00:04:46.040 --> 00:04:50.941
+&gt;&gt; Steve Kinney: So we'll go ahead,
+and we'll make another post.
+
+77
+00:04:58.720 --> 00:05:02.017
+&gt;&gt; Steve Kinney: Whoa,
+it happened on both simultaneously, right,
+
+78
+00:05:02.017 --> 00:05:07.237
+because both of them are subscribed to the
+database just really just to make a point.
+
+79
+00:05:15.710 --> 00:05:18.739
+&gt;&gt; Steve Kinney: Watch
+both of the screens.
+
+80
+00:05:18.739 --> 00:05:21.488
+Boom, real-time updates being
+pushed to both of them.
+
+81
+00:05:24.952 --> 00:05:26.306
+&gt;&gt; Steve Kinney: We can also go ahead and
+
+82
+00:05:26.306 --> 00:05:30.599
+delete one, you see delete on both
+of them, so on and so forth, right?
+
+83
+00:05:30.599 --> 00:05:34.650
+As the data changes, these updates
+are pushed out to every connected user.
+

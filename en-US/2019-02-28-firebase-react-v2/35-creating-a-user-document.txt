@@ -1,0 +1,92 @@
+[00:00:00]
+>> Steve Kinney: So what I wanna do now is I wanna store the user information. I wanna create one of these user profiles. I have two code paths now. So you notice that when a brand new user signed in with Google OAuth, they didn't have to sign up with Google OAuth, right?
+
+[00:00:19]
+They weren't a new user they signed in with it, then Firebase created a user for them. So one way that you can sign up for an account is to simply sign in with Google, right? The other one is to actually go to that sign up form and do it.
+
+[00:00:33]
+So we have two code paths that we need to deal with here. We need to either figure out if it's happening from the sign up form or if they're coming in this other way. Also we don't want to recreate the account. So for instance, if they sign in with Google, we can be like yeah take that photo url, take that display name.
+
+[00:00:56]
+Those seem like sensible defaults let's go with that. Right, but if we do it on every log in, that means they can log in, they upload a new picture and change the display name, and we blow it away the next time that they log in. That's not great.
+
+[00:01:12]
+So, we wanna make sure that, we wanna check to see if that document exists. If it doesn't exist, then we'll go ahead and create a profile for them and if it does, we'll simply respect the profile that they have, and we'll use that instead of the AuthData. Does that make sense?
+
+[00:01:30]
+Cool. So we're gonna need two methods here one for creating the user document, or the user profile, and one for getting the user document or the user profile. Let's go ahead and, it's really in a real app I might still have to break this stuff out into multiple files, but I'm also aware that if I go too many files it gets really confusing to follow along.
+
+[00:01:56]
+So I'm gonna kind of add more stuff into this Firebase js file mostly cuz I have Firestore and Auth available in here as well. This is going to be a little bit of the squirrelier code that we've written because we are gonna check to see if documents exist and stuff along those lines.
+
+[00:02:13]
+So I'm gonna write a lot of comments as I write the code and I talk. Cool. So we'll start out with this,
+>> Steve Kinney: createUserProfileDocument, right? And that is gonna be an Async document. And it'll take some user object that we got back from the Auth module. And then we're also gonna pass in what I'm gonna call additional Data.
+
+[00:02:43]
+Does anyone have an idea what some of the additional data might be?
+>> Steve Kinney: I asked the display name in that form, right? I'm not getting it back from the email address in sign up, so I can also pass that in as long as well as like, okay make this user profile, also they gave a display name.
+
+[00:03:01]
+Use that, right? So for Google Auth we're gonna get the display name out of the box for email address and password, we're gonna pass along the display name that they put into the form. So we'll have both options there. If for some reason this function gets called, and it could get called without a user.
+
+[00:03:21]
+When could it get called without a user? If we're doing a offstage change for the Google sign-in and they sign out, that will be null. So we'll be like listen, only do this if you have a user. Otherwise, this will blow up and React gets very angry if you blow up in a component and don't do a componentDidCatch and stuff like that.
+
+[00:03:41]
+So we're just gonna try to not blow here. So if there is no user leave this function we are not doing anything. Okay, next we're gonna wanna see if the document is in the database. So first we're gonna find a reference to that place in the database. Okay we're expecting that if this user had a profile in our database then it exists at users slash their UID.
+
+[00:04:05]
+So we wanna reference. Remember we had snapshots of the database, which is the actual data and then we also have references. The references is just a place in the database that we can talk about and deal with. So we'll say const userRef = firestore.doc. That's gonna be users/$ { user.uid}.
+
+[00:04:32]
+Except it's gonna be back-ticks because I'm using string interpolation, okay. And we're also gonna see if we can get a snapshot from there. So we'll say,
+>> Steve Kinney: We'll start with get a reference,
+>> Steve Kinney: Cool. And then,
+>> Steve Kinney: Go and fetch document from that location. We'll say const snapshot.
+
+[00:05:27]
+
+>> Steve Kinney: From that location, go get a document. Now, if we remember from all the way back a few hours ago, document snapshots have a property called exist, which is either true or false pending, whether or not it exists. So now, we should know if the snapshot does not exist, then we know we need to go ahead and create one, right?
+
+[00:05:52]
+So this is a little bit about users and authentication, but this is also a little bit more granular, how to work with Firestore documents. So kinda like we're taking the previous two things that we talked about and trying to combine them into one thing here. So if the snapshot, plural, it's the one thing usually I can't remember is, for query snapshots it's exist and for document snapshots it exists because English.
+
+[00:06:19]
+[LAUGH] Right, because English is hard. So, we'll go ahead and we'll have this idea of a createdAt. Now, this is the very first thing on a user profile. There was a little bit of that kind of in the meta data but it wasn't necessarily on those top level things in the user that we were pulling in from before.
+
+[00:06:45]
+So we'll say, new Date.
+>> Steve Kinney: And we will,
+>> Steve Kinney: We're gonna try to set a document as that user reference if it doesn't exist. Now, previously when we used post, we used Add. Add, we gave it a collection, we said Add, and it generated a UID for us.
+
+[00:07:11]
+This time we know the UID that we want, or the ID that we want we know that it should be the UID of the user. So, we're saying hey I found the location where this document should be I want to set it.
+>> Steve Kinney: So, we'll say try,
+>> Steve Kinney: userRef.set and we're gonna give it,
+
+[00:07:40]
+
+>> Steve Kinney: We'll pull some stuff off, that user object that we passed in. So we'll say const.
+>> Steve Kinney: { displayName, email, photoURL }
+>> Steve Kinney: Now, those could still be my photoURL is likely to be undefined on an email address and password we know that displayName is too. So we'll say displayName, email, photoURL, that createdAt which is our own bespoke thing there, and any of the additional data that got passed in, put it on there as well.
+
+[00:08:24]
+
+>> Steve Kinney: So we're gonna try to set that, if that doesn't work, we'll do another consular.
+>> Steve Kinney: It's not gonna work at first, does anyone want to take a lucky guess why?
+>> Steve Kinney: This is a trick question. It's not gonna work, but.
+>> Steve Kinney: What did we do to our database like 20, 30 minutes ago?
+
+[00:08:52]
+
+>> Student: The rule won't allow you to-
+>> Steve Kinney: Yeah, we locked down our database and did not set up a security rule. So it will blow up. So, let's give our self an error so that we can see it blow up, so we're not totally confused.
+>> Student2: And the createdAt, is also created right here, and not in a database, right?
+
+[00:09:12]
+It's created like on the front?
+>> Steve Kinney: Because we don't know about cloud functions yet.
+>> Student2: Okay.
+>> Steve Kinney: [LAUGH] So yes-ish, because we're not at the end of the workshop yet. [LAUGH] We could and likely should do it on the backend. That is a really good instinct there.
+

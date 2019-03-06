@@ -1,0 +1,90 @@
+[00:00:00]
+>> Steve Kinney: We're gonna write one now that is going to be able to modify a document. Now this is a little bit tricky because we're saying hey, whenever the user writes a document, I want to change it. What do you think that's gonna trigger?
+>> Student: Another change.
+>> Steve Kinney: Another change.
+
+[00:00:23]
+What do you think that's gonna trigger? Yeah, so the reason we're gonna have this talk now is you do need some, it's kind of like recursion, right? You need something in place to eventually stop you, right? Otherwise you will keep going and going and going. So that's kind of why we're doing this quick example, to kind of put that in place.
+
+[00:00:46]
+So what we are going to do is we are going to listen for a document write. Now document writes are very much like they are for the security rules. You have a write, which is a create, an update, or a delete, but you can also do unupdate, uncreate, undelete, just like you can do with the security rules.
+
+[00:01:05]
+So let's try this one out. We'll say exports.sanitizeContent. And that will be functions. In this case, we're gonna try to hook into firestore. We'll grab a given document path that we're looking for. That's gonna be very much like the security rules, posts with a postId, and that'll be a param you can hook into if you need to.
+
+[00:01:43]
+We'll say onWrite. Whenever somebody modifies or changes one or whatever, we'll go ahead and we'll call this, and we'll say, async and [SOUND], you'll get the change and the context there.
+>> Steve Kinney: We'll go ahead and so the change, so if you're creating one, you'll get the snapshot. If you're changing one, you're gonna get the before and the after, right?
+
+[00:02:19]
+So we did a kind of a very loose validation with the security rules. We're like, make sure it has a title, right? But here we're gonna get even more granular if we wanted to, which is okay, there's someone with an empty title, use the old title, right? So you'll have all the things before, all the things afterwards, right?
+
+[00:02:40]
+Or what's currently in the database and what's coming in, not unlike the security rules. So we do onWrite, and we'll have this change, and,
+>> Steve Kinney: One thing we wanna check for,
+>> Steve Kinney: Is the change.
+>> Steve Kinney: We saw this exist before.
+>> Steve Kinney: What's the situation where the after effect would be the document no longer existing?
+
+[00:03:06]
+
+>> Student: Write.
+>> Steve Kinney: Yeah, write. So write works for create, update, and delete. We don't wanna write a function for both create and update, right? So it's better to write one for write and check to see, okay, if it's because we deleted, all right, we're not doing anything here, where we're done.
+
+[00:03:28]
+Cool, and so from here we could say,
+>> Steve Kinney: const content will be, and the change is like a snapshot, change.after.data. That's all the properties. And what we could do is if there is content, we will return. The way that these all work, you have to return something, right?
+
+[00:03:54]
+Otherwise, it never knows when it's over, right? The cloud function doesn't know when to spin down. So if you have a callback and yet you never actually return anything, it basically just doesn't run your function. It's gonna check to see if you will return something at some point or another.
+
+[00:04:09]
+Cuz if you return either a value it's like, okay, I know I'm done. Or if you return a promise, when that promise resolves, it knows that it's done. So you need to return. If you don't return, it's not gonna work. If it's just like, we reached the end of the function, that's the end, it doesn't know that there wasn't a callback on the event loop, and it just won't run your function.
+
+[00:04:31]
+So we always need to make sure that no matter what, we return something in every case. So in this case, we return change.after. We'll get the reference to where it was in the database, and we'll update it.
+>> Steve Kinney: And we'll do a content. Now the content is replaced, we'll just do.
+
+[00:04:53]
+I think I joked before, we're gonna do CoffeeScript, so let's do that. Coffee, all instances of CoffeeScript with,
+>> Steve Kinney: Some stars. I don't know if that's enough stars, but it's fine.
+>> Steve Kinney: All right, I'm not deploying this, because this is the problem that we talked about earlier. Which is, this will trigger a change, which will trigger the function, which will trigger a change, which will trigger the function, so on and so forth.
+
+[00:05:22]
+Also, there is a case where there's no content, and it doesn't return anything. So we'll return null if there was no content. We will also write a new property. We'll call it sanitize. It doesn't matter what it is. It's just something that you have on the document that you can hold on to.
+
+[00:05:40]
+And we'll grab that as well.
+>> Steve Kinney: And we'll say if content, and it's not sanitized already. So it has content but sanitized either doesn't exist or it's false, go ahead and do this. That will trigger another run on it, but then that's it, right? At that point, it will no longer run.
+
+[00:06:05]
+We'll return null, and everything will be good in the world. Right, all right. Let's go ahead and let's deploy this one.
+>> Steve Kinney: Cool, it's going up. Now, even though I have to deploy them to work with them, I can still work against local host, right? So I don't necessarily need to go to production, right?
+
+[00:06:42]
+It is actually going to affect production, so one thing you might wanna do is have a project for staging, another project for production, switch out the file, so on and so forth. But we can still try it again as local host. And to me, it doesn't really matter but,
+
+[00:07:02]
+
+>> Steve Kinney: Login in the meantime.
+>> Steve Kinney: Cool, see if that's gone up yet. Gonna give it a second. Now again, the functions do take some time to warm up which means we might see the word CoffeeScript in the post. And then once the function warms up and runs, then it will go ahead and replace it.
+
+[00:07:26]
+So to think that these are all instantaneous, like HTTP request comes in in Rails, it hits my controller. My controller does stuff before we commit it to the database. That's not how this works. It's going in. The idea of it going into the database will trigger the function that will change it, right?
+
+[00:07:41]
+And so especially the very first time, you might very well see the word show up. You'll probably see it disappear slightly afterward. They're not instantaneous, like I said, the feedback loop is not great.
+>> Steve Kinney: All right, so there it is, is, yep, and there it went. Right, the function went ahead.
+
+[00:08:23]
+
+>> Student: Whoo! [APPLAUSE]
+>> [INAUDIBLE]
+>> Steve Kinney: [LAUGH]
+>> [INAUDIBLE]
+>> Student: I do recall you complaining about curly braces earlier, so.
+>> Steve Kinney: Yeah. I have mixed feelings about CoffeeScript. I was a Rubyist before I was a JavaScript developer, and the way that I learned how to do stuff in JavaScript was I wrote Ruby-like syntax and then translated it from CoffeeScript to JavaScript to figure out how you actually write JavaScript.
+
+[00:08:44]
+That explains a lot, right? [LAUGH] So I have fond memories of CoffeeScript. Cool, one thing that we didn't do before that I meant to do, is these are all in crazy order because they're by the id. We should order it by traded out at one point. But so we can see that we can edit the database and modify stuff.
+

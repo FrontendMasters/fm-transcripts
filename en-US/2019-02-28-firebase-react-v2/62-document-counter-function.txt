@@ -1,0 +1,91 @@
+[00:00:00]
+>> Steve Kinney: Let's try to say we have this comment count, now there's a bunch of stuff we could do, we could like theoretically keep an array of comments and my query that or sub collection every time, count all the documents and see, but that still like, if I'm gonna get all of them.
+
+[00:00:19]
+All right, what if it's really like contentious thread and so now I've got a query for like a thousand comments every time it would be a lot better, like that's 1000 comments every time we just want to get this number. It would be a lot better just like as comments happen increment and decrement that count, right, this function is going to have some flaws, cuz it's going to now respond to new comments and it's gonna increment and decrement that count right?
+
+[00:00:47]
+Which means that anything that currently has comments it's gonna be off, so what could you do? Well you could have the Cloud function that goes ahead and like re-tabulates them all and you could also have a script that on deploys or whatever runs a node script with the fire base admin tool right like.
+
+[00:01:05]
+You can also re-tabulate some of the stuff, one of the nice things about NoSQL database is kind of like you get to play a little bit more with the eventual consistency, is the number of comments being super accurate? Especially at a large number, really important like you start round it to 1.4k, and all of a sudden you can get away with being a little off, right?
+
+[00:01:29]
+[LAUGH] And that's like one of things that makes NoSQL scale sometimes is we go ahead and do stuff like that. So well, I think this one is really kind of interesting is, because it involve every time a new document goes into the comments collection for a post, we'll then have to go, last time we based through that, hey for this document, we wanna change it, this time we have say every time we put a new document in, we're gonna have to go, to this other place and change that document, so it's a little bit of a twist on our last trick.
+
+[00:02:07]
+So we’ll go ahead and we’ll say exports.incrementCommentCount seems good functions.firestore.document, in this case, we’re going to listen for
+>> Steve Kinney: ('posts/{postId}, not a given particular one, /comments/{commentId}'), so any change to a commentId, we really only care about onCreate this time, we don't wanna increment the calendar, they update one.
+
+[00:02:47]
+One would argue we don't have the ability to delete comments right now, one would argue we should probably also have a decrement one on deletes but since today we now have the ability to like once you comment now it's sets in stone until I go into the admin dashboard and take it away.
+
+[00:03:02]
+So we're not gonna worry about that just yet, we'll say async and for create we'll get a snapshot there's no before and the after because there's no before, [LAUGH] all right?
+>> Steve Kinney: Cool, so we'll have the snapshot,
+>> Steve Kinney: And if I wanna get, I can get any of these, there's also a second argument called the context.
+
+[00:03:33]
+
+>> Steve Kinney: I have two ways to get that postId,
+>> Steve Kinney: I could navigate up the references of the parents, remember how to use child in the storage one before? I can parent my way up as well, or with context, just like in React Router, there is a params object which will be each of those dynamics segments in there, so we'll say post ID,
+
+[00:04:06]
+
+>> Steve Kinney: Context.params and we'll say the postRef = firestore.doc.
+>> Steve Kinney: PostId, and we'll get its comments count, we need to know what its current count is, so we need to go ask it, so we'll say const comments = await, did I make an async function? Yeah, I did, cool, we'll say await postRef data will get everything, but if I only need one property, I can use get('comments'), and we'll return, cuz it's got, we always have to return a promise.
+
+[00:04:55]
+I know that I'm not like returning this value, but this will let the function know when it's over, was it postRef.update({comments : comments + 1 }), so whenever a new comment document is added to the sub-collection of a post, go find the default zero in there get whatever's count is return a operation to increment it by 1.
+
+[00:05:37]
+
+>> Steve Kinney: And away we go, some other ones I'll kind of leave as an exercise for the reader, like we can listen to OAuth changes, all right? So OAuth has a on create, or when would that happen, that would happen on these sign in with the email and password right with sign an email password or when we create the Google OAuth1 that will go ahead and trigger an OAuth that on create event, what could we do there?
+
+[00:06:02]
+We could create that user doc, right, so we don't have to do a client-side anymore, we don't have to trust that that code runs and stuff like that. We can start taking off some of the stuff that we did on the front end because we didn't know cloud functions yet, and we can start taking them back.
+
+[00:06:17]
+Now there could be delay, and we need to code defensively for that document not being there yet, and stuff like that. That is part of just, yeah, we have this real time, push-based database that automatically updates and sends stuff, but it means that it’s not like activerecord or something where the database completes this entire operation, we have all the data before we make an HTML page like we do need to code a little bit differently and a lot more defensively we saw some of that today, but it does allow us to do really cool things and push like we can write a lot of back end heavy stuff in Firebase and something that like abstracts away a lot of the back end in a way that I think is really cool.
+
+[00:06:58]
+And I love this has come a long way the first time we did this course club functions were released the night before we did it, [LAUGH] so and that was I think 18 months ago so like a lot of this is still like 18 months is a long time in tech but like.
+
+[00:07:13]
+Still, a lot of this is very new, and getting increasingly more powerful too, so I would also encourage you to watch this space as well, and this definitely seems, amongst a lot of the cloud providers, to be something of an arms race, all right. So let's go ahead, I'm gonna make a brand new one, that I know has zero.
+
+[00:07:44]
+
+>> Steve Kinney: Now, this one might not be warmed up yet, we'll find out.
+>> Steve Kinney: Yeah, that comment It is one of those things where if it doesn't work I will have to check the logs and see where the boo boo was made, [LAUGH] kind of work,s [LAUGH] the debugging cloud functions, it's great, it really makes you feel good about life, but let's take a look.
+
+[00:08:18]
+
+>> Steve Kinney: The one thing I'm gonna do is, this is kind of one of the reasons I gave myself the firebase on the window object, is so I could kind of, it's just gonna add 1 to an object, we can, [LAUGH] we can keep commenting, it's just gonna keep adding 1 to an object, it's probably the way that I'm fetching it, let's take a look.
+
+[00:08:41]
+
+>> Steve Kinney: So we can say firebase.firestore,
+>> Steve Kinney: I'll grab that up there.
+>> Steve Kinney: Now it's a string, that's great. [LAUGH]
+>> Speaker 2: The function is somehow setting a string object, we are setting an object.
+>> Steve Kinney: Yep, the big question is where is it doing it,
+>> Steve Kinney: Let's take a look at the code, I know what's happening comments is this is actually the snapshot literally the code I was typing.
+
+[00:09:59]
+
+>> Steve Kinney: We actually want this and we'll say,
+>> Steve Kinney: Okay, let's try that out.
+>> Steve Kinney: I was, calling it on the reference which is trying to get a document called comments which was an object and I was adding it, plus one to the actual reference which was setting it to an object, fun times, and I'll supply that might create myself a fresh one because I've ruined this.
+
+[00:10:57]
+
+>> Steve Kinney: All right, nobody comment on it until my function deploys.
+>> Steve Kinney: But you all are here, so it keeps me honest, all right, now,
+>> Steve Kinney: I'm not convinced that wasn't the old function, [LAUGH] this is what you all tune in for, all right?
+>> Steve Kinney: There's some it feels like a cold start to me.
+
+[00:11:29]
+
+>> Steve Kinney: Yeah, [SOUND] and that was warmed up and working, all right, so yeah, here's the thing about the cloud, this stuff isn't instant, [LAUGH] we're deploying stuff just everywhere around the world, takes a while. See also the course we did on, doing CDMs on Cloudfront, involved a lot of patience and in this we're propagating a lot
+
