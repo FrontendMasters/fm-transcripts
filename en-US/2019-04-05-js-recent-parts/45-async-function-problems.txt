@@ -1,0 +1,98 @@
+[00:00:00]
+>> Kyle Simpson: All right, so that helps address one of the shortcomings of async functions which is that if we nest functions inside of them, we create barriers and we can't use it in a way in a deeply nested function or whatever. That fixes one of the problems but to be honest with you, there are some other problems that I think need to be considered when we talk about async functions.
+
+[00:00:24]
+And these issues taken together as a whole, are one of the reasons I personally still often use the generators with a runner, instead of using the normal built in basic async function. So I want to talk to you about a few issues, design issues if you will, for a sync functions.
+
+[00:00:45]
+Number one. The async function, the await keyword only knows what to do with actual real promises. Which generally isn't that big of a deal but there are other representations of future values that would be more convenient sometimes to be able to await. For example, it might be useful to be able to await.
+
+[00:01:07]
+A custom promise that doesn't have the same then function on it, it might be useful to await a what's called a Func, which is a function representation of a future value. The await keyword doesn't offer us any options for that it's not extensible in any way. It only knows what to do with thenables and promises.
+
+[00:01:28]
+So it's a little bit more limited. That's not a huge deal, but it is a little annoying. When you work with a generator, and you have your own gen runner, you have the complete freedom to be able to yield and pause on any representation of future value that you need to.
+
+[00:01:46]
+
+>> Kyle Simpson: Number two, this is an even more nuanced issue, but I think a big, big problem which is the way that the specification implemented promises is that it implemented what we call the micro-task queue. So to have a synchrony meaning I don't want this thing to block right now but I want it to happen on the next tick as many people say.
+
+[00:02:12]
+But I don't want it to actually be like subject to waiting on other event handlers, there's essentially internal in the event loop, this thing called the micro task queue. And promises when ever they need to resolve an asynchronous operation they actually don't queue an event loop item, they queue something in the micro task queue.
+
+[00:02:32]
+And that means that they essentially are cutting to the front of the line. So anything that's built up waiting like any ajax or other events handlers that are all waiting on the event loop. They don't get a chance to fire as long as something keeps getting added to the micro task queue.
+
+[00:02:49]
+The effect of this is that certain programming patterns can either intentional or accidentally end up creating an infinite loop, where a promise keeps adding a new micro-task queue. And it keeps consuming that event loop and it never lets anything else in the program resolve. And there's a term for that in broader concurrency programming.
+
+[00:03:13]
+That's called starvation. It's a big enough problem like whole PhD theses have been done on people studying the problems of starvation and algorithms to avoid starvation within computer programs. Starvation creates a form of denial of service, it creates a form of deadlock These are big big problems in computer science.
+
+[00:03:37]
+And I find it particularly troubling that they naively implemented the scheduling algorithm for promises, that is inherently susceptible to starvation. I didn't go looking for this problem to try to expose it. I ran across this accidentally because I was implementing a programming concurrency pattern called CSP which stands for communicating sequential processes.
+
+[00:04:02]
+I ran across this problem where I had implemented CSP with a generator and then one of the things you do in CSP that's a common pattern. It ended up producing that infinite microtask loop, and it starved out the rest of the program. And that's what led me down the rabbit hole of, how did this even happen?
+
+[00:04:21]
+And then I found out, this scheduling algorithm is not preventing starvation. And so I went to the specification list I brought this to the attention of several people on TC39. And I said, this is kind of a problem, that we have this naive scheduling algorithm that is susceptible to starvation.
+
+[00:04:40]
+Here's the code that I did, very innocently, not realizing that it would expose this problem. And we went back and forth, and then they basically just said this is probably not a big deal because you're the only person that's ever complained about it. And then they just blew it off, so what we have is promises and specifically the way they were exposed inside of cancel, I mean, inside of asynch function is essentially this ticking time bomb of people accidentally gonna create starvation and not even know why it's happening.
+
+[00:05:15]
+And it's because we didn't build the algorithm to be robust to that. There are good solid strategies that have been around for decades. And we just didn't employ any of those in the definition of the microtask queue. So that is one of the things that I'm frustrated about with the design of promises and async functions.
+
+[00:05:33]
+I think they should have been more defensive about that problem. But this third problem is really the kind of dagger to the heart. It's really the one, you could ignore these other two as being rather niche and nuance, but this third one I think is a really big deal.
+
+[00:05:49]
+And by the way, it's not that we waited until after to know that this was a problem. Two and a half years before async functions landed finally in the spec, I was raising noise about this on the spec list saying This is a really bad problem, we need to fix this design before you ship async functions.
+
+[00:06:08]
+And there were several really really long GitHub threads like hundreds of messages long where we were all fighting about this and I kept saying listen we need to fix this, don't ship them without this. And then they just ended up shipping it without fixing this problem. So it's almost self-inflicted, because we knew that this could be a problem.
+
+[00:06:32]
+The problem I'm speaking about is that async functions are essentially black boxes that once they start, it is impossible to externally cancel them. You can't tell an a sync function, once you invoke it, hey I know you're in the middle of doing a bunch of downloading of stuff, or whatever, but I want you to stop.
+
+[00:06:50]
+There's no way to tell it do that, which means it's gonna continue to spin on the micro task queue, and consume resources, until forever. Until it decides that it wants to stop, if ever. So I'm particularly troubled by cancellation, matter of fact I have a whole talk on the topic of asynchronous cancellation, it's called cancel all my appointments.
+
+[00:07:12]
+And if you check out online, you'll see links on my social feeds to this talk. Because I actually believe that this is such a big deal that all forms of asynchrony that we ever do should have some mechanism for cancellation. And here, we have potentially one of the most important additions to JavaScript ever added to the language.
+
+[00:07:35]
+And we just completely ignored the question of, how are these going to be cancellable? And so it is for those three reasons that, in many cases the async function, while it's very attractive syntactically is sort of fatally flawed. And it doesn't mean I never use them, but I still use generators whenever I need to get around one or more of these problems.
+
+[00:07:59]
+And specifically with respect to cancellation I had developed a library to try to show what I thought could be a workable way for asynchronous functions to be cancellable. It's based on the idea of cancellation tokens. That is not an invention that I made up. That is a standardized thing for many other languages, like C Sharp.
+
+[00:08:24]
+And in fact we already have in the web platform cancellation tokens. If you've ever used something like fetch. Fetch has a way for you to cancel an ajax request and the way you do it is to pass in a cancellation token. And then when you call abort on the cancellation token it stops the ajax request.
+
+[00:08:44]
+So it's standardized in C Sharp and we already have it in the web platform and I was like this is a really good way for us to make async functions cancellable. Unfortunately as things currently stand it's just a user [INAUDIBLE] it didn't end up getting picked up. But this is what it looks like.
+
+[00:09:02]
+It's called CAF. Stands for cancellable asynch functions, you make a token like I'm doing on line one. You make a generator that is wrapped with the CAF utility and you notice that you pass in the signal. On line 10, when you call down here token.abort on line 15, oops.
+
+[00:09:24]
+On line 15, when you call token,abort,
+>> Kyle Simpson: It will actually send that signal into the asynchronous funciton and tell it, stop running. Whatever you're in the middle of stop right away. So now we have the way to send a standardized way of sending in a cancellation signal from the external side.
+
+[00:09:46]
+One of the most common ways that you're going to want to, or one of the most common decisions that you're going to want to make about canceling your asynchronous behavior. Is if you have a time-based cancellation like I wanna time out. I wanna let this operation run for a maximum of 5 seconds.
+
+[00:10:03]
+So you see I'm doing it kinda manually here with the set timeout. There's actually a mechanism built right into the API. Line one, you see CAF.timeout. That makes a cancellation token that will automatically cancel itself after five seconds. So then you just passed that in and you don't have to mess around with your own set timeout calls.
+
+[00:10:22]
+So again, I'm not trying to plug this library like I want you to go use it but I deeply believe that every asynchronous operation that you write in your programs, needs to have a mechanism for cancellation if you're gonna like make a request of the file system. But what happened to the file system is network mounted and the network's down and now you're seemingly benign request to do a directory listing is hanging forever.
+
+[00:10:49]
+Even stuff like that needs cancellation. Every asynchronous operation that we could ever do in any part of the app front or back end, you should have some mechanism for cancelling it at a minimum based on a time mount. And I was hoping that this kind of research and experimentation into something like CAF would lead to a larger movement of, let's address cancellation in the design of our asynchronous operations.
+
+[00:11:16]
+So maybe someday that ends up happening but unfortunately ships already sailed with async functions. They don't by default, have a way to do cancellation.
+

@@ -1,0 +1,79 @@
+[00:00:00]
+>> Kyle Simpson: So now you understand what the syntactic sugar layer looks like, but let's peel back the covers, look underneath, and find out how the prototype system that it's layered on top of actually works. Exactly the same as everything else I've taught you, it's better to understand these systems than to just have, well, I don't know how it works, it's a black box.
+
+[00:00:20]
+Or worse, have a totally wrong mental model for it. So we wanna look at how the prototype system works, and specifically how its used to implement class systems in JavaScript. First observation I would make is that objects that exist in our programs that we can see and that we create or that we interact with, they're always created by these so-called constructor calls.
+
+[00:00:42]
+You might remember in our discussion of this keyword that I said that new in front of a function call is a constructor call. That is not the same thing as saying there's a constructor, it is to simply say that that is basically for lack of a better term when you use new in front of a function call it's constructing an object to be used for this binding of that function call.
+
+[00:01:07]
+So that's where objects come from. They come via new from these constructor calls. And it is often said that in that process of constructing these new objects that it's making that object based on the constructor's prototype.
+>> Kyle Simpson: That phrase based on is what I have to take issue with.
+
+[00:01:27]
+So I'm gonna just for a moment diverge from or go down from talking about JavaScript. I'll take off the JavaScript hat for a moment, and I wanna talk more about the foundations of class theory. As if you were in CS101 and they were gonna teach you all about classes, what would they explain to you about classes?
+
+[00:01:49]
+Well, number one, the most common metaphor to describe the difference between a class and an instance is that a class is the abstract pattern for a thing. It's like a blueprint. And the instance is like when an architect takes the blueprint and builds the thing. It's the literal concrete thing.
+
+[00:02:10]
+So we have blueprint, abstract, plan, that's the class. We have physical, concrete, object, that's the instance. That's the most common of those metaphors. Now in that metaphor, whether you realize it or not, there's something being implied to you. And you're picking up on and you're internalizing, just like anybody else that's ever done class-oriented coding has.
+
+[00:02:34]
+And it is that class-oriented coding is fundamentally a copy operation. And I get push back on this a lot, when I say this, people that like classes will push back and they say, no, no, no, but, but, but, but. And they'll point to lots of other examples of languages where it's not exactly that.
+
+[00:02:54]
+The truth is that there is no one specific standard for what the class design pattern really is. There's a lots of different ones. But it is also true that the majority of people that write JavaScript, the first time they ever saw something like a class was in a language like Java or C++.
+
+[00:03:14]
+So Java and C++'s flavor of classes is heavily influential in the mind and mental model that people have about classes. Certainly my CS program did all Java and all C++, that's the only class learning they did for the entire however many years I was in school. And I think I'm definitely not the only one who comes to JavaScript by way of what I would call more traditional class-oriented languages.
+
+[00:03:43]
+And when we say this idea of copying, and when we teach it in a CS program as if there's a copy behavior, that means something. It means something about our expectations, our even subconscious expectations about what we think the code will do. So here's why that metaphor implies that copy relationship without you potentially even knowing it.
+
+[00:04:05]
+Let's imagine that you draw up the blueprints for a building and then you go build the building. The architect builds, he designs it and then somebody goes and builds it. Now, what would happen if you came back to the blueprints and you erased a wall? Is that wall gonna disappear from the building?
+
+[00:04:22]
+No, that would be crazy, right? That would be really weird. What happens if you went to the building and you installed a new window that wasn't in the original plans? Does it magically show up on the blueprint? The reason is because the relationship that existed between the blueprint and the building existed for the split second, if you will, that it was being instantiated.
+
+[00:04:48]
+The characteristics from the blueprint were copied into the real building and then the relationship ceased to exist. You follow me? So that metaphor in and of itself and the way we think about what we're doing when we're instantiating. When you make an instance of a class, the mental model that you're getting is my instance is a copy of all those behaviors.
+
+[00:05:12]
+They're inherited, and that's copying. Speaking of inherited, when you start talking about classes you immediately start talking about parent and child classes, and all what inheritance is about. An inheritance is also fundamentally a copy operation. The metaphor that's most often used to describe inheritance is the genetic metaphor.
+
+[00:05:35]
+Now I have a son, he's eight years old and when he was created, he got a copy of my DNA.
+>> Kyle Simpson: He now exist as an entirely independent person. If he breaks his leg in his baseball game tonight, my leg is not gonna get broken. And if I lose my hair someday, hopefully he does lose his hair.
+
+[00:05:56]
+We are distinct people, but we had a relationship at the moment of creation that was a copy relationship.
+>> Kyle Simpson: As a matter of fact, even when you think about many languages, interpreters, compilers, will implement classes, they will actually flatten them for performance reasons. They will literally copy down into the instance, cuz it's much faster for the instance to have a reference to the function instead of having to look up some dynamic class hierarchy chain.
+
+[00:06:27]
+They only maintain the class hierarchy chain when there's relative polymorphism. It's called a virtual table. That's from C++, okay? So in all possible ways that you slice this, the relationship that is implied by classes is a copy relationship. And so we pop the stack of our conversation back to this statement on the slide, and that phrase based on.
+
+[00:06:52]
+When we say a constructor call is making the object based on its prototype, we're saying in our mental model that the constructor is making a copy of the prototype in the instance. Except there's a little tiny detail, which is JavaScript doesn't do any copying at all. As a matter of fact, to properly describe what is happening when a constructor call makes an object, it doesn't make it based on the constructor's prototype.
+
+[00:07:22]
+It makes it linked to the prototype.
+>> Kyle Simpson: Now there are many that have argued with me and said, it have disagreed with me and said copying versus linking is a distinction without difference. There's no difference there, it doesn't matter, there are just two different sides of the same thing, linking is just the dynamic form of copy.
+
+[00:07:47]
+And I couldn't disagree more. Linking and copying are not just two different sides of the same coin, they are completely and fundamentally and diametrically opposite to each other. And they completely change what your expectation of a system is based on whether your mental model is all about copying, or your mental model is all about linking.
+
+[00:08:12]
+
+>> Kyle Simpson: It matters what mental model you're using for expectation because when the program breaks, why did it break? It broke because you had a divergence between what you were thinking, your mental model, and what the system was actually doing. If you're thinking copying and it's doing linking, guess what is going to occur.
+
+[00:08:31]
+Not maybe, will occur, bugs. Cuz your mental model diverges from the way it works.
+>> Kyle Simpson: So I have a problem with this whole notion of trying to take a class system, which is fundamentally copy, the design pattern's fundamentally copy, and put it on top of a language that doesn't do copies.
+
+[00:08:54]
+
+>> Kyle Simpson: It doesn't fit. And it shouldn't be surprising that we've had so much trouble making JavaScript look and feel and behave like a class-related language. They're just not designed to fit together. At least in the mental model you get from say a Java or a C++.
+

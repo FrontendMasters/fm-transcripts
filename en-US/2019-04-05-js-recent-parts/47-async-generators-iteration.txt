@@ -1,0 +1,55 @@
+[00:00:00]
+>> Kyle Simpson: Now that's not just semantically cleaner coding, it actually produces a different kind of interface for how you would work with this function. As opposed to normal async functions where you call them and get back a single promise that waits to resolve until it has all the results for you.
+
+[00:00:19]
+When you call an async generator, what you're gonna get back is a special kind of iterator, so that you can consume its results as it has them. So you might think, okay, well, that's cool. I ought to just be able to wire up an async generator against a for-of loop.
+
+[00:00:38]
+Just like I can with regular generators, can I just do a for-of loop over an async generator? Well, it's not gonna quite work and let's see why. So if I were to pull all of those URLs upfront and then all of those results upfront, and do the yield keyword as I went along, how would I consume that content?
+
+[00:01:07]
+What would the consumption loop look like? Well, let's take a look. It might look like this, you might say, I'll do for let text of fetchURLs. In other words, I've gone and gotten all of them, and now I'm gonna just loop over them. But there is a problem here, which is that the fetchURLs is not gonna return us, it is returning us an iterator, but the iteration results, we don't know what the iteration result is because it's asynchronous.
+
+[00:01:39]
+So what's gonna break here is that when we call an async generator and we get back, or we call an async iterator and we call .next on it, and we would get back something that we thought would be an iterator result. That's what for-of is expecting. What we're actually gonna get back, every time we call .next on an asynchronous iterator, is we're gonna get back a promise for an iterator result.
+
+[00:02:06]
+Not the iterator result itself, but a promise for the iterator result. Now, this is a nuanced point, but think about the difference between getting an iterator result back that had a promise for the value in it, versus getting back a promise for the iterator result. Those are two different things.
+
+[00:02:30]
+They sound almost the same but they're different, and here's how they're different. Because if I got back an iterator result with a promise for the value, then what I would have is I would know right now if it's done true or false. But what if I can't even know if I'm done yet until after I get the result back?
+
+[00:02:54]
+Well, then I don't want an iterator result with a promise, I want a promise for the iterator result. That's the difference between asynchronous iteration of promises and an asynchronous iteration, which is what we actually want here. So this for-of loop couldn't work because it's gonna say, I got a promise not an iterator result.
+
+[00:03:15]
+I don't know what to do with this. So how would we do that? How would we consume such a asynchronous iterator? You can imagine wiring something kind of like this loop up. You could get an iterator from your fetchURLs function, and then you could set up a while loop.
+
+[00:03:33]
+The let res here on line 4, res is going to be a promise, right? And that's the problem, because we're trying to look for res.done, and there is no .done on it. So that's why, conceptually, the for-of loop above is not working, because we tried to call it.next and what we got back was not an iterator result.
+
+[00:03:57]
+We got back a promise. Okay, this seems solvable, right? Why don't we just have a while true loop with an await in it? I can call it.next and await the result of it.next, and then I'll have my iterator result and I can check the .done and then use the .value.
+
+[00:04:18]
+So do you see the difference between those two consumption loops? One of them is trying to go through it right away, and it can't because we don't even know whether we have a next iteration or not. And this one says, okay, I'll wait. I'll do one iteration and wait for you to give me that result.
+
+[00:04:35]
+And then another one, and wait for the result, and another one, and wait for the result. So this is an effective way to what we call asynchronously iterate, okay? It would be a lazy asynchronous iteration, as opposed to, as we talked about earlier when I mentioned the fasy library, which is an eager asynchronous iteration, this is a lazy asynchronous iteration.
+
+[00:05:00]
+But nobody wants to write up their own iterator and while loop format. We want nice, clean, syntactic sugar for it. We want something like the for-of loop to be able to consume these lazy asynchronous generators. So you can probably guess what happened next, they added a for await of loop.
+
+[00:05:24]
+So line 2, we have for await, and then it is a for-of loop over an asynchronous iterator. So under the covers, the for await loop is automatically awaiting the iterator result before moving on to decide if it needs to do another iteration.
+>> Kyle Simpson: So now we have generators which can push out values, but they are immediate values that we can push out right away or we can push them out lazily.
+
+[00:05:58]
+That's the benefit of a push interface, is that we can get lazy synchronous iterations. And then we have asynchronous functions, which are pulls so we can pull values asynchronously. And then we saw something like fasy, which is a iteration that is eager, but asynchronous. And now we're seeing the fourth quadrant, which is I need to be able to push and pull at the same time, so that I can have lazy asynchronous iteration.
+
+[00:06:30]
+This was kind of the last missing conceptual piece that JavaScript didn't have, and so a whole set of use cases we basically couldn't do, or couldn't do well, because we didn't have the right primitives. You need all four of those quadrants to be filled in to be able to to do all of the various different asynchronous tasks.
+
+[00:06:54]
+So I'm particularly excited about asynchronous generators because they represent kind of completion of the puzzle, if you will. We finally have all the pieces in place that whatever sort of synchronous or asynchronous, pull or push, we have a primitive in the language that does all four of those things.
+

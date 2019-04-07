@@ -1,0 +1,149 @@
+[00:00:00]
+>> Kyle: I'd like to talk about, a way of doing typing that doesn't require us to limit our coding style just to accomplish type-aware linting.
+>> Kyle: The lack of runtime behavior by the way, is a big deal. Maybe I should've made a bigger deal about this earlier. But the idea that the way to get assertions or guarantees about your codes behavior in something like Typescript and Flow is that you necessarily have to change what you would normally do about your coding so that the things that are obvious are obvious to the compiler.
+
+[00:00:40]
+I do think it's important for your types to be obvious, but there is a difference between making something obvious to the reader of the code and making something obvious to the computer. Those are different, and we kind of conflate those two. So essentially, the complete, that there's no way that TypeScript could benefit you in the run time.
+
+[00:00:59]
+All the benefit that you got was at compile time and what they admitted was JavaScript that didn't have any type script-ishness to it. So that means that to get all of that benefit, you really have to change what you do, and I think that what you change it into is less like JavaScript.
+
+[00:01:17]
+So what would this alternative look like? Well, I've been playing around for the last several weeks, or month, a month and a half, I've been playing around with an idea for a type-aware linter that I believe embraces what JavaScript's typing system is about. That gives us more tooling, gives us more confidence, but doesn't try to change JavaScript into something it's not.
+
+[00:01:41]
+That project is called TypL.
+>> Kyle: There's no documentation on this yet, so if you go to the repo, you'll see that there's a bunch of code and a bunch of tests and no documentation. This is still alpha, we have a set of issues that we're tracking towards a 1.0, which I hope will happen fairly soon.
+
+[00:02:02]
+So you're getting an early sneak peek of this project in action, or before it's in action, you're getting an early sneak peek of it. But before I even show you some code examples, I wanna talk about my motivations. From that list of cons, how would I design a type-aware linter that I think goes more with the grain of JavaScript?
+
+[00:02:20]
+So number one, I think we need only standard JavaScripts syntax, and I don't mean just code comments. I mean we need to be able to embrace just JavaScript that way, we prevent ourselves from having a sort of ecosystem lock in. Number two, I think it's critical that we have both a compiler component and a runtime component.
+
+[00:02:42]
+By runtime component I mean, that there are runtime assertions that could exist in the code that you ship, and that would assert things and let you know if there were problems. Because I don't think it's healthy for us to contort our coding styles just so that we can only get them from the compiler.
+
+[00:03:01]
+But this is also critical, you should have the option of using one of the other or both. You should not have to use the system that has to have a compiler or has to have a runtime you should have that option. And if you said, listen, I only want the compiler, not the runtime, that ought to be an option.
+
+[00:03:17]
+If you said, I only want the runtime and not the compiler, that ought to be an option. The systems that exist today don't really give you any choices along that. So that was a strong motivation for TypL. Number three, in the style of ESLint I want everything configurable.
+
+[00:03:33]
+So the way TypL works is that it complains about everything. And then you tell it what complaints you don't wanna see. So it will complain about all the things that Typescript and Flow and all them would complain about and a bunch of stuff that they don't complain about and then you get to decide with those preferences which of those errors is useful to you.
+
+[00:03:53]
+And it gets us fine-grained to saying I want to allow double equals to do strings and numbers but nothing else, for example. You have that level of control to customize the behavior of this to help you instead of forcing you to do something that doesn't work. Number four, the focus shifts from this idea of static typing as the main design goal to more about inferring or annotating the values.
+
+[00:04:19]
+In other words, it embraces value types instead of variable types. And you'll see in the code in just a moment what that means. Optionally of course, you can have all those static typing errors being omitted if those are ones that you wanna see. I'm not gonna have that option turned on but I'm gonna build a tool that has it in case that's something that you wanna see.
+
+[00:04:39]
+Follow me? And lastly the design goal here is that I wanna go with the grain of JavaScript and not against it. I'm not trying to make a different JavaScript. I'm trying to improve what we have with JavaScript. So, starting out as the same example as you got from the Flow and Typescript example.
+
+[00:04:59]
+You can define a variable and if you have the option configured on it's gonna complain at you about your static type. It's gonna say hey, you assigned a string, and now you're assigning an object and that's an error. So you have the option of getting that error just like you did in the past.
+
+[00:05:14]
+It's doing the inference, it's inferring that you assigned a string to teacher, and then it's inferring that you're assigning an object. So in the base case, it's very similar, in terms of it's building from inference up into it. But this is where things start to diverge, because if you want to have those sorts of errors, but you only wanna have those errors when you've said what the type is and not when it inferred it, for example.
+
+[00:05:39]
+So, let's say don't complain to me about those inferences but do complain at me when I violate the type annotations that I've done when I've been more explicit about it. So here's what it looks like if you wanna annotate something like that string Kyle you wanna explicitly say that's a string.
+
+[00:05:56]
+You put, as you can see here, this thing in front of it. Now that is actually still standard JavaScript because that is a template tag. That's entirely standard JavaScript, but it's a template tag. And TypL is going to use the name of that template tag to say, okay, you're telling me that you want this value to be interpreted as a string.
+
+[00:06:23]
+If you use a different type like number for example, the thing that's in the back tick quote swill be interpreted in that form, so it would say 42 or whatever. Here I'm saying I want teacher to be interpreted as holding the string Kyle. And notice something, that this is immediately off the bat already different from Flow and Typescript, because here, I am gonna annotate the value in an object property.
+
+[00:06:48]
+I don't need to go create a whole type for this kind of object that says that name properties are strings, I'm annotating the value itself.
+>> Kyle: And that can be implied to properties or variables if you want it to. But it's not necessary that I go create another type to give it that type information.
+
+[00:07:08]
+So you wanna think about it more like your annotating all the places that values and expressions occur rather than annotating the types on your variables.
+>> Kyle: Because that's I think were we have all our problems. Where all of our values and expressions get all mixed up. I don't think we have as many problems with our variables getting reassigned.
+
+[00:07:28]
+You can also be more explicit even in this particular case you could tag that thing as an object. You'll notice that I still have the object literal dropped inside of a template tagged expression. But this is now saying it's absolutely an object, don't just guess that it's an object, it's absolutely an object.
+
+[00:07:46]
+So that would put it into the realm of the error is from tagged type violation as opposed to an inferred type violation.
+>> Kyle: Here I'm saying that the age property on this object, is at the moment gonna hold integer 42. So in TypL, you can make distinctions between numbers, integers, finite values, and big Ns.
+
+[00:08:18]
+So there's not just one number type, you have four number types actually. And importantly, down here, I am saying wherever student.age comes from, I'm essentially asserting that it has to be a number. So if student.age comes from somewhere and it's not a number, this is going to be an error.
+
+[00:08:39]
+It will either be a compiler error, if the compiler can figure out that student.age is not gonna be a number or it will be a runtime error if it can't figure it out. But either way, I'm essentially doing assertions in-line in my values and expressions. Saying, this thing has to be a number, this thing has to be an integer.
+
+[00:09:03]
+
+>> Kyle: You can use the same style still to deal with the type signatures on your functions. So here, I have a default value expression, which I'm overloading to allow me to do a type signature for this function. I'm saying that studentRec should be assumed to be this object.
+
+[00:09:24]
+Now, I could've annotated it with a tag to say object, but here I'm just making an object. So it's gonna infer that studentRec needs to be an object with a name and name has to be interpreted as a string. All of this is still totally standard valid JavaScript, and if you shipped this code to a browser it would all run.
+
+[00:09:43]
+It may not do all of the same things that it would at the compile stage, but it would all run and compile. So the compiler can pick up on that information and say okay that's cool you want an object with a name property that holds a string. Which means that when I return studentrRec.name I know that I'm returning a string.
+
+[00:10:00]
+And because I know I'm returning a string, down here at the bottom when I assign it, now I can imply that the for student name is gonna be a string. So all of the same things that you could get out of Typescript, but if you compare this example before I didn't need to go to all of this extra work to set up a custom type to give you that information because I put the typing on the values themselves.
+
+[00:10:22]
+
+>> Kyle: We can make all the same kinds of assertions about what gets passed into functions, what gets returned from them, whether they are inferred or whether they are tagged. And by the way, those type signatures are persistent and can also be in line. So here, I am annotating a callback type signature.
+
+[00:10:40]
+The on record function is a callback, but I am saying that it must fit this particular function signature. So that function means that it has to receive an object that has a name property that's a string and the function has to return the void basically the undefined type.
+
+[00:11:02]
+So that's an inline signature. But notice what happens down here is that I can assign a function to another variable and the type signature of print name is persistent so when I pass it in as a callback it gets matched to the type signature that is required from line 3.
+
+[00:11:23]
+So all those same things that you would expect out of a Typescript or a Flow, we're doing those same sorts of things here, it's just we're doing them on the values instead of on the containers.
+>> Kyle: A lot of improvements on the inferencing that I've been focusing on recently.
+
+[00:11:38]
+This is a particularly interesting example because this is a case that TypeScript and Flow don't handle. Maybe they will eventually but they currently do not do anything in this particular case. So looks like a pretty simple example but there's more complexity here than you might realize. So number one, we have a function call earlier in the code we're relying upon a function hoisting.
+
+[00:12:04]
+We have a function call earlier in the code than where we've seen that function. So we can't really validate whether this is correct according to the signature or not. So we're at least gonna have to have some sort of second pass, and TypL has this multi-pass inferencing. In addition to having multi-pass inferencing, when we get to the function we see that the parameter does not have any defined name on it.
+
+[00:12:28]
+So what we're going to do is infer that this of type int because we are passing in an int. So we're gonna infer the function signature from the call sign. So we have already seen this call site, and when we get here, we are gonna say ah-ha, I remember that you passed in a 3 earlier, so now we're gonna infer that num is an integer.
+
+[00:12:53]
+And because we know num is an integer, we now know what the return value of this function is, because there's a return statement with that variable. So when we do our second pass through, we now know that gimme is going to return an integer, because it passed in and returned an integer.
+
+[00:13:08]
+So now we can apply the type integer to 3, and now we can complain that you're adding a string and an integer. So there's this multi-pass inferencing that's happening, and this took several weeks of work to make it work. But if you try that same code example in something like TypeScript or Flow, they just infer any and don't report an error.
+
+[00:13:30]
+So this is an example, I think, where TypL shines because it focuses on the value types rather than on the variables.
+>> Kyle: [COUGH] Compiler versus runtime. As I said, the compiler will try to figure out everything that it can, if you're using the compiler, of course, it'll try to figure out everything that it can.
+
+[00:13:51]
+But if it can figure something out, it removes that stuff from the code, so it's not gonna burden down the runtime. But any place that it can't figure it out, it leaves the runtime assertions in place. So in this code example we've got a set of parameters here that are typed, we're saying name is a string, topic is a string that is defaulted to empty, count is an integer that is defaulted to 0.
+
+[00:14:13]
+So those are things that the compiler would pick up on, and say okay I know about the function signature, and I need to validate that function signature. But what would ship to production is a reduced set of this because there are some places where we already know that we can validate it at compile time.
+
+[00:14:32]
+For example, lines 9 and 10, we already know that those are strings nothing at runtime could change that. So we can validate that stuff at compile time and then remove those so they don't burden down the code and the runtime. So, what this compiler would do is rework this code to look like this.
+
+[00:14:52]
+So now you see on lines 2, 3, and 4 we still have our parameters with our default values in them, but now we have those type assertions in line in the code. So we are gonna guarantee at runtime that every time this function gets called, you always pass in a string for the first two and an integer for the second one.
+
+[00:15:09]
+The way that works is that those tag functions are actual tag functions that the compiler includes with the runtime. And they validate at runtime, what you've passed in.
+>> Kyle: And we've removed the teacher and the workshop assertions on lines 10 and 11. We left in the assertion on line 13 because here we have an expression and we need to verify that what is in fact coming in is actually a number.
+
+[00:15:38]
+That is actually an integer cuz it could be a nan or it could be infinity and those are not integers.
+>> Kyle: So that's just a quick brief glimpse of that. Everything that I showed, or most everything that I showed you already works with the code, but none of this is documented or released.
+
+[00:15:54]
+If you wanna play around with it, you can check out that repo. I'm hoping that sometime within the next few weeks that we will have a 1.0 release of that, and then there's a lot more that we want to do. But that's what I think embraces JavaScript's typing system and makes it better rather than trying to rewire to a different DNA.Ç
+

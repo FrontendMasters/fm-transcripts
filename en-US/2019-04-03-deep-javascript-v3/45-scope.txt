@@ -1,0 +1,81 @@
+[00:00:00]
+>> Kyle Simpson: In the course overview we talked about JavaScript having three core pillars. And one of those important core pillars is the scopes system, how JavaScript deals with scope. Specifically, the name for that, as we'll see in this lecture, is lexical scope. So what is the lexical scope mechanism of JavaScript?
+
+[00:00:19]
+And as you see here, the goal is to lead us towards a pattern of code that improves our code organization. So we need to understand lexical scope so that we can understand closure, and we need to understand closure so that we can understand the module pattern. So that is our goal for this unit of discussion.
+
+[00:00:37]
+Let's dive in. All right, scope is where we look for things. That's your first what-you-need-to-know definition on this topic. It's where to look for things, but that definition should ask a couple of questions in your mind. Number one, what is it that we are looking for? So very simply, we're looking for identifiers.
+
+[00:00:57]
+Here you see an x that's being assigned to, or a y that's being a value retrieved from. Whether you realize this or not, all variables are in one of those two roles in your program. All variables are either receiving the assignment of some value, or you are retrieving a value from the variable.
+
+[00:01:18]
+That's it, there's no other existence for variables in our programs than that. So what we're doing is, we're fundamentally, when we're processing our code, when the scope is being processed by the JavaScript engine, it's essentially asking the question, when I see this variable, first of all, what position is it in?
+
+[00:01:36]
+And secondly, what scope does it belong to? In other words, this is basically like a game of matching marbles to their color-coded buckets. If you think about the way a JavaScript engine processes the code, it's going to find a variable and it's gonna say, hmm, this is a green marble so it goes in the green bucket.
+
+[00:01:56]
+And this is a red marble, so it goes into the red bucket. So it's fundamentally a game of sorting colored marbles. This was the best picture I could find on Google. I could either find colored buckets or I could find colored marbles, I couldn't find them together. So here you go, colored buckets, okay?
+
+[00:02:13]
+All right, but there's something nuanced about that definition that may not be all that obvious, which is that this processing that we're talking about is an actual step within JavaScript. It's not simply inlined with the execution. It's extremely common for people to think about JavaScript as running top down, line by line, executing.
+
+[00:02:35]
+Because when we think of interpreted programs, or dynamic scripted programs, we generally think of them as executing line by line, top down. And so when I assert to you that JavaScript is not an interpreted language, but is in fact actually a compiled language, that may not fit with your whole mental model because you're probably used to thinking of line-by-line JavaScript interpretation.
+
+[00:03:00]
+So let me prove to you that JavaScript is, in fact, compiled, or at least, as we would say, it's parsed. That there's some processing step that has to happen before execution has occurred. If you have ever written a JavaScript, syntax error. Left off a comma, had an extra parenthesis, or curly brace somewhere, and then you try to run the program, and you immediately got a syntax error.
+
+[00:03:24]
+That is, say you have a syntax error on line 10, but you immediately get that error reported to you before lines 1 through 9 have executed. You may never have stopped to ask, but the question bears asking. How is it possible that JavaScript knew about the syntax error on line 10 before executing lines 1 through 9, unless JavaScript actually went through a processing step first as opposed to simply executing top down?
+
+[00:03:54]
+There was some processing step, so what does that processing step look like? Well, I'm an old compiler theory nerd for my computer science day. I am one of those weird folks that writes compilers for fun, I enjoy doing that sort of stuff. And so in compiler theory, there are essentially four stages to a compiler.
+
+[00:04:16]
+Sometimes the first two are combined into one stage, sometimes they're separate, my textbook had them separate. So there's lexing and tokenization. There's parsing, which turns the stream of tokens into what's called an abstract syntax tree. And then the last step is what's called code generation, taking an abstract syntax tree and producing some kind of other executable form of that program.
+
+[00:04:37]
+That's basically, in 57 words, a computer science degree for you, right, or at least compiler theory for you, right? That is how our program gets processed from its textual code and your source format into some kind of representation that can be executed. Now, a lot of people think, well, JavaScript can't be compiled because I don't run a compiler on my development machine and then ship off the compiled code to some other location.
+
+[00:05:08]
+So in other words, a lot of people think about this difference between interpreted and compiled as the distribution model for the binary. But that's not really the right axis to be thinking about. The right axis is, is the code processed before it is executed or not? We do have languages that exist which generally don't get processing before execution.
+
+[00:05:30]
+For example, Bash script. In a Bash script, if you write a malformed command on line 4, lines 1, 2, and 3 are gonna run. And when line 4 fails that might screw stuff up, because you wanna undo [LAUGH] lines 1, 2, and 3. This is a perpetual problem in something like a true scripting language.
+
+[00:05:46]
+But in JavaScript, if you have a syntax error on line 10 nothing happens on lines 1 through 9. It has to be processed to check that it's a well-formed, correctly formed, program. So this is going through these compilation steps. And the reason I bring up this compiler theory to talk to you about JavaScript being a compiled language is because we need to think about when all this marble bucket sorting happens.
+
+[00:06:10]
+If you think about this marble bucket sorting stuff is happening at runtime, it turns out that not only is that an inaccurate mental model, but it turns out it can create bugs within your program because you assume something to be true and something is different. That divergence, remember the law?
+
+[00:06:28]
+This is a divergence where you think something and the computer thinks something else. And guess who wins? The computer, okay? So what we wanna do is try to align our brains more like the computer, we want to think like a compiler. The good news is that even though we're gonna talk a little bit about compiler theory, there's a whole bunch of it that we're gonna completely gloss over.
+
+[00:06:48]
+Bunch of complexity that is not important for this discussion. But the one thing that is important is our marble sorting. Marble sorting is the thing. It is essentially that metaphorically is processing of our scopes and putting all of these identifiers, that is the colored marbles, into their correct buckets.
+
+[00:07:07]
+So the way that processing first happens before we execute, is that there is a stage where it goes through all of that compilation, It goes through all of that parsing, and it produces this abstract syntax tree. But it also produces, essentially, a plan for the lexical environment. That is, where all the lexical scopes are, and what marbles are gonna be in them, what identifiers.
+
+[00:07:30]
+It prepares this plan, and that is the executable code that is handed off to be executed by the other part of the JavaScript engine, okay? Now, some people would say, for example, Java, well, that's a compiled language because I compile it and then they distribute a bytecode. It turns out, JavaScript does almost the same thing.
+
+[00:07:53]
+There is a parser that parses through your JavaScript source code, and it produces, in essence, an intermediate representation not that dissimilar from a bytecode. And it hands it off to the JavaScript virtual machine, which is embedded inside of the same JavaScript engine. And it interprets all that stuff, and one of the things that it interprets is, whenever it enters a scope it creates all the marbles according to what the program told it to do.
+
+[00:08:18]
+So whether you like compiler theory or not, we have to think about JavaScript as a two-pass system rather than a single-pass. If you think it only as a single-pass, you end up having to do all sorts of other contortions to avoid incorrect analysis of your program. And I have seen a number of bugs where people have thought about scoping incorrectly.
+
+[00:08:41]
+So we wanna make sure we dig in and get this. What happens when we process our code, which I would call compilation, if you feel better calling it parsing, doesn't matter. But we are gonna process the code first, and set up the scopes, and then we are gonna execute it, okay?
+
+[00:08:56]
+And I wanna understand, or I wanna talk about, where those buckets come from. So if the identifiers are the marbles, what are the buckets? Well, the buckets are our units of scope. And in JavaScript we primarily have functions, but we also now have blocks. As of ES6, a few years ago, we have blocks.
+
+[00:09:14]
+So you have functions and you have blocks, those are the units of scope. That's how JavaScript organizes them. Those are our buckets, and we create those whenever we encounter those scopes as we process the code. And then, we have the marbles. We create those every time we see a marble being referenced in our program, we create a marble for it and drop it in the appropriate bucket.
+

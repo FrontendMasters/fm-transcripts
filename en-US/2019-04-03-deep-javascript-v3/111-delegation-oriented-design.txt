@@ -1,0 +1,76 @@
+[00:00:00]
+>> Kyle Simpson: Now I promised not only a cleaner code style, but a more powerful design pattern. Delegation is a design pattern, and design patterns should affect, they should change the way that you think about designing a code. And so, in this last part of our discussion, I want to talk about how delegation should be approached to solve problems differently, not just to write code differently, but to solve problems fundamentally differently.
+
+[00:00:32]
+Imagine you have a scenario like this. Imagine you have a login page that you need to construct in your application and you're going to have two different controllers. You're gonna have an AuthController that represents the authentication part, like communicating with the server. And you're gonna have a LoginFormController, which represents all the UI stuff, the text boxes, and buttons, and error messages, and all of that, okay.
+
+[00:00:58]
+The old school way of designing this is that you need both sets of behaviors in some way, shape or form, you need them both composed, or you need access to both of them. So the old school way, which is what we would typically think of in a class inheritance system like Java, is you make one of them the parent class, the other one the child class.
+
+[00:01:19]
+And then you instantiate to get this pageInstance. And it has all the methods from AuthController and all the methods from the LoginFormController present in this instance. And then you can do whatever you need to do for the page. That's sort of how the inheritance way of solving this problem would have approached it.
+
+[00:01:39]
+That's what we called composition thru inheritance. This was the 1980's and 1990's vision for how software should be built. Somewhere in the mid to late 90s, you started to hear that this whole 15-level deep inheritance chain thing was like an anti-pattern. And people started saying, no, no, no, we don't wanna do composition thru inheritance, we wanna do composition instead over composition over inheritance.
+
+[00:02:08]
+Get rid of all those vertically-oriented nested chains and let's just have these things compose themselves together. So one way of composing them is to have these two classes, to instantiate one of them, and then when you instantiate the other one, make it a property of the first one.
+
+[00:02:26]
+So now I have access to all the methods on pageInstance and all the methods on offInstance all in one place, they are composed together. That's one way of doing that composition. And then somebody said, well, that's ugly because then if I need to compose more I got all these properties, let's do mixins.
+
+[00:02:46]
+So then we invented the idea of mixin composition, which said, I'm gonna instantiate a ControllerClass and instantiate an AuthControllerClass. And then I'm just gonna copy everything over into the other one. So now all those methods have been copied over. All of these are different ways that we've solved the problem, which is I want to logically separate these two things.
+
+[00:03:07]
+But then they need to coexist for me to actually get the page to work. By coexist I mean, they need to be composed in some way. And we've been trying to invent different ways to compose this things. So, what is delegation's answer to this? How does delegation do things differently?
+
+[00:03:27]
+Number one, the thing that you do with delegation, excuse me. The thing that you do with delegation is you stop thinking about parent and child and you start thinking about peer-to-peer. So I could have a LoginFormController that is linked to an AuthController. We have to get rid of this idea of a parent-child and think about the peer-to-peer.
+
+[00:03:48]
+We're gonna just say LoginController is linked to AuthController, all right?
+>> Kyle Simpson: So here's an example in code of doing that in JavaScript. I'm gonna make an AuthController that has methods on it like authenticate and handleResponse. And then I'm gonna make a LoginFormController, and it has methods on it like an onSubmit handler for the form and a displayError message.
+
+[00:04:12]
+And LoginFormController is linked to, through the prototype chain, the AuthController. But these are two separate concrete objects. It's not like they're a class for these things, they are actual two separate objects. And you could interact with them separately if you needed to. But part of the time, they need to cooperate with each other.
+
+[00:04:32]
+So for example, whenever I got to onSubmit, as you see here, whenever I go to onSubmit, I need to call this.authenticate on line 18. But the LoginFormController doesn't have an authenticate method. And so that method is delegated to the AuthControl object. So we then run the authenticate method, but what is the this key we're gonna point at?
+
+[00:04:56]
+It's still gonna be pointing at LoginFormController, right? So what we have actually done is through the unicorn magic of the this key word in the prototype system, we have virtually composed these two objects during the function call. They are now in a shared context over the this keyword where both of them can talk to each other and share with each other.
+
+[00:05:21]
+Here we are calling the authenticate method. But when authenticate says this.userName on line 4, it's actually referring to the username property back on LoginFormController. So it's able to access those properties and use them as it needs them. And then whenever the handleResponse comes back from the server and there's an error, on line 9, I know there is a lot of arrows now, but on line 9 when we say, this.displayError, we don't have a displayError, but who does?
+
+[00:05:55]
+The LoginFormController. So you see how these two separate concrete objects have virtually composed each other over the shared this context?
+>> Kyle Simpson: That's a very different way of thinking about how we solve software. We solve software, we have two separate concrete things that can do their own work. But when they need to cooperate, the way they cooperate is not having instance a call instance a call instance.b method.
+
+[00:06:18]
+The way they cooperate is linked through the prototype chain, they just share a call context. And they can call each other's methods as necessary.
+>> Kyle Simpson: One of the many benefits of that approach is that if you have separate objects that are only linked through a prototype chain, because those objects are separate instead of being wired together through class hierarchies or anything, they become much more testable.
+
+[00:06:55]
+Independently testable. So lets say I have these two objects and what I want to do is I want to make a mock that I can test against. So let's mock out the AuthController. I'm testing the LoginFormController by mocking the AuthController. All I have to do is have the LoginFormController prototype linked to my mock object.
+
+[00:07:19]
+I didn't have to change anything about the code. I just change where its prototype linked. You can do that with a proto, remember? So now I'm testing the LoginFormController by mocking out the AuthController, but what if I wanna test the other one? What if I wanna test the AuthController?
+
+[00:07:37]
+Well, I make a MockLoginFormController that delegates to the AuthController, and now I'm testing the AuthController. I can set up these tests entirely independent. I don't need test dependency injection or any of that other nonsense. These tests are just entirely separate of the code, they just change where the prototype chain linkage happens.
+
+[00:08:00]
+And we're able to mock out the different objects. And that gets even more powerful if you have three or four or five objects that are in the prototype chain. You can mock out different parts to isolate and test.
+>> Kyle Simpson: So that's my case for why I think we've been missing the mark by doing classes.
+
+[00:08:21]
+I understand why there is sometimes not even an option, the framework makes the choice for you. Or even if you do have an option, I understand sometimes that there's an emotional attachment to doing classes. I get all of that stuff. But I really think that if you are taking seriously, understanding and learning JavaScript, part of that endeavor is, how do I use JavaScript in its most effectively designed way?
+
+[00:08:45]
+And I don't think even with all the sugar they've layered on top of classes that it meets the mark of the DNA of JavaScript. That's what JavaScript does inherently. What JavaScript does and does well inherently is delegation, it does prototype delegation. And what I'd like to see is, I'd like to see more people embracing that.
+
+[00:09:06]
+And going after that rather than trying to find more complex ways to layer on class syntax.
+
