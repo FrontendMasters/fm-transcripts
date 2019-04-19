@@ -1,0 +1,54 @@
+[00:00:00]
+>> Mike North: One thing that you'll need to know for this exercise we're gearing up for here is how to terminate a worker. So once you get reference, once you get an instance of this worker, you can call that terminate on it and that will stop everything. If it is in the middle of a function at that point, it may not continue invoking that function.
+
+[00:00:22]
+It is like a full-on slam the brakes, we're done. So this is a good thing to do if you're absolutely sure that your worker is done with what it was set out to do. You would want to do this because when you think about the overhead of spinning one of this things up it's got its own scope, its got its own part of the JavaScript event loop.
+
+[00:00:47]
+The internal mechanism that it uses to figure out which functions to call, and schedules that time out on its own. So there is a non-trivial overhead for creating one of these things. The mental model I want you to use is, it's on the order of somewhere between 100 and 1,000 function closures.
+
+[00:01:07]
+So it is not a light thing. You don't wanna have 1,000 of these spun up and to implement a parallel map, right? JavaScript is just not designed to have tons and tons of workers functioning at the same time. But if you have a task that you wanna complete, and in our case it's, I have an image with the QR code in it, find the QR code, decode it for me.
+
+[00:01:30]
+It's a bunch of an image analysis and like linear algebra, do that task, give me the data back, then I can terminate worker. It's job is done. It's almost like a disposable thing. So we'll start talking about service workers towards the end of the day, like when once it pass it back to Steve.
+
+[00:01:51]
+Important to know that you cannot terminate a service worker in this way because it is highly likely that doing so would harm your user's experience. Because they need to be, it is responsible for handling navigation events and potentially satisfying HTTP requests. And there would be no way of knowing whether it is safe to interrupt it.
+
+[00:02:17]
+So you'd almost always end up shooting yourself in the foot. So that API is actually disabled in service workers.
+>> Mike North: And finally, I'm not sure if I made this totally clear at the beginning, you can instantiate more than one worker off of the same script and it will get their own scope, each instance gets its own scope.
+
+[00:02:39]
+
+>> Speaker 2: Except for the original scope, right? So the original scope is still a linear path, instantiate, instantiate, instantiate, instantiate.
+>> Mike North: So let's call it-
+>> Speaker 2: Then they go off and do their thing and come back.
+>> Mike North: Let's call it the application scope. Our app, that is one scope and then each worker has its own scope.
+
+[00:02:56]
+Even if it's the exact same file that we're using to instantiate these workers. Right, maybe they each represent creating a real time connection to something, we connect the three different services, that could be the same JS file. A new worker means a new scope
+>> Speaker 3: One question?
+>> Mike North: Yes?
+
+[00:03:18]
+
+>> Speaker 3: In a mobile device, if the user actually closes or terminates that app, or web page or whatever, would the worker get killed and.
+>> Mike North: Indeterminate, it is not, so there are several things that can happen, and it depends on a mobile device. In Safari, if you're a mobile developer, you kind of learn about these things so I can only speak to iOS cuz I don't have deep Android familiarity.
+
+[00:03:51]
+There are several different modes you can go into. And I'm gonna call the first one sleep, which is if the user sort of tabs away and then maybe they're just getting a password and then they come back. Your worker has been continuing the whole time. Think of it just like a stutter in the execution of functions, you're sort of frozen while the user's tabbing over and then come back.
+
+[00:04:18]
+If the user goes away for an extended period of time, think of that as hibernate where we take all of that state it's not longer in fast memory, we save it to disc. At which point, your worker may have terminated, right? It may not be there. Like these things, the browser can kill it whenever it wants basically.
+
+[00:04:43]
+So you typically want to wrap these things with a set timeout, or to periodically, a common pattern is ping-pong where you send the worker a ping and you get a pong back. And on a mobile device, when you can come back and say, are you still here? Answer me if you're still there.
+
+[00:05:03]
+And that's a way that you can verify it's there and then maybe create a new one passing it state again so it can do it's job. But there is no standard that dictates exactly how this should happen and it is different on iOS versus Android. iOS is very, very, very protective over allowing anything at all to happen in the background, even native iOS apps.
+
+[00:05:29]
+There are less than a dozen things that you can do in the background, push notification, background download. You can play audio in the background. They added the ability to play video, but only on 6 core, really powerful tablets. So they're gonna shut Safari down whenever it's not in focus so that it doesn't eat battery.
+

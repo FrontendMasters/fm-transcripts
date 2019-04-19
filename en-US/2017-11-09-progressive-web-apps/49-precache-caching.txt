@@ -1,0 +1,75 @@
+[00:00:00]
+>> Mike North: Let's put this into practice in a more large-scale way. This is a very popular pattern that will apply to our app in order to radically increase return visits through time, right? As soon as the service worker is activated, they're not going to have to go to the outside world for JavaScript or CSS anymore, regardless of the HTTP cache.
+
+[00:00:26]
+And this is a technique that we call pre-caching. So, let's imagine this as a sort of a conversation between the cache, the service worker cache and the application. So we begin by providing the cache with some way of getting information about resources we know at build time. These wouldn't be those grocery images necessarily, because as we scale up to a million groceries, those we'd wanna host on a CDN somewhere, and we might add a couple more while the service worker is active.
+
+[00:00:58]
+However, maybe the home screen icons, we know about those at build time. We know about the JavaScript we built, we know about the web app manifest, things like that. So those are sort of things that are part of our application, they're the things that are in the dist folder, if you will.
+
+[00:01:15]
+So as part of the install process, it's gonna go and download that stuff in advance. And then, by the time the app asks for something it's going to return it immediately without going to the outside world to get it. So essentially what this means, is if you deploy a new version of your app and you have some logic in place for pre-caching, your service worker will be sort of, we'll call it version one of the app is live.
+
+[00:01:45]
+As you deploy version two of the service worker and your application, the service worker is gonna be installed, right, while version one is still live. And it's gonna go and download version two of your JavaScript. And then, when the user comes back that will be ready to go.
+
+[00:02:04]
+So, this is a great tradeoff between being slightly out of date but that's the price you pay for a nearly instant boot, because that script is already there. And these are generally like, you can focus on the heaviest assets that are part of your app, usually it's the script, right?
+
+[00:02:23]
+Or maybe it's like, have you ever seen these sites that have a fuzzed up background video? That is not a trivial amount of data to go and get that. And so you might wanna say, we're only gonna show that on the page, the next version of that, once we've downloaded it in the background in advance.
+
+[00:02:41]
+So it's no longer on the critical path to that page load, right? You're sort of you're a little bit out of date showing that old application until you got you're like ready. And need of app style like we're installing the next version, and then the next time you launch it you'll be good to go.
+
+[00:03:00]
+
+>> Speaker 2: And downloading short video files would be outside of that 6% range for start.
+>> Mike North: The 6% range?
+>> Speaker 2: I think Steve mentioned-
+>> Speaker 3: Chrome budgets you about 6% of available storage, officially.
+>> Mike North: So that can be a reasonable amount for you to store. If your video, usually it's gonna be like a low resolution video, and you've stripped the audio track away, you might be able to get that down to the 11 megabyte mark and that is gonna be in the range.
+
+[00:03:38]
+Just to give you an idea, IndexedDB, which we'll talk about later, you get about 50 megabytes. Local storage you get about three megabytes, although it varies from browser to browser. A cookie, you start getting funny looks from other developers when you start to approach one megabyte, there's even a word for them called super cookies and they're a bad, bad idea.
+
+[00:03:58]
+But, this is in the 50 and up range, just because that 100% of which we get 6 is not usually a trivial amount. So it might be like Chrome can cache half a gigabyte of data, that's for the HTTP cache and stuff. And there you've got where that be 30 megs to work with.
+
+[00:04:27]
+
+>> Mike North: Steve's put together a great little demo of using the cache API. If you have the slides click on this link, check out the glitch, and look at in particular the fetch handler. I'm gonna kick out to that so we can kinda take a look together.
+>> Mike North: So here's the glitch, and you see it's like Steve likes the Beatles apparently.
+
+[00:05:03]
+We're using the Beatles image again. And this is really the interesting part to look at. The event respond with right here, so this as we know, it takes a promise. And what we're gonna do is, in the event that we find something in the cash, right, which means that this, the promise returned by cashes.match returns, that promise resolves to a truthy response, right?
+
+[00:05:35]
+It doesn't resolve the undefined. We will end up using that response, otherwise we will fall back to the network. And in the install hook, he's got a list of assets he knows about at build time, right? So he's got the style.css, and client js, and the beetles url, which is this image that's on a CDN.
+
+[00:05:56]
+So, as part of the install process this service worker is guaranteed to go and get the stuff, put it in the cache, and by the time it activates, we know that this cache is populated. That is the point of having the ability to use promises and have this multi-faced life cycle.
+
+[00:06:17]
+The value of that is having a guarantee that by the time we're in activate, install has completed successfully. And if something goes wrong, like if we hit a four to four here, or for some reason there's a certificate error, or whatever, you will never activate, right? The old service worker which activated successfully because it installed successfully, that will remain in place.
+
+[00:06:42]
+So this is also a safety issue preventing potentially a bad worker from being promoted to the active role. So this is a nice and simple example of precaching, right? And we're going to in the next exercise do something very similar to this, the only difference is I've made it more of a real world scenario.
+
+[00:07:09]
+In that we don't have this hard coded array here, because remember we're using the immutable content caching strategy, we have this fingerprints in the name of our JavaScript. So we actually have to go in our service worker, fetch a JSON file that has information about all of the stuff that we should pre-cache.
+
+[00:07:31]
+And you would do that fetch when it comes back, use the contents of that JSON file to then add all of the things that are appropriate. And you’ll have to sort through a little bit cuz, for example there’s a source map there, you may not wanna go and precache that.
+
+[00:07:48]
+I mean, there may or may not be harm to that, we’ll find out. Does that make sense to everybody?
+>> Speaker 4: Will call fetch on each of the parameters?
+>> Mike North: Steve has been alluding to this, and I just wanna reinforce it. When we talk about a request, we can either build a request or we can use arguments that are passed to the request constructor.
+
+[00:08:17]
+And in this case, we know that when we build the request we can pass it to URL, or we can give it an object that has a URL property on it. So this here, we could add something here like, or I can, I guess I can forget, but right at this cursor, I could write new capital R request and be more deliberate and explicit about constructing one.
+
+[00:08:42]
+But, think of it as the same things that you pass to fetch, you can use here, and you can use in the request constructor. They're all sort of representations of that object, and the full-fledged object will be created on the fly for you inside this code.
+

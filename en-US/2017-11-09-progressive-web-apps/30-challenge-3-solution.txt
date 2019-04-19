@@ -1,0 +1,163 @@
+[00:00:00]
+>> Mike North: So Steve, the first place I would like you to go is to the index.js. And we're going to set up a new, it's right there on top. So we're gonna set up just like that web app manifest on line 20. We're gonna set up a new import and we're gonna just call it QR-worker.js.
+
+[00:00:23]
+So essentially we're getting ready to create a brand new file and we want to be able to just refer to this file by name when we instantiate a new dedicated worker. Great, and we need a JS extension there and then we need to create the file in the client folder.
+
+[00:00:45]
+And we'll start working in there.
+>> Steve: Client, right, on the top, right there?
+>> Mike North: Yep, and you file right in there.
+>> Mike North: Wonderful, all right. And Tim, we're gonna leave this blank for now, put a pin in it. And I wanna go to a file called qrcode.js, and this is where we said we were gonna do most of the work here.
+
+[00:01:10]
+Sorry, no dash in there, perfect. And ight at the bottom here, you can see we've got like begin main thread solution, end main thread solution. If we were to do some performance analysis and track down exactly where the problem is happening, it is on line 93, it is that QR decode call and is what's taking 20 seconds.
+
+[00:01:32]
+That function call, it because in JavaScript like functions run to completion, that's gonna go as long it has synchronous work to do and it has a lot of it. Just think of it like the biggest for loop that you've ever seen. There's nothing to, let it rest up and draw another frame and allow you to scroll.
+
+[00:01:52]
+So we're going to begin our parallel solution. And we can just start that on line 95, cuz eventually we're gonna end up moving it over, moving the stuff between the comments into the worker. So let's create a new worker. And this can be let worker equal new worker and pass in, I think it's QR-worker.js.
+
+[00:02:21]
+I think either would have worked, but you're good. All right, and what I'd like to do now is I'd like to just send the workers something and verify that I can catch it in the worker. So let's do worker.postmessage,
+>> Mike North: And let's send it the image buffer that something pass as an argument to on QR codes again.
+
+[00:02:47]
+This is really the main piece of data that we need, so if we were to study what's between the comments there, image buffer is the only thing that comes from the outside, you need to run that block of code. And then, let's save this file, go over to the worker script.
+
+[00:03:08]
+And in here, we're gonna do self.onmessage. Self is almost like in a worker scope, self, you can think of it like window. So it is a good practice, window has always been this mysterious thing where anything that's on window that's available as a global. I don't like that personally I'd like to know where things come from.
+
+[00:03:33]
+And so I always write self.onmessage. I think you could also just write on message equals and it would work. The value of this property is going to be a function that receives an event.
+>> Mike North: So it's gonna be on message equals I wish it were this Steve, bu, [LAUGH] perfect arrow.
+
+[00:03:54]
+And the first thing we'll do in here, I just wanna console.log event.data. All right, and go back to your QR code JS comment out the sink solution. And we're gonna see how this thing works.
+>> Steve: The entire of it or?
+>> Mike North: Yes.
+>> Mike North: Great.
+>> Mike North: And now, let's hit this QR code button.
+
+[00:04:26]
+Did a refresh, Steve?
+>> Steve: I did not see it.
+>> Mike North: All code is defined, that's fine. Do a hard refresh. Great, all right. Hit the QR code button on the top. And, [LAUGH] all right, that's fine, that will work. Okay, so there's image data. We've successfully logged it out.
+
+[00:04:49]
+Now you see that little violation call back or violation warning there, that's telling us that even active reading this huge file which is over 3 megabytes. That blew our budget for our 13 milliseconds, so like a further optimization we would begin to address that. We might have one worker read the file and then pass the file back to the application thread, which would do an adjustment and then say now decode it, something like that.
+
+[00:05:20]
+In the meantime, we actually know we're good to go. So let's go over to our QR worker JS. Actually, before you go, grab all that stuff you have highlighted there, copy to the clipboard, go to QR worker, paste it right where you're at.
+>> Mike North: And uncomment it. And then we're gonna need to go and grab that QR code import from the other place where it used to be.
+
+[00:05:44]
+I got my ultra annoying linting rules there, there you go. So that's now an unused import, and what Steve's doing right now, moving this into the worker, he's reducing the size of the main application considerably from 80KB to 60KB. And now we have to import one thing that QR code string to object.
+
+[00:06:10]
+So I deliberately put that function there on line 11 to demonstrate like you can have modules in your application where your worker needs one function from it and your application needs another function from it, this is fine. This works just fine. So let's below that line on line two do import and them a named import QR code string to object, perfect.
+
+[00:06:37]
+From I think it's dot slash. Wait where is this file, it's in client. Dot slash util slash QR code. All right, that should work as long as your js there is not gonna make something that unhappy.
+>> Steve: It's very angry.
+>> Mike North: Yeah, yeah. Hard refresh.
+>> Mike North: And now let's try the QR code.
+
+[00:07:07]
+Now try to reference error requires not defined. Interesting.
+>> Mike North: Why are we using a require? Us.
+>> Steve: I'm gonna guess it's babble. Okay.
+>> Mike North: I know the problem here. Go back to your index.js, so we're using something called the file loader. And this is just like a A dumb thing that we can use for images, any kind of file.
+
+[00:07:38]
+I said dumb, in that it doesn't care what the file is. Let's change it to the worker loader. And what that's gonna do, it will actually process through this file and resolve any imports, and go and bring in the appropriate stuff. So now it should work, let's see if we can make it work.
+
+[00:07:57]
+In image buffer is not defined. All right, the last thing that we need to do here grab that event dot data that's below line five, say let image buffer equal events.data. Great.
+>> Mike North: There we go. All right, and there's still something we're gonna have to fix here. So I'm confident that we're gonna get pretty far here.
+
+[00:08:29]
+Line 14, we've got a resolve. We're not in the context of the promise that this code used to live in. But the equivalent, the old school pre-promises being part of JavaScript thing to do here would be to send a message back to whatever created us. And that is done, so we're gonna replace that line with a self.postMessage.
+
+[00:08:54]
+And we're gonna pass the result in as the message. And I actually like passing it in under a top level key like data, so that we can just say like, if data is in this object like if there is a truthy value for data we know we're in a good situation.
+
+[00:09:13]
+We can easily switch between error and data. We should be good here now and if we go back to QR code JS still all the way at the bottom. All right, so after we line 96 we're resented the image buffer, immediately thereafter now we're gonna do worker.onmessage.
+>> Mike North: And we're gonna say worker.onmessage equals,
+
+[00:09:41]
+
+>> Mike North: A function that takes an event. And event.data is what we're interested in. And we're going to resolve the promise with event.data.
+>> Mike North: All right, let's see if we've nailed this one.
+>> Mike North: No more warnings, hit it and enter,
+>> Mike North: I need a badge to show up on the cart, cannot read property to fixed.
+
+[00:10:19]
+Let's see, what is going on here? Image data each child in array iterates should have a unique key.
+>> Steve: That's a warning. I think this is our bigger concern.
+>> Mike North: Two fixed of undefined.
+>> Mike North: Can we log the QR data before we, yep, perfect.
+>> Mike North: All right, it's decoding, it's decoding, it's decoding.
+
+[00:11:05]
+
+>> Mike North: And scroll up see where we're at, there's is the object. We have to resolve with the property data, so we wrapped it in this object under the top level key, and we're-
+>> Steve: I think event.data.data in this case.
+>> Mike North: Yeah.
+>> Mike North: Interesting.
+>> Steve: So it's the data of the event.
+
+[00:11:28]
+
+>> Mike North: Sure, that's right, that's right. Okay, we've poorly chosen our top level key. Event.data is where we'll find the message that we sent. And that message has a top level key of data, which is why I have to do data twice. We might choose to in this case use result, something like that.
+
+[00:11:46]
+[SOUND] There we go. We've got a badge on our cart. And if we open that up, we should be able to see, like click on the cart icon, there's our banana. So now, we have offloaded this onto a worker. So Steve if you would please open up the terminal with like a command tilde or something, command backtick, perfect.
+
+[00:12:10]
+Kill that, and then do analyze equals true.
+>> Mike North: NPM run build:prod. So we started out at 80 kilobytes, and I want us to now study where we're at. We're supposed to be keeping track of how we progress here. This is gonna pop open in just a moment, that nice tree graph, where we can see the size of our app and how it's broken down.
+
+[00:12:37]
+And what I want you to realize is if we hover over app.js all the way at the top, it's clickable cool, we're now at 64.99 kilobytes. So we went on a 15 kilobyte diet there, which is a big deal when you're 80 kilobytes. I mean that is let's call it pretty close to a fifth of the size of our app.
+
+[00:12:59]
+And if you hear about this terminology like route splitting or code splitting. This is in spirit is that same idea, meaning until the user actually goes to that QR code feature, picks an image, that image is the file that can actually be read, it's not like there are any permissions problems.
+
+[00:13:18]
+Only when we get to the point where we've read it into this image buffer. Do we pay the price for downloading that QR code library performing that work. So as opposed to just the act of viewing the root screen of the app being the thing that causes us to pay the price.
+
+[00:13:38]
+
+>> Steve: To put it another way, like there's a huge chance that a user is going to visit this page and never use the QR code feature like most people and QR codes. And so why download that 15 kilobytes? Why download HCS as a payload that's gonna take time to download, that's gonna take time to parse, that's gonna move us between time to interactive, basically doing all this stuff.
+
+[00:13:58]
+Right, we can just only get that file if we need it.
+>> Mike North: Yep, so in summary, we've taking something off the main thread. We have reduced the size of our app. We have allowed our app, our user to continue doing whatever they were gonna do. They could have added three more items and then the QR reading [INAUDIBLE] and it comes back and it gets added to the cart.
+
+[00:14:25]
+A question that a classic web developer might be asking at this point is, why on earth would we have a client doing this work? There are probably a hundred libraries that we could use to have a our little Node.js API doing the work to take this image, like am image upload and it's gonna do its work.
+
+[00:14:45]
+And it's gonna send it back and we would not have to do all of these backflips. Well, when we're building progressive web apps, we want this to be treated like a thick client. And if a server is responsible for doing that, now it does not work when it's offline, right?
+
+[00:15:00]
+So if you're building like a progressive web delta app and you wanna be able to scan like snack items, and then flush them through later, it's like we reconcile against credit card information that's been collected. You want as much of that to be transformed from raw data to refined data on that device as you can.
+
+[00:15:23]
+You want the client to be a sort of a fully functional thing. As opposed to like outsourcing it to a server at which point like when you're offline tough luck or the work best we can do is hold onto the image. And raw images shot by phones these days are like eight megabytes.
+
+[00:15:40]
+So good luck with that. You can hold like three before your browser will start pushing the oldest ones out. So I hope this sheds some light on the fact that this is not that hard. We've wrapped it in a promise. We didn't have to touch other parts of the app.
+
+[00:15:56]
+It illustrates the power of a promise, it illustrates how web workers, they have a little bit of an antiquated API, but they're still incredibly powerful. The idea of paralyzing anything that is hard work like this, other candidates would be like Big CSV parsing on the string. And you can do client-side gzip compression, right?
+
+[00:16:22]
+So if you've got users uploading a big text document and you wanna compress it on the client because it maybe that network connection is very limited but your device is reasonably powerful, like let's get that shrunk down before we start using expensive data. So a lot of applications here and people rarely reach for it.
+
+[00:16:42]
+So I hope this gives you the confidence to try it out.
+

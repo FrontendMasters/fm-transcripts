@@ -1,0 +1,391 @@
+[00:00:00]
+>> Mike North: All right, welcome back. First, an apology, there is a really like esoteric problem that some of you may have run into. And hopefully, if you're watching on the video course now, you did not hit this. But it involves course and credential to requests. And it is one like intersection of two concepts where it could lead to some unsafe situations, and browsers protect us from that.
+
+[00:00:27]
+But it may have been interfering with our ability to go and get those fallback images. So I have here on MDN the text that you can find later, so that we can read about it. The thing to search for is credentialed requests and wildcards. And the idea here is that if you have a wildcard course header which is basically that our little API is saying, it is safe to hit me from any origin, including dangerous scammer.cc.net.
+
+[00:00:59]
+And you would never want to do this outside the context of a workshop. We have it this way so that even if you wanna use 127.0.0.1 or localhost or lvh.me, it will work for all of these things. However, the browser is going to block us and unfortunately not give us a whole lot of useful feedback about why it's blocking us because we are making what is called a credential request.
+
+[00:01:25]
+You may be making a credentialed request meaning your cookies are passed along to the server as you go and fetch one of those images. And when we get a response that has a wild card course header, we're not allowed to let that happen in the context of sending our cookies along for the ride.
+
+[00:01:50]
+This is for your safety so that I can't just make my own page with a bunch of Ajax in it that's gonna talk to your online bank and your cookies going to authenticate you as I do a whole bunch of bad stuff. So you may have run into that problem, I'm gonna show you how to solve it really quickly.
+
+[00:02:08]
+This actually pertained more to the last exercise rather than this one, but we will go ahead and catch up really quickly. So as we were looking for that fallback image right here, there's our fetch right? Now you see here mine's working because there's a fix for the API, it's been checked into master.
+
+[00:02:33]
+You may not have pulled this in yet and that's why you would hit this problem. The way we would make sure that credentials were not sent along is like this, credentials omit. So, for example, you were seeing the fallback images for every single grocery item on the page, this might have been your problem.
+
+[00:02:58]
+
+>> Mike North: I'm gonna leave this in here just in case people come across this.
+>> Speaker 2: What file is that?
+>> Mike North: This is your service worker, SWs. And I'll say, in case CORS wild card header. Sorry about that we fixed it but we forgot to let you know that there was a problem and that we fixed it.
+
+[00:03:21]
+With that, let's go into the solution for a quick boot. So first thing I'm going to do is grab this URL from asset manifest and I'm gonna try and squeeze that as much as I can. And I like having this kind of thing, like a very static-y or I like this should be a constant on top of my service work or module.
+
+[00:03:45]
+So asset manifest URL.
+>> Mike North: There we go. All right, so the first thing I wanna do is I want to go ahead and populate, I want to get the precache stuff ready. So I'm gonna do this in two phases. First, let's download everything we need. And then second, I'm gonna worry about in my Fetch Handler, making some improvements so that I can take advantage of those downloads.
+
+[00:04:12]
+So let's proceed. Now we've run into a situation where Steve and his solution for the fallback images, he's put this promise in Wade Intel. Now we've reached the very common situation where we need more than one thing we're waiting on. We basically want to kick off a bunch of things in parallel, right?
+
+[00:04:33]
+Go download that fallback image and also download these assets I know about. We want them to happen in parallel. We have a nice little helper here. Promise that all takes an array of promises and it will essentially wait for everything to result. So we kick them all off, as far as we're concerned at once, it will be kicked off in sequence very, very close together.
+
+[00:05:00]
+And now, so this is like promise number one, get the fallback image. And then promise number two is populate the precache stuff and that is gonna be its function, this is gonna get a little bit more involved than Steve's little one line thing. So we don't want that complexity to start cluttering our install handler.
+
+[00:05:28]
+So we're just gonna call it that and we will add in argument as we find that we need them. So the first thing is this is gonna return a promise, right? And this is part of what's gonna help us with, if you're interested in learning more about Visual Studio code, you can see it's helping us see that now it knows this returns a promise.
+
+[00:05:53]
+If it returned like a string, we might see, I guess it's not quite that smart yet. Sometimes you will see like feedback saying, you probably don't wanna pass that into the promised.all function. So step one, get the asset manifest, how should I go and do that?
+>> Mike North: Fetch.
+
+[00:06:14]
+Wonderful, so it's a get request, I'm not gonna worry about any options passed to it. I don't think I'll need them, so get the response, turn it into JSON, and then,
+>> Mike North: We've got jsonAssets or something like that. I'm just gonna put a debugger here so we can iteratively see what we're working with as we go along.
+
+[00:06:57]
+Let me make sure our server is up.
+>> Mike North: Refresh.
+>> Mike North: I don't wanna be offline.
+>> Mike North: It's just building right now or it should be perm.
+>> Mike North: All right, I'm not sure, we'll clear the caches, see what's going on. I'm getting an empty response,
+>> Mike North: Don't see build error.
+
+[00:07:45]
+
+>> Mike North: There you, I'm not using https. There we go. All right, so now we're in this debugger. And here's what our asset manifest looks like. This is how you want this object to look. So For our keys, we have things that don't change, app.js that's always sort of we can call it the canonical name of this resource.
+
+[00:08:12]
+Right, it's how we would refer to it as developers. In reality, when this is built, we get that long fingerprint there so that we can use cache busting effectively. We can take advantage of this immutable content passion strategy. And what these lessons to do is like we know we want app.js, so we can now get the real file name of that file, and now we have the ability to download it.
+
+[00:08:41]
+So, I don't know if you look around and saw that we might have a couple little clues here
+>> Mike North: In here, there were a couple little helpers. If you were looking around and you found like there was this clear method like remove unused caches, but we've got an asset manifest URL here.
+
+[00:09:04]
+We've got RESOURCES TO PRECACHE. So, if you looked at these, they might be a sign that like, this might be like a wait list of things to bring in. Right, it may be like, this is the set of keys to look for in this asset manifest object.
+>> Mike North: And like those are the things we should go and fetch.
+
+[00:09:28]
+So, what I'm gonna do, let's actually move this out to this other file since I have it sorta half completed there, const. So I think this is the entry point here, pre-fetched static assets.
+>> Mike North: We'll go through it line by line, don't worry.
+>> Mike North: Sorry, import from caches.js, move that up to the top.
+
+[00:10:09]
+
+>> Mike North: Wonderful, all right, so in here, this is where we enter. And ultimately, like we're returning a promise as always. First thing we're gonna do is fetch that manifest. We got response.json, we've got our assetManifestJson. Now we need to do something with it. And, this list of little regular expressions here, if you've used these before like this is a good use of regular expressions, right?
+
+[00:10:37]
+Because in this case, like, I can get any of the images. Basically, this is the whole image folder. This will be all of my like, launch images, I don't have to enumerate them one by one. So I've got those resources to cache and then I've got a little helper function here.
+
+[00:10:52]
+ShouldPrecacheFile, that looks like it might be something we can use to check whether like a given key in that asset manifest represents something that we should bother to go and pre-fetch. So with that, we can do this toPrefetch.
+>> Mike North: This is gonna end up being an array. That equals Object.keys, this is the way we get the keys of an object, the innumerable properties.
+
+[00:11:19]
+And we're going to start with the assetManifestationJson. So what this we'll give us is basically an array with app.css, css.map, and so on. So we're gonna enumerate over those keys.
+>> Mike North: And, we're going to use the higher order function that's on arrays, it is called filter. And we basically pass in the little tester function, and that's tested on each element in array and we get back from this, a new array of all of those elements for which that test passes.
+
+[00:11:55]
+And conveniently, shouldPrecacheFile that is already kind of aligned with the expected convention for this test or function, function that receives a single argument.
+>> Mike North: So now, let's see where we left off here.
+>> Mike North: Sorry, so one thing you'll be aware of is that, if you have a break point in a service worker, you may find that it's kind of difficult to escape from it.
+
+[00:12:32]
+So this is your friend, deactivate break point. So if you're stopped at a particular place, and you wanna sort of play through and go and get the next service worker, oftentimes he'll say like, forget about break points for now, proceed and then turn it back on, start fresh.
+
+[00:12:50]
+All right, so here, let's see what to prefetch looks like, great. So that looks like a nice little subset of those resources. We're not bothering with the source maps. That CSS file, it's not a trick but it's just there as bi-product of the build process. We don't need the CSS files, it's all baked into index.html, so now we've got a list things to prefetch.
+
+[00:13:13]
+Conveniently, these are already in a form where we can pass them to the cache and say like, go and get all of these things.
+>> Mike North: So the way we do this, we need a new cache here and the convection here like this is me sharing patterns that work in larger scale apps here.
+
+[00:13:39]
+I've got like a very nice convention for cache names here, so I could say, ALL CACHE that prefetch. And then when it gets like a version prefetched cache, here is what those cache names looks like. If we go to Application>Cache storage,
+>> Mike North: I guess we don't have one yet, we're about to.
+
+[00:14:06]
+
+>> Mike North: It's the first time we have one. So we're gonna say caches open and we pass in the cacheName, ALL_CACHES.prefetch.
+>> Mike North: And that returns a promise. And that's gonna be,
+>> Mike North: That one prefetchCache. So, can anybody think of why I might wanna have multiple caches where I am keeping stuff, as oppose to one big pile of data?
+
+[00:14:36]
+
+>> Speaker 3: So that you can have different strategies for different caches.
+>> Mike North: Okay, different strategies for different caches, that's correct. Let me it some polish on that correct point. Sometimes, why would we have an option to take the whole set of caches and try match a request against that?
+
+[00:14:54]
+Oftentimes, we want to try to match a request against a specific cache, and then handle that appropriately. So we have different types of assets and we want the ability to have like multiple different piles of things and say, is this request in any pile, but rather, are you in the prefetch pile?
+
+[00:15:15]
+
+>> Mike North: So now we've got that prefetchCache and we can say, addAll, and it's gonna take RequestInfo objects. This is Visual Studio code's way of saying, anything we could pass to fetch can go here. This could be URLs, these could be a request that you build, anything like that.
+
+[00:15:37]
+In this case, I kinda already got something that looks appropriate here.
+>> Mike North: And, what is addALL return? No surprise, it returns a promise. So in the tool tip, you see that promise boolean, that's just gonna tell us if things were added successfully or not. But we wanna make sure we've returned that so that when we eventually say Wait until prefetch static assets are done, we'll wait for the follow routine of logic to happen.
+
+[00:16:07]
+One, we fetch the ASSET_MANIFEST, we do the potentially asynchronous thing of converting that into JSON. Remember, it could be like a streaming response, not in the case of JSON but we have to be prepared for that possibility, all right. And then that will leave us with assetManifest.Json. We're going to synchronously filter through and find those appropriate assets we want to Prefetch and then, we're going to asynchronously, again, open the cache, the appropriately cache.
+
+[00:16:38]
+And if it doesn't exist yet, it'll be created for us on the fly. And then finally, the last asynchronous step in the chain is we're going to basically create requests and begin the process of adding all of these things to the cache, and wait for that to complete.
+
+[00:16:55]
+So by the time this promise resolves, we will have everything precached.
+>> Mike North: And when I say asynchronous, when you're working in application land, right, without a service worker. Most of your asynchronous stuff involves talking to the outside world and asynchronous can be often synonymous with taking a very long time.
+
+[00:17:19]
+These promises can resolve in micro seconds. So it may look like well, it's four things in a row kind of in waterfall. It is a really short waterfall. So do not be concerned with the number of steps in the chain. The total time elapsed is quite short. So we've got that in place and let's see where we're at.
+
+[00:17:44]
+
+>> Mike North: Update and reload happen and we are loading, maybe we are at a break point, let me make sure.
+>> Mike North: Network, all right, so I've just loaded, let's take a look what's in the cache. Currently, there's little Chrome bug where this little tool here does not update automatically.
+
+[00:18:10]
+You have to explicitly refresh it and, I've got a nice new cache created. It's called FEG-v2-prefetch. What this means is at the top of this cache's file, I can increment this little number here, and all of a sudden I'm working with version 3. And that would mean that when it comes time for like a service worker to clean up all the old stuff, all of the version 2 stuff go away.
+
+[00:18:36]
+It's a very common convention diversion your cache this way. And if you look at what's in there,
+>> Mike North: Nothing is in there, all right, let's see what's going on.
+>> Mike North: Request failed in service worker. Let's add a couple of little debuggers here.
+>> Mike North: Registration is defined, so that's no problem.
+
+[00:19:10]
+
+>> Mike North: Gonna track this one down, that's not useful for me, all right. We'll just put it in some of the places that things could have gone wrong. So let's add a debugger, we've already put a debugger here. We've seen this toPrefetch array. Let's try one there.
+>> Mike North: And then I'm gonna bump the version of the cache just so we get a clean slate.
+
+[00:19:40]
+
+>> Mike North: All right, so there's the prefetchCache. There it is, and we're saying addAll toPrefetch of that list of things. Looks okay to me.
+>> Mike North: Let's play through.
+>> Mike North: Interesting.
+>> Mike North: You know what it could be, let me check out these URLs one more time with these paths. app.js okay, anyone spot what's wrong?
+
+[00:20:17]
+I missed a step.
+>> Speaker 2: You don't actually have your hash.
+>> Mike North: Yes, I'm still using the keys of these objects. There is no file called app.js. There's app and then that fingerprint.js. So one last step here, and I expect this will work. So we filter through and then the last thing is we're going to map which is another higher order function.
+
+[00:20:40]
+We're gonna take those keys and I'm just gonna use that ASSET_MANIFEST object to convert them into values.
+>> Mike North: Just like that. All right, let's see where we're at.
+>> Mike North: And now, I have to put it through,
+>> Mike North: prefetchCache to prefetch, that looks a lot better.
+>> Mike North: Let me get rid of this.
+
+[00:21:17]
+
+>> Mike North: All right, let's check out our cache and see where we're at.
+>> Mike North: There we go, v3 prefetch, I incremented the cache, right? So, we've got these in here, that's looking good. I wanna make sure that this stuff gets cleaned up, really easy change that we can make.
+
+[00:21:41]
+I just need this function here. I literally like copy and paste this all over the place. There's a more efficient way to do this. But I do enjoy having this console log where like, instead of going through and deleting the caches one at a time, that sort of accumulates a list of things to delete.
+
+[00:21:59]
+So you get some feedback here. And remember, it's happening in a separate thread this is not going to like interfere with your boot time or anything. The install process of the service worker, it kind of can take it sweet time. If it takes five seconds, all you need is your user to be on the page for five seconds while the app is already booted.
+
+[00:22:20]
+So inactivate, we're going to say, we've created an event here and by the time we've reached activate, we are assured that the prefetchCache has been populated. So we're gonna say wait until this takes a promise, and we're gonna say remove unused caches, we're gonna pass in all caches, and I'll take care of that up here.
+
+[00:22:52]
+Actually, it's all caches list. So, I've given you here a good pattern to use. These constants and stuff, they're at the top of that caches file. That will help you have some sanity in your service worker design. And we don't need this anymore, let's see where we at now.
+
+[00:23:17]
+So now, I'm gonna increment one more just for fun. And I expect when we look, we should see a v4 but two and three should be cleaned up.
+>> Mike North: And there it is. So now at any given time, we basically wait. We had v3, it was there in case something failed.
+
+[00:23:40]
+So we can keep using that until we know that v4 has been downloaded and that sort of bundle of things was intact and in memory. We hold on to be v3 but when we reach that moment, get rid of v3 and everything else we're not using and proceed onward.
+
+[00:23:56]
+
+>> Speaker 2: So what happens if you hit your Theoretical limit on the install because you have a service worker that's got half of the limit. You're getting new assets in, you cache too much and you never again attempt to install. Because the browser blew away your cache and you've installed the service worker already, so the install process doesn't happen again.
+
+[00:24:23]
+I feel like I just spoke Klingon, did that make sense?
+>> Mike North: Right, so service worker is still active, your cache has reached the threshold where it gets evicted.
+>> Speaker 2: And new guy comes in and he hits the cache limit, blowing away all the cache during the install process.
+
+[00:24:43]
+
+>> Mike North: So I believe at the time that a cache gets cleaned up, your service worker will begin its life cycle again. So the cache API is designed to be used in the install and activate hooks there. So at the time, where like if the browser reaches a threshold and decides to squash your cache, you can be assured that the next time your user visits your app, you're gonna be either in one of two situations.
+
+[00:25:11]
+Number one is they've never seen a service worker before, and it's gonna activate in the background, but they'll get no benefits of the cache there. Or two, no I believe that's the only one they'll end up in.
+>> Speaker 2: If the cache blows up the install process fails?
+>> Mike North: If the cache blows up the install process fails, the cache blows up-
+
+[00:25:30]
+
+>> Steve Kinney: Yeah, cuz the promise will reject.
+>> Mike North: If the install, those seem unrelated to me.
+>> Steve Kinney: So if you're returning the promise on add all, if for some reason any of those adding to the cache reject, the promise at all rejects.
+>> Mike North: Yeah, if your promise fails, you don't successfully reach the activate phase, that's the point of having that.
+
+[00:25:51]
+
+>> Steve Kinney: Yeah, an interesting point of color though is that again, going on this idea of giving programmers low level primitives, right? That there is a quota API where you can theoretically find out like how much storage am I allotted, how much am I using? So ideally, if this is, I would argue that for most use cases you're unlikely to butt up against this for regular page assets, right?
+
+[00:26:15]
+But in the situation where like, I'm working on something where I'm worried about this, right? You could, in the active service worker, be able to monitor how much am I using? And in the same way that you would do in a native application, am I butting up against the threshold?
+
+[00:26:31]
+Okay, what can I delete from cache? And you could handle that programmatically. And that's really one of the great things with the way this API was designed is that you have the ability to one, introspect, and B, do something about it. And like there isn't a take this answer off of the shelf and use it, right?
+
+[00:26:47]
+Because especially it's like a scaling issue, right? When you reach that level of problem, it is very specific, right? So there is very rarely an off the shelf solution for that. But you're able to kind of find out, yeah, how much storage you have, how much you're using, and then depending on the nature of your application, how you ended up in that situation, be able to deal with it.
+
+[00:27:11]
+The browser blowing stuff away is not necessarily a threat to you, it's more of like a safeguard in case you made boo-boo. [LAUGH] And so that you don't eat up their entire disk. So it's basically an escape hatch if things go horribly wrong. But it's not like this looming threat that you could get cuz you have the ability to figure out those kinds of things.
+
+[00:27:32]
+
+>> Mike North: It's also in case you visit like thousands of websites and they each take up 100 megabytes each and that potentially can be a problem. Especially on something like a Chromebook that can affect performance or mobile device for that matter. Where people love to flirt with like the total limit of their device.
+
+[00:27:52]
+They only have a little bit of memory free. I do want to make sure we put a bow on this. In the event the browser decides to squash your cache as a result of you reaching that threshold, it is basically start over. So you're not in this partially disrupted state, you're back to zero.
+
+[00:28:08]
+And now the existing process by which you would install the service worker from scratch, begins anew.
+>> Steve Kinney: Assuming, of course that you've programmed defensively. If you're doing cache fallback to network, the cache got blown away, you will fall back to the network and you can theoretically then put that back in the cache.
+
+[00:28:27]
+If you're just always assuming the cache is going to be there, well, then that's a bug, right? But yeah, that covers the strategies Mike just went to over earlier. It's the kind of like defensively, so you want that progressive web app. If no cache, I can progressively build it back up again but I don't count on it.
+
+[00:28:46]
+And that's the progressive in the progressive web app in that case.
+>> Mike North: Yeah, and one more like word of wisdom from someone that's been trolled by service workers more than I hope any of you get trolled by them, start really simple. This is not the kind of thing where you wanna just jump in and have one release where you're gonna go from no service worker at all, to full offline pumping stuff in the IndexDB with notifications.
+
+[00:29:15]
+You wanna be conservative, and so if you are doing things, the way I advise, by the time you're even thinking about cache thresholds, you are a well seasoned service worker expert. But just starting with a couple of hundred kilobytes of JavaScript, for all of you that probably have not put one of these on your app yet, you will, in all likelihood be under the two megabyte mark for the total size of the cache.
+
+[00:29:49]
+And start there, and then as things evolve, then we can worry about that complexity. But start with tiny things, quick wins, things that we'll speed stuff up but not maybe allow things to work completely offline. And then iteratively move towards the solution that's more comprehensive. So we have one last thing to do here, our prefetch cache is populated, our fallback image is there.
+
+[00:30:17]
+While Steve was talking, I kinda changed the name of his cache just so that it is versioned along with everything else. So now I've gone back to version one, as long as this is changing I just delete anything that's not the current version, so I don't have to even increase it, I can decrease it too.
+
+[00:30:33]
+Now we just have to use the stuff in the cache. So we're gonna go into our fetch handler here, I can close this or collapse it cuz we don't need that quite yet. Or we can just kind of leave it alone. And now we're in the situation if you remember that slide where we had different MIME types and we wanna handle that stuff differently.
+
+[00:30:52]
+Prefetch I like to handle in a slightly different way. I want, if it's possible, to use something from the prefetch cache, let's go ahead and use that. And then all other strategies, I like to sort of that to live in the, we have nothing in the prefetch cache spot.
+
+[00:31:12]
+So let me translate that nebulous sentence into code for you.
+>> Mike North: So what we're gonna do is say,
+>> Mike North: So we'll say event.respondWith, and we're gonna have a giant mega promise here. So the first thing we're gonna do is say caches.match, right? Just like, Steve has been using up here and FALLBACK_IMAGEs here, right?
+
+[00:31:44]
+And sorry, we need something else here,
+>> Mike North: Great, and we're gonna do the same approach here where we name the cache we're matching against. It's not good enough just to say This is somewhere, it's the prefetch we're looking at. So we're saying, ALL_CACHES.prefetch, that'll give us the correct version string.
+
+[00:32:10]
+Sorry, wrong, what goes in here is the request,
+>> Mike North: Something like that. All right, so and then we're going to return the response, or proceed anywhere. Like, proceed to the next level down. So this is a pattern you'll see all over the place, and let's see if we've already got it up here.
+
+[00:32:42]
+Not yet, we didn't have an opportunity to do it yet. We're taking advantage of the fact that when you return a non promise value from your dot then call back, it gets wrapped in a promise for us. So we can say return this response or other promise, and regardless like we gonna get a promise that returns the response as part of this chain.
+
+[00:33:06]
+So in this case-
+>> Speaker 2: Unless the second one rejects also.
+>> Mike North: But no matter what we want to return a promise, like we want to ultimately, sorry, no matter what we need to return a promise-
+>> Speaker 2: A response-
+>> Mike North: A results to response.
+>> Speaker 2: Okay.
+>> Mike North: Promise that results to a response.
+
+[00:33:23]
+
+>> Speaker 2: Because it always returns something, right?
+>> Mike North: Yep, absolutely.
+>> Speaker 2: Okay.
+>> Mike North: Actually, the way this is structured, I can't be quite so neat about it here but no worry. So if response we're gonna return, we're gonna let it just pass through, and then we can put this, and here.
+
+[00:33:47]
+So one interesting thing is that you don't, I find that I don't have to be quite so defensive about the caches.match. Because it's gonna return you something or return you undefined the catch handler is, that's a really strange thing to hit from caches.match. It's gonna return you a value and we can sort of proceed forward.
+
+[00:34:11]
+So effectively here, let me add some comments. Let's say, if a precached thing is found,
+>> Mike North: Go with it. Otherwise,
+>> Mike North: Let's dig deeper. So if we find images like we'll go through that, and then we just need to sort of unpack this from respond with here. So we're gonna return that.
+
+[00:34:39]
+And then, otherwise, if we get all the way down here,
+>> Mike North: We'll just make the request to the outside world. The reason I structure things this way is you can only respond to requests once. You can only respond to requests once. So if we had what Steve's code was completely reasonable here, structured as so.
+
+[00:35:03]
+If you have like littered event that respond with and scattered amongst all of these little functions that you've broken your various mind type specific handling into. It's very easy to kinda find that you're trying to respond to something that has already been responded to. The way to save yourself from this is to just say look our job is now to have some chain of promise you things, right?
+
+[00:35:32]
+That ultimately resolve to a response, and we're gonna use that. So I've sort of unpacked events that respond with that's now on the outside, and now instead we're returning. The benefit there is like return terminate that function, like we're done with that, right? And so that is what makes it so that we don't end up like continuing on and responding with something else.
+
+[00:35:59]
+So it's sort of like these two ideas are equal except one puts the brakes on things, and lets us say like we're finished, right? But their consequences, now, I'm obligated to explicitly go it and fetch in the event that like no other caching strategy has met our needs.
+
+[00:36:23]
+And let's look at where we at once this reload, getting some errors, unused variables, that's fine. Okay, so if we look at our network tab, click the JavaScript. Here is the big change that we see. So the app JavaScript file is served from the service working. And although it is 372 milliseconds here, let me expand this out.
+
+[00:36:53]
+
+>> Mike North: Come on, work with me, Chrome.
+>> Mike North: There we go.
+>> Mike North: Okay, so Let me decode this for you.
+>> Mike North: So this was the original download here, that was the content being downloaded. That's a fetch the outside world.
+>> Mike North: Interesting, let me do some login, here's what I suspect.
+
+[00:37:28]
+This is still taking way too long. I expect this number to be really small, but everything's being handled by the service worker now. I'm gonna put a debugger here, and see if we hit it for JavaScript files.
+>> Mike North: So that's the index.html, that's fine.
+>> Mike North: Let me put a watch in place.
+
+[00:38:04]
+
+>> Mike North: Play, play, play.
+>> Mike North: So there's API calls going out, that's that's some DevTools stuff going on the tell web pack knows to refresh your screen, a chrome extension.
+>> Mike North: I need to do a refresh here because like we're certainly past the JavaScript.
+>> Mike North: Play through, all right, what's going on?
+
+[00:38:48]
+Let me do a conditional break point instead of this, the stuff.
+>> Mike North: Edit break points and we're gonna say only stop here if event.request.url.indexOf (".js") >= 0.
+>> Mike North: And make sure we're not service worker reluct. Like we don't have something waiting, we do. All right, there's our JavaScript.
+
+[00:39:34]
+So let's see where this takes us.
+>> Mike North: So there's our response, that looks like our JavaScript response. Maybe we just have a little like, a stale service worker running the show. Let's look at our network tab, uh-ha, here we go. That is way shorter. We just took the downloading process, even from local hosts, this thing took 327 milliseconds.
+
+[00:40:03]
+We brought it down to less than 10% of the time it takes to download that file. Because it's really just like sitting in memory waiting for us, right? And you can even see that there's like it's broken down into us kind of waiting for the service worker to free up functions run to completion there.
+
+[00:40:23]
+They do anywhere else in JavaScript, they might be in the middle of doing something else. And we sort of think of it almost like a set timeout 0, or it says like soon, please give me this asset. But this is a massive improvement, this is a big improvement.
+
+[00:40:38]
+And this kind of thing is one of the early improvements you can make to your app to really take advantage of the power of service workers. And to speed up everything but the first boot time, the second through nth boot time until you deploy again. Well actually, even after you deploy again you've got your service worker downloading the next version in the background.
+
+[00:41:00]
+So this really will give that time to first paint for return visits, a huge boost. And that is the end of the exercise here. A little involved, and I don't, let me just go back to the slid here so you can see what we've done here. So in short, we've fetch in asset manifest, download a bunch of stuff that we know about the build time.
+
+[00:41:26]
+And the activate handler we cleaned up anything that was old that we don't need again. And then finally, in our fetch handler we kinda upgraded it. So beyond to just as fallback image thing. Now we're checking to see if we got something that we prepared in advance that we can use rather than going to the outside network.
+
+[00:41:44]
+If you didn't follow along with this, I would encourage you to like save your work, and maybe get reset to the commit I'm about to push. Because we're gonna go deeper, and deeper down this rabbit hole.
+>> Mike North: Ultimately, dealing with the JSON, and then finally, index.html at which point we'll be fully offline.
+

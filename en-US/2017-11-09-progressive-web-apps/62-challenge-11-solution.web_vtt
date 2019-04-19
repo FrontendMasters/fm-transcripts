@@ -1,0 +1,1370 @@
+WEBVTT
+
+1
+00:00:00.746 --> 00:00:05.886
+&gt;&gt; Mike North: We're going to work with
+IndexedDB, specifically idb a little bit.
+
+2
+00:00:05.886 --> 00:00:10.800
+So that we can go ahead and,
+as our service worker's installing,
+
+3
+00:00:10.800 --> 00:00:14.397
+kind of preload our app
+with at least the JSON data
+
+4
+00:00:14.397 --> 00:00:18.811
+that represents all of the grocery
+images available to us.
+
+5
+00:00:18.811 --> 00:00:23.925
+And this is a great pattern if we
+wanted to sort of allow the user to
+
+6
+00:00:23.925 --> 00:00:29.154
+have the experience that they
+landed on based on the URL, right?
+
+7
+00:00:29.154 --> 00:00:33.444
+Load whatever they need to render there,
+but in the background,
+
+8
+00:00:33.444 --> 00:00:37.197
+kinda get ready for
+generalized use of this app, right?
+
+9
+00:00:37.197 --> 00:00:42.454
+So that even if there are API
+endpoints we haven't hit yet,
+
+10
+00:00:42.454 --> 00:00:47.712
+maybe we can build an IndexedDB and
+use those records to fuel
+
+11
+00:00:47.712 --> 00:00:53.309
+our app rather than relying on
+like HTTP layer to drive our app.
+
+12
+00:00:54.860 --> 00:00:58.328
+&gt;&gt; Mike North: So let's get started.
+
+13
+00:01:01.803 --> 00:01:05.912
+&gt;&gt; Mike North: All right, so
+the first thing we're gonna do,
+
+14
+00:01:05.912 --> 00:01:10.445
+I just have some notes here,
+so I'll stay on track.
+
+15
+00:01:10.445 --> 00:01:13.434
+So I'm going to try to
+shoot the moon here.
+
+16
+00:01:13.434 --> 00:01:16.233
+Go for the whole problem and
+
+17
+00:01:16.233 --> 00:01:22.329
+ultimately I'm gonna need
+multiple fallback image URLs.
+
+18
+00:01:25.084 --> 00:01:27.658
+&gt;&gt; Mike North: Right, one per type.
+
+19
+00:01:27.658 --> 00:01:29.942
+And they're gonna look like,
+
+20
+00:01:33.006 --> 00:01:38.976
+&gt;&gt; Mike North:
+localhost:3100/images/fallback-grocery.-
+
+21
+00:01:38.976 --> 00:01:39.589
+png.
+
+22
+00:01:39.589 --> 00:01:43.595
+So that's our generalized one and
+we've got a bunch of them.
+
+23
+00:01:47.805 --> 00:01:52.828
+&gt;&gt; Mike North: So we've got grocery,
+we've got bakery,
+
+24
+00:01:52.828 --> 00:01:57.809
+dairy,
+&gt;&gt; Mike North: We've got
+
+25
+00:01:57.809 --> 00:02:01.877
+frozen, fruit, herbs,
+
+26
+00:02:04.254 --> 00:02:08.756
+&gt;&gt; Mike North: Meat and vegetables.
+
+27
+00:02:08.756 --> 00:02:13.876
+And if you were to look where
+these images are located,
+
+28
+00:02:13.876 --> 00:02:17.448
+it's in the server/images folder.
+
+29
+00:02:17.448 --> 00:02:21.501
+These are a little bit different so it's
+going to provide a better experience for
+
+30
+00:02:21.501 --> 00:02:22.102
+our users.
+
+31
+00:02:22.102 --> 00:02:25.212
+That's the story,
+the motivation behind this exercise.
+
+32
+00:02:25.212 --> 00:02:28.799
+We can show a picture of a fruit
+with a question mark instead of just
+
+33
+00:02:28.799 --> 00:02:29.655
+a grocery bag.
+
+34
+00:02:29.655 --> 00:02:35.362
+So ultimately, my static analysis is
+telling me this is an unused variable.
+
+35
+00:02:35.362 --> 00:02:39.380
+Ultimately this will end up being the
+unused variable we can get away from that.
+
+36
+00:02:39.380 --> 00:02:43.080
+That's how we will know we
+fully made this transition.
+
+37
+00:02:43.080 --> 00:02:47.580
+So, the next thing I'm gonna
+do is there are multiple
+
+38
+00:02:47.580 --> 00:02:51.781
+situations where I'm
+gonna need this database.
+
+39
+00:02:51.781 --> 00:02:53.824
+I'm gonna need it when I
+populate the database.
+
+40
+00:02:53.824 --> 00:02:57.015
+I'm gonna need it whenever
+I make use of it,
+
+41
+00:02:57.015 --> 00:03:01.863
+so that I can use it to determine
+what kind of fallback image I need.
+
+42
+00:03:01.863 --> 00:03:06.339
+So I'm just going to make a little
+function that will open the database and
+
+43
+00:03:06.339 --> 00:03:07.357
+return it to me.
+
+44
+00:03:07.357 --> 00:03:10.131
+That way I can leverage
+that code a couple times.
+
+45
+00:03:15.151 --> 00:03:17.853
+&gt;&gt; Mike North: And
+now we need idb, this library.
+
+46
+00:03:21.324 --> 00:03:24.605
+&gt;&gt; Mike North: And here we can return
+
+47
+00:03:24.605 --> 00:03:31.902
+idb.open('groceryitem-store'), and
+
+48
+00:03:31.902 --> 00:03:35.740
+we'll open version 1.
+
+49
+00:03:35.740 --> 00:03:42.024
+There's our upgradeDb event, and in here,
+I'm gonna kind of build a case switch,
+
+50
+00:03:42.024 --> 00:03:46.727
+but we're not gonna have multiple
+versions we'll deal with.
+
+51
+00:03:46.727 --> 00:03:49.974
+This would be the starting point
+that we'd build on top of.
+
+52
+00:03:53.432 --> 00:03:56.525
+&gt;&gt; Mike North: upgradeDb,
+old version, right?
+
+53
+00:03:56.525 --> 00:04:00.034
+So this is the number of the previous
+version of the database,
+
+54
+00:04:00.034 --> 00:04:02.204
+seen by the browser or 0 if it's new.
+
+55
+00:04:04.892 --> 00:04:09.572
+&gt;&gt; Mike North: So if it's new, we're
+gonna do sort of our initial setup stuff.
+
+56
+00:04:09.572 --> 00:04:12.472
+And in this case it's gonna be
+
+57
+00:04:12.472 --> 00:04:18.507
+upgradeDb.createObjectStore('grocery-item-
+s').
+
+58
+00:04:18.507 --> 00:04:22.637
+I'm giving these different
+names deliberately so
+
+59
+00:04:22.637 --> 00:04:27.157
+we can tell what's the database and
+what's the store.
+
+60
+00:04:27.157 --> 00:04:30.477
+We can actually move that up to this line.
+
+61
+00:04:30.477 --> 00:04:34.464
+Great, okay, we're done with this.
+
+62
+00:04:34.464 --> 00:04:37.201
+So now we can invoke this function and
+
+63
+00:04:37.201 --> 00:04:40.651
+what we'll get back is
+an upgraded database.
+
+64
+00:04:40.651 --> 00:04:43.011
+It'll create one on the fly if we need to.
+
+65
+00:04:43.011 --> 00:04:46.696
+If it's a brand new empty database
+that's created on the fly,
+
+66
+00:04:46.696 --> 00:04:48.514
+we'll add this object store.
+
+67
+00:04:48.514 --> 00:04:50.137
+We've got this little key path here.
+
+68
+00:04:50.137 --> 00:04:53.943
+So now as long as my objects that
+I put into it, they have an ID,
+
+69
+00:04:53.943 --> 00:04:55.427
+we should be good to go.
+
+70
+00:04:55.427 --> 00:05:00.375
+You'll get complaints if you
+don't define how the primary key
+
+71
+00:05:00.375 --> 00:05:02.625
+can be found on each record.
+
+72
+00:05:02.625 --> 00:05:07.947
+So the next thing I'm gonna do is create
+
+73
+00:05:07.947 --> 00:05:12.465
+a function that returns a promise
+
+74
+00:05:12.465 --> 00:05:17.479
+called the downloadGroceryItems.
+
+75
+00:05:17.479 --> 00:05:20.688
+It's not important really what
+this promise resolves to.
+
+76
+00:05:20.688 --> 00:05:26.820
+It is just something that I'm going to
+add to my list of things to wait for,
+
+77
+00:05:31.771 --> 00:05:36.899
+&gt;&gt; Mike North: In the install hook, right?
+
+78
+00:05:36.899 --> 00:05:41.878
+So this is not one of these fetch related
+things where I have to make sure I return
+
+79
+00:05:41.878 --> 00:05:44.378
+a promise that resolves to a response.
+
+80
+00:05:44.378 --> 00:05:46.572
+It just needs to return a promise.
+
+81
+00:05:46.572 --> 00:05:50.652
+And in here,
+I'm going to first open the database.
+
+82
+00:05:56.282 --> 00:06:02.729
+&gt;&gt; Mike North: And we get a database here
+passed to the promise handler there.
+
+83
+00:06:02.729 --> 00:06:09.218
+And then once the database is open, I can
+go and begin to fetch data from my API.
+
+84
+00:06:09.218 --> 00:06:12.872
+So I'll go back to the slide,
+steal that URL.
+
+85
+00:06:16.692 --> 00:06:22.289
+&gt;&gt; Mike North: There we go, and we'll
+do the typical thing we do with fetch.
+
+86
+00:06:26.479 --> 00:06:33.399
+&gt;&gt; Mike North: And what I expect here,
+&gt;&gt; Mike North: Is
+
+87
+00:06:33.399 --> 00:06:37.755
+a property called data on
+this JSON object I get.
+
+88
+00:06:37.755 --> 00:06:41.607
+And I'm going locally within the body
+of this little call back here.
+
+89
+00:06:41.607 --> 00:06:44.684
+We'll just call those groceryItems.
+
+90
+00:06:44.684 --> 00:06:49.283
+What you're seeing here, it's like
+a fancy destructured assignment and
+
+91
+00:06:49.283 --> 00:06:50.819
+naming at the same time.
+
+92
+00:06:50.819 --> 00:06:55.213
+Basically saying,
+take the object I get back, reach in,
+
+93
+00:06:55.213 --> 00:06:58.801
+grab this data property
+off of that object, and
+
+94
+00:06:58.801 --> 00:07:04.920
+make it available in this function here
+as this local variable, groceryItems.
+
+95
+00:07:04.920 --> 00:07:09.050
+All right, so now I've got the JSON,
+I've opened my database,
+
+96
+00:07:09.050 --> 00:07:10.938
+let's smash them together.
+
+97
+00:07:15.287 --> 00:07:17.465
+&gt;&gt; Mike North: So
+we're gonna create a transaction,
+
+98
+00:07:17.465 --> 00:07:19.447
+tx is a common convention for that.
+
+99
+00:07:27.596 --> 00:07:31.627
+&gt;&gt; Mike North: So man,
+I love Visual Studio code here.
+
+100
+00:07:31.627 --> 00:07:33.319
+So the second argument that we pass here.
+
+101
+00:07:33.319 --> 00:07:34.967
+The first argument you see,
+
+102
+00:07:34.967 --> 00:07:38.891
+it's the name of the store that
+we're creating a transaction for.
+
+103
+00:07:38.891 --> 00:07:42.402
+So almost always,
+you're gonna be working with one store but
+
+104
+00:07:42.402 --> 00:07:46.249
+you can see that optionally you can
+provide multiple store names and
+
+105
+00:07:46.249 --> 00:07:50.049
+that will be a transaction that's
+working with multiple things.
+
+106
+00:07:50.049 --> 00:07:53.785
+So the example of emptying the shopping
+cart and creating an order,
+
+107
+00:07:53.785 --> 00:07:56.483
+that's a transaction
+that touches two tables.
+
+108
+00:07:56.483 --> 00:07:59.733
+So that would be like a multi-store
+transaction if we were doing it in
+
+109
+00:07:59.733 --> 00:08:01.150
+the browser.
+
+110
+00:08:01.150 --> 00:08:05.470
+The second argument here is
+whether we're using a read and
+
+111
+00:08:05.470 --> 00:08:09.780
+write or read mode for this transaction.
+
+112
+00:08:11.270 --> 00:08:14.670
+So this kind of sets the rules for
+what we can touch,
+
+113
+00:08:14.670 --> 00:08:18.130
+which stores we can touch, and
+the kinds of operations we can do on them.
+
+114
+00:08:21.090 --> 00:08:29.140
+Then we're going to, sorry,
+I've got some notes here.
+
+115
+00:08:31.250 --> 00:08:35.360
+So the first thing I wanna do is,
+in the installation process here,
+
+116
+00:08:35.360 --> 00:08:38.180
+I'm gonna treat this kinda
+like a pre cast assets.
+
+117
+00:08:38.180 --> 00:08:41.810
+Meaning that if I find something there,
+like, every time a new service worker
+
+118
+00:08:41.810 --> 00:08:47.160
+installs, let's start from scratch and
+repopulate this database.
+
+119
+00:08:47.160 --> 00:08:48.530
+Now if we had a million records or
+
+120
+00:08:48.530 --> 00:08:53.280
+something, number one, probably not a good
+candidate for storing in the browser.
+
+121
+00:08:53.280 --> 00:08:57.980
+But if it were getting
+complicated you might just wanna
+
+122
+00:08:57.980 --> 00:09:00.760
+be a little bit more thoughtful
+about the way you handle it.
+
+123
+00:09:00.760 --> 00:09:03.573
+In this case,
+we're not gonna worry too much.
+
+124
+00:09:06.317 --> 00:09:10.850
+&gt;&gt; Mike North: So we're gonna get
+this objectStore and clear it.
+
+125
+00:09:12.240 --> 00:09:17.850
+Which, it returns a promise but
+we're not too concerned with it.
+
+126
+00:09:18.850 --> 00:09:21.410
+Well, we'll chain to
+the promise in a second.
+
+127
+00:09:21.410 --> 00:09:24.578
+This removes all of
+the objects in this store.
+
+128
+00:09:29.380 --> 00:09:33.065
+&gt;&gt; Mike North: So
+once the clearing is complete,
+
+129
+00:09:33.065 --> 00:09:39.194
+we can,
+&gt;&gt; Mike North: So
+
+130
+00:09:39.194 --> 00:09:45.790
+we're basically going to go through all
+of the grocery items that we found.
+
+131
+00:09:45.790 --> 00:09:50.660
+And turn each one into a put operation.
+
+132
+00:09:50.660 --> 00:09:54.730
+So we're gonna take our grocery-items and
+we're gonna basically, for
+
+133
+00:09:54.730 --> 00:10:01.850
+n grocery-items, we're gonna create
+n put operations into this database.
+
+134
+00:10:03.510 --> 00:10:09.240
+And here's how that would look at
+a high level, groceryItems.map.
+
+135
+00:10:11.080 --> 00:10:12.686
+We've got one grocery item here.
+
+136
+00:10:15.569 --> 00:10:21.580
+&gt;&gt; Mike North: And we're gonna grab
+that so we can create a new transaction.
+
+137
+00:10:26.312 --> 00:10:27.830
+&gt;&gt; Mike North: We're creating
+a lot of transactions here.
+
+138
+00:10:27.830 --> 00:10:30.057
+Actually, you could do
+something like this.
+
+139
+00:10:35.570 --> 00:10:36.949
+&gt;&gt; Mike North: Create a new transaction,
+
+140
+00:10:46.670 --> 00:10:48.982
+&gt;&gt; Mike North: And
+we're going to map over.
+
+141
+00:10:54.671 --> 00:10:57.643
+&gt;&gt; Mike North: I can clean this up by
+holding a reference to this grocery
+
+142
+00:10:57.643 --> 00:10:58.346
+item store.
+
+143
+00:11:01.826 --> 00:11:04.631
+&gt;&gt; Mike North: And we're gonna just
+put that grocery item right in, and
+
+144
+00:11:04.631 --> 00:11:08.344
+these are relatively, these are flat
+objects, they have an ID property.
+
+145
+00:11:08.344 --> 00:11:12.880
+So they're actually already ready
+to just drop into index DB.
+
+146
+00:11:12.880 --> 00:11:15.655
+It doesn't need them to be flat, but
+
+147
+00:11:15.655 --> 00:11:20.142
+it does need that ID to be a top
+level property on the object.
+
+148
+00:11:21.540 --> 00:11:27.001
+&gt;&gt; Mike North: So this will turn, this
+map is a high order function on arrays,
+
+149
+00:11:27.001 --> 00:11:33.594
+and it takes the contents of an array and,
+one by one, try to form the items,
+
+150
+00:11:33.594 --> 00:11:39.861
+and we've transformed an array of
+JavaScript objects into promises.
+
+151
+00:11:39.861 --> 00:11:45.580
+Put returns a,
+let me put it more in the center,
+
+152
+00:11:47.190 --> 00:11:53.290
+so put returns a promise, we can see it's
+a promise that resolves to an IDBValidKey.
+
+153
+00:11:53.290 --> 00:11:56.310
+Whatever that means,
+we're not concerned with it.
+
+154
+00:11:56.310 --> 00:12:01.384
+Really, the whole point of this function,
+and our chaining of things together is,
+
+155
+00:12:01.384 --> 00:12:04.860
+we want the promise to
+resolve when all is done.
+
+156
+00:12:04.860 --> 00:12:09.810
+We don't really care once we shove
+stuff in there, we're done with it.
+
+157
+00:12:09.810 --> 00:12:17.330
+So if we return this, now we've got,
+we'll call this the putPromises.
+
+158
+00:12:17.330 --> 00:12:19.690
+And they're all associated
+with this one transaction.
+
+159
+00:12:19.690 --> 00:12:20.927
+I just made this change here,
+
+160
+00:12:20.927 --> 00:12:23.255
+I was associating it with
+this wrong transaction here.
+
+161
+00:12:25.600 --> 00:12:30.175
+&gt;&gt; Mike North: So
+now what we can do is we will, sorry,
+
+162
+00:12:30.175 --> 00:12:35.724
+let me make sure I haven't
+made a mistake here,
+
+163
+00:12:35.724 --> 00:12:41.301
+groceryItem's clear,
+I have a little error.
+
+164
+00:12:45.981 --> 00:12:47.150
+&gt;&gt; Mike North: There we go.
+
+165
+00:12:47.150 --> 00:12:49.720
+Okay, so
+it's two transactions that work here,
+
+166
+00:12:49.720 --> 00:12:52.630
+and I've broken them apart for
+a pretty obvious reason.
+
+167
+00:12:52.630 --> 00:12:57.773
+I'm dumping the table and now I'm
+starting to fill it up bit by bit, and
+
+168
+00:12:57.773 --> 00:13:03.203
+it just makes more sense in my mind to
+think of those as two separate things.
+
+169
+00:13:05.484 --> 00:13:08.315
+&gt;&gt; Mike North: So,
+when the first transaction is completed,
+
+170
+00:13:08.315 --> 00:13:12.915
+we kind of set up the second transaction,
+we've got these putPromises, and
+
+171
+00:13:12.915 --> 00:13:16.204
+now we're gonna say return
+Promise all putPromises.
+
+172
+00:13:20.117 --> 00:13:23.300
+&gt;&gt; Mike North: And
+last thing we need to do here,
+
+173
+00:13:23.300 --> 00:13:28.600
+I just made the same mistake twice,
+is complete.
+
+174
+00:13:28.600 --> 00:13:34.160
+So this complete property,
+that is where you have access
+
+175
+00:13:34.160 --> 00:13:39.230
+to the promise that resolves when
+the transaction is complete.
+
+176
+00:13:39.230 --> 00:13:43.290
+So that's why here we're chaining against
+complete, and here we're mapping and
+
+177
+00:13:43.290 --> 00:13:47.690
+we're ultimately returning complete,
+so that essentially when all of these
+
+178
+00:13:47.690 --> 00:13:52.643
+promises resolve, we should be good.
+
+179
+00:13:52.643 --> 00:13:57.230
+Sorry, I'm halfway between
+two approaches here.
+
+180
+00:13:58.410 --> 00:13:59.318
+Now we're all set.
+
+181
+00:14:01.914 --> 00:14:04.843
+&gt;&gt; Mike North: We can
+actually do it this way.
+
+182
+00:14:04.843 --> 00:14:07.975
+All right, this make a lot more sense,
+begin the transaction,
+
+183
+00:14:07.975 --> 00:14:11.630
+put end operations inside this
+transaction, complete the transaction.
+
+184
+00:14:13.880 --> 00:14:17.378
+Trying to correct errors on the fly and
+
+185
+00:14:17.378 --> 00:14:21.760
+it requires a lot of brain
+power [LAUGH] so great.
+
+186
+00:14:23.610 --> 00:14:26.650
+Let's operate on the assumption
+that this works and
+
+187
+00:14:26.650 --> 00:14:28.630
+we'll go back to debug if necessary.
+
+188
+00:14:28.630 --> 00:14:32.680
+So we've already wired this
+download grocery items thing up.
+
+189
+00:14:32.680 --> 00:14:36.550
+And I think this is a good
+time to start the server and
+
+190
+00:14:36.550 --> 00:14:39.711
+just see if the database gets populated.
+
+191
+00:14:42.990 --> 00:14:45.402
+&gt;&gt; Mike North: So let's go here.
+
+192
+00:14:49.017 --> 00:14:49.984
+&gt;&gt; Mike North: Refresh.
+
+193
+00:14:53.066 --> 00:14:54.990
+&gt;&gt; Mike North: And
+we'll look at our application tab.
+
+194
+00:14:56.450 --> 00:15:00.862
+Down on the left panel,
+we'll look at IndexedDB.
+
+195
+00:15:00.862 --> 00:15:06.004
+And you can see we have a grocery
+item store in there at version one.
+
+196
+00:15:06.004 --> 00:15:09.990
+And here's a list of grocery items,
+looks good, looks good.
+
+197
+00:15:09.990 --> 00:15:16.696
+We have IDs, and here's the value,
+these multi-property objects here.
+
+198
+00:15:16.696 --> 00:15:20.738
+So you can think of it like a key-value
+store, I mean, it is a key-value store,
+
+199
+00:15:20.738 --> 00:15:22.770
+and the value is the document.
+
+200
+00:15:22.770 --> 00:15:27.030
+Why we would call this a NoSQL
+database instead of a key-value store?
+
+201
+00:15:27.030 --> 00:15:31.141
+We have the ability to kind of query
+against values and have indices.
+
+202
+00:15:31.141 --> 00:15:36.307
+And if you've used something like Redis
+before or even local storage as a key
+
+203
+00:15:36.307 --> 00:15:41.650
+value store, really the key is the only
+power you have for looking up objects.
+
+204
+00:15:41.650 --> 00:15:45.630
+And that's why we'd say this
+is Definitely a database and
+
+205
+00:15:45.630 --> 00:15:49.220
+not just that simpler,
+more primitive storage mechanism.
+
+206
+00:15:50.930 --> 00:15:54.950
+All right, so
+this is step one of this exercise,
+
+207
+00:15:54.950 --> 00:15:57.820
+let's rounded it out in a step two.
+
+208
+00:15:57.820 --> 00:16:02.737
+So the bonus thing So in the event
+
+209
+00:16:02.737 --> 00:16:07.539
+that we have to fall
+back on an image here,
+
+210
+00:16:07.539 --> 00:16:15.136
+we've got two situations where we're,
+&gt;&gt; Mike North: Going for
+
+211
+00:16:15.136 --> 00:16:16.740
+this FALLBACK_IMAGE_URL.
+
+212
+00:16:16.740 --> 00:16:19.274
+And I'm jut gonna break
+out a new function here.
+
+213
+00:16:24.284 --> 00:16:27.079
+&gt;&gt; Mike North: So you've got
+a fallbackImageForRequest just so
+
+214
+00:16:27.079 --> 00:16:33.952
+we can reuse some logic here
+&gt;&gt; Mike North: I'll save that for
+
+215
+00:16:33.952 --> 00:16:38.126
+later,
+&gt;&gt; Mike North: And
+
+216
+00:16:38.126 --> 00:16:40.817
+we'll put the same thing down here.
+
+217
+00:16:45.911 --> 00:16:49.038
+&gt;&gt; Mike North: All right, so
+now our job is given a request,
+
+218
+00:16:49.038 --> 00:16:53.896
+like if we were to uncomment this,
+&gt;&gt; Mike North: We've
+
+219
+00:16:53.896 --> 00:16:57.100
+basically got exactly the same thing that
+we've been working with this whole time.
+
+220
+00:16:57.100 --> 00:17:01.090
+If we refresh, we should see,
+there's our fall back image.
+
+221
+00:17:01.090 --> 00:17:05.108
+But we wanna take into
+account the URL here.
+
+222
+00:17:11.585 --> 00:17:15.960
+&gt;&gt; Mike North: So we're gonna grab
+the path portion of the URL, and
+
+223
+00:17:15.960 --> 00:17:18.950
+we'll extract the itemId from it.
+
+224
+00:17:18.950 --> 00:17:26.180
+So they'll end up looking like this,
+&gt;&gt; Mike North: Something like that.
+
+225
+00:17:26.180 --> 00:17:30.788
+So we're gonna take the path and
+we're gonna get a substring.
+
+226
+00:17:33.693 --> 00:17:41.640
+&gt;&gt; Mike North: And we're gonna begin
+with the last index of slash + 1.
+
+227
+00:17:41.640 --> 00:17:46.210
+And we're gonna end with
+the last index of a period.
+
+228
+00:17:46.210 --> 00:17:50.080
+So basically,
+we're trying to start here at 1,
+
+229
+00:17:50.080 --> 00:17:54.710
+go all the way until we hit
+stopping short of the period.
+
+230
+00:17:54.710 --> 00:17:59.480
+And we'll get 123, and
+let's wrap that all in a parseInt,
+
+231
+00:17:59.480 --> 00:18:02.470
+with a radix of 10.
+
+232
+00:18:02.470 --> 00:18:08.920
+So now we've got a number which is great,
+because that's exactly what IndexDB needs.
+
+233
+00:18:08.920 --> 00:18:14.930
+And our job here, this function
+here it's involved with fetch.
+
+234
+00:18:14.930 --> 00:18:18.929
+We always wanna make sure that writing
+this in a way that they return those
+
+235
+00:18:18.929 --> 00:18:21.640
+promises that resolve to responses.
+
+236
+00:18:21.640 --> 00:18:26.974
+But we can start by opening the db,
+we'll do it right here.
+
+237
+00:18:29.401 --> 00:18:33.991
+&gt;&gt; Mike North: So we'll open the db,
+it's groceryItemDb,
+
+238
+00:18:33.991 --> 00:18:38.227
+and,
+&gt;&gt; Mike North: We get the database and
+
+239
+00:18:38.227 --> 00:18:45.656
+then in here, what we're gonna do is,
+&gt;&gt; Mike North: Create a new transaction,
+
+240
+00:18:50.874 --> 00:18:53.049
+&gt;&gt; Mike North: And we're gonna get itemId.
+
+241
+00:18:59.632 --> 00:19:03.733
+&gt;&gt; Mike North: So we can return that and
+then we will chain here,
+
+242
+00:19:03.733 --> 00:19:07.646
+we're trying to keep
+things linear if we can.
+
+243
+00:19:12.325 --> 00:19:14.400
+&gt;&gt; Mike North: So,
+we've got a grocery item at this point.
+
+244
+00:19:14.400 --> 00:19:17.677
+It's gonna look just like that plain
+JavaScript object that we put in.
+
+245
+00:19:23.857 --> 00:19:29.097
+&gt;&gt; Mike North: So at this point we've got
+the category and now we can use the same
+
+246
+00:19:29.097 --> 00:19:35.550
+thing thing like this is the ultimate
+annual back into sort of fetch land.
+
+247
+00:19:35.550 --> 00:19:37.809
+We're returning this promise
+that resolves to response.
+
+248
+00:19:39.340 --> 00:19:43.915
+And instead of the fallback image url
+here, I'm just gonna grab one of these,
+
+249
+00:19:43.915 --> 00:19:46.230
+we'll just build the string manually.
+
+250
+00:19:48.170 --> 00:19:50.805
+They're more graceful ways to do it,
+but this work for us.
+
+251
+00:19:54.288 --> 00:19:58.274
+&gt;&gt; Mike North: And we'll substitute
+this thing here with the category name.
+
+252
+00:20:00.745 --> 00:20:02.029
+&gt;&gt; Mike North: Something like that.
+
+253
+00:20:02.029 --> 00:20:05.008
+All right, let's see where we're at.
+
+254
+00:20:13.403 --> 00:20:18.779
+&gt;&gt; Mike North: Interesting,
+&gt;&gt; Mike North: Let
+
+255
+00:20:18.779 --> 00:20:22.090
+me make sure everything's
+working as it should.
+
+256
+00:20:22.090 --> 00:20:25.601
+So grocery items should get pre-cached.
+
+257
+00:20:28.778 --> 00:20:33.053
+&gt;&gt; Mike North: I think that's the problem,
+fallback image URL,
+
+258
+00:20:33.053 --> 00:20:35.430
+we want to cache those.
+
+259
+00:20:35.430 --> 00:20:36.350
+Those aren't in the cache.
+
+260
+00:20:42.987 --> 00:20:48.510
+&gt;&gt; Mike North: So let's check the cache,
+see if they're there, refresh, open it up.
+
+261
+00:20:48.510 --> 00:20:55.878
+It is the fallbackImages, great, so
+now we have far more than just the one.
+
+262
+00:21:01.277 --> 00:21:06.898
+&gt;&gt; Mike North: And,
+&gt;&gt; Mike North: That looks right,
+
+263
+00:21:06.898 --> 00:21:09.420
+let me just add a break
+point here real quick.
+
+264
+00:21:09.420 --> 00:21:12.100
+&gt;&gt; Speaker 2: Those fallback images
+are all the categories, right?
+
+265
+00:21:12.100 --> 00:21:12.600
+&gt;&gt; Mike North: Yep.
+
+266
+00:21:12.600 --> 00:21:14.954
+&gt;&gt; Speaker 2: That's how that
+associates with, yeah that stuff.
+
+267
+00:21:14.954 --> 00:21:18.880
+&gt;&gt; Mike North: So I'm just simply
+using that to pre-fetch, right?
+
+268
+00:21:18.880 --> 00:21:21.170
+So that I go, did I say add all here for
+
+269
+00:21:21.170 --> 00:21:25.350
+fall back images,
+I did fall back image URLs.
+
+270
+00:21:25.350 --> 00:21:30.163
+So I just want a break point right here,
+we'll shake out this last issue,
+
+271
+00:21:30.163 --> 00:21:31.962
+whatever it happens to be.
+
+272
+00:21:37.463 --> 00:21:42.708
+&gt;&gt; Mike North: AVR service
+workers still waiting and it is.
+
+273
+00:21:50.435 --> 00:21:51.981
+&gt;&gt; Mike North: I'll just
+do update on reload.
+
+274
+00:21:55.282 --> 00:22:00.790
+&gt;&gt; Mike North: And okay, so
+we have some different behavior here.
+
+275
+00:22:00.790 --> 00:22:01.700
+Let's see what's going on.
+
+276
+00:22:03.260 --> 00:22:09.236
+Transaction get is not a function,
+I've made a little mistake here.
+
+277
+00:22:12.812 --> 00:22:20.296
+&gt;&gt; Mike North: So,
+it's transaction.objectStore.
+
+278
+00:22:23.372 --> 00:22:28.350
+&gt;&gt; Mike North: So as you can see, there's
+a serious multi-step process at work here.
+
+279
+00:22:28.350 --> 00:22:32.790
+A very powerful tool, but
+a bit of a low-level API, there we go.
+
+280
+00:22:32.790 --> 00:22:36.860
+So now, instead of the generic fallback
+image, we get a bread-specific
+
+281
+00:22:36.860 --> 00:22:42.070
+fallback image here, and if we've
+got the banana moved or something.
+
+282
+00:22:42.070 --> 00:22:45.123
+Forget where the other
+thing we deleted is, but
+
+283
+00:22:45.123 --> 00:22:49.183
+actually know the idea of the banana
+one we can do it right away.
+
+284
+00:22:54.738 --> 00:22:57.779
+&gt;&gt; Mike North: So
+there's our wheat one and here's fruit.
+
+285
+00:22:58.900 --> 00:23:04.060
+All right, so now we're using serious
+imperative logic in a database, and
+
+286
+00:23:04.060 --> 00:23:09.920
+our last snapshot of the data itself
+to have dynamic fallback images here.
+
+287
+00:23:09.920 --> 00:23:14.920
+And I hope you're seeing now,
+we're not dealing with just a caching
+
+288
+00:23:14.920 --> 00:23:19.150
+layer that lets us have some logic
+around caching, we can do a lot more.
+

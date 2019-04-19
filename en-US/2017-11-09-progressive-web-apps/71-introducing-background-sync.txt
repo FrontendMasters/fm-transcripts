@@ -1,0 +1,75 @@
+[00:00:05]
+>> Steve Kinney: And that is the ability to synchronize in the background. Cuz at this point in the workshop, I think we've spoiled the surprise on how this is going to end for you. But it is a long bit of problem. The reason you'd want an app is cuz it can go get your RSS feeds in the background, you get on a New York City subway train, cuz we do that in Minneapolis, right?
+
+[00:00:26]
+We get on New York City subway trains. They're above ground, they're great. And we don't have the data we need, right? And there's a lot of problems with this. So with a background sync we could theoretically, we've talked a lot about getting resources, getting resources, getting resources, right?
+
+[00:00:41]
+We can cache the CSS file, we can cache the JavaScript file. But what happens when we go to post or to put some data to the server when there's no connection? It's just our app doesn't work. We've, again, ruined the illusion, right? And there's some cases where this is okay, there's some cases charge my bank account.
+
+[00:01:02]
+Listen, if we don't have a connection and that doesn't happen, tell you what, don't do that. That's acceptable for me not to be able to do, to publish my latest thought leadership piece. Maybe that can't go to the server. But there's a lot that we still can do when there is no Internet.
+
+[00:01:18]
+And we've thought a lot about offline and online, but it turns out that there is a third class of connectivity. There's online and there's offline, and then there's bad connection, right? Where you could say, hey, I'm gonna send this and it takes so long and potentially times out that it becomes unusable.
+
+[00:01:41]
+I think both Mike and I have been doing a lot of traveling lately, and when you travel, you get 2G. Which changes the way that you feel about persistently fast Internet connections everywhere, where whatever you do, it's just not going to work out. And if you think about it, this is also an interesting problem because we force some caching mechanisms, right?
+
+[00:02:02]
+We said hey, go hit the network. And if the network doesn't work out, then go to the cache. That's wonderful if you have no connection, right? Okay, I tried to connect, there was no connection, give me the cache version. What if you have an abysmally slow connection? Well, you wait, and wait, and wait, and wait.
+
+[00:02:26]
+Until either A, the merciful deities of network connectivity time you out, or B, you just lose your mind and close the application and go ahead and do something else, right? Those are the kind of two things that could happen if you have an incredibly slow connection. The thing was, there are a bunch of actions we could take in our applications.
+
+[00:02:46]
+And like we said earlier, how this manifests itself in your application depends on the application that you're building. We'll take a look at some examples in a little bit. So there's not off the shelf, here's what you do. It is the interaction that you're trying to optimize for is going to have, you have to think about what the use or what you expect in these situations.
+
+[00:03:06]
+But we know that we have ways of doing stuff when the user isn't actively using the page. So couldn't we just cache those things and tell the user listen, we've got your back. And I'll try to do it later, or something like that. Well, well. No, we can.
+
+[00:03:27]
+So think about here's a use case. Let's think about it from the terms of the user, right? Logan has been using this native to-do application for the last year and things have been going swimmingly. Whenever she's on the go and needs to remember something do, she just jots it down, right?
+
+[00:03:41]
+It's key she comes up with something, she puts it in there, she's good to go and heads about her day. At the behest of her husband who's all about the open Web, she decides to give some web-based application a shot, and it doesn't really work out, right? She goes ahead and she finds this application, she opens it online, it's a progressive web app, right?
+
+[00:04:00]
+This is great, she can see her to-dos, the subway train that doesn't exist in Denver. And she's like I've got this, I'm going to put something in. Or maybe she's on her way to the mountains or something along those lines. She can see them all, and so she's like I just remembered I need to take Wes to the dentist.
+
+[00:04:17]
+Fine, let's put it in the application. Let's wait. Let's see how it goes. This might go well. That face could be the face of watching the network time out or just the face of it taking forever, right? Which we don't know, that's not the interaction that we expect out of a to-do list, right?
+
+[00:04:37]
+We just wanna put it in, put it back in our pocket, and just assume that it's going to be there, right? We don't have to wait on a native app. Why would we have to wait on a mobile app? With progressive web apps, one of the newer kids on the block is background sync.
+
+[00:04:55]
+Background sync allows us to defer an action until we have a successful connection again. And so instead of maybe even making the fetch request, we can schedule a sync. And if you have Internet, well, that's great, you will then perform the sync. If you don't have Internet, that's fine, the sync has been scheduled.
+
+[00:05:16]
+We will wait until you have Internet, and we will take a look, and we'll see if we can connect later. If not, we will try again, and we will try again. It'll do you stuff like incremental back off, so it won't continually thrash around trying, but will just wait until we have a connection and then we'll try to do it.
+
+[00:05:35]
+The way this works is we've used a lot of navigator.serviceWorker.register, right? .register is a serviceWorker, fine, and that happens to work out great. There already is one. It says, here is your registration. We also have its kind of sibling which is navigator.serviceWorker.ready. And that will return a promise that will give you the registration if there is one.
+
+[00:06:03]
+And obviously, it will catch if there isn't a serviceWorker installed. So we'll say hey, I would like to know about the currently installed serviceWorker. You'll get that back. And then registration.sync.register. And then you can register some name of your event. And this is an arbitrary string, it all depends on your application.
+
+[00:06:23]
+This is create to-do. It is favorite tweet, something along those lines. It all depends, but the string is up to you. It depends on your application. This is what it looks like in the browser. On the service worker side, very similar to how we've handled fetch, and activate, and even push, right, we just add a listener for a sync event.
+
+[00:06:43]
+And this sync event will be fired if you're online immediately or if not eventually, right? And this is where that tag comes in because you could have many. Like every other kind of serviceWorker API, there is one event you listen for and then you kind of have to namespace it a little bit to kind of figure out which one.
+
+[00:07:01]
+And that's where the tag comes in, where we gave it a name that arbitrary string will get that as event.Tag. And you can break this out into functions. If you're using web pack, you can break this out in other modules. We’ll use event.waitUntil. If you remember from earlier, event.waitUntil1 keeps this current process alive until we're done.
+
+[00:07:20]
+More importantly, it looks at the promise that gets returned. If, let's say, you're scheduling a fetch. If that fetch resolves, well, the serviceWorker can assume, I have done my job. I sent a fetch request, it resolved, my job is done here. I do not need to do this sync event again.
+
+[00:07:41]
+Syncs are a one-time thing. If it fails for some reason, maybe it's still like, I'm online, I'm gonna try to do this. Timed out again, cool. That promise rejects and the sync event is still valid. If you register another sync event with the same tag, right, that will again replace this one.
+
+[00:08:06]
+It's the same thing with notifications. A tag is a way for you not to double up or to duplicate notifications, or in this case, sync events.
+

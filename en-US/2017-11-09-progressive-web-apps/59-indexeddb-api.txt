@@ -1,0 +1,74 @@
+[00:00:00]
+>> Mike North: Here's, this is sort of like at a very high level how things work with IndexedDB. You open a database and you open it by name, you can have multiple IndexedDB databases. And when you open it, you kind of declare that this application would like to open it and the current version of this database is 1.
+
+[00:00:20]
+So let's say the current version of the database is 10. And if we find something on disk that's a version 5, that lets us know well, we have to migrate this thing forward. Maybe you've added a couple fields, or created a new store, or changed the way indices work.
+
+[00:00:36]
+That tells you sort of your target and your current position, and now you know the path that you have to take. And that brings us to onupgradeneeded, so this event is fired in the event that what is found does not match the version that you're asking for. Here, we're asking for version 1.
+
+[00:00:55]
+Like, if we were asking for version 10 what we find on disk is version 9. That thing's gonna get called. And we'll drill into that more deeply. And then finally, after the database has been opened, right, and the upgrade has completed, basically taking what was stored and bringing it up to current, now we can do stuff in this onsuccess hook.
+
+[00:01:23]
+This is a really cool way of doing this. And I've had experience working on desktop apps, and server-side apps that store data for many years. That's in document format. There's a lot of value in this because most of the code that you write is going to be in unsuccess.
+
+[00:01:41]
+And you can take for granted that by the time that is called you're working with an already updated database. You kind of bring it up to date and then let's start working with it. Rather than having to have a lot of complex switching. Like if you've ever dealt with maintaining local storage data over long term, oftentimes you end up just throwing it out the window, because you've changed the way you handle certain things, which is not a good experience for users.
+
+[00:02:07]
+So let's drill into these. Let's first focus on the onupgradeneeded. And this is the pattern I advise that you use when you're upgrading a database. So, you can first see that we get this thing called a DB, sort of a very central object. We will use this DB object quite a lot, and that is available on, if we look back here, open is the thing that we got from the, it is returned by this open function, right?
+
+[00:02:43]
+And once this function is called here, you will find that there's something available on this open object under the result property. Already you should be thinking this is clunky as all hell, I should be getting this as an argument to a function. The reason is IndexedDB is pretty old.
+
+[00:02:59]
+It's been around since, it is available in a genuine way all the way back to IE11 and polyfillable in IE10. So like Promises were not at the heart of what we were working on and you have to imagine that the standards were developed long before IE 10 so it's like it feels old because it is old and that's why I'm going to show you something that's a little nicer to work with as we round things to the exercise.
+
+[00:03:31]
+So we get the database on this open object, and on this event what we can do is basically switch on this old version. So the old version is what you're gonna, that is where we find the version of the database that was found on that user's disk. I advise a key switch upgrade pattern here with no breaks, deliberately.
+
+[00:04:01]
+The idea is if you have 8 different cases for 8 different versions of the database. Each case statement can represent an incremental upgrade from version 1to version 2, version 2 to version 3. And essentially, a very old database will sort of begin executing those steps 1 by 1, beginning at the correct spot and following all the way through to the bottom, and then you're completely upgraded.
+
+[00:04:29]
+This makes managing complexity a lot easier, and it also keeps us honest about forward compatible, or sorry backwards compatible changes. So you should never find yourself committing new code that alters very old migrations from, if you're on version 10, you really shouldn't be mucking with the code that takes version 2 to version 3.
+
+[00:04:51]
+Unless there's a bug in that area, that's pretty much set in stone. And now you should be always just adding stuff to this.
+>> Speaker 2: Am I right in the assumption that if you're on version 10, and the disk has version 1, you're gonna get 9 onupgradeneeded events that fire sequentially?
+
+[00:05:10]
+
+>> Mike North: No, you're performing 1 upgrade, but you're gonna enter this switch and fall through 9 cases. So the act of upgrading happens once.
+>> Speaker 2: Okay.
+>> Speaker 3: And the version is that application's version or the IndexedDB's own version?
+>> Mike North: EVT.old version is the version of the database found in storage.
+
+[00:05:36]
+The number 1 that we passed in here when we opened this thing. That is the application's like most modern known version. So you'll be incrementing that up and up and up as this database evolves. And you'll be adding more cases here as well, so that's all I really have to say about on Upgrade Needed.
+
+[00:06:03]
+It's not incredibly complex. And if you've ever used a server-side application that has a concept of database migrations. This is database migrations in case switch form. So let's look at what we can do in the unsuccess hook.
+>> Mike North: So we get that database object, and we create a transaction.
+
+[00:06:29]
+So here we're seeing that IndexedDB is transactional. What this means is that we can attempt to carry out a sequence of operations, and they will either complete or nothing will happen. So, what I mean by that is either the whole transaction will finish successfully or any partial work that has been done will be rolled back.
+
+[00:06:55]
+So it's sort of an all-or-nothing thing. Here's an example of a transaction that's been happening behind the scenes in the app that we've been using so far. When you create an order, like all the items are removed from the cart. So that creation of an order and removal of 10 or so records that were cart items, those operations either all work or the database is left as is.
+
+[00:07:23]
+You're never gonna end up in a situation where the order was created but we still have stuff in the cart. So this is great in terms having guarantees about completing a multistep thing or leave it alone. You're never caught with a half complete situation. So once we create a transaction, we can get on this transaction a store, and this is a collection of these objects.
+
+[00:07:50]
+And at the end, we want to add this on complete callback for the transaction, and essentially that will make sure that we close the database up when we're done.
+>> Mike North: Here is an example of stuff that we could do with records. So we've got, we can create an index, we can put records into the store.
+
+[00:08:13]
+You'll see that all records will have an ID. This is very important, you have to have an ID on records. And what we have here is fields that can be nested, so we have name, first, and last. Name is an object here. And once we have an index, we can use that index in order to retrieve records, so here's an example of retrieving a record by ID or using this index that we created on the first line.
+
+[00:08:42]
+
+>> Mike North: And again, it's available in a lot of different browsers. Opera Mini doesn't use it because they tried to offload some Java execution onto servers and that's sort of an oddball. But Chrome's had it for a very long time. This works on iOS Safari. In fact, Safari just shipped IndexedDB 2 which is faster and offers some more features around query.
+

@@ -1,0 +1,133 @@
+[00:00:00]
+>> Steve Kinney: Talking a little about cache, right? Cuz like, we don't have an offline app yet, we are simply taking your request and giving back another request. That does not get us the progressive web app stamp of approval, right? It doesn't work offline, we're just sending pictures of oasis like giant trolls every time they ask for a picture of The Beatles.
+
+[00:00:19]
+Very cool, but not particularly useful for building offline applications. The Cache API, again, follows this same extensible web manifesto logic. We know that there is a cache. There's an HTTP cache, right? We saw that when we started looking at service workers earlier. You can set max age of a year and maybe the browser keeps it for a year, maybe it doesn't, right?
+
+[00:00:42]
+You can say, I would like these things to happen, but you don't have fine-grain control. You don't have programmatic access to make decisions with the normal HTTP cache. The cache API gives us, again, in the same way service worker gives us fine-grain control and programmatic JavaScript access to intercepting network requests.
+
+[00:01:02]
+The cache API gives us fine-grain control and JavaScript access in the full JavaScript programming language for managing cache. All right, so what does this look like? We have caches, which is globally available, and you can open the caches and again, everything in a worker is effectively asynchronous, right?
+
+[00:01:24]
+So that time we spent talking about promises is paying off in dividends right now because most of these modern APIs, with one exception that we'll talk about later, use a promise-based API. So we say caches open, we say what cache would you like to open, this is an arbitrary string, right?
+
+[00:01:44]
+In this case I've called it assets-v1, you can call it sandwich. It doesn't matter, it is simply a unique identifier for the set of caches that you would like to open. Or they're giving cache that you would like to open. When that happens, you return a promise which is the cache, right?
+
+[00:02:01]
+This would be the sandwich cache or the assets-v1 cache in this case. You can tell your cache a bunch of things that you would like it to hold on to, all right? Again, this is not like hoping that the HTTP header was all right and the browser does the right thing.
+
+[00:02:16]
+You are in control. So when a service worker installs, we'll use this event waitUntil that we'll talk about in a second, and we'll open the caches, we'll take the given caches again, this is assets-v1, and we'll add three files to the cache. Index.html, style.css, client.js in this case.
+
+[00:02:37]
+These are just arbitrary files for a very simple application and they will now, we know that they have been added to the cache. If any of them have not been added to the cache, this promise will fail, right? So it's not just like hope they were added, hope everything worked out.
+
+[00:02:52]
+It's like no, no, no, this promise will reject if something didn't work out. We will know if something didn't work out. We can write a fallback if something didn't work out. And we put there three strings, but it's a lot like Fetch insofar that these strings are effectively request objects, right?
+
+[00:03:09]
+And we can add all, we'll take a look at some of the other methods in a second. One strategy that you'll see sometimes is this cache.add that's separate, right? The promise will only resolve or reject if everything in that return resolves, or any of them reject, all of them reject.
+
+[00:03:29]
+If there's non-critical things, you can also do it outside of the return promise. An example, like why would you ever wanna use this. Let's say, you're making a game and you might say like listen. We're not starting, like let's assume that this thing did not install if we did not cache levels like 1 through 20.
+
+[00:03:49]
+We can also try to cache like 23 through 40 as well but we don't necessarily, they're not critical. If you can cache them, great. If the service worker that's lifetime times out, fine. If you can get them, cool. But anything in that return value, if it doesn't work out, the service worker will not have installed.
+
+[00:04:11]
+So yeah, this is like non-critical css, non-critical like things that you could lazy load. If you get it now great, otherwise use it later. So that waitUntil.
+>> Steve Kinney: If you've ever written a asynchronous JavaScript test, you know that, in Mocha, you might have to say done and then pass it in as an argument.
+
+[00:04:31]
+And with that way the test doesn't like complete because the asynchronous stuff hasn't come back yet, event.waitUntil takes a promise and it will keep this service, this install process alive until that promise resolves. Again, if the promise resolves in a happy place, the service workers installed. If the promise rejects, we've assumed that this service worker is bunk and we don't actually install it at all.
+
+[00:04:56]
+So it gives you, one, the ability to make sure like I'm doing some of the asynchronous things, give me time. And two, if things go wrong, don't actually install me. I don't know what I'm doing. Let's wait until I configure this out. So we use it a lot for anything that we want to, one, insure success or know about failure and b, keep this process alive until it is done.
+
+[00:05:21]
+So, I hinted this before, the Cache API is effectively a key values storage. The keys are requests, the values are responses.
+>> Steve Kinney: Which means that if you say hey, I have this request, it's like yes, I already know about these kinds of requests. I have one of them, here is this response that I would like to give.
+
+[00:05:45]
+Here's a response that I know about. And this plays really nicely with the Fetch API, right? Which means the Fetch API has a request, right? It got a request as part of the Fetch, and so you can talk to the cache API. Listen, I got this request through Fetch, do you know anything about this?
+
+[00:06:03]
+Do you have anything stored for this, and the Cache can go, those kind of requests, yeah, I know about those, right? Or it can be, I've never seen that before in my life, so, sorry. Generally speaking, the only kinda things that we can really cache are GET requests, right.
+
+[00:06:20]
+You can't cache what happens if a user sends data. So generally speaking, these are GET requests. But thinking about it, we'll see a lot of stuff in strings. If you see a string being handed to the Cache, it's doing the same thing Fetch does. The kind of primitive under the hood is this request object, and that's kind of like how it all strings together.
+
+[00:06:37]
+So we have a bunch of methods for manipulating the cache. Cool. So we'll open this band-assets, keep on our Beatles Oasis theme. And effectively the most, the simplest one for putting something in the cache is this very well-named method called put. And put takes two arguments. It will take a request and a response.
+
+[00:07:01]
+And if it sees that request again it will give you that response, right? Now, this is a perfect world where I happen to have a response object just sitting around in my JavaScript code that I could pass in. Likely, you don't have that yet, right? How do we normally grab a hands on responses?
+
+[00:07:21]
+Fetch, right? So normally it's like I will Fetch something and I will get the response back from the server. Basically, you get a Fetch and then pass it in. There's a little helper called add. Add will just take a request. And it is effectively the same as doing this.
+
+[00:07:43]
+It's effectively the same of taking the request, fetching the request, storing the response, and then putting the request and the response then. So add takes one argument, but effectively what it does, it goes ahead and then fetches it and stores that response in there, right? So our cache is request and the associated responses at the time that it was put into the cache.
+
+[00:08:04]
+
+>> Speaker 2: Cache match versus cache put?
+>> Steve Kinney: Cache match will say are you in the cache? That's kind of like getting something out of the cache. Cache add will take a request, fetch the response, and put the request response pair in. Cache, yeah, that should be put, thank you.
+
+[00:08:25]
+[LAUGH] Minor tab, yeah, that last line should be a put in there, instead of a match. A match, spoiler alert, will check to see if something is in the cache, and then return you that response. So working with the cache, there are two times that we might set up the cache in this case.
+
+[00:08:43]
+We've talked about adding stuff into the cache but we haven't really talked about getting stuff out yet. The getting stuff out mostly happens at fetches, right? Like, hey they asked for something. That is most likely when you pull something out of the cache. But setting up the cache, we have two major times that we might set up the cache.
+
+[00:08:58]
+One, uninstall. So its new service worker is emerging and it basically is like okay, I know that I need to cache the index.html, the style.css, the script.js. I need to collect all these things as part of me being a service worker is I have all these things, so we set up all the things that this service worker needs to have in cache in order to be able to do its job.
+
+[00:09:25]
+What do you not want to do in the install process is touch anything that the existing service worker is using, right? This should be setting up what you need, but not touching what anyone else needs. Activate, which means I am now the service worker, right? Which means I no longer have to care about anyone else, I am the service worker, which is a great time to remove any cache that the current service worker doesn't need that maybe old ones did.
+
+[00:09:56]
+And this is where those cache names become really important. Because this service worker could be assets-v1. It sets everything up, it takes the stage, a new service worker emerges. Maybe its cache name is asset-v2. It can set up the asset-v2 cache. And then what should it do when it takes the stage?
+
+[00:10:17]
+Remove then the assets-v1. What you don't wanna do is on install, let's get rid of the one that the current service worker is using, no. The strings, those arbitrary strings, give us the ability to name space the cache, right. So we can have this service worker's cache versus another service worker's cache.
+
+[00:10:35]
+So let's look at this with some code. Here we have a constant called currentCache, again assets-v1, this is a string. A more advanced thing you could do is if you had some build tools you could theoretically go if the service worker has changed, let's update this to the hash that we saw in the file names to the build process or something along those lines.
+
+[00:10:59]
+And you'd do it dynamically. Or in a very simple application, you can manually increment this. We'll say, okay, we're gonna install, wait, open the current cache, add these three files in there. And this will set up the initial service worker. Let's say we have a second one come and it's now taking the stage.
+
+[00:11:24]
+Its current cache is assets-v2. Again, like this is you might have manually updated because you know it's doing different stuff with the caches. Basically, the easiest way to do it is caches.keys will give you all of those strings. So in this case, assets-v1, assets-v2. It'll give you all of the name spaces in there.
+
+[00:11:45]
+And you can simply go through all of them and say, I am now the service worker, I use assets-v2. Anything that's in there, we can filter through all of the other cache keys. If you're not the current one, I'm gonna clean you up and get rid of you, right?
+
+[00:12:02]
+So we go through all of them, we say if the name of that cache is not the name of the current cache, cool. Make an array of all of those, go through those and delete each one of those, so now you've cleaned up after yourself. Otherwise, you start taking up more and more memory.
+
+[00:12:17]
+How much memory you're allotted in cache and index DB and all those things varies from browser to browser. And even within browsers, varies a little bit depending on disk space. So this number I can always change, it's not actually in the spec. At this moment, Chrome gives you per origin, 6% of available storage space.
+
+[00:12:43]
+You don't know what's 6% is, [LAUGH] right, if it is like a older budget-priced phone, probably not a lot. If it is a like, top of the line phone you might have a whole lot, you don't really know, right? So you do need to be judicious as you store stuff.
+
+[00:13:03]
+Because if you start blowing your budget, the browser will take care of this for you and it will basically wipe you out completely. So you want to be 6%, Jen always figures a lot. I think Firefox is 10%. Some other browsers might be a certain number of megabytes, it varies and it could change cuz it's not in the spec.
+
+[00:13:24]
+So generally speaking, as much as you need and as little as you can get away with.
+>> Speaker 3: So if you go over the browser sort of pick and choose what it drops as you add new things?
+>> Steve Kinney: It will wipe you out.
+>> Speaker 3: It will go away, yep, so you want to in a lot of cases that is still like a lot of stuff that you would be caching, right?
+
+[00:13:42]
+But yeah something to keep in mind. The really cool thing about the Cache API is we've looked in the context of a service worker, because that's our focus today. But you can also access the Cache API from the browser as well, from the client-side code. And it's really interesting, so you could implement stuff like save for offline where you have a link.
+
+[00:14:05]
+Yeah, totally go fetch that, and let's store it in the cache, right. So you can programmatically access it from the main thread as well, which is really kinda cool.
+

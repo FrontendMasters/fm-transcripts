@@ -1,0 +1,85 @@
+[00:00:00]
+>> [MUSIC]
+
+[00:00:05]
+>> Douglas Crockford: So this is a composition pattern, so this shows how composition works. So I can have when's attached to the result of another when and so on. It's the same thing as when with this nested call of f and g. And some of you might be going and saying, wait a minute, that looks a lot like the third axiom.
+
+[00:00:26]
+And you're right, this is the third axiom, because it turns out that a promise is a monad. It's a different kind of monad because the value is not known at the time the monad is created. The value will only be known, if it is ever known, sometime in the future.
+
+[00:00:45]
+And also unlike other monads, a promise is linked to two resolver functions, the keep function and the break function. Whereas other monads are more singular things. And also the when function of the monad is like bind, except it takes two arguments, one for success or failure. Failure is not a consideration with the ordinary monad, but otherwise it's a monad, it otherwise respects all the properties of monads.
+
+[00:01:14]
+So, I'm going to make one, so, here's the VOW function, so I've got a lot of code to show you. It's about a page worth of code, it's not that much, but you can't project a page of code, it's just rude. So what I'm going to do is show it in pieces and hope you can kind of put it together.
+
+[00:01:32]
+
+>> [COUGH]
+>> Douglas Crockford: So we've got a function closure here, like we've been doing before because I want to have some shared state. In particular, the enqueue function and the enlighten function. And I don't want those to be global, I want to hide them inside of this shared structure, so I'm calling it immediately.
+
+[00:01:51]
+And then, oops, I got that wrong again, so I've got to fix that, wrap that up, that's nice, okay, so let's zoom in on the make function.
+>> Douglas Crockford: So make has some private state. It's going to have an array of break functions that are waiting to be called, an array of keep functions that are waiting to be called.
+
+[00:02:15]
+Its ultimate fate, which will be its value some day and its initial status, is pending. And we'll have a herald function that we'll get to in a minute. And then it returns an object containing a break function, a keep function, and the promise object. Now normally, when I make one of these, I will take the promise piece and snap it off and give it to someone else.
+
+[00:02:40]
+So I give you my promise, and at the point in time where I'm able to keep or break that promise. I will then call one of these methods that I'm reserving, I could pass those to you as well, but there's no point. You wouldn't want to break your own promise, that doesn't do you any good, and one of these methods can only be called once, right?
+
+[00:02:58]
+So once someone has kept the promise, no one else can keep it. Any attempt to change the fate of the promise will fail, it will fail immediately, that is something that can throw, so no point in that. So let's zoom in on the promise, I'm sorry, well, let's zoom in on the herald.
+
+[00:03:21]
+So the herald is the function that break and keep will call to when they know what the result of the function is going to be. And they want to tell everybody about it. So herald will get the state of the monad, which will now be either. Which should be pending at this point because we're about to change it.
+
+[00:03:42]
+If it isn't pending, then we have to throw an exception, then we will set the fate to the new value that we got. And we've got this queue of functions that are waiting for the resolution of this promise. And we will enlighten the queue and let all of those functions know this is the fate.
+
+[00:04:02]
+We will then take the array of breakers and the array keepers and set them both to zero. Because they've, whichever one doesn't matter anymore, we just want to forget about them. So it allows them to get garbage collected. And we want to make sure everybody only gets called once, so we'll just get rid of both queues.
+
+[00:04:21]
+So now let's zoom in on the promise, so the promise is an object. It contains a property is promise just so that we can recognize that it's a promise. It's not strictly necessary, but it can be a good thing to have, the important thing is the when method.
+
+[00:04:39]
+The when method is the thing someone will call on the promise when they want to be informed about what the result of the promise is. And it can take a capped function and a broken function, so first thing we'll do is make a new vow. This will be where we get the promise that when is going to return.
+
+[00:04:58]
+And then, depending on what the current status is, we'll either add the new methods to their respective queues. Where if the promise has already been kept, then we'll add it to the keeper queue and enlighten that queue immediately. That'll cause that promise to get dispatched, so that means it doesn't matter when, there's no race between when and keep.
+
+[00:05:22]
+You can call when after the promises have been kept, and you can't tell the difference. It works just the same, so that turns out to be a really nice temporal property, and broken does a similar thing. And then at the end, we'll return the promise component of the vow and it's done.
+
+[00:05:42]
+
+>> Douglas Crockford: Okay, and then this is a function that does the enqueueing, and there are a couple of cases that it has to be concerned about. Whether it's getting past a value or getting past another promise or whatever. And this deals with that and make sure that the right thing gets put onto the queue.
+
+[00:06:01]
+Then enlighten is the thing that informs everybody about what the outcome is, so it just goes through the queue. And for each function that's stored in the queue, it will call setImmediate to cause that function to get called with the fate. setImmediate is a new thing that was just added to the DOM, it's not in most of the browsers yet.
+
+[00:06:21]
+It's like setTimeout of 0, except faster. It turned out that the early browsers couldn't keep up with setTimeout of 0. So they added a fudge factor to it, which makes that time out of 0 actually take a long time. And there are now applications which say, wait a minute, we actually wanted to run immediately.
+
+[00:06:38]
+So, they had put in another thing to do what setTimeout at 0 should have done. So, all of the code for this is on GitHub, if you want to take a look at it altogether. This is the full page, I'll give you a minute to write that down, that's it.
+
+[00:06:56]
+Okay, so Our Friend the Monad, so who knew? So you've seen four monads now, the Identity Monad, the Ajax Monad, the Maybe Monad, and the Promise Monad. And it turns out they're really easy and kind of simple and not all that thing that they fussed about, which is okay with me.
+
+[00:07:24]
+You might want to go reading through the literature, search for monad burrito, you'll be surprised at what you see. And you'll be able to understand it because you've been through this. Whereas I can guarantee you no one else who reads that stuff will make any sense out of it.
+
+[00:07:42]
+So for further viewing, I've got more videos for you to watch. Neither of these has anything directly to do with monads, but they're both really interesting. So I've been talking all day about the actor model, Carl Hewitt is the guy who discovered it at MIT. Brilliant guy, he's written a lot about the actor model, but it's all written at that level.
+
+[00:08:01]
+And there are very few people on the planet who've been able to make a lot of sense out of it. But he did an interview for Channel 9 at Microsoft a few months ago, and it's a very nice interview and he clearly explains what this stuff is. Unfortunately the folks at Channel 9 seemed to like the really long URLs.
+
+[00:08:19]
+So I doubt that there's anybody who could actually type this one in, but if you do a search for these words, you'll probably find it. Then Mark Miller, he's a guy who developed the modern promise based on futures and other things. And he's been using promises to not only develop secure systems, but to develop economic systems.
+
+[00:08:42]
+So he's using the ability to control object references in a distributed graph as tokens of value by which you can create a financial system. Really, really interesting stuff, and this is a collection of two lectures which talk about that.
+

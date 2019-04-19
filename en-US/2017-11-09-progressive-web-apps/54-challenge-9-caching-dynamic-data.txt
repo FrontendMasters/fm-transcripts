@@ -1,0 +1,148 @@
+[00:00:00]
+>> Mike North: I hope that our first big step into doing something really meaningful in the service worker, precaching. I hope that's been interesting and we're starting to understand the power of this new tool in our web development toolbox. So this is actually the first in a series of three exercises that will take us closer and closer to working offline.
+
+[00:00:26]
+And there are three patterns that are regularly used in apps that are using service workers today that embody this idea of progressive enhancement. So in the event that this work that we're doing with the Service Worker, it's not supported, all of these requests will just go to the outside world.
+
+[00:00:51]
+So this is something that we sort of slip in underneath our app and it will have the effect of speeding things up or allowing us to tolerate things that previously were intolerable, like working offline. With that, let's move on to the next step and when looking at these three steps, they're for three different categories of assets.
+
+[00:01:12]
+So exercise eight, this is stuff you know about atbuild time. Next we're going to have a strategy for dealing with JSON, dealing with some of this dynamic data. So our app is, it's actually not able to boot without an Internet connection yet, that'll be the next step here, I think we reordered these.
+
+[00:01:37]
+But anyhow, we need JSON in order to get that list of grocery items to appear on the screen. So that's the second of three things that we need in order to get online. The last being indexed at HTML, if we can get JSON working and we have fallback images, and we have all of our JavaScript in CSS handled already if we have pre-caching.
+
+[00:02:01]
+Index.html is all that's left. So the caching strategy we're going to employ here is network, then cache. So we try to use the network first, we have a bias for getting fresh data, fresh JSON, in the event that the fetch doesn't work out, we want to use a cache copy of that thing.
+
+[00:02:28]
+And what that involves is, even if we do go out to the network, we wanna make sure that when that response comes back and we say respond with this. We wanna make sure that we also put it into the cache, so that's it there later if we need it, if we need to fall back onto it.
+
+[00:02:45]
+We wanna store these in a separate cache than the precache responses. The reason is, occasionally there are use cases for maybe our fallback images. That cache can hang around over multiple versions of a service broker. This probably cannot, in fact, this is one that we want to write over repeatedly.
+
+[00:03:05]
+Every time we go out and get fresh data, we're gonna also update what's in the cache. Even if it's the same thing, it's harmless to do this because it is happening in another thread, it basically comes at no cost. I say it comes at no cost because your service worker is mostly idle.
+
+[00:03:21]
+And so asking it to do things so it's not competing for resources that are scarce, which is our main application thread. So with that, I wanna make sure I set you up for success in this exercise. And I wanna point out exactly what we should be doing and where we should be putting our code.
+
+[00:03:41]
+
+>> Mike North: So first and foremost, what I want to do is, I want to look at our code.
+>> Mike North: So everything that we're gonna be doing is gonna be stuff that's sort of stems from the fetch handler here. With this kind of cache, it's sort of, think of it as like storing the most recent copy of things that we've seen.
+
+[00:04:12]
+There's no setup process, we sort of just throw stuff in there as we see it. And if we look at the way that this is structured and what your seeing here this has been pushed to master in the Frontend Masters branch. Sorry, it's been pushed to get on the Frontendmasters branch, you can see that we've got like a multi teared thing.
+
+[00:04:33]
+So first, we attempt to match the request with something that is in the precache pile of stuff. And if we find it, we're gonna go ahead and use it and proceed no further. That's the advantage of using return here, we're done, this function is completed early. Here, we begin to handle stuff that is kind of type specific.
+
+[00:04:59]
+So I'm gonna actually clean this up a little bit for our purposes, and just combine this into one check. I'll repush this up, so no problem. And here's the kind of stuff that we'll want to start doing in order to make our service worker a little bit more maintainable.
+
+[00:05:25]
+
+>> Mike North: Something like this.
+>> Mike North: So we're gonna kind of have these little checks and flags that let us find where we wanna go. Up at the top before we start responding to things. And then we can say if it's a grocery image do that. Click else if isApi.Json.
+
+[00:05:51]
+Return fetchApiJsonWithFallback, something like that, right? So you're gonna have this nice, easy to read, high level function that kinda takes care of routing stuff where it needs to go. And then we're gonna define this function out here.
+>> Mike North: And this simply needs to return a promise,
+>> Mike North: That resolves to a response.
+
+[00:06:36]
+And so in here we're gonna either do, we'll do something like,
+>> Mike North: If this is an API call, actually that's already checked. We'll leave this as false for now.
+>> Mike North: All right, it's up to you to figure this out, how to make an appropriate check, and the hint is probably qualitatively similar to what we've done for image checking.
+
+[00:07:04]
+All right, we checked the type, like the accept header, we checked some part of the path portion of the URL. Maybe there's some similarity with all of our AP calls that we can use there. And here we're gonna say try to go to the network for some json in the event that it doesn't work out.
+
+[00:07:30]
+
+>> Mike North: Serve from the cache.
+>> Mike North: And,
+>> Mike North: Here, we can say this'll be sort of a sub-path after this line. When it comes back, return that,
+>> Mike North: That promise or, sorry, when it comes back, I'm trying to write this in a way that it can be transformed into code really easily.
+
+[00:07:57]
+When it comes back, begin the process of putting it in the cache.
+>> Mike North: And then immediately,
+>> Mike North: Return the original response.
+>> Mike North: And then resolve the promise with the original response.
+>> Mike North: So here's the reason I phrased it this way.
+>> Mike North: You have to remember that like promises, they can resolve, but then they can actually continue on doing stuff.
+
+[00:08:48]
+So you can resolve with that response and then begin some work that the service worker has to do what the application may not care about at that moment, such as taking that response that's already been heading back to the app. And like we wanna put that in or cache for later.
+
+[00:09:05]
+In terms of how we're going to figure out how to put it in the cache, you're gonna do something like this. Caches.open(ALL_CACHES_Fallback).
+>> Mike North: And then cache.add or addAll.
+>> Mike North: And you'll pass that a request or URL, something like that.
+>> Mike North: Does that make sense to everyone? I mean I'm trying not to solve the problem for you but this is sort of the way I would go about solving it.
+
+[00:09:47]
+So I'm gonna quickly push this up to Git. Feel free to pull it down and use this as your starting point or just refer to it on GitHub. But all of your work should be done in this file. There's nothing in this caches file that relates to falling back.
+
+[00:10:04]
+So you're just gonna be dealing with your Service Worker here. And again, I hope you'll start to see similarities. We have one fallback, for images. And hopefully we'll start to see that we can employ some of the things we've already learned, in order to have slightly different strategies that are more appropriate for JSON.
+
+[00:10:24]
+Any questions?
+>> Student: JSON responses in your API, are you more apps to allow 404s, 500s and such to fall through to the app, and not pull those from cache? Because those are potentially, the development would be super trolley, if you're returning from cache on a 500 or a 404.
+
+[00:10:47]
+
+>> Student2: Yeah.
+>> Mike North: So here's my advice on status code. A 404 means resource not found. So the convention typically is if you ask for a single resource, and that resource doesn't exist, you should get a 404 back. So that would be like if we had a grocery tile and no grocery items with that ID is known, and we're trying to get just that one grocery, 404 is appropriate.
+
+[00:11:14]
+A collection of resources should never really return a 404. An empty collection is still a successful return of a collection, it's just empty. It would be quite confusing to other developers if you design a system where a 404 for a list of groceries is possible.
+>> Student3: And if it's a 404, it will never be in the cache.
+
+[00:11:40]
+
+>> Mike North: Yes, exactly, it never gets HTTP cached either, that's what you're talking about here. So we don't typically-
+>> Student3: But it couldn't be in our app cache as well, because we'll never might have retrieved it.
+>> Student: Unless it becomes a 404-
+>> Mike North: You can cache a 404.
+>> Student: Later.
+
+[00:11:57]
+
+>> Mike North: It's just a response. You can cache a 404, and you might find, if we were to do that, that could be tricky. Because say we cache that 404, that empty collection, and now, even if we handle that 404 as an empty collection in our app, what if I add a new resource?
+
+[00:12:18]
+Like add a new item, and now we've cached that 404. Browsers don't typically cache anything than successful status codes. For that matter, also keep in mind, we're constantly overwriting our fallback cache as we see new JSON come in. And we're only using it in the event that getting other data fresh is not possible.
+
+[00:12:39]
+So it may be a little bit out of date, but keep in mind the alternative is not get fresh data, the alternative is our app does not work offline.
+>> Student: A lot of it, again, is very contextual to the application that you're building. So if you imagine for a second that we are building a social media application like Twitter, right?
+
+[00:13:01]
+You could run into a situation where you have a 404 resource that has been deleted, right? That's a very different situation from a fallback image that you might have for an avatar, right? In those situations you might still want to show the empty avatar versus a broken image, right?
+
+[00:13:17]
+So it's very contextual to be like given thing that you're doing in your application, right?
+>> Mike North: Yeah.
+>> Student: So there's not a, here's one rule that fits everything. That's, again, the power of this when you have this fine grain control. You're able to, what is the expected user experience and use that a the basis for how you handle these things.
+
+[00:13:39]
+And again, having the full power of the JavaScript programming language helps in this case. And so yeah, it all depends on what exactly it is, right? Maybe we want to show, if an image has been deleted, it might be appropriate to show the fall back image in this case, versus some other resource, is it more appropriate if it's paged?
+
+[00:13:58]
+Is it more appropriate to say hey this resource no longer exist, right? And those are like I think very different in those cases. And there there are still status codes that you would get back from a server, if there's a loss of connection, right? But they are different in maybe how you choose to handle that user interface of your application.
+
+[00:14:12]
+
+>> Mike North: But one one thing you'll notice that's really consistent about what Steve and I have said, 404 indicates a single resource is not found. That is not the same thing as empty list of results. All right, with that, I just re-pushed because I forgot I need to return a promise, I just kick off a promise and forget to return it.
+
+[00:14:38]
+So this is a great starting point. Sorry, I have to save it one more time. A great starting point for the next exercise. And we're going to take about 20 minutes for this. So the goal here is that now you should be able to see that JSON is cached as you encounter it.
+
+[00:14:59]
+So just loading the first page, you should start to see that maybe eight different JSON requests and then being cached, one per category of groceries. And that will allow you, in the event that your network is offline, you can then reach in there and retrieve it.
+

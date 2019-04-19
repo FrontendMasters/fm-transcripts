@@ -1,0 +1,255 @@
+[00:00:00]
+>> Mike North: So we're gonna go through the solution to handling dynamic data and at the end of this, we're only going to be left with index.html. We'll have some offline support for everything except that. And that will be the last piece of the puzzle that will get us to the point where we can turn our network connection completely off and our app will still work as we're used to seeing it.
+
+[00:00:25]
+So the first thing I'm gonna start with here is the code. The first thing I'm gonna start with here is I want to design something that handles the API/Chase on here. Design a check that lets me know as a request is coming in, what are we working with here?
+
+[00:00:46]
+Is it JSON for an API? So the first thing I wanna do is, I'm actually gonna do a sort of basic solution that solves this exercise and I'm gonna enhance it one step further. Not introducing a new concept but just being a little bit more thorough so I can get those grocery images as well, cache them as we see them, right?
+
+[00:01:11]
+So what I'm gonna do is I'll change this variable name, is from API, and this makes it actually easy to figure out what the solution here is. We're going to just look at the request, path name. And instead of checking for images, I'm just gonna check for local host 3100.
+
+[00:01:35]
+Anything coming from the API, I'm just going to cash it. So basically like, and by the way, this API is serving up the images as well. So this would be fine. And you can make this as complex as necessary. Maybe you've got a CDN for your images, your API is somewhere else, but oftentimes you want to treat dynamic data all the same way, be it JSON or URLs to images that are held somewhere else.
+
+[00:02:03]
+You want those images that are referred to by some database record to be treated like data. So now, down here we say, if we're coming from the API, we're going to proceed into this function here, fetch API data with fallback and that's up here. So essentially like we've wired up this placeholder and now our job is to flesh it up.
+
+[00:02:34]
+And it's gonna involve opening this cache and it's useful to kind of make this the outer promise because there are two things that might happen here. We might reach into the cache because we wanna serve a cache response like in the event that we're offline. And in the event that we're online, we're always writing over slightly older data in the cache.
+
+[00:03:01]
+We're always keeping that entry up to date. So regardless, if we enter this function, we're going to need that cache. So it makes sense to sort of start by opening that.
+>> Mike North: So I'm actually gonna put all of this in here. It's gonna sort of be one promise that starts there.
+
+[00:03:20]
+And there are a couple different ways to do this. But we're gonna leave this cache alone for the moment.
+>> Mike North: Now,
+>> Mike North: The next thing we wanna do is we have to attempt to make a fetch, right? So we have a BiOS for fresh new data. The only fall back in the event that that doesn't work out, and we're going to, we wanna fetch something send fetch out.
+
+[00:03:56]
+Now in order to do that we need the request, so now I'm just going to, looks like i'm passing the whole event in, that's fine.
+>> Mike North: And I always like to rename things like fetch event here, so we know like what kind of event we're working with. There's several different flavors of events in a service worker.
+
+[00:04:18]
+Good to leave yourself clues and bread crumbs. All right, so this is gonna end up sending this request out, and what we're gonna get, what's gonna happen is we've got three scenarios that we need to worry about. First is a successful response in which case proceed. The next is a response that is not successful, so that's still in the dark thin callback, the promise handler.
+
+[00:04:49]
+And the third situation is the network is down. And there clearly we want to fall back. And for now, I'm gonna kinda ignore the possibility that we might hit a 404 or something with this kind of request. We're gonna have to fix that later in order for our fallback images to work, but I'm just gonna try to incrementally get there.
+
+[00:05:17]
+So this is gonna return a response or result to a response. And then, of course, we have our cache which is gonna have some error. A quick side note, the errors that you will catch here are often not useful for security reasons, so often it'll just say, the fetch was not successful which that doesn't add any information.
+
+[00:05:50]
+
+>> Speaker 2: The fetch failed [CROSSTALK].
+>> Mike North: The fetch failed, and the reason is, when we talk about an opaque response, for example, you're not even entitled as the developer of this app to know why that failed. Is it like a security issue? Is it that the Internet is down?
+
+[00:06:11]
+All you know is you either were not allowed to or circumstances prevented this operation from completing one way or the other. So that's why I don't normally in a catch you would not wanna just omit this argument here but it's just generally useless. And that you know when this callback is called, that the fetch did not succeed.
+
+[00:06:34]
+All right, so in this case we're just gonna return the response.
+>> Mike North: And let me pause here for a moment. Instead of walking into a problem here, I foresee one coming. So if we remember dealing with response bodies, they're sort of disposable. You can only use them once.
+
+[00:07:01]
+If I were to do this,
+>> Mike North: And then try this,
+>> Mike North: This line here would fail because I've already consumed this response. I've sort of taken this raw data and decoded it. I'm not entitled to go about doing that again. And in this case, we wanna use this response in two ways.
+
+[00:07:22]
+Number one, return it to the app. Number two, make sure it goes into our cache. So here's how we'll do that.
+>> Mike North: There's our cloned response and then here we can say cache put request.
+>> Mike North: And cloned response.
+>> Mike North: All right, so. Let's add some comments so we can describe what's going on here.
+
+[00:08:01]
+Clone response so we can return one and store one.
+>> Mike North: And here, we're gonna use this put function, this is the first time we actually experience it and written in code. Now you could have done cache.add. But that would have been slightly less efficient in that a new request would go out.
+
+[00:08:22]
+It's sort of like you're passing it a URL, acting as if we hadn't already fetched that data a moment ago. Unlike,
+>> Mike North: That would work, it is not optimal. So instead we're gonna use put, and that's almost like you're gonna say, here's the request I sent out and the response I get back, just put those in the cache directly.
+
+[00:08:45]
+Don't bother doing the work to fetch it fresh again.
+>> Mike North: Put the clonedResponse and request,
+>> Mike North: In the cache, and then return the original.
+>> Mike North: In the event that something goes wrong,
+>> Mike North: We're going to just go into this same cache and take this request and match it.
+
+[00:09:19]
+So hopefully that'll work. If there's something there, it should work for us. Let's take a look at how this ends up working out. First let's start up the server.
+>> Mike North: Okay, so we're getting some errors here but this is fine. One is just a warning here, the other is a 404 that we expect, right?
+
+[00:09:58]
+That's our grocery image here. And if we look in our application tab and on the left go all the way down to Cache and Cache Storage. Refresh it, open it up.
+>> Mike North: I expected, we've probably got a Service Worker waiting to activate. No?
+>> Mike North: I'll take another look.
+
+[00:10:30]
+
+>> Mike North: All my files are saved.
+>> Mike North: Save Fallback.
+>> Mike North: Interesting, you know it's possible this is never triggering.
+>> Mike North: Let's make sure that our little checker boolean is doing what it's supposed to be doing.
+>> Mike North: Never hit that break point, interesting. So request URL path name index of local host 3100.
+
+[00:11:07]
+[LAUGH] There we go, that was the problem.
+>> Mike North: The path name is just after the origin, right, so that would never contain the word, local host.
+>> Mike North: And at this point, activated and running, caches, refresh. Should have three in there now, we don't.
+>> Mike North: That was probably the problem too.
+
+[00:11:46]
+
+>> Mike North: Here we go. So it's from the API, here's the event, and the request is,
+>> Mike North: Cart items, we're looking for the JSON for the cart items. Okay, we've straightened that out. And now hopefully you're seeing debugging Service Worker is not harder than debugging your own code. You can set break points, you can use the console to fit it around, you can sort of, with this little drop down here, you can shift between the activated installed service worker and you call functions directly.
+
+[00:12:20]
+It's really pretty simple.
+>> Mike North: Okay?
+>> Mike North: Now, what's going on?
+>> Mike North: So I bet we're cached here. I suspect that this is a cache logic error. So I think we'll see three here, we still see two.
+>> Mike North: There it is, Service Workers waiting to activate, there we go.
+
+[00:12:45]
+
+>> Mike North: Finally Fallback cache, and here are all my different URLs. They are API calls, right? And,
+>> Mike North: Now,
+>> Mike North: If all is working, I can actually, I wanna see if I can demonstrate this. It's an idea from a student in the room here. So I've stopped the server, and I'm only going to start the UI portion up so it will still serve up index start HTML.
+
+[00:13:14]
+But our JSON API is going away, and my hope is this will still work.
+>> Mike North: So npm run watch, that's just the browser UI portion of things. If I refresh this,
+>> Mike North: Hey, hey, it looks a little different, but the data is there. Why does this look different.
+
+[00:13:44]
+
+>> Mike North: Any ideas? Why am I not seeing my images?
+>> Speaker 2: Because your server's offline.
+>> Mike North: My server's offline.
+>> Mike North: So we can,
+>> Mike North: The server's offline, and I had not added those images to the cache. Now,
+>> Mike North: I can enhance this a little bit, and I'm wanna have kill this and start the API backup.
+
+[00:14:08]
+So basically like what's happening here, is grocery images are handled here, and then sort of the next level we go and start checking is, are we coming from an API? So what we can do is, because we're working with functions that return promises that resolve to responses, they're like responses to be, we can actually compose these together quite nicely.
+
+[00:14:39]
+And if I were to take this boolean here, move it into fetchApiDataWithFallback, we need to accept header as well.
+>> Mike North: And we're gonna leave that right there. And so, here basically we need some special treatment around the fetch. So, here we can say,
+>> Mike North: If it is a GroceryImage && the response is not ok, we're going to return,
+
+[00:15:32]
+
+>> Mike North: Actually that logic's already built into this.
+>> Mike North: This is just a special kind of fetch, which is actually great. So I can refactor this even better.
+>> Mike North: I'm gonna grab this, fetchImageOrFall back. Collapse this down, so now all Api related stuff goes down the same path. And up here we can say [BLANK AUDIO] Fetch promise equals.
+
+[00:16:04]
+It's like if it's a grocery image that otherwise this. [BLANK AUDIO] I will straighten this out a little bit. So if you're not familiar with this, this is just a ternary operator. It's sort of an if else. So if this is a grocery image, we are going to do this.
+
+[00:16:24]
+Which has baked into it this idea of trying the image first, falling back. Otherwise, we're just going to do a normal fetch. And we can kinda wire that up here and have all of our existing logic carry off of that.
+>> Mike North: So let's try again.
+>> Mike North: Actually, let me make sure my new service worker gets loaded up here before we kinda simulate the API outage.
+
+[00:16:58]
+
+>> Mike North: And we've got a couple problems. Let's see.
+>> Mike North: This request failed.
+>> Mike North: In _restoreCart. Cuz why?
+>> Mike North: Lemme just set a break point in here to see what's going on.
+>> Mike North: Clear our storage out, make sure everything is good.
+>> Mike North: All right, so that's number one.
+>> Mike North: All right, so we never get this response handler here, interesting.
+
+[00:18:08]
+
+>> Mike North: There we go.
+>> Mike North: fetchEvent.request, so I had a little syntax error there.
+>> Mike North: So cannot read property indexOf of undefined. That is coming from here is grocery image. acceptHeader has to be defined above isGroceryImage, cuz with let we don't have hoisting.
+>> Mike North: And this has to be a fetchEvent.
+
+[00:18:51]
+
+>> Mike North: Instead of just an event.
+>> Mike North: Now, we're hitting this debugger, okay.
+>> Mike North: Okay, so it looks like it's not interfering with the JSON anymore. So those responses are coming back. All of my images are still unhappy. So those requests are failed because requestsUrl is not defined.
+>> Mike North: I am using that.
+
+[00:19:40]
+
+>> Mike North: There's request URL.
+>> Mike North: Up here.
+>> Mike North: So I need to just copy this over.
+>> Mike North: Event has to be changed to fetchEvent.
+>> Mike North: All right, now we're starting to get a little bit closer.
+>> Mike North: So I want to dive into the images to make sure. Obviously, they're not coming through here.
+
+[00:20:35]
+I want to make sure we're getting those where we should be getting them. So [INAUDIBLE] request. That looks correct.
+>> Speaker 2: Is gGroceryImage, is that condition [INAUDIBLE] condition?
+>> Mike North: Yes, that could be.
+>> Mike North: Except header. So I can set a conditional break point for that.
+>> Mike North: All right, so here we go, and we've got a promise, and it's pending.
+
+[00:21:31]
+
+>> Mike North: I just want to get rid of one of those break points.
+>> Mike North: That one.
+>> Mike North: All right, turn this back on.
+>> Mike North: Interesting. So that is never getting hit.
+>> Mike North: And cache is not getting hit either.
+>> Speaker 2: The condition is wrong.
+>> Mike North: You think the condition's wrong?
+
+[00:22:11]
+
+>> Speaker 2: Yeah, after the ampersand, now go to the far right, that should be larger than 0, large or equal to.
+>> Mike North: Greater than or equal to. But the path name should still.
+>> Mike North: You should end up with exactly 0 there, in theory.
+>> Mike North: Well, I don't know what's going on here, but this was sort of an optimization.
+
+[00:22:45]
+So I'm just gonna go ahead and put this fetch back here to something that is hard to figure out on the fly for some reason. So when I put this back, now we're letting images be handled with the typical fallback. I'm not editing my code, I'm editing it in the browser.
+
+[00:23:06]
+
+>> Mike North: So I'm just gonna back all this out so that I have those two different ways of handling it inside the fetch handler.
+>> Mike North: Right here.
+>> Mike North: Which is fine, we've just got fallback images. And that's one of the benefits of having them there. Okay, so here, we're online.
+
+[00:23:27]
+And if I kill the API again, npm run watch. So now, we're just running the UI, refresh.
+>> Mike North: It's just building the UI right now.
+>> Mike North: Now it's failing to fetch other things.
+>> Mike North: Interesting. All right, I'm just gonna keep dragging this down here, so,
+>> Mike North: If I look in my cache, I wanna make sure that I've got stuff in there to satisfy those responses, and my fallback cache.
+
+[00:24:13]
+And I do, I see new stuff is being added, those might be the images, and they are. I'm just gonna increment my cache, just so I kind of blow it all away, and kinda get a chance to start fresh here.
+>> Mike North: And I need the API to be running for that.
+
+[00:24:43]
+
+>> Mike North: Okay, so now I want to look into cache storage. Interesting. So I don't have my fallback cache at all there.
+>> Mike North: Maybe, so it deleted my old caches, let me make sure that my function here is still wired up as it should be, and my service worker.
+
+[00:25:05]
+So the one that we have been spending time in, FetchApiDataWithCallback, there we go, is from API. Maybe I backed out, yep, there it is. I backed out my original fix for that first problem.
+>> Mike North: And now I think we'll be in a good state.
+>> Mike North: I might be frozen at a breakpoint, I am.
+
+[00:25:47]
+Okay? So there we are, and now. Let's try our one last attempt to prove that this works.
+>> Mike North: There we go. Okay, so the JSON data is cached, that's why we're seeing these grocery items here. The images are not, but we're falling back to something a little bit more reasonable.
+
+[00:26:15]
+Now, a further optimization for this would be as we do these fallback images, as we go and fetch the real ones successfully, we would want to put those in the same fallback cache along with the JSON. And then our app would be none the wiser that those were showing up instead of the fallback images where it's possible.
+
+[00:26:36]
+Right now we're getting that 154 error count? Largely, that's 404's for the images, but our app is not failing because of those. Those are 404's that are sort of been handled inside the service work, our other app was not exposed to them. So we're getting really close. We are just index.html away from this app working offline, where I'll be able to kill everything else, close Visual Studio code, and the app still work, and that is in fact the next item on our agenda.
+

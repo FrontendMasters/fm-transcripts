@@ -1,0 +1,44 @@
+[00:00:00]
+>> Mike North: Here is the exercise. So the story here is we've got our grocery store, they have their standard inventory, but sometimes we get fresh stuff that's coming out in front. And they might have little QR codes that you can scan to maybe just pay for it with your account and it will be delivered to your house later.
+
+[00:00:20]
+But the idea is we wanna use sensors on this device, in this case the camera, to accomplish this. And this QR code reader, the little button in the menu bar, it actually works right now, but it works on the main thread. So you've got a file called banana, and depending on when you checked it out it might be misspelled.
+
+[00:00:41]
+But banana.png, it is a deliberately large file with a rotated QR code. You should be able to click on the QR code reader, and the way that mobile devices handle a file input is they ask the mobile device to provide a picture in response, like a regular HTML file input.
+
+[00:01:06]
+You can provide a picture, and we're going to, on the client, process this picture and add that item to the cart that matches that QR code. So you should end up with a banana in your cart after processing this image. But it is really really heavy work. So here I profiled it this morning.
+
+[00:01:26]
+Does anyone remember what the budget for our functions was that I talked about in terms of things that [CROSSTALK]
+>> Speaker 2: 15 milliseconds.
+>> Mike North: All right, so we're at 20,829 milliseconds, slightly over our frame budget. We're gonna wanna move this off of the main thread. And if you tried this now with the banana image, you'll see that if you try to scroll while that processing is taking place, it's really stuttery.
+
+[00:01:53]
+Like your browser's starting to freak out, and it's not a good experience for your user. And there's really no way to break this up, it is a single function that takes 20 milliseconds. This is an awesome candidate for doing in the background in parallel. Let the main thread relax, let the user maybe go on to finding their next item to scan or something like that.
+
+[00:02:19]
+So here are some tips that you may need in order to make this work. So we're gonna have to add a new file. You already added a web app manifest file, so we're gonna follow that same pattern. This is not correct, I'm gonna correct it right now really quickly.
+
+[00:02:38]
+So we have to add that name attribute as we learned, this is important, otherwise the name of the file will be the hash of that file. We don't want that because we want to be able to pass that file to our worker constructor. That needs to be really predictable, what that is.
+
+[00:02:55]
+And almost all the work you're gonna do is going to be in this JavaScript file, it's client/util/qrcode. Right now there's a comment wrapping the synchronous implementation of that. You really shouldn't have to go outside of that area, but we're gonna basically take that heavy work and do it in such a way where we instead spin up a worker.
+
+[00:03:21]
+And then use that message passing that I showed you an example of, where we post message and the worker will catch it in the on message. So the worker will end up doing the heavy work, and then it'll send the result, which is just the string, the QR code data, back to the host app.
+
+[00:03:42]
+And I do want you to do a production build, a minified build, before you make this improvement and after. Because one of the advantages we're gonna get is that we now we'll have removed the need to have this QR code library as part of that core app.js file.
+
+[00:04:01]
+Webpack is gonna wrap this all up in the worker itself. And so our app size should drop from about 80 kilobytes to 60 kilobytes, further improving our load time and parse time metrics. So this is what you're gonna hopefully end up with once we get done with this.
+
+[00:04:19]
+Whereas before, let me skip back, we had this big, solid, yellow thing where it's just taking 20 seconds to do this on the main thread. If you can see it here it's sort of hashed out the yellow now and that represents that a worker is doing it. And below, in this middle section here, you can see main with the green and yellow.
+
+[00:04:41]
+That sort of does the initial work of reading the file, creates something called an image buffer that you don't need to worry about, and then passes that off to the worker or thread. And all of that purple there, that's all of that hard work being done in the background without interfering with the main thread's responsibilities.
+

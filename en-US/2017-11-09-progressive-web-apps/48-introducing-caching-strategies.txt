@@ -1,0 +1,50 @@
+[00:00:00]
+>> Mike North: Like Steve mentioned with the extensible web manifesto, what we have learned so far. They've been the ingredients that we can use to compose together a caching strategy that works for us. And hopefully, this fallback image exercise we just went through, helps us understand how. For that one particular case where we want, in the event of a four four.
+
+[00:00:25]
+Or potentially if it's taking a really long time to download that image, we can handle that in a special way. But as you may suspect, we have to treat different resources with different caching strategies. So I'm going to take us through from some very rudimentary, almost to the point of useless caching strategies.
+
+[00:00:47]
+All the way to things that are regular practices in large scale apps which employ a service worker in order to improve their performance. And here's the first one, this is probably the most useless one, and we call this the cache-only caching strategy. And the idea here is that when receive this fetch event, we're going to reach into the cache and respond with whatever's there.
+
+[00:01:18]
+So essentially we're never looking to the outside network to see if there is new data. Now this may be useful, but it would have to be for example, in this case of this fall back image. If we put something in the cache and then maybe we only updated it in the case of install.
+
+[00:01:36]
+Like it's a resource, maybe it's a logo that like, we don't expect to change ever. So we go and download it once and then until we're in this mode where we want to clear up all of the dirty old stale cache stuff. And repopulate from scratch, we're never going to look to the outside to get this here.
+
+[00:01:56]
+We're just going into the cache and you can see that is the only thing we respond with.
+>> Mike North: So not incredibly useful, although for things that are really, really, really static. Like maybe a logo that you don't expect to change for years. It is the kind of thing that won't necessarily work well for us.
+
+[00:02:21]
+So here's sort of the opposite, it is network-only. Also useless, because you can think of this as the equivalent of a no-op. This is the equivalent behavior we would get if we removed that line Event that respond With. Because in the absence of us calling event respondWith, the default behavior is to sort of let that fetch request.
+
+[00:02:53]
+Pass straight through the service worker to the outside world. The only effect that this will have is that if you look in your network tab, you're gonna see little gears next to those network responses. Because technically the service worker is getting involved, but it is doing nothing. This is also like bringing a function that returns undefined and you are actually return undefined.
+
+[00:03:18]
+You don't need that line of code, because it is what will happen in the absence of code.
+>> Mike North: So these are sort of the two extremes, never looking to the network, always looking to the network. But we can start to compose these together to make them look a little bit more interesting.
+
+[00:03:39]
+And as Steve pointed out in his solution to the fallback image problem. We have to keep in mind we have really one fetch event handler and things are gonna get pretty busy in that function that we put there. So a great pattern is to sort of have any checks that you do like this check against the accept header.
+
+[00:04:02]
+To see if this is like the mimed type of this thing as we desire for that to be an image that comes back. Those might be in the fetch handler and we should sort of delegate control of actually doing the interesting work. To functions that are outside of that fetch handler.
+
+[00:04:21]
+So here's a simple example, and we're not at the point yet where we can start refactoring this out of the fetch handler. But this is what we call a cache with a network backup. And this would basically mean that if we find something in our cache, we will go ahead and use that.
+
+[00:04:39]
+And we're using the logical OR operator here, in order to. In the event that that response is falsey, which means that there's nothing in the cache to satisfy that request. We're going to make a new request to the outside world with that fetch(event.request) there. This might be useful in the event that potentially we have some other logic somewhere else.
+
+[00:05:06]
+That is caching things as we encounter them, perhaps these grocery images, right? The first time we download one of these images, we'll let that pass through to the outside world. We'll return that response using event.respondWith, but then we'll also sort of branch off. And we'll put that in the cache for later, so the next time you ask for it, we can serve it up instantly.
+
+[00:05:29]
+In that case you might have a line of code like this, that tries to hit the cache because this might be an image we've seen before. In the event that we haven't seen it, go to the outside world and get it. So now we're starting to see that, hey, this would really speed up those image downloads.
+
+[00:05:45]
+You're only paying the price of downloading it once per instance of the cache. At least until we clear it out and start over.
+

@@ -1,0 +1,257 @@
+[00:00:00]
+>> Steve Kinney: Let's try to implement this. This is our service worker right now, and it's still got all of our counts. We don't really need any of that, so we'll go ahead and get rid of that. Which means we'll get rid of all the count stuff in here, cuz that no longer works.
+
+[00:00:19]
+
+>> Steve Kinney: So first thing we're gonna need is that fallbackImage, right? Which in this case is fallback grossrate-png. So we can restore that for ourselves. So we'll say const stuff, FALLBACK_IMAGE_URL. And I'm gonna cheat for moment cuz nobody wants to watch me type a URL, sweet. So now I will just have access to it, so I never have to type that again.
+
+[00:00:53]
+So first thing we probably wanna do is we don't need this function either, is when we first go ahead and install the service worker. Like we now know that this service worker is going to need this fallback image, right, it's going to rely on it. So we wanna make sure that it's cached.
+
+[00:01:11]
+So what we'll do is when that happens, we do need a cache name. And in a second, I'll show you that we actually have some other ceremony around this in this application. There's a folder with a bunch of cache names to help us manage these things. Well let's start with something really simple first.
+
+[00:01:26]
+So we'll say const fallbackImage =, again, this can be any arbitrary string.
+>> Steve Kinney: Cool.
+>> Steve Kinney: We got that in place.
+>> Steve Kinney: Got a ESLint yelled at for back text, tried to be fancy. All right, so we've got our cache name. And so what we wanna do now is we want to open the cache.
+
+[00:01:59]
+But normally when we want to make sure something resolves or rejects and we want to make sure that the process stays alive and doesn't get killed, what kind of structure do we need?
+>> Speaker 2: waitUntil.
+>> Steve Kinney: We need event.waitUntil, exactly. So bring in the event.
+>> Steve Kinney: And we'll say, event.waitUntil, and event.waitUntil is going to just simply take a promise.
+
+[00:02:30]
+We know that caches.open returns a promise. So this will work out really well for us. So we say caches.open, we'll say fallbackImages, cool. And that again is going to go ahead and return another promise. So we'll say, .then. And this will now be the given cache. We've opened the cache here it is, we're ready to do stuff with it.
+
+[00:03:00]
+No semicolon, that's the mistake that I always make. Cuz I get semicolon happy but I'm actually, an argument being passed to event.waitUntil, and that will blow up my code, that's always fun. All right, neat. So what we wanna do is we wanna add that fallbackImage url to the cache.
+
+[00:03:19]
+So we'll say cache.add FALLBACK_IMAGE_URL. Let's actually take this first one for a moment. We'll go ahead and we'll refresh this. I'm gonna open the tools to make sure I have the newest, latest and greatest service worker.
+>> Steve Kinney: All right, and let's check the application.
+>> Steve Kinney: Okay, and if we go we can see that I've got cache.
+
+[00:03:50]
+I'm interested in that. We've got a bunch of caches in here
+>> Steve Kinney: Those are all of our cache images from playing around. Let's see, all right, that's not super helpful, so let's ignore that for a second cuz my font's a little too big. We'll point that out momentarily.
+
+[00:04:06]
+So we're keeping the cache and we're ready to rock and roll. Now what we need to do is intercept it. Now, it could be easy to say, yeah, I'll do that all in the fetch EventListener. And that works. It's a great way to do it. But we can imagine as our progressive web app gets a little sophisticated, making the fetch event handler a 200-line method is maybe not the greatest thing in the world.
+
+[00:04:36]
+And yesterday I showed you that, hey, if you have the service worker in the same folder. Or in a folder near your client JavaScript, you can just say the name of it and it loads the service worker. And you might have looked at our webpack configuration. You're like, if I can do that, why are you making me do this like import with three different exclamation points?
+
+[00:04:58]
+A lot for the same reason that we do it in general, right? We wanna be able to break stuff out into different files. Have a module system and webpack is very good about bundling those things together. So by running it through webpack, I can eventually even go a step further than what we're gonna do right now, and break stuff out into different files.
+
+[00:05:15]
+But we're gonna do the first, most obvious thing, which is at least break this out into a different function. And I feel like a good name for this function could be something like,
+>> Steve Kinney: Let's say it's like fetchImageOrFallback. It seems legit. And it will take some kind of fetchEvent, right?
+
+[00:05:39]
+Which will be the event that eventually gets passed in here, cool. And now, there's a few things that might be happening here, like we want to go ahead and try to get the image, right? So we will return,
+>> Steve Kinney: A fetch of that fetch event request. Cuz we saw that the event that goes into the fetchEventListener has a request which is a request object.
+
+[00:06:09]
+There is a URL and a method there, but we know that with fetch, we can pass in a full request object and everything will work the way that we expect it to. So we're gonna pass it along in there. In this case, we're also gonna give it, we'll pass it through and we'll also say, hey listen.
+
+[00:06:28]
+Just in case it is for an external resource, we'll say,
+>> Steve Kinney: mode: 'no-cors'. All right, so if that works out great and we got an image, that seems cool.
+>> Steve Kinney: We'll take the response that comes out, right. This is equivalent to saying event.response.
+>> Steve Kinney: All right, we have a response.
+
+[00:06:58]
+Now with response, this is gonna resolve even if we get a 404 not found, right? And in that case, we probably wanna show the fallbackImage, the requested image that we literally, we got to the network, great. But that image doesn't exist. Well in that case, we're probably going to want to still serve the fallbackImage.
+
+[00:07:22]
+So, with the response we can look at the status code, we can look at also two things. There's also a nice little helper called response.OK, right? And OK is any kind of positive status code not a 400 or 500. Anything from 200 to the end of the 300s.
+
+[00:07:38]
+So, we'll say is if response is not OK,
+>> Steve Kinney: All right, what we're gonna do is we will return the caches,
+>> Steve Kinney: The caches that match
+>> Steve Kinney: FALLBACK_IMAGE_URL. Let me scroll a little bit.
+>> Steve Kinney: I'll give it a cache name to look in there. We could also open the cache and look for it as well.
+
+[00:08:13]
+This will actually just save us a promise along the way.
+>> Steve Kinney: Fall back images, cool. So things go poorly and, we get a 400 listen like, go ahead and get something out of the cash and send it back to me. Otherwise, everything worked out great from the network, then go head and give me that one you got back for the network.
+
+[00:08:42]
+That seem great, send that response through. So basically, we are gonna send something out to that network looking for that image, if the response is great like the service worker open door policy. If something didn't go right. Then in that case what we're going to do is we'll go ahead and get our fallback image out of cash and send it along.
+
+[00:09:05]
+Will simplify this in a second. We know that fetches we can we move on to the catch method if there was no network request at all. So we couldn't, that case we want to do the same thing we did before
+>> Steve Kinney: And we will return the caches. The caches that match that fallback image URL will give them [INAUDIBLE].
+
+[00:09:36]
+
+All right, squiggly lines, doesn't like my spacing.
+>> Steve Kinney: That's fine.
+>> Steve Kinney: I'm not fixing it. Cool, so we refresh this. What happens if I go ahead and, let's take an image and let's break it. So we'll go ahead and we'll go to server. And go to the images and which one are you?
+
+[00:10:07]
+
+>> Steve Kinney: You're 435.
+>> Steve Kinney: So let's find the very first one here so I don't have to go looking for my broken image. And you know what? There you are. I'm gonna rename you.
+>> Steve Kinney: To not 435 effectively.
+>> Steve Kinney: And you can see that we sent the network request.
+
+[00:10:35]
+It couldn't find that one which will give us a not okay response. And in that case we will go ahead and grab the fallback image out of cache and serve that one instead. This is instead of like a broken image or something along those lines. We can get a little bit more advanced with caching strategies.
+
+[00:10:52]
+Imagine we got those things originally the last time we were online. What if we just store them all and said like, hey, I know you're looking for 435. We couldn't find them or in this case like for offline and we couldn't connect at all. I stored it last time.
+
+[00:11:11]
+So do you want that one, which for our tendering on? That is probably a legitimate thing to do in this case. All right, few more things to look at. That lay again, keeping track of all the strings will get you somewhat pretty far. You can also see another strategy that we have here.
+
+[00:11:35]
+Where we could do it, I keep a separate file, and basically a constants file. So we'll have a cash name, we will prefix it and everything along those lines and then way we can just require this image. We changed it all in one place theoretically, and we do other things to manage cache.
+
+[00:11:50]
+You'll see later when we can remove all the unused caches and stuff along those lines. So right now. This is hard coded, if we go ahead and change that we need to update everything manually. Let's actually remove caches that we don't want, on activate as well. So here we added the fallback images to the cache, that seems good.
+
+[00:12:13]
+Let's also go ahead and say, hey, when you come alive let's remove all of the caches that are not the fallback image in this case. So we could say.
+>> Steve Kinney: When it comes alive.
+>> Steve Kinney: FallbackImages, cool. So we need caches.keys.
+>> Speaker 3: You did not call this spreadsheet where you made your fallback method.
+
+[00:12:55]
+
+>> Steve Kinney: Yeah.
+>> Speaker 3: How did you still get that fallback image on the browser?
+>> Steve Kinney: That's a good question
+>> Speaker 4: Yeah, I just wondered the same thing. [LAUGH]
+>> Steve Kinney: Do we have an alt service-
+>> Speaker 5: Do you have an alt service program still?
+>> Steve Kinney: I don't think so. Maybe if I reload and refresh.
+
+[00:13:08]
+
+>> Speaker 4: I think we're good now.
+>> Steve Kinney: Okay. Yeah, we didn't actually call it. It's a good, good catch. Let's see, do we have an old service worker-
+>> Speaker 3: I'm just looking for where you called so I was-
+>> Steve Kinney: Yeah, yeah, no, no. So one quick notice that we didn't call it, we might have an old service worker installed.
+
+[00:13:29]
+Let's see.
+>> Speaker 5: And that machine you almost certainly do.
+>> Steve Kinney: Let's check out our service work there.
+>> Speaker 5: Just go to clear storage.
+>> Steve Kinney: Yeah, [INAUDIBLE] I am.
+>> Speaker 5: That's it.
+>> Steve Kinney: Cool, all right, so now it doesn't work, great, that is now what we actually expect. We had an old service worker which would actually be a great Segway when Mike talks in a second about some of the dangers of the service workers.
+
+[00:13:57]
+We actually find ourselves slightly trolled preparing for this, where our server was offline and we were making changes and they weren't working. And we're like, why aren't they working? Because the servers not running. We just happen to have an offline app. So everything didn't blow up. And we were lulled into a false sense of complacency.
+
+[00:14:13]
+Which is again in the same way that you will pass console log into a promise and be horrified when it returns undefined. This is a rite of passage for working offline app, which is having a cache service work and acts like everything's fine when in fact, things are not.
+
+[00:14:30]
+So we've cleared it out, and now we have a broken one. We will steal a little bit of code, actually we can write it. Let's give ourselves a little more space to work here. And we'll say,
+>> Steve Kinney: We only wanna catch the images, right? Right now we have this function, and we just put it in place for all requests.
+
+[00:14:53]
+You're getting a fallback image for anything that doesn't work, which is not great. So we've got acceptHeader. I will look at the event that's being passed in here. Cool, event.request.headers, and headers looks and feels like an object but is actually built by the headers constructor. So it's not, you can't just say headers and get the accept.
+
+[00:15:19]
+It's actually, you need to use .get to actually find it in that case. Cool. So this will be, we'll say it like what for the request, like what are you expecting back. And we'll actually store on, we'll store the request URL just to keep it easy for yourselves.
+
+[00:15:40]
+In the same way that we store the full long URL earlier. In a constant so that our lines don't get too long. This is mostly for good code hygiene.
+>> Steve Kinney: We got ourselves a URL object. All right, so If except header Except there is a long string of comma separated of all the different types of accepts.
+
+[00:16:11]
+So we're gonna say hey, if in there there is image/star, so we're looking for some kind of image and we do IndexOf,
+>> Steve Kinney: Is greater than equal to 0 or you might like does not equal 1, whichever one makes you happier, both will work in this case. So if this is a request that is expecting some kind of image right, and what kind of image?
+
+[00:16:36]
+All of our glossary image happen to be in our assets under /images /all those glossaries, right? So in the situation that it's our logo, we do not want to show them a missing glossary, right? For your given app, this will be different. It's all unique to what your application is expecting, but in this one we know that all of our glossaries are in the image directory.
+
+[00:16:58]
+So we'll say request URL.
+>> Steve Kinney: Look at the path name, right? So URL is just to helper that takes a URL string, this new URL that you see on line 34, it takes URL string and it breaks into an object. We can get the path name and different parts of it.
+
+[00:17:16]
+So we'll say requestUrl.pathname and we look for the indexOf('/images/'), all right. So if this is in the URL,
+>> Steve Kinney: And we'll go in the beginning of it, right? Cuz, yes, we know that our application is very simple, right? But theoretically if you just say anywhere in there there's a chance that you might have images somewhere else in there, right.
+
+[00:17:40]
+Let's be a little defensive, our application is somewhat naive but we'll be okay, so, event.respondWith
+>> Steve Kinney: And then what we'll do is, now this is expecting a promise. If you look at fetchImageOrFallback, it returns a fetch promise, right? We chain it, it's promises all the way down the line.
+
+[00:18:01]
+So what we can say is fetchImageOrFallback and pass it that (event). I almost made that semicolon mistake again. What's important here,
+>> Speaker 3: You need to add a parenthesis in line 37.
+>> Steve Kinney: Yep.
+>> Steve Kinney: There's a few that need to happen here. Typing and talking is difficult, all right cool, and then not that.
+
+[00:18:37]
+
+>> Speaker 6: Do you really wanna index of twice on 36?
+>> Steve Kinney: Nope.
+>> Steve Kinney: So busy talking and looking around thank you. Pair programming with 15 to 100 of your best friends is a really good idea. You should all try it sometime. Cool, so we'll check it out. Now what you'll notice is this is an if, there's no else.
+
+[00:19:01]
+And what we saw with the console logs when we did the exercise yesterday, is that should you not use event.respondwith, it passes through. So this is only, if these two conditions are met, then we will go ahead and respond with this other image. All right, this now for the live coding moment of truth.
+
+[00:19:21]
+
+>> Steve Kinney: Let's clear out that service worker again.
+>> Steve Kinney: Cannot create property URL of undefined.
+>> Speaker 5: I think that's kinda where I'm at.
+>> Steve Kinney: All right, let's see.
+>> Speaker 3: Event.request.
+>> Steve Kinney: Event.request, whenever your student node programming, if you ever use express, every argument passed in is request and response.
+
+[00:19:45]
+But a lot people like to do RES and REQ. I've lost days of my life, like not in a row but like cumulatively over five minutes paper cuts. I have lost days of my life with the fact that those words are similar.
+>> Steve Kinney: All right, so here we go.
+
+[00:20:05]
+We definitely have a bug here, we're getting lots of them, all right? Which is definitely not what we want. Cool, so we gotta debug up here. We got a function, we're going to fetch it.
+>> Steve Kinney: Looks like we only failed to load the 435, so we've got a logic error here.
+
+[00:20:28]
+Let's see, ifresponse not ok.
+>> Steve Kinney: Do you see it?
+>> Speaker 3: Do you need an object notation that responds in line 21?
+>> Steve Kinney: Pardon?
+>> Speaker 3: Do we need that in an object or just-
+>> Steve Kinney: That is effectively event.reponse, we're just pulling the response property off the event.
+>> Speaker 5: So let's trying doing this in cors mode, just for fun.
+
+[00:20:58]
+
+>> Steve Kinney: All right,
+>> Steve Kinney: Now, it looks like I think we've got a logic issue, right? Cuz the 435 is not found, but it looks like we're pretty happy in here.
+>> Speaker 5: Cannot read property 'ok' of undefined.
+>> Steve Kinney: All right.
+>> Steve Kinney: Let's take our cor back.
+>> Speaker 5: Sorry, so your fetch returns a promise, that resolves to a response.
+
+[00:22:00]
+So you should not destruct a response, so-
+>> Steve Kinney: Keep going.
+>> Speaker 5: Actually you're correct, that was destructure an assignment but that property was not there.
+>> Steve Kinney: All right, there we go.
+>> Speaker 5: That was-
+>> Steve Kinney: Good catch.
+>> Speaker 5: You caught that one for sure. [LAUGH]
+>> Steve Kinney: Yeah, let's clean it up there, all right, so now we have it.
+
+[00:22:18]
+We can see that just this one that didn't work out, we don't get the right image. Let's go offline for a second, the whole page doesn't work, cool. Cuz we have not cached all of the other assets in there, right?
+>> Speaker 5: As expected.
+>> Steve Kinney: As expected, so we could theoretically add the rest of the pages in there but right now our images will fall back but we need to figure out some caching strategies.
+
+[00:22:40]
+We need to figure out, how we handle images that are not found, is different than how we handle the index which is different than how we handle the script.
+

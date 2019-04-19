@@ -1,0 +1,211 @@
+[00:00:00]
+>> Mike North: We're going to work with IndexedDB, specifically idb a little bit. So that we can go ahead and, as our service worker's installing, kind of preload our app with at least the JSON data that represents all of the grocery images available to us. And this is a great pattern if we wanted to sort of allow the user to have the experience that they landed on based on the URL, right?
+
+[00:00:29]
+Load whatever they need to render there, but in the background, kinda get ready for generalized use of this app, right? So that even if there are API endpoints we haven't hit yet, maybe we can build an IndexedDB and use those records to fuel our app rather than relying on like HTTP layer to drive our app.
+
+[00:00:54]
+
+>> Mike North: So let's get started.
+>> Mike North: All right, so the first thing we're gonna do, I just have some notes here, so I'll stay on track. So I'm going to try to shoot the moon here. Go for the whole problem and ultimately I'm gonna need multiple fallback image URLs.
+
+[00:01:25]
+
+>> Mike North: Right, one per type. And they're gonna look like,
+>> Mike North: localhost:3100/images/fallback-grocery.png. So that's our generalized one and we've got a bunch of them.
+>> Mike North: So we've got grocery, we've got bakery, dairy,
+>> Mike North: We've got frozen, fruit, herbs,
+>> Mike North: Meat and vegetables. And if you were to look where these images are located, it's in the server/images folder.
+
+[00:02:17]
+These are a little bit different so it's going to provide a better experience for our users. That's the story, the motivation behind this exercise. We can show a picture of a fruit with a question mark instead of just a grocery bag. So ultimately, my static analysis is telling me this is an unused variable.
+
+[00:02:35]
+Ultimately this will end up being the unused variable we can get away from that. That's how we will know we fully made this transition. So, the next thing I'm gonna do is there are multiple situations where I'm gonna need this database. I'm gonna need it when I populate the database.
+
+[00:02:53]
+I'm gonna need it whenever I make use of it, so that I can use it to determine what kind of fallback image I need. So I'm just going to make a little function that will open the database and return it to me. That way I can leverage that code a couple times.
+
+[00:03:15]
+
+>> Mike North: And now we need idb, this library.
+>> Mike North: And here we can return idb.open('groceryitem-store'), and we'll open version 1. There's our upgradeDb event, and in here, I'm gonna kind of build a case switch, but we're not gonna have multiple versions we'll deal with. This would be the starting point that we'd build on top of.
+
+[00:03:53]
+
+>> Mike North: upgradeDb, old version, right? So this is the number of the previous version of the database, seen by the browser or 0 if it's new.
+>> Mike North: So if it's new, we're gonna do sort of our initial setup stuff. And in this case it's gonna be upgradeDb.createObjectStore('grocery-items'). I'm giving these different names deliberately so we can tell what's the database and what's the store.
+
+[00:04:27]
+We can actually move that up to this line. Great, okay, we're done with this. So now we can invoke this function and what we'll get back is an upgraded database. It'll create one on the fly if we need to. If it's a brand new empty database that's created on the fly, we'll add this object store.
+
+[00:04:48]
+We've got this little key path here. So now as long as my objects that I put into it, they have an ID, we should be good to go. You'll get complaints if you don't define how the primary key can be found on each record. So the next thing I'm gonna do is create a function that returns a promise called the downloadGroceryItems.
+
+[00:05:17]
+It's not important really what this promise resolves to. It is just something that I'm going to add to my list of things to wait for,
+>> Mike North: In the install hook, right? So this is not one of these fetch related things where I have to make sure I return a promise that resolves to a response.
+
+[00:05:44]
+It just needs to return a promise. And in here, I'm going to first open the database.
+>> Mike North: And we get a database here passed to the promise handler there. And then once the database is open, I can go and begin to fetch data from my API. So I'll go back to the slide, steal that URL.
+
+[00:06:16]
+
+>> Mike North: There we go, and we'll do the typical thing we do with fetch.
+>> Mike North: And what I expect here,
+>> Mike North: Is a property called data on this JSON object I get. And I'm going locally within the body of this little call back here. We'll just call those groceryItems.
+
+[00:06:44]
+What you're seeing here, it's like a fancy destructured assignment and naming at the same time. Basically saying, take the object I get back, reach in, grab this data property off of that object, and make it available in this function here as this local variable, groceryItems. All right, so now I've got the JSON, I've opened my database, let's smash them together.
+
+[00:07:15]
+
+>> Mike North: So we're gonna create a transaction, tx is a common convention for that.
+>> Mike North: So man, I love Visual Studio code here. So the second argument that we pass here. The first argument you see, it's the name of the store that we're creating a transaction for. So almost always, you're gonna be working with one store but you can see that optionally you can provide multiple store names and that will be a transaction that's working with multiple things.
+
+[00:07:50]
+So the example of emptying the shopping cart and creating an order, that's a transaction that touches two tables. So that would be like a multi-store transaction if we were doing it in the browser. The second argument here is whether we're using a read and write or read mode for this transaction.
+
+[00:08:11]
+So this kind of sets the rules for what we can touch, which stores we can touch, and the kinds of operations we can do on them. Then we're going to, sorry, I've got some notes here. So the first thing I wanna do is, in the installation process here, I'm gonna treat this kinda like a pre cast assets.
+
+[00:08:38]
+Meaning that if I find something there, like, every time a new service worker installs, let's start from scratch and repopulate this database. Now if we had a million records or something, number one, probably not a good candidate for storing in the browser. But if it were getting complicated you might just wanna be a little bit more thoughtful about the way you handle it.
+
+[00:09:00]
+In this case, we're not gonna worry too much.
+>> Mike North: So we're gonna get this objectStore and clear it. Which, it returns a promise but we're not too concerned with it. Well, we'll chain to the promise in a second. This removes all of the objects in this store.
+>> Mike North: So once the clearing is complete, we can,
+
+[00:09:39]
+
+>> Mike North: So we're basically going to go through all of the grocery items that we found. And turn each one into a put operation. So we're gonna take our grocery-items and we're gonna basically, for n grocery-items, we're gonna create n put operations into this database. And here's how that would look at a high level, groceryItems.map.
+
+[00:10:11]
+We've got one grocery item here.
+>> Mike North: And we're gonna grab that so we can create a new transaction.
+>> Mike North: We're creating a lot of transactions here. Actually, you could do something like this.
+>> Mike North: Create a new transaction,
+>> Mike North: And we're going to map over.
+>> Mike North: I can clean this up by holding a reference to this grocery item store.
+
+[00:11:01]
+
+>> Mike North: And we're gonna just put that grocery item right in, and these are relatively, these are flat objects, they have an ID property. So they're actually already ready to just drop into index DB. It doesn't need them to be flat, but it does need that ID to be a top level property on the object.
+
+[00:11:21]
+
+>> Mike North: So this will turn, this map is a high order function on arrays, and it takes the contents of an array and, one by one, try to form the items, and we've transformed an array of JavaScript objects into promises. Put returns a, let me put it more in the center, so put returns a promise, we can see it's a promise that resolves to an IDBValidKey.
+
+[00:11:53]
+Whatever that means, we're not concerned with it. Really, the whole point of this function, and our chaining of things together is, we want the promise to resolve when all is done. We don't really care once we shove stuff in there, we're done with it. So if we return this, now we've got, we'll call this the putPromises.
+
+[00:12:17]
+And they're all associated with this one transaction. I just made this change here, I was associating it with this wrong transaction here.
+>> Mike North: So now what we can do is we will, sorry, let me make sure I haven't made a mistake here, groceryItem's clear, I have a little error.
+
+[00:12:45]
+
+>> Mike North: There we go. Okay, so it's two transactions that work here, and I've broken them apart for a pretty obvious reason. I'm dumping the table and now I'm starting to fill it up bit by bit, and it just makes more sense in my mind to think of those as two separate things.
+
+[00:13:05]
+
+>> Mike North: So, when the first transaction is completed, we kind of set up the second transaction, we've got these putPromises, and now we're gonna say return Promise all putPromises.
+>> Mike North: And last thing we need to do here, I just made the same mistake twice, is complete. So this complete property, that is where you have access to the promise that resolves when the transaction is complete.
+
+[00:13:39]
+So that's why here we're chaining against complete, and here we're mapping and we're ultimately returning complete, so that essentially when all of these promises resolve, we should be good. Sorry, I'm halfway between two approaches here. Now we're all set.
+>> Mike North: We can actually do it this way. All right, this make a lot more sense, begin the transaction, put end operations inside this transaction, complete the transaction.
+
+[00:14:13]
+Trying to correct errors on the fly and it requires a lot of brain power [LAUGH] so great. Let's operate on the assumption that this works and we'll go back to debug if necessary. So we've already wired this download grocery items thing up. And I think this is a good time to start the server and just see if the database gets populated.
+
+[00:14:42]
+
+>> Mike North: So let's go here.
+>> Mike North: Refresh.
+>> Mike North: And we'll look at our application tab. Down on the left panel, we'll look at IndexedDB. And you can see we have a grocery item store in there at version one. And here's a list of grocery items, looks good, looks good.
+
+[00:15:09]
+We have IDs, and here's the value, these multi-property objects here. So you can think of it like a key-value store, I mean, it is a key-value store, and the value is the document. Why we would call this a NoSQL database instead of a key-value store? We have the ability to kind of query against values and have indices.
+
+[00:15:31]
+And if you've used something like Redis before or even local storage as a key value store, really the key is the only power you have for looking up objects. And that's why we'd say this is Definitely a database and not just that simpler, more primitive storage mechanism. All right, so this is step one of this exercise, let's rounded it out in a step two.
+
+[00:15:57]
+So the bonus thing So in the event that we have to fall back on an image here, we've got two situations where we're,
+>> Mike North: Going for this FALLBACK_IMAGE_URL. And I'm jut gonna break out a new function here.
+>> Mike North: So you've got a fallbackImageForRequest just so we can reuse some logic here
+
+[00:16:33]
+
+>> Mike North: I'll save that for later,
+>> Mike North: And we'll put the same thing down here.
+>> Mike North: All right, so now our job is given a request, like if we were to uncomment this,
+>> Mike North: We've basically got exactly the same thing that we've been working with this whole time. If we refresh, we should see, there's our fall back image.
+
+[00:17:01]
+But we wanna take into account the URL here.
+>> Mike North: So we're gonna grab the path portion of the URL, and we'll extract the itemId from it. So they'll end up looking like this,
+>> Mike North: Something like that. So we're gonna take the path and we're gonna get a substring.
+
+[00:17:33]
+
+>> Mike North: And we're gonna begin with the last index of slash + 1. And we're gonna end with the last index of a period. So basically, we're trying to start here at 1, go all the way until we hit stopping short of the period. And we'll get 123, and let's wrap that all in a parseInt, with a radix of 10.
+
+[00:18:02]
+So now we've got a number which is great, because that's exactly what IndexDB needs. And our job here, this function here it's involved with fetch. We always wanna make sure that writing this in a way that they return those promises that resolve to responses. But we can start by opening the db, we'll do it right here.
+
+[00:18:29]
+
+>> Mike North: So we'll open the db, it's groceryItemDb, and,
+>> Mike North: We get the database and then in here, what we're gonna do is,
+>> Mike North: Create a new transaction,
+>> Mike North: And we're gonna get itemId.
+>> Mike North: So we can return that and then we will chain here, we're trying to keep things linear if we can.
+
+[00:19:12]
+
+>> Mike North: So, we've got a grocery item at this point. It's gonna look just like that plain JavaScript object that we put in.
+>> Mike North: So at this point we've got the category and now we can use the same thing thing like this is the ultimate annual back into sort of fetch land.
+
+[00:19:35]
+We're returning this promise that resolves to response. And instead of the fallback image url here, I'm just gonna grab one of these, we'll just build the string manually. They're more graceful ways to do it, but this work for us.
+>> Mike North: And we'll substitute this thing here with the category name.
+
+[00:20:00]
+
+>> Mike North: Something like that. All right, let's see where we're at.
+>> Mike North: Interesting,
+>> Mike North: Let me make sure everything's working as it should. So grocery items should get pre-cached.
+>> Mike North: I think that's the problem, fallback image URL, we want to cache those. Those aren't in the cache.
+>> Mike North: So let's check the cache, see if they're there, refresh, open it up.
+
+[00:20:48]
+It is the fallbackImages, great, so now we have far more than just the one.
+>> Mike North: And,
+>> Mike North: That looks right, let me just add a break point here real quick.
+>> Speaker 2: Those fallback images are all the categories, right?
+>> Mike North: Yep.
+>> Speaker 2: That's how that associates with, yeah that stuff.
+
+[00:21:14]
+
+>> Mike North: So I'm just simply using that to pre-fetch, right? So that I go, did I say add all here for fall back images, I did fall back image URLs. So I just want a break point right here, we'll shake out this last issue, whatever it happens to be.
+
+[00:21:37]
+
+>> Mike North: AVR service workers still waiting and it is.
+>> Mike North: I'll just do update on reload.
+>> Mike North: And okay, so we have some different behavior here. Let's see what's going on. Transaction get is not a function, I've made a little mistake here.
+>> Mike North: So, it's transaction.objectStore.
+>> Mike North: So as you can see, there's a serious multi-step process at work here.
+
+[00:22:28]
+A very powerful tool, but a bit of a low-level API, there we go. So now, instead of the generic fallback image, we get a bread-specific fallback image here, and if we've got the banana moved or something. Forget where the other thing we deleted is, but actually know the idea of the banana one we can do it right away.
+
+[00:22:54]
+
+>> Mike North: So there's our wheat one and here's fruit. All right, so now we're using serious imperative logic in a database, and our last snapshot of the data itself to have dynamic fallback images here. And I hope you're seeing now, we're not dealing with just a caching layer that lets us have some logic around caching, we can do a lot more.
+

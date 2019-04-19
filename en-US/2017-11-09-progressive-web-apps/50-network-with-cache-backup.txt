@@ -1,0 +1,61 @@
+[00:00:00]
+>> Mike North: Here is another strategy called network with a cache backup. And in my service workers, I like to call this the fallback cache, right? So this would be basically, we have a bias for wanting fresh data. We're gonna try to use the network in the event that something has gone wrong.
+
+[00:00:23]
+Maybe it's taking too long, maybe we're off the line. Only then will we fallback to the cache. This is a great strategy to use for JSON get requests, right? Our list of groceries like it would be great for us to know that a new item has been added since the last time we alerted the screen.
+
+[00:00:41]
+That would be ideal. In the event that we're offline, that's off the table. But it would probably be fine for us to use a stored older version of that JSON response in its place. It's like we use that and we fallback to that in the event that we can't use fresh data.
+
+[00:01:01]
+
+>> Mike North: So you can see here that we're using this catch callback of the fetch promise, the promise returned by fetch. In this case, so can anyone tell me in what situations would we end up falling back to the cache?
+>> Mike North: All right, pardon.
+>> Speaker 2: A time out.
+>> Mike North: A time out, yes.
+
+[00:01:26]
+And a certificate error, yes. Being offline, yes. How about a 404? No, so like this would work in many situations. But in order to be complete like for this also work for image fallback or something like that, we would need to also add like something similar in the successful promise handler and the dot then.
+
+[00:01:52]
+And say, if the response is not okay, also caches much this other thing. That would give us like a complete fallback for anything other than successful 200 status code like responses.
+>> Mike North: So here is that looks like in the conversation between the app and service worker. So the app says, it wants an item and the cache is gonna go and fetch it and return it to the app.
+
+[00:02:25]
+And typically, what we're gonna do then is, well, first off, this is not fantastic. This looks like the default behavior of fetch. I've asked the service worker to go and get something from the internet, and give it back to me. We've had this. This is how AJAX works.
+
+[00:02:42]
+This is how fetch works without a service worker present. The benefit here is that we can add imperative logic to this situation. For example, we could wrap the fetch that we're sending to the outside world. Within our service worker, we can wrap in a setTimeout. So that in the event that something took too long, then we can use something from our cache.
+
+[00:03:09]
+So this basically say, we're in the middle of a deploy and we've just invalidated our whole CDN, right? So now,, things are just taking dramatically longer than typical. And in that situation with the proper logic have all of your web clients out there kind of trading off and wanting to have something quickly available rather than having the most up-to-date version of something.
+
+[00:03:37]
+And this is typically fine for JSON responses and images, and things like that. Obviously, it doesn't apply well to JavaScript. You want that to be fresh most of the time and we're gonna have a different strategy for that.
+>> Mike North: So in addition to being able to cut things off if they take too long, we can, of course, also in the event that something errors return a fallback image, for example.
+
+[00:04:05]
+So we've already kind of worked with this strategy already. We just didn't know that it had a name.
+>> Mike North: So hopefully what you're saying is like we're gonna end up composing a bunch of stuff together and treat images one way, JSON another way. Our application assets third way.
+
+[00:04:26]
+We'll pre-fetch those and have a bias for serving them from the cache. So let's keep drilling a little bit deeper in this and this is starting to approach more of the pattern that we like to see when we're building service workers have a little bit of complexity. You're gonna have two different flavors of things kind of being the dominant stuff that's going on in the fetch handler itself.
+
+[00:04:54]
+You're gonna have like truthy or falsy variable that you can use in order to switch things. Like is this an image? Is this a local request? The same origin that my service worker is operating on. Is this an HTML request? Something like that and then you're gonna have functions outside of it that you like, if you will let deal with all of the cache matching and opening of caches, and pre-populating.
+
+[00:05:25]
+You want those to be individual things. Additional benefit of that is testing service workers. There is not really an amazing story around this yet. But the more you can refractor out into independent functions, the closer you're getting to unit testable code as opposed to having to simulate that fetch event.
+
+[00:05:46]
+And if all of your complexity is tied up in that, you're basically in the worst kind of testing scenario which is where you have to like programmatically open a browser. You're using like Capybara or Selenium, something like that. These are the slowest most heavy weight test frameworks that really kind of simulate the end-to-end experience right down to the browser internals itself, right?
+
+[00:06:14]
+It just literally programmatically mouse clicking on things in an open browser tab. We don't wanna be there, that is how you end up with really long deploy times. So here's how we might take that doSomethingWithData function and compose it together with this cache then network strategy. So in this case, we're gonna go and grab this JSON document.
+
+[00:06:42]
+And when it comes back, we're actually gonna return that and that sort of ends the thing that your application is waiting for, right? So what that would mean is your JSON is back in our application. Your grocery list is showing up. Keep in mind that this is a separate thread.
+
+[00:07:04]
+We can actually do something after we return stuff to the application. And in this case, we're gonna say, I went and got something. Here it is and then while you do your thing, I'm gonna proceed to put it in my fallback cache for later.
+
