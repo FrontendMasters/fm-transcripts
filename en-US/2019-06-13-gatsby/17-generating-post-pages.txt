@@ -1,0 +1,96 @@
+[00:00:00]
+>> Jason Lengstorf: So we've got this, but now how do we actually get content into the pages? Cuz if I click through this, obviously we're not getting, we're not seeing anything, there's no pages yet, so we need to fix that. To fix that, we're going to get into programmatic page generation.
+
+[00:00:18]
+And we do that by creating a new file, so let me make this a little bit bigger here.
+>> Jason Lengstorf: We're gonna come down here, and next to our gatsby-config, we're gonna add a new file called gatsby-node. And this is where you can start to see that extending Gatsby works.
+
+[00:00:39]
+We expose a node set of APIs, a browser set of APIs and then some APIs for server-side rendering, each of those is named gatsby-thing. So gatsby-node, gatsby-browser, gatsby-ssr. Inside of those, you can export a function that is the same name as one of the hooks that we look for, and we will do whatever you tell us to do at that phase of the build.
+
+[00:01:04]
+So in our case, we wanna create pages, so we're going to use exports.createPages. And because we're gonna load data, we're gonna make this an async function. And then we're gonna need some stuff out of Gatsby. So Gatsby's gonna give us a couple utility methods that we can use.
+
+[00:01:24]
+We get a whole bundle of actions, and then we get a GraphQL helper.
+>> Jason Lengstorf: And then I'm also gonna grab the reporter in case we need to put something out to the console. So this is Gatsby's kind of internal console log. And it prevents you from having to use console log, and also add some styling and will do things like hook into telemetry and give you the ability to do some extra stuff.
+
+[00:01:49]
+We're not gonna get deep into that because it's pretty advanced, but just know that it's there. So what we can do now that we've got these actions in the GraphQL, I'm gonna just make a GraphQL query. I want to get, the result of this query is going to be what I get from awaiting the graphql call.
+
+[00:02:08]
+And my graphql call, now notice this time, it's a function. We're not using it as a template literal, this is a function. This is a Node interface, which is different from the React interface. So it's a subtle difference, it trips people up sometimes. Just know that when you're in gatsby-node, this graphql is in deed a function call.
+
+[00:02:31]
+Inside of it, I wanna run a query. And the query that I want is to get all these mdx files. And inside of the nodes, I want the frontmatter. And I'm gonna get the slug. And if you're wondering why I'm only getting the slug when I'm about to create these pages, it's because we don't necessarily want to have to load all of the content and then shove that content into a component.
+
+[00:02:56]
+Instead, we want to create these pages and then have the pages query for the data that they want. You wanna co-locate the data queries where it's used as opposed to having these kind of pass along things where you load data here and then you just have to know when you're editing that component that, if you wanna touch that data, you have to go to gatsby-node.
+
+[00:03:17]
+It creates magic references. And it gets kind of tricky, so we wanna minimize those as much as we can. So once we've got our results, we're going to check and make sure that we got what we needed. This is gonna matter less when you're doing local files because they're unlikely to break.
+
+[00:03:32]
+But as you start using third party sources, APIs that could be down, something that might rate limit you, or be missing an API key, you wanna make sure that you're checking for errors. And what I'm gonna do in this case is that I'm gonna panic.
+>> Jason Lengstorf: And so we will say that we failed to create post, if we get here, and then we'll just add the errors.
+
+[00:03:57]
+
+>> Jason Lengstorf: And what panic does is it prints out an error and stops the Gatsby build and tells you what went wrong so that you have a chance to fix it.
+>> Jason Lengstorf: If we get past the result.errors.errors, then we're able to assume that we've got our post and things worked as expected.
+
+[00:04:16]
+So I'm gonna go in, and I'm going to the result, I'm gonna get the data out of it and then allMdx and nodes. And so this is my post object, which is going to contain my frontmatter of the slug. Then I can posts.forEach, and that'll give me a post.
+
+[00:04:34]
+And I'm using forEach versus map because we're not returning anything here. So this is just a side effect and we don't necessarily want to return a value.
+>> Jason Lengstorf: Inside, I'm gonna use that actions object, and there's one called createPage, which is singular, and this one takes three arguments.
+
+[00:04:53]
+The first one is the path, and that's where we want it to live. I want this to live at the slug, so I'm gonna do post.frontmatter.slug. The next is a component. So we need to tell it what component to use. The same as we told MDX what component to use.
+
+[00:05:13]
+So we haven't actually built that component yet, so we're gonna need to do that. For now,
+>> Jason Lengstorf: We can just placeholder that. We need to do that. And then finally, is some context. And we'll look at this in a minute, but what I wanna send is the slug.
+
+[00:05:31]
+And the slug that I'm going to send is gonna be wrapped in,
+>> Jason Lengstorf: Forward slashes is the word I was looking for. It's gonna be wrapped in forward slashes, and we'll talk about why once we get to it.
+>> Jason Lengstorf: So all right, here we are.
+>> Jason Lengstorf: We have this thing that's gonna create pages for us, but we're missing a component.
+
+[00:05:58]
+So let's go ahead and create that component. A convention that I like is to create a new folder called templates for this, and I'm going to call it post.
+>> Jason Lengstorf: If I can find it.
+>> Jason Lengstorf: post.js, and in here, we're going to style this thing out. So we've got import React from 'react'.
+
+[00:06:26]
+We're gonna import { graphql } from 'gatsby'. We're going import the MDX, well, let's do that in a minute. Let's import { css } from '@emotion core'. We're going to import our layout, cuz we wanna keep that consistent feel. So we're gonna go '../components/layout'. And then I also want to use the read-link.
+
+[00:07:00]
+
+>> Jason Lengstorf: '../components/read-link'.
+>> Jason Lengstorf: And so now I can set up my template. So I'm gonna set up a PostTemplate.
+>> Jason Lengstorf: And that is going to eventually receive some props, but we're not quite there yet, so we can set it up. Let's set up our Layout. Inside of our Layout, I want to use post title, then we're going to show who wrote it.
+
+[00:07:39]
+
+>> Jason Lengstorf: And I'm just scaffolding this out so that we can see what it looks like. And then we'll figure out how to actually show it. Then, here,
+>> Jason Lengstorf: Post body goes here. And then finally, we'll set up a ReadLink back to the homepage. And we'll just use the left arrow HTML entity and say back to all posts.
+
+[00:08:08]
+
+>> Jason Lengstorf: So this is gonna work out kind of okay. This Posted by author, we want that to be styled up. So let's add a couple styles here. And all I'm really gonna do is just make it small. So I'm gonna do font-size is 0.75rem. And that puts us pretty close to where we wanna be.
+
+[00:08:28]
+So let's export default PostTemplate.
+>> Jason Lengstorf: So now if I come back here and I wanna set this up, I can use the required.resolve and get to that post. So I'm gonna go to the ./src/templates/post.js. And now what we should see is that it's gonna generate a page for each post that we've created.
+
+[00:08:58]
+So let's go in here, I'm gonna stop and restart the server. Whenever you change gatsby-node API, it's going to require a stop and restart.
+>> Jason Lengstorf: Okay, so we're built, we're getting a linter error because we we set up GraphQL but haven't used it yet. So now if I click through,
+
+[00:09:20]
+
+>> Jason Lengstorf: We're getting our post. So we do see a post, but, I mean, obviously this is all hard coded data.
+
