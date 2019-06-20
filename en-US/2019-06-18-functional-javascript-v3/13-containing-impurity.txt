@@ -1,0 +1,95 @@
+[00:00:00]
+>> Kyle Simpson: If you can't extract the impurity, another way of getting around the problem of function impurity, the pollution that it has, the polluting effect that it has on the rest of the code. Another way to do that is to contain the impurity. What do I mean by contain?
+
+[00:00:18]
+This is sometimes hard for people, so let me make sure we're real clear here. It is not that we don't make impurity happen, impurity may have to happen. But if there's some way for us to structure things so that the impurity does not affect other parts of the application.
+
+[00:00:38]
+If there's some way for us to reduce the surface area of the impurity. We've had a net overall benefit to our application. In other words, if the side effect can pollute the global scope, that's bad, right? But what if the side effect that has to happen only ever has to affect five lines of code?
+
+[00:01:03]
+That's a lot better than affecting the entire global scope, right? So sometimes, we can't get rid of the impurity, but sometimes, we can simply contain it, we can reduce the surface area of it. One way of doing that. Here I have a SomeAPI, it's got a method on it called isBelowThreshold, and some value on it.
+
+[00:01:21]
+What's important here is that I call that method. I'm gonna modify the numbers array, but I'm calling line 11. SomeAPI.isBelowThreshold, I'm using that. So SomeAPI is provided to me by like a framework or a library. And it has a function on it that I wanna use. Well, one thing that I can do If I don't want to modify the global numbers array, and I don't wanna use this SomeAPI.isBelowThreshold.
+
+[00:01:51]
+If I don't wanna use those side effects, one way of doing this is to wrap that entire function so that the side effects that occur are not in the global scope, but they are inside of a function scope. Let's do that. Let's wrap the insertSortedDescending, that was the function that previously existed in the global scope.
+
+[00:02:15]
+We wrapped it in another function called getSortedNums. And notice that there is still, line 7, a global variable called numbers, there is an array. But notice now, there is also an array line 10 inside of getSortedNumbers. There's an array there that when insertSortedDescending is called and line 20 tries to modify it, it is now modifying the array from line 10, not the array from line 7.
+
+[00:02:48]
+And what we did on line 24 and line 25, and 26, and 27, and 28 is we passed in the one from the global scope. And then line 10, we made a copy of it. So as to not modify the global numbers array, only modify the local numbers array.
+
+[00:03:08]
+Did you see how I contained the impurity? There is an impurity happening, I am modifying that array and I'm modifying it by reference and it's a variable outside of myself. That's a side effect. But I have contained that side effect to lines 9 through 22 instead of the global scope of the entire program.
+
+[00:03:29]
+
+>> Kyle Simpson: That's one way of dealing of impurity is to contain it, in this case, wrapping a function. Now, I'll be honest with you, that doesn't often occur for me. A handful of times have I ever been able to take advantage of wrapping a function around another function, but sometimes.
+
+[00:03:47]
+Sometimes that is useful. So it's good technique to be aware of. But there is still another problem, there is still an impurity here. And the impurity is that we are using the SomeAPI.threshold and SomeAPI.isBelowThreshold. Notice line 15, we are setting the variable. Line 15, we are setting threshold, which is modifying something that we don't own.
+
+[00:04:20]
+We're modifying threshold and then calling this function. That's having a side effect. And it really wouldn't work for us to wrap the SomeAPI up into our function, because that's a third party provided thing. It's probably actually in a separate file. So wrapping it isn't going to work. Is there any way for us to contain the impurity when we can't just wrap a function around it?
+
+[00:04:45]
+There's another technique. It's uglier than this, it's worse than this, but it's better than nothing. The next technique that will look at instead of wrapping a function around it, is create alongside of it an adapter function. So notice we're back now, line 9, we have an insertSortedDescription. That function is just out in the global scope like it was before.
+
+[00:05:11]
+So is the SomeAPI. But notice line 18, we have our getSortedNums alongside it instead of wrapped around it. And notice what's important here is that I first make a copy of the current state that is going to be modified. I take some local variables called origNumbers and origThreshold, I get copies of those current values.
+
+[00:05:35]
+And then line 20, step two, is I set up the environment to be what I want it to be, which is that numbers is a copy of this array. Okay? It's a copy of the passed in array. And then I call the insertSortedDescending. That's our thing that does all our side effects that we don't like.
+
+[00:05:57]
+It's gonna make changes to that global variable numbers, and that SomeAPI.threshold, both of those are gonna be changed, they're gonna be modified as side effects. And then on line 22, step 4, we capture that changed state. In this case, it's only the numbers array that we care about.
+
+[00:06:16]
+We capture the new changed state. We save that. And the most critical piece of all, line 5, we return all of the state that was modified back to its original values.
+>> Kyle Simpson: And finally, line 24, step 6, we return that new state that we've computed. This is very brute force.
+
+[00:06:42]
+It is very ugly and would get very unmanageable very quickly if we had a more complex set of state, like for example, the DOM. Capturing the current state of the DOM, modifying it, and then resetting it is hard. Possible, but quite difficult. Capturing the current state of your database, modifying it, and resetting it, really hard.
+
+[00:07:05]
+Possible, but probably not worth it. But in this particular case, we had just a couple of variables that were getting changed in a way we didn't like. And so we said we can capture those values and then restore them. From the beginning of the getSortedNums call on line 27 to the end of that function call, from the beginning to the end, during that call, everything is all messed up.
+
+[00:07:29]
+But by the end, it's all back to the way it was before. Are you with me? So we have contained the observability of that side effect to the function call. Even though getSortedNums is not actually a pure function from the technical definition. We have achieved the greater, the more important outcome, I argue, which is that line 27 runs as a pure function call.
+
+[00:07:59]
+It satisfies all the conditions that we want out of a pure function call, which is that it takes direct inputs, it gives us a direct output, and it doesn't change anything else about the state of the program afterwards. And it didn't rely upon anything about the state of the program before.
+
+[00:08:17]
+Those are all the things on our check mark list that we want, and line 27 fulfills it. And so does 28, 29, 30, and 31. So this is another way of dealing with side effects, is to contain their effects. In this case, contain them to a single function call.
+
+[00:08:36]
+Sometimes they're gonna happen. We want to reduce the surface area where side effects happen at all costs. And if none of these things work, if you can't write it pure from the beginning, if you can't refactor it to be pure because now you know that's important, if you can't extract the impurities so that it leaves a pure function.
+
+[00:08:55]
+If you can't make a wrapper function around it, and you can't make an adapter function. If you tried all five of those things and none of that worked, you're stuck with the side-effect, at least make it obvious. Contain it somewhere, make it obvious. So that if there are bugs, then the future reader, the maintainer of your code, knows where to go looking.
+
+[00:09:20]
+
+>> Kyle Simpson: How do we feel about side effects? Give me a thumbs up, thumbs down. How are we feeling so far about this idea of side effects and using pure functions. Yes?
+>> Speaker 2: I've heard before that also, mutating the state of parameters is also considered to be unpure, impure.
+
+[00:09:38]
+What are your thoughts on that?
+>> Kyle Simpson: Okay, so the question is if I have a parameter that's passed in and I mutate the state of it. Well, unfortunately, we need to be more specific around that wording. So let's look for example at the insertSortedDescription, sorry, insertSortedDecending function. The one that's defined on line 9 here.
+
+[00:09:56]
+If I passed in numbers rather than refering to the global one but I still called numbers.splice on line 15. Or if we consider the previous slide, where I was doing it on the array numbers. In both of those those cases, I would be modifying the value by reference.
+
+[00:10:17]
+So I'm not actually changing the parameter. I didn't reassign a parameter to a different value. I used a reference to mutate a value at a distance. Using a reference to mutate a value at a distance is absolutely a side effect. That's the whole reason we wanted to avoid the numbers.splice here, cuz that is definitely a side effect.
+
+[00:10:40]
+But taking a parameter that, say, was passed in as the value for or even an array and reassigning it to point to a different value, that doesn't have any effect on the outside world. So when you mutate a parameter, you have to ask, are you mutating the value the parameter references, or are you mutating what assignment the parameter has?
+
+[00:11:02]
+The former of those is a bad side effect. The latter of those is totally fine.
+
