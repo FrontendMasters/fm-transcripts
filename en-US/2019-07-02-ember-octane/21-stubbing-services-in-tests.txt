@@ -1,0 +1,97 @@
+[00:00:00]
+>> Mike North: One thing that is a little bit interesting here is we are using, as we run through our tests, and as we go through in particular the log in test. Wrong log in test,
+>> Mike North: Yeah, the logout test, let's look at this one. So if we go through this logout test which we wrote earlier where we start on teams and we click on the logout button and we find ourselves at the log in screen, presumably unauthenticated at that point.
+
+[00:00:39]
+We're going to run into a problem in the very near future and that problem has to do with the fact that as we run through the tests, the tests are actually reading from and writing to your local storage. It would be really annoying for us if we started to build on this without addressing the problem there because you could basically start logged in and then as soon as you run your test, find yourself very quickly logged out.
+
+[00:01:06]
+Because you've gone through this test and it's clicked the log out button and that really writes to local storage. So what we need to do is create a service that looks very similar to the off service and to kinda stub that in during testing so that no interaction with local storage is happening.
+
+[00:01:28]
+And it's not too bad to do this. So I do anticipate we're gonna need it in a couple of places so I'm gonna define this mock service in another file. And then I'll show you how to install it in a test like this to ensure that this isn't something that'll sting us as we start moving forward.
+
+[00:01:46]
+So in my test folder I'm just gonna create a new folder that stubs and I'm gonna create a file in there that's called auth-service.
+>> Mike North: In here I'm gonna import the same service base class.
+>> Mike North: And,
+>> Mike North: We're gonna export class auth service, extends service. And we need login with user ID.
+
+[00:02:37]
+I'm remembering what our old service looked like. In fact, I'm gonna open it just to make things as easy as possible so we can look at them side by side. So I need current user ID, I need that to be a property I can at least access. So for now,
+
+[00:02:55]
+
+>> Mike North: We'll just make it a value-based property, login with current user ID. We can just do something like this,
+>> Mike North: Right? We're not writing to local storage anymore, we're just holding this as a class field. It's very disposable, not gonna effect anything else. And then we need the router so I'll just grab this and we can inject the real router service.
+
+[00:03:21]
+We are totally fine with a real transition to another URL. It's the state that creates problems for us. So I just copied and pasted this piece of code here where we're injecting the router service. And I'm just gonna grab the related imports necessary to support that piece of code and paste them up here.
+
+[00:03:43]
+And we have a very simple service here. You can imagine once we get to logging out, it'd be very easy to clear that current user ID, right? It's all very nice and self-contained and disposable. So now that we have this, we simply need to wire it up in our test.
+
+[00:04:03]
+So that before each of our tests starts running, we install this mock object as the service you get when you want off. So you get this instead of the real one. Here's how we're going to do that. We're going to use Q units hook, it's called before each.
+
+[00:04:28]
+And I'm just gonna show you we have before and after so that's like for your whole module of tests, right? So that before and after it would be for everything contained within this module. Before each it's gonna be before and after each of these many tests that you may have in there.
+
+[00:04:46]
+And I want each test to get a clean service so I don't have to worry about- A much more cumbersome approach could be, read the current state of local storage. Now set it to null, now run through the test, now restore that previous state. It sounds like a lot of shuffling.
+
+[00:05:04]
+And if anything goes wrong and I never reach that clean up phase at the end I can't rely on any subsequent test results being valid. This much easier, it's nice and self-contained and disposable. Before each and we're gonna pass in a function to run that's sort of a per test setup.
+
+[00:05:21]
+And we're gonna go this.owner, which is an object you can think of this is like your application, right? So this that you customize the app before you kick the test off. This owner register, and we're gonna register a service and provide it with a constructor, and there we go.
+
+[00:05:46]
+That is all we need to do. This owner register, and we're registering a service, and here is the class for the service we wish to use. I'm gonna save this, and our tests run successfully, and I wanna set a break point in here, so we can confirm that we are in fact stopping at this.
+
+[00:06:07]
+Looks like we may not be. Let's see, loginWithUserId.
+>> Speaker 2: You're on the log out test, the log in test. You haven't used that service to log out yet.
+>> Mike North: We should be using it to log in though, let me just think here for a moment, okay.
+>> Speaker 2: We didn't write any test actually log in, we just changed the value of the user we're going to use and check [CROSSTALK] disabled.
+
+[00:06:39]
+
+>> Mike North: Got it okay, okay so it's gonna be hard to verify this for now. I do wanna kinda prove to ourselves this works. Trying to think of a quick and easy way to do it.
+>> Speaker 3: The button?
+>> Mike North: Yeah, I could. I'll use our pause test helper. So I can pause in the middle of this test and I will there is nothing that calls, yeah that will work.
+
+[00:07:09]
+So pause test, all right so here is our little mini app, I'm gonna log out,
+>> Mike North: And,
+>> Mike North: Here we are at the login screen. I'm gonna select a user, sign in, and we are at our break point and that break point is in our mock auth service.
+
+[00:07:32]
+So this is proof that our little bait and switch thing was successful. So we've kinda stubbed out at a very reasonable point this AuthService. And I'm, in general, very against, stubbing in tests. I think that especially if you're trying to stub the date constructor or require which people differ for wacky reasons.
+
+[00:07:58]
+This can be very difficult code to maintain. But for a service where it has a very well-defined boundary, and it's a nice encapsulated particular concern, this is the the best approach to use.
+>> Speaker 4: I recently did something like this for I had local storage as a prime data storage.
+
+[00:08:17]
+And, I just changed the key, I prepended it with a testing at that variable.
+>> Mike North: But you're still contaminating the real local storage.
+>> Speaker 4: I know.
+>> Mike North: Between tests, what assurance could you have that 100% of your local storage was removed?
+>> Speaker 4: Do a-
+>> Mike North: Iteration through [CROSSTALK]
+
+[00:08:37]
+
+>> Speaker 4: And clear local storage.
+>> Mike North: But now a developer comes along that mistypes something. There is some human diligence required for that to be a successful approach. Whereas if you had written an abstraction, a local storage service with a read and a write method, and instead of actually reading and writing to local storage you, that was like the single place your access is local storage stuff.
+
+[00:09:03]
+You could swap it out and just hold some stuff in memory and validate that everything works properly. You access that memory really quickly. There's no chance even with a slip in human diligence that that would cause problems. So before we take a quick little break here, I do wanna point out that there's another approach that kind of makes not a twist on this approach that sometimes makes a lot of sense.
+
+[00:09:33]
+We could have very well subclassed the real service. So if I in my auth service I had like read from local storage, write to local storage, I had those methods. I could have subclassed the real auth service, and only replaced those read and write methods, and that way, if I added more stuff here that depends on local storage state, I don't have to keep updating this mark.
+
+[00:10:00]
+This is sorta the most basic way to do it, but that that is often a logical extension of this technique.
+

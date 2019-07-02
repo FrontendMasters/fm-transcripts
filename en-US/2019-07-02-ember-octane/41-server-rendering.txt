@@ -1,0 +1,110 @@
+[00:00:00]
+>> Mike North: The last two things we're going to work on today have to do with performance. I told you at the beginning of this class, we're gonna make this app really, really fast. And we're gonna do this with two improvements. Number one, we're going to apply Ember's server side rendering technology.
+
+[00:00:20]
+And that means that we're not going to get what we currently have when we view source on this page,
+>> Mike North: Which is an empty HTML document. I mean, it's not empty empty, but certainly the body is empty. It just contains our script tag, so everything you are seeing on the screen is due to that JavaScript running.
+
+[00:00:44]
+So that means anything you are seeing on the screen has to wait for the JavaScript to download, be parsed, and run. And we're going to make it to the starting point, HTML is a lot farther along with stuff already there ready to go. So that's the first improvement we're going to make.
+
+[00:01:02]
+The second improvement is we're going to turn this into a progressive web app. And this is going to cache the static assets, cache the JavaScript and the CSS that build up this m wrap,
+>> Mike North: That are this m wrap. And caching API calls as they sail through so that if we ever lose connectivity we can fall back onto old API responses.
+
+[00:01:26]
+And we're gonna end up with a super fast loading app that works offline. At least to see data that you've already seen. And it's going to be surprisingly easy. So with that, [LAUGH]
+let's look at server side rendering. When you're building an app and you're intending to render it server side, you have to remember that there are some parts of JavaScript, or what we think of JavaScript, that only pertained to browsers and there's some things that only pertain to Node.js.
+
+[00:02:02]
+Example something that's browser specific document like window. Those mean nothing in Node.js, there is no window, there is no HTML document. In Node.js, you have something called process, where you would see what's your current working directory, what were arguments passed to your Node.js program. That means nothing to a browser.
+
+[00:02:24]
+But there's a ton of stuff in the middle, like promises and set time out, and all of the core JavaScript language features. So if you can manage to stick to that, you're gonna have a good time. If you start getting out into lots of non-standard stuff, it's a lot more difficult to just sort of flip a switch and allow your app to work.
+
+[00:02:47]
+So we're gonna install the server side rendering Ember add-on and we're gonna run into a problem and quickly solve it. But just a heads up try to stick to the stuff that works both in Node and in browsers. The way you enable server rendering in an Ember app is installing an add on called ember-cli-fastboot.
+
+[00:03:13]
+And I'm gonna kill my existing Ember server, because anytime you install a new add on, you need to kind of stop and start back up again. Add ons can affect your build pipeline and there's no way to sorta hot insert chunks of code into that.
+>> Mike North: Ember-cli-fastboot and this is gonna make it so even when we run Ember serve, you're gonna get a server rendered app or this source is gonna look a lot different than what we've got on the right.
+
+[00:03:43]
+But not at first because there's a problem.
+>> Mike North: Should say like running with fastboot.
+>> Mike North: Let's try it. Okay, so there's our error, app is being served by fastboot. Does this look kinda familiar? This was the stuff we saw in the console when our client side app starts up, right, the Ember version.
+
+[00:04:15]
+So we need to do one thing, and that's define the domains, the hosts where our app is allowed to be served. We're gonna do that in config, environment js. Right up here, we can say fastboot.
+>> Mike North: hostwhitelist,
+>> Mike North: And we're gonna say anything that has local host in there.
+
+[00:04:46]
+And you'd want to for a real app be careful about this because I could create local host.front end masters.com then anyone could create a domain that would work for you or that would defeat this. It's a security measure. So we'll stop and restart and re-serve and now it should give us another error that relates to us going outside the boundaries of the kind of stuff we should be using.
+
+[00:05:16]
+Ah-ha, I cannot read properly get item of undefined. So, can anyone venture guess as to what, where we've crossed the boundary?
+>> Speaker 2: Local storage.
+>> Mike North: Local storage, that is a browser specific API. The whole point of local storage, the whole reason it was created as a separate thing from cookies.
+
+[00:05:38]
+Cookies of course are sent along with every HTTP request that you make, by default they are. So the whole reason it was created is that’s data that has confined to the browser. So what I’m gonna do to solve this is I’m going to install another add on, it’s called ember-cookies, and ember install, ember cookies.
+
+[00:06:04]
+What this does is it creates a single facade, that in a browser, will read cookies off of the document. That's like where you're going to find cookies in a browser. And when your server rendering, it will read the cookies that came in with an incoming request that is asking for an HTML response.
+
+[00:06:23]
+So two very different places to look for cookies but this gives us a nice service that switches from one to the other and from our app's standpoint, we get to treat in one way. So I'm going to run ember s, s is for serve and we just need to go to our off service and move away from localStorage.
+
+[00:06:47]
+So we'll inject cookies with the ember-cookies service.
+>> Mike North: I like that it brought this in, this is gonna work out well for me.
+>> Mike North: Type.
+>> Mike North: And we are going to purge any reference to local storage. So the AUTH_KEY is still useful to us, but we can do this.cookies.read.
+
+[00:07:22]
+That looks right. Read, sounds good. And then set item, so we're gonna do this, cookies, right. Yep, takes very similar arguments, so it's working out really easily. Removing an item. This cookies I’m just gonna write null, that’s effectively zeroing it out. Certainly if we read it again, it'll be understood as falsies.
+
+[00:08:01]
+We could even have set it to zero or an empty string because our authentication checks are based on a truthy-falsey condition. And now there's no more local storage in here. So let's see what happens if we refresh. Ah-ha, there's our app. That's good, good sign. Let's look at the view sources tab here.
+
+[00:08:22]
+So this is the before picture and here's the after. That's our actual app rendered, it's an ember app that's sort of ready and waiting in Node.js. And when an incoming request arrives, it will go through a router just like it does in your browser. And once everything is settled, all the promises of result, it will take all that HTML and send it back.
+
+[00:08:45]
+Then, when your client-side app boots up, it will take over from there. So, even if people are taking a while to download your JavaScript, they will see on the screen the HTML with the real data, with CSS applied to it and they very much feel like the app is loaded.
+
+[00:09:04]
+Yes, sir.
+>> Speaker 3: If they follow a link to a path rather than your sorta route for the first page load, will it still affect that path's page load?
+>> Mike North: So the way you set up a production fastboot server, that will involve listening for any path that begins from wherever the app is mounted.
+
+[00:09:26]
+So regardless of which URL you hit, it's all going to the right place. And we just save the URL, or the path portion of the URL whatever that was we give it to the client side router and it'll take it from there. But it'll respond on any URL that is a valid URL for this app.
+
+[00:09:49]
+But you're smart to think about index to that HTML special for a single page app because the same content either way. Same content, no matter how you access it. Yes?
+>> Speaker 4: I was just gonna ask, does this actually give you effectively the same output as if you ran it locally and you are at some route.
+
+[00:10:07]
+So, what about things like your AUTH service, does the back end know if you're logged in or out, in order to generate your code?
+>> Mike North: Good question, it does. And it does because we're using cookies as our storage mechanism now. So my cookie is sent along with that HTTP request.
+
+[00:10:25]
+And I can show you what that looks like. So our document request,
+>> Mike North: Well, I have a filter. There's our document request for going to teams/LinkedIn/recruiting. If I look at that look at the headers. You can probably scroll down and see something. So there's my cookie and my user ID being sent along for the ride.
+
+[00:10:54]
+
+>> Speaker 5: Looks very secure, no way to possibly send the wrong ID there.
+>> Mike North: Well, that's not real authentication.
+>> Speaker 5: No, I get it.
+>> Mike North: But typically this would be a server generated token of some sort where it’s of no value to anyone who would snoop on it, it would be like one way hashed
+
+[00:11:12]
+
+>> Mike North: Like a JSON web token would be totally safe to put here. And if we're using HTTPS then no one's gonna be able to read this anyway. All right, so we have server rendering. Last step is to make it a PWA. So I'm gonna commit this code and we will do our last little step.
+
+[00:11:31]
+And then take a look at how fast this thing is.
+

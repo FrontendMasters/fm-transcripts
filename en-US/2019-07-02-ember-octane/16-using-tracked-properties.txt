@@ -1,0 +1,96 @@
+[00:00:00]
+>> Mike: Let's render that on the screen. So you might notice at the bottom here we've got a validation message. So we're not gonna really use this for validation, although we'll call it a validation message. I'm just gonna tell the user which user ID they're logging in as, and we would do it the following way.
+
+[00:00:18]
+
+>> Mike: this.usderId, only on the initial render are we seeing the correct result. So if I were to change this, we'll see userId 1, we'll see userId 2. Let's see what happens here, userId of null. So as long as I'm driving things from the userId property, everything looks good.
+
+[00:00:46]
+Unfortunately, it seems that when I change things, we're out of luck. And this is because we have one-way data binding by default. Previous versions of Ember heavily emphasize two-way data binding, where we would have sort of connected this userId property to the thing that's manipulating it. And not only is it used to initially set it up, but anytime you would alter the select, it would sort of push a change back out to the property that it was bound to.
+
+[00:01:16]
+This is not a path that leads to well-performing apps, so we have one-way data binding now. And we have to be a little bit more deliberate about opting in to keeping things in sync. And the way we’re going to do this is through listening to a DOM event, how did we do that with a form?
+
+[00:01:35]
+We used a modifier, anyone remember the name?
+>> Speaker 2: On.
+>> Mike: On modifier, thank you, so we'll say on "change", that's a good DOM event to listen to in this case. And I'm going to invoke a function, onSelectChanged.
+>> Mike: So we get an error because undefined is not a valid callback.
+
+[00:02:04]
+That's giving us a clue that onSelectChanged has not been defined yet, right? It needs this to be a function, so let's make it one.
+>> Mike: We already learned our lesson when it came to using action, so we'll just use that from the start here. onSelectChanged, and this is going to receive a DOM event.
+
+[00:02:27]
+Oops, sorry, I put this between the comment and the code of the next one here.
+>> Mike: Yeah, sorry, I just inserted that in the wrong place, but we're good to go now, and this will receive an event. And for those of you who would like some nice autocomplete stuff, you would say, this is an event.
+
+[00:02:48]
+And also, its target is an HTMLSelectElement.
+>> Mike: And now, aside from the fact that we're not clearing our log every time we load up, we should see that things are kinda looking a little bit better. Our on modifier's not throwing as we first render this template, that's great.
+
+[00:03:20]
+No errors on changing, we certainly don't see the data being updated, right? We should see something down here, like userId 1, userId 2, so we need to mutate this state. In older versions of Ember, you would have used what to change the value of a property?
+>> Mike: Come on, some of you know this.
+
+[00:03:45]
+
+>> Speaker 2: this.set?
+>> Mike: this.set, thank goodness we don't have to use that here. All we have to do is vanilla JavaScript, this.userId =, and it's gonna be the DOM event. Actually, its target, which is a HTMLSelectElement, and that has a value. I love these JS dot comments, I don't have to look up documentation, it's just all there.
+
+[00:04:13]
+Awesome, and let me just check what is happening here. So now I hope this works, but it's not going to, so we can change this. Okay, now we're getting a big error, it's a very descriptive error. So we attempted to change userId to 1, but it's being tracked by a tracking context, such as a template.
+
+[00:04:42]
+So let me translate this a little bit, we tried to set userId to something, but it's being used in a template. And we have not indicated that this should be a tracked property. This is where we see that we need to opt in to mutations in data causing HTML changes.
+
+[00:05:05]
+That's an opt-in situation here, it doesn't happen by default. So we tried to set userId to 1, it's being used in a template, or a computed property, or observer, but a template in our case. We're not gonna deal with those other concepts at all today. In order to make sure that everything updates properly, you should mark the property as tracked or use set.
+
+[00:05:28]
+But we're not gonna use set, we're going to use tracked, it's another decorator. And this is all we need to do in order to make sure that everything downstream, everything that depends on this.userId will automatically update whenever userId changes.
+>> Mike: So tracked, and we're gonna import this,
+>> Mike: From glimmer/tracking.
+
+[00:05:57]
+
+>> Mike: Two Ms, let's clear our console, reload, okay, no errors on load, and let's select a user. Hey, there we go, logging in as userId 1, userId 2, back to null, back to 1. Now everything is kept in sync, so here are the moving parts just to recap, we're listening for a DOM event.
+
+[00:06:23]
+When that DOM event is fired, we're just using vanilla JavaScript right here to give userId a new value. And in order to make that work, all we had to do was mark userId as tracked. Now, if we weren't using userId in a template, we could have freely manipulated this thing.
+
+[00:06:45]
+It's the fact that it's being used in a template that makes it so we have to track it if we want to change it. But if it were just some private thing, maybe like, anyone here use setTimeout? Use whatever returns, and you have to clearTimeout, make sure that you cancel it.
+
+[00:07:03]
+So that would be a thing you would never ever render, but you'd want to keep track of it, so not a tracked thing.
+>> Speaker 2: Mike?
+>> Mike: Yes?
+>> Speaker 2: Still use the mute helper as opposed to using a function for literally just changing a value like that?
+>> Mike: Good question, so the mute helper, it appears to generate a function that will update a particular value when invoked.
+
+[00:07:33]
+The problem is we have a little bit of a missing piece, and third-party libraries can make this. I'm not gonna say legacy, but the action helper that is not part of Ember Octane is not really the path forward in terms of handling DOM events. That had an ability to do this, to take the event and to grab a property off of that event, to reach into the event's target, and reach into its value, and get the new attribute or the new property of the select tag.
+
+[00:08:11]
+We don't have that with the on modifier, so this is why I'm choosing to bring this into JavaScript land. I don't have that way of saying, yeah, update the value of userId, but I don't want to update its value to the whole DOM event. I want a subpart of it, so that is why I've made this choice.
+
+[00:08:30]
+I'm gonna use this userId in a different way, I'm gonna use it in order to determine whether the form should be enabled or disabled. So in what situation should we disable the form? If it's-
+>> Speaker 3: Nothing selected.
+>> Mike: Nothing selected, I'm gonna pick that one, so we need to create a piece of derived state.
+
+[00:08:51]
+And when I say this, I want you to think, everyone's used a spreadsheet before probably, this is a spreadsheet cell that contains a formula, right? It's something whose value depends on other values, and in formulas and spreadsheets, you could have literals. You could say six plus the value of this other cell, it doesn't have to exclusively depend on only other properties.
+
+[00:09:13]
+It can have some of its own, but that's sort of what defines it, and here's how we do this in Ember Octane. We use a JavaScript getter, this is something that's been around for a very long time. It was part of IE, sorry, part of ECMAScript 5.1, I think, just like the IE9 and 10 variant, get isDisabled.
+
+[00:09:40]
+
+>> Mike: And all we need to do here is, so it's yelling at us, VS Code's yelling at us cuz we have to return something here. So we're defining a property whose value is determined by whatever this function returns. It's not a value-based property, it's an accessor-based property, where the accessor describes this thing.
+
+[00:10:03]
+It's a function that determines how we access this property's value, and so it should be true if userId is false.
+>> Mike: I think that is the right way to express that, and we're done. This doesn't need to be tracked, it's just ready to go.
+
