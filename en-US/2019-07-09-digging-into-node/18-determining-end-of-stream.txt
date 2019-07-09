@@ -1,0 +1,67 @@
+[00:00:00]
+>> Kyle Simpson: Okay, we're gonna move on to exercise three. We're gonna do the same thing as before, which is we're gonna, from the command line, copy ex2.js into ex3.js. That will maintain our executable bit. And then we'll open up ex3.js in the exercises folder. Before I forget like I did before, I'm gonna go ahead and update my help so that we know that we're talking about ex3 so I don't confuse myself.
+
+[00:00:30]
+
+>> Kyle Simpson: And we're gonna start talking about some other issues related to this streaming that may not have been that obvious. One of the nice parts about working with a stream is that we're basically saying, listen, do whatever you need to do, take however long you need to take, just do all those chunks.
+
+[00:00:48]
+We sorta fire those off and then we're finished. So for example, if I were to insert a console.log statement after this processFile statement. If I said console.log("Complete":).
+>> Kyle Simpson: If we were to run that with say the,
+>> Kyle Simpson: Make sure to update ex3.js. Let's say, file=files/hello.txt. If we were to update,if we were to run this, and we'll say, --out, so we're trying to print stuff out.
+
+[00:01:34]
+You'll notice what happens is that the complete message happens before we've done our stream processing, even though the console message came after process file. It's because inherently all of the stream operations are asynchronous. So how could we wait until all the stream operations were complete before doing something like printing a complete message?
+
+[00:02:00]
+
+>> Kyle Simpson: Well what we're gonna need to do is treat process file as a function that can signal to us when it has completed its work. One way of thinking about doing that is making it to be an async function., so it's gonna give us a promise back, and we can listen for that promise.
+
+[00:02:25]
+
+>> Kyle Simpson: And then print the complete message when the promise finishes.
+>> Kyle Simpson: Just so I catch, don't forget, cuz I often forget to put a .catch on here so that we can see any errors that we make in our coding. Don't forget to do that.
+>> Kyle Simpson: Okay, so how do we make process file wait for the completion of all of this streaming stuff?
+
+[00:03:02]
+Well we don't need to hook into all of these things, but we need to hook into the very final stream that is the output stream. Just before it starts to go to the target stream, we need to hook into that stream and we need to know when that stream finishes, when it closes.
+
+[00:03:18]
+So what I'm gonna do is make myself a little bit of a helper. I'm gonna come up here and define a helper, I'm gonna call it streamComplete.
+>> Kyle Simpson: It's gonna take a stream, and we want to listen for some stuff on the stream to let us know when the stream is finished, and we're gonna return back a promise.
+
+[00:03:52]
+
+>> Kyle Simpson: The reason I didn't make stream completely an sync function is because I need actual control over when the promise is gonna get resolved. So I need to actually make a promise here. Now how am I gonna detect when the stream that I'm monitoring has finished? Well they are going to emit certain different kinds of events.
+
+[00:04:12]
+So under the covers the .pipe utility is automatically listening for these various events, like the data event and so forth. But there's an end event that is fired whenever a stream finishes. So if we were to listen for that event, then we would know that it had been finished and that would allow us to know that we were done with the process files.
+
+[00:04:33]
+So if we said stream.on ("end") event,
+>> Kyle Simpson: Then we could call c to signal that the stream had reached Its end event.
+>> Kyle Simpson: And since I don't need to do anything else in, I'm sorry, not c, it's res. Since I don't need to do anything else inside of that function, I'm just gonna pass res.
+
+[00:05:13]
+
+>> Kyle Simpson: So how are we gonna use that? Well down in process file, remember the thing that we want to monitor is the output stream. We wanna monitor when the output stream fires its end event, that means it has completely flushed itself to the target stream, and that means that we are done.
+
+[00:05:31]
+So we're gonna basically say,
+>> Kyle Simpson: Set up the piping here. And then what we basically wanna do is await the promise completion of stream complete,
+>> Kyle Simpson: With output stream.
+>> Kyle Simpson: That should now cause it to wait the extra couple of milliseconds so that hello world prints before the complete message.
+
+[00:06:06]
+And if we use the larger file, like lorem.txt, it waits all the way to the end before printing the complete.
+>> Kyle Simpson: Now it's true that we are able to listen for the completion of the stream operations. It's a little bit manual, but we're at least able to hook into an event and be notified that something has finished.
+
+[00:06:34]
+But there is a downside here, and it's especially acute if we start thinking about building programs that might be doing really, really large data set processing. Because it might be the case that we write this program, and then we run it against a file that's local and it's always there.
+
+[00:06:51]
+But what if this was running against a really large file that was on a network mount that had sort of a spotty connection to the network mountor something, and things were delayed? We might want to essentially say, there's a certain maximum amount of time that I want to allow this to go before I give up.
+
+[00:07:11]
+I maybe don't want for my automation server to just sit there and spin for hours and hours and hours. It's not able to process the file within five minutes, for example, then it should probably give up and let somebody know that something's down or whatever.
+

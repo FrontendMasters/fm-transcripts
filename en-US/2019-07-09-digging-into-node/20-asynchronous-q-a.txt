@@ -1,0 +1,117 @@
+[00:00:00]
+>> Student: So you're giving in streams not from local machine but over the network?
+>> Kyle Simpson: Mm-hm, so you've made a network request somewhere and you've got a response stream that you're listening to?
+>> Student: Yeah can you, let's say you've got two of them coming in, but you have to wait for the result for both.
+
+[00:00:23]
+
+>> Kyle Simpson: Okay.
+>> Student: To run some process to, you're depending on both results, but you don't know when they're both gonna show up or when they're both going to finish.
+>> Kyle Simpson: Yep.
+>> Student: I guess.
+>> Kyle Simpson: Mm-hm.
+>> Student: How do you, can you, is there a way to deal with that?
+
+[00:00:39]
+
+>> Kyle Simpson: Yeah, I mean basically this has it's less to do with streams, but it's the idea if I have two different concurrent things that are happening, and I don't know what order they're gonna finish in, but I wanna wait for both of them to finish. That general concept in asynchrony can be modeled with a gate, which we can do with promise.all.
+
+[00:00:59]
+So if you were to take a promise, similar to what get standard in did, where it had a stream and it had a promise on the end, if you were to attach a promise to the end of a stream read, very much like what we just did with the stream complete, right?
+
+[00:01:13]
+Attach a promise to it that tells you when the stream has finished, and it gives you all of its contents. If you were to make a promise for each of those two streams and then put both of those promises into a promise.all, that promise would resolve whenever both of them had successfully completed.
+
+[00:01:30]
+
+>> Student: Okay.
+>> Kyle Simpson: Whichever order they finish in.
+>> Student: All right, and that promise.all obviously-
+>> Kyle Simpson: It would look like this.
+>> Student: It's an array, right?
+>> Kyle Simpson: It would look like this, if you had a stream1 [SOUND] and a stream two, right? And those were attached to respond, those were response streams from some basically node Ajax requests, like he made a get request somewhere else, right?
+
+[00:01:54]
+So all you need to do is call something very much like the stream complete that we used to make a promise for stream one. And then another one for stream two, and then pass both of those, and the promise.all.
+>> Kyle Simpson: And this will be a promise that will get resolved whenever both of those are finished no matter what order they finish in.
+
+[00:02:27]
+
+>> Student: Okay, and what you get back are two objects or whatever to-
+>> Kyle Simpson: You're talking about the contents of the stream? So streamComplete the way we wrote it did not actually concern itself with the contents. But you could very easily adapt this streamComplete to have been listening for the data, collecting it, getting all the data from that stream and then resolving the promise with the contents of the stream.
+
+[00:02:53]
+Don't make sense?
+>> Student: So promise.all then you, will give you back as many, return as many outputs as you have input is that right?
+>> Kyle Simpson: That's correct.
+>> Student: Okay.
+>> Kyle Simpson: This promise would be resolved within an array of all the response with all of the completions of these promises.
+
+[00:03:15]
+So right now we're not completing it with anything, but we could if we wire this a little bit to actually have that resolve function resolve with the contents that we've collected from stream. But actually that's much harder there's packages that already do this. There's packages that will turn a streams, completion, just like get standard in does that uses one of them.
+
+[00:03:37]
+They'll turn a stream into a completed promise. And then you would just call one, call those on your streams, pass them into promise.all, and then what you'd have as a result of the .then is you'd have a responses array, where responses of zero is stream1's content. And responses of 1 is stream2's contents.
+
+[00:04:08]
+So you can't really use this stream, complete the way I've written it, but you could use one of those like what I'm talking about, or you could adopt this if you wanna try. That make sense?
+>> Kyle Simpson: This is a general strategy for any sort of concurrency, if you have two or more things happening at the same time.
+
+[00:04:28]
+Don't know when they're gonna finish, but I want all of the results whenever they do finish. Promise.all is kind of your go to for that.
+>> Student: Going back a bit, is there a rule of thumb for when you would want to create and work with duplex streams versus piping, or treating the pipes of readables?
+
+[00:04:50]
+
+>> Kyle Simpson: I have never once created a duplex stream so anecdotally, I would say not very often. There are some times on occasion where you will interact with something that is created one for you, and maybe you need to read from it and write to it. I could imagine, for example, a database that gave you a duplex stream so you could write SQL queries to it and read responses maybe.
+
+[00:05:14]
+But, I don't do that very often. It's almost always the simplex streams readables and writables that you find together.
+>> Kyle Simpson: And honestly, with the database, I'd probably just end up exposing to, if I were designing it, I'd end up exposing a readable and a writer will stream separately.
+
+[00:05:34]
+It doesn't seem like there's a ton of benefit to the complexity of a duplex stream. But maybe there are some scenarios where it's useful.
+>> Kyle Simpson: Yes.
+>> Student2: Why do you use a REST API over Streams?
+>> Kyle Simpson: Well, the REST API is a sort of a separate kind of question.
+
+[00:05:52]
+I mean, it's a good question, but it's a separate question. If the rest API was in the habit of streaming it's responses, yes. If the rest API gives you everything as one big chunk, you're not gonna get a ton of benefit out of consuming it as a stream.
+
+[00:06:08]
+But once you have it, whether you've got it as a stream or not, if you need to do processing on it, I would absolutely dump it into a stream and then do the rest of the process. But if your rest API has a sort of streaming response, for example HTTP is a streaming protocol, and HTTP can send you chunked responses.
+
+[00:06:29]
+That's an example of streaming, so if you were downloading from an HTTP server, that was sending out chunk responses. Your rest API was sending out chunk responses, then yeah it would make sense to stream those. But a lot of times a rest API just give you one big old blob of json, that's going to be one chunk in your stream response.
+
+[00:06:50]
+So there isn't as much benefit to the stream in that specific scenario.
+>> Student2: So in that scenario, what would you use then instead of streams?
+>> Kyle Simpson: We just use one of the, there's about a million different ajax kinds of methods in node that can make outbound network requests.
+
+[00:07:13]
+The most common of which we are gonna actually gonna practice a little bit later in the course. But I think one of the most common ones is they have taken the Fetch API that was a web based, web platform API for making Ajax. There is a port of that to node, and any time I would make a outbound Ajax sort of request or get or post request from node.
+
+[00:07:34]
+I would just use the node fetch. And by the way, that fetch actually supports the Streaming API. So you would either make a regular old normal fetch when all you want is just the big thing. Or if you end up connecting to something that has a stream, fetch automatically has that built into it.
+
+[00:07:51]
+Where you can listen and receive the stream. So the web platform has been adding a bunch of stuff about streams, JavaScript added in ES 2018, last year, the AC generators and with basic generators, we can now basically have readable streams and I mean interval streams and nodes adding support for that.
+
+[00:08:11]
+I think in the next stable version, if not already. I might already be in here, but basically there's a bunch of different ways now that we can consume those things. So I would just start by calling fetch and making a request somewhere. And then depending on what I was expecting, I would either consume it as a stream or just as a single blob.
+
+[00:08:34]
+
+>> Kyle Simpson: Yeah.
+>> Student3: So why do we need streams? So there's a default size range.
+>> Kyle Simpson: I think it's 65k is the internal buffer size.
+>> Student3: What would be the alternative? We are supposed, I am sorry. Why do we need chunks?
+>> Kyle Simpson: Well if you think about the scenario like what we've been doing in this exercise where we're like converting a whole word upper case, I know that's silly but think about doing some kind of processing on a file.
+
+[00:09:05]
+When its only one megabyte in size, then you use 2 or 3 megabytes of memory to reread the whole thing in, you convert it, you write it back out, it’s maybe 2 or 3 times it’s been copied in RAM at that point. But if that file was a gigabyte in size, now all of a sudden you just used up 3 gigabytes of RAM to read the entire thing into memory, do your transform and write it back out, you see how much worse that would be?
+
+[00:09:30]
+As opposed to only having 65K in memory at any given time by doing a chunk at a time to the streaming. So the advantage of the streaming protocol is not always a more efficient, but it's also gonna use much less memory.
+

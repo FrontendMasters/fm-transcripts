@@ -1,0 +1,99 @@
+[00:00:00]
+>> Kyle Simpson: Alright, we're gonna go ahead and switch now into Exercise 2, which is really, just gonna be a continuation of what we've been doing in Exercise 1. So there's a couple of different ways to do that. I'm just gonna copy the ex1.js into ex2.js so that it is a starting point for us.
+
+[00:00:18]
+And the benefit of doing the copy approach is that it keeps, if you're on a system like this, it'll keep the executable bit for you. So let's open up the ex2.js and our exercises folder. And then we'll move on from there. So we talked about several things in our Exercise 1 discussion.
+
+[00:00:43]
+For example, we talked about the problem, if we were to process a really large file, our current approach is that we're pulling this whole thing in and dumping it out. So let's talk about how we might deal with streams. And I wanna talk for a moment about how node streams work.
+
+[00:01:02]
+I also wanna point out to you that there's a really fantastic resource on this topic. It is the node stream handbook and I will show, you literally just Google node stream handbook and it's the very first link. This handbook written by sub stack is probably the best resource I have found to talk about node stream.
+
+[00:01:25]
+So I'm gonna briefly introduce the concept, but I strongly strongly recommend that you go read the node stream handbook.
+>> Student: Sub stack actually has a course on streams on Front End Masters.
+>> Kyle Simpson: Excellent, see the node stream handbook and sub stack has a course here on Front End Masters about node streams.
+
+[00:01:43]
+Basic idea that you need to grasp on to is that streams have, they can be in a mode where you can read from them, meaning they're producing and you can consume from them, you can read from them. That's called a read stream or a readable stream. And then, the other mode would be that they're a writable stream, meaning that they can receive inputs and you can write to them.
+
+[00:02:06]
+So you can read from a readable stream, write to a writable stream. Those are both called simplex streams, meaning they're just unidirectional. You can either read from it or write to it. There is a special kind of stream called a duplex stream, which can be both read to and written from, that's not what we're covering here.
+
+[00:02:24]
+But just so you're aware, you have readable streams and writable streams. So let me just actually open up an empty file and give you an idea of what I'm talking about here. If I have a stream that's come from somewhere and I wanna say stream2 and I wanna get some information out of stream1.
+
+[00:02:43]
+Let's say I have a stream1 and a stream2, and these have been created somehow, and I want to take the output of stream1. So let's say that stream one is a readable streams, I wanna be able to read from it. And let's say stream2 is a writable stream, so I'll annotate that here.
+
+[00:03:02]
+We'll say this is a readable stream and this is a writable stream. If I want to connect those two, it's kind of like literally if you connected a garden hose to the outlet. I want to connect these so that the flow of data is continuous through them. Then you literally will take the readable stream and pipe it into the writable stream.
+
+[00:03:24]
+So we would say, stream1.pipe stream2. You call .pipe on a readable stream. And that hooks up a listener to listen for chunks of data that are coming through. These streams under the covers are in chunks. I think the default chunk size is 65,000 bytes. In chunks, they are reading binary data from a readable stream and then pushing it out to the writable side of a stream.
+
+[00:03:54]
+And so they're just doing that chunks at a time, chunks at a time. And they're doing it highly efficiently, using these binary buffers. And so what we're saying is, take my readable stream and pipe it to my writable stream. You'll notice if you ever try to do a writable stream.pipe, that method isn't there.
+
+[00:04:11]
+So pipe is a part of the readable interface. And the mechanisms under the covers that pipe uses to attach and start writing into it, those will only be available if you pass in a writable stream because it's got the writable interface. So if I wanted to find out what was coming out of that process.
+
+[00:04:34]
+In other words, I wanna be reading from, if stream2 was a duplex stream then I could both write to it and read from it. But in general, it's gonna be a simplex stream. It's not gonna have the readable interface to it, so I can't read from stream2. But if I wanted to pipe the output of stream to somewhere else, then I don't really have a way to do that.
+
+[00:04:56]
+And so that's the third part that you need to know is that the return value from a .pipe call stream three that is another readable stream. So the pattern here is readable.pipe writable, and what you get back is another readable. And that means that you could then have kind of a chain of these.
+
+[00:05:22]
+You could have stream1, .pipe(stream2), .pipe(stream5), .pipe you know it just takes the readable, pipes it to a writable and then exposes a readable that can read from the other end of that and then lets you keep you chaining that, lets you keep piping that to as many places as you need to go, okay.
+
+[00:05:44]
+So here, we would basically be saying, stream1 is gonna go into stream2, stream2 is gonna go into stream5, stream5 is gonna go into final. And if final had any outputs, then that would actually be coming into stream3. So the pattern again is readable.pipe passed into writable and you get back a readable.
+
+[00:06:04]
+And that's literally like 85% of understanding how to work with streams, it's just figuring out how to have a readable stream hooked up to a writable stream and how to then take some data from one location and push it to another. So how are we gonna use that?
+
+[00:06:18]
+Well, let's go back to our exercise and let's think about what we were doing with our files and our get standard in. Remember, I said that gets, that standard in is a stream. But we have been pulling in the files as a string, not a stream. Well, what if we were to switch this to a streaming interface?
+
+[00:06:38]
+Meaning, we could get a stream for the standard in, we could get a stream from our file, and then we could do the processing chunk by chunk. That's gonna be a switch of our strategy. Same outcome but a switch of our strategy that's gonna be much more efficient, much more the way that you ought to be doing things in node.
+
+[00:06:56]
+So number one, we're gonna change, we're gonna get rid of our usage of getStdin now, because we're gonna actually just use the straight up Stdin stream. So I'm gonna take this part out and I'm gonna call processFile and I'm gonna pass in process.stdin, because we're now gonna make processFile actually able to handle a stream.
+
+[00:07:23]
+It's gonna be a stream of contents, okay? Now, how would we do it with the file system? Well, we have a method on the FS module that can give us a readable stream that's connected to a file. So what we're gonna do is say.
+>> Kyle Simpson: fs.createReadStream. And we're gonna give it that same path.
+
+[00:07:55]
+
+>> Kyle Simpson: And now rather than getting the whole contents of the file, we have a readable stream that's hooked up to that file, and we can read from it. Just like we can read from standard in. So now, we just wanna to pass that into processFile.
+>> Kyle Simpson: So we’ve changed our processFile to take a readable stream as its input.
+
+[00:08:24]
+I'm gonna come here and modify process file. We're gonna call this in stream. That's the incoming stream. And then at the very end of this, we're gonna have an output stream that we want to send out. So we're gonna say process.stdout is gonna be our target stream will call that target for now.
+
+[00:08:50]
+That's gonna be our target stream. And what we're gonna do is have an output stream that we pipe to our target. I'll call it target stream.
+>> Kyle Simpson: Okay. So our input stream is coming in and we could just literally dump it. We could literally just say outStream = inStream or we could say input stream.pipe to the output stream.
+
+[00:09:24]
+We could literally do nothing in between, but that's not particularly interesting we wanted to be able to do the upper casing of the values. So if we're gonna have our input stream, let me just show you the intermediate, we'll do that, we'll say, the input stream. The out stream, sorry, outStream = inStream.
+
+[00:09:52]
+And this would allow us to dump the contents to the standard out from our file or from our standard in without any processing happening whatsoever. So when we pass in this ReadStream from our file, or when we process process standard in, it's this thing and we're just making a reference to it called outStream.
+
+[00:10:15]
+And because we know it's a readable, we can .pipe it to a writable stream process.stdout as a writable stream. So our shapes line up. So let's just go back to our command line and try it. Remember, you wanna be using ex2,js, so don't forget to update your command line usage.
+
+[00:10:35]
+And we're gonna just say, file=files/hello.txt, we still get the same output. Same thing if I change it to lorem.txt, it'll now stream the entire contents of that file. It's not doing any changes to the file, but it's streaming in the entire context. Now, if we were really getting into the nitty gritty, we could like debug the memory process and see that this was different than what we did before when we have this one big megabyte of content, we never have the whole megabyte in memory.
+
+[00:11:11]
+Effectively, we only had about 65,000 bytes in memory anytime because it would read a chunk, and then write it out to the standard out and then read another chunk and read it out to the standard out. Instead of like we were doing before, which is we read it into a buffer and then converted it to a string and changed it to an uppercase string and then wrote it out.
+
+[00:11:29]
+That would have been a lot of copies of that megabyte of memory, being juggled in garbage collector and so forth.
+

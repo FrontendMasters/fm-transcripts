@@ -1,0 +1,96 @@
+[00:00:00]
+>> Kyle Simpson: One of the problems with using promises to model asynchrony is that they're kind of a black box from the outside. Once you have a promise, you have no way of telling process file or even really the streams per se. You have no way of telling them stop doing what you're doing.
+
+[00:00:15]
+We've got a timeout that has occurred and I don't want you to do that anymore. So for that reason, there's a tool that I've built that allows us to do asynchrony but with cancelation. And we're gonna pull in that tool and use it in the modeling of what we're doing here.
+
+[00:00:31]
+We're gonna pull in a tool called CAF, C-A-F.
+>> Kyle Simpson: Again, that package is already installed for you. If I come over here to a browser, if we look up CAF, you'll see it stands for Cancelable Async Flows.
+>> Kyle Simpson: And here's all the documentation for it. Essentially, it allows you to turn a generator into something that looks like an async function.
+
+[00:01:02]
+But that generator uses cancelation tokens so that you can cancel it if it's stuck or taking too long, you can use it to cancel. So that's what we're gonna do is use CAF with generator style instead of with async function style. So the only things that I really need to change here, I'm gonna change process file into a generator.
+
+[00:01:26]
+And process file is going to receive as its first input, it's going to receive the signal for the cancelation token.
+>> Kyle Simpson: And then we need to adapt process file so here I will say processFile = CAF(processFile).
+>> Kyle Simpson: That's the magic that turns it into a thing that still looks like an async function.
+
+[00:02:03]
+
+>> Kyle Simpson: But when we call it, we're now gonna be calling it with two inputs instead of with one. We're gonna be calling it with the cancelation token as the first input, and then in this case, the stream is the second input. So let's make a cancelation token to use.
+
+[00:02:31]
+
+>> Kyle Simpson: I'll call it tooLong. We'll just say CAF.timeout, and I'll give it a really short amount of time like, say 3 milliseconds just for our illustration purposes. So this is gonna be a cancelation token that fires its signal really, really quick. And we're gonna pass in the tooLong cancelation token there.
+
+[00:02:56]
+
+>> Kyle Simpson: I need to do the same thing up here so I don't forget.
+>> Kyle Simpson: All right, so let's see what this does by just canceling the process file. We're just saying listen, you're done. You don't need to do anything else.
+>> Kyle Simpson: And let me actually give it a little message here like Took too long.
+
+[00:03:21]
+This will be the custom message.
+>> Kyle Simpson: Uh-oh, I forgot we gotta change any awaits back to yields. That was the other thing that we needed to fix in our process file, so our await down here needs to be a yield instead. That's the difference between a generator and an async function is at the signature, you use a star instead of async.
+
+[00:03:52]
+And then for any place that you would have said await you say yield, otherwise, they're pretty much identical.
+>> Kyle Simpson: Let's try that again.
+>> Kyle Simpson: So you notice that it did fire our Took too long, which is great. We got notified that it had timed out, but it didn't stop the stream processing from doing its work.
+
+[00:04:14]
+It did allow us to tell process file not to wait any longer, which is why we were able to print that message right away. But it didn't actually stop the asynchronous work, which is what we want. We want sort of a deeper cancelation rather than a shallow cancelation.
+
+[00:04:32]
+So to do that, we're gonna need to take the cancelation token, which were provided via this parameter. We're gonna need to take that signal and do something with it. We're gonna need to have that signal, tell us that we need to stop the stream processing. So what I'm gonna do right here is set up signal.
+
+[00:04:52]
+Signal comes in with a promise on it that is going to be rejected whenever the timeout has fired or whenever the cancelation is fired. So this is how we're gonna know that the timeout has occurred. And here's where we want to do something to tell the streams, stop doing what you're doing.
+
+[00:05:20]
+
+>> Kyle Simpson: So there's two steps that we wanna do to tell the streams to stop. The first one is, we wanna undo the last piping that occurred. So let me just actually move this down so it's closer to what we can see.
+>> Kyle Simpson: What we wanna do is unpipe so literally it's the same call.
+
+[00:05:44]
+We're gonna say outputStream.unpipe(targetStream).
+>> Kyle Simpson: In other words, we're basically saying that piping that you were doing wherever you're out in the middle of that stops sending more chunks of data to it. So it's like a removeEventListener almost for this. We're saying unpipe it. And then for good measure because the stream up to this point might have a big old long line of things that are processing through the and stuff.
+
+[00:06:13]
+What we wanna go ahead and do is tell the rest of the stream, you don't need to do any other work. So we're gonna call destroy on output stream. And that is the effect of basically pushing that signal all the way back up through the other streams and telling all of them there's no more piping to happen because there's no more target for it to go to.
+
+[00:06:31]
+So we call outStream.destroy after we call the unpipe and that will have the effect of basically killing that stream processing wherever it's at.
+>> Kyle Simpson: So now when we run this, we just get the Took too long message. It doesn't print the HELLO WORLD because it was able to abort it.
+
+[00:06:58]
+And if I go back and change that timeout to be just slightly too longer, if I make it 13 instead of 3, we should see it just go ahead and print HELLO WORLD and not print, uh-oh.
+>> Kyle Simpson: Took too long,
+>> Kyle Simpson: Maybe we need it slightly longer.
+>> Kyle Simpson: There we go.
+
+[00:07:40]
+13 was just accidentally just a brief moment too short. Okay, so you can see that we're able to print out the contents of it. But now if I were to run it with lorem, we're gonna stop somewhere in the middle of the lorem file. Cuz it's gonna be able to get through a pretty good amount of the lorem file, but probably not the entire thing.
+
+[00:07:59]
+So it stopped right there. Maybe I make it a little bit shorter of a delay. Let's make that back down to 12. And you'll notice this time when it runs should stop in a different location in the file. I wasn't able to get any of it in that 12 milliseconds.
+
+[00:08:20]
+Let's fiddle with it and make it slightly longer then.
+>> Kyle Simpson: And there we are stopping in a different place in it. So the longer that that time not happening, again, you have to use your imagination imagining we were processing a gigabyte sized file. Those timeouts would be like a minute or five minutes or something like that.
+
+[00:09:01]
+But the point is that you can see that we're able to stop an asynchronous operation like a streaming operation right in the middle of it, instead of continuing to consume system resources unnecessarily. So that's a big deal. I think it's underutilized, the idea of asynchronous cancelation. And this is one of the points I wanna make.
+
+[00:09:23]
+It's kinda the point of EX3. It's not just the streams interface. It's really all of the asynchronous interfaces in Node.js are very,
+>> Kyle Simpson: Optimistic. They're optimistic that they're always gonna finish. Whenever we do a fs.readFile, we're just assuming that's definitely gonna eventually open up the file and give me the contents.
+
+[00:09:45]
+But what about if it's on a network mount and there's just a never ending delay of the network, being down or something like that? Well, that's just gonna sit there and spin forever and ever and hang up your program. So really all asynchrony whether it's a database, whether it's a file system access, network call, any sort of thing, even a stream operation like what we're talking about, I think it makes sense to at least consider, do I need some kind of timeout?
+
+[00:10:12]
+And that was really the reason I designed that CAF package was to make it a little bit easier to model the idea of asynchronous cancelation with these cancelation tokens.
+
