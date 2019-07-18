@@ -1,0 +1,66 @@
+[00:00:00]
+>> Kyle Simpson: Okay, let's add a function that can start caching these.
+>> Kyle Simpson: We'll call it cacheLoggedOutFiles. And for reasons that aren't clear now but will be later, we're gonna want to be able to tell it to force reload, but we'll default that to false.
+>> Kyle Simpson: And then we need to open up our cache.
+
+[00:00:43]
+And the way we're gonna do that is to say cache = await caches.match(cacheName). CacheName is that string that we created at the top, we're gonna say open up that cache entry, that's an asynchronous operation, but open up that cache entry up so that I can start pushing stuff into it.
+
+[00:01:07]
+All right, we want for this cache logged out files function to wait for all of these to finish. So we're gonna do a Promise.all, similar to how we did before in that other function. We're gonna do a Promise.all and what we're gonna do is take the urlsToCache.loggedout. We're going to turn all of those URL into promises by calling .map on that array.
+
+[00:02:00]
+
+>> Kyle Simpson: Maybe I'll rename that to requestFile. Okay, now we want to wrap this code in a try catch. Because it is possible that we're gonna be trying this while the network is down or there's some other kind of network error and we don't want this to crash.
+>> Kyle Simpson: So, if we have not asked to do a force reload, then we should not unnecessarily cache these logged out files again.
+
+[00:02:39]
+So in some cases we wanna forcibly ask for all of them. In other cases, we only just want to check if there are any that aren't cached, okay? It's at least theoretically possible that our cache got emptied partially or it didn't finish because their browser crashed or whatever.
+
+[00:02:56]
+So in some cases we want to check so we're gonna say if not forceReload, then we wanna first check the cache to see if it's already there. So I'm gonna say res is equal to await cache. Remember, cache is the thing that we've opened. Cache.match. And the thing that I'm gonna match against is the URL.
+
+[00:03:19]
+So that's why those URLs matter because that's the key in the cache that we're using. And if we were able to successfully pull something from the cache, then let's just,
+>> Kyle Simpson: Return.
+>> Kyle Simpson: So in other words, we're not gonna make a request here unless we're either in a force reload, or we weren't in a force reload, but it wasn't in the cache.
+
+[00:03:53]
+In either of those cases, we wouldn't make the request. But here we're going to make a request. Here's where we're gonna start doing Ajax. So we're gonna use the same method that some of you are familiar with in the browser. Using the fetch method to do Ajax, I'm gonna set up an options object
+
+[00:04:15]
+
+>> Kyle Simpson: These are all going to be requested with "GET".
+>> Kyle Simpson: Credentials is the cookies, and because these are all logged out resources they don't need the cookies, so we want to make sure to strip off any credentials that might mess around or give us a different response.
+>> Kyle Simpson: So we're gonna say omit.
+
+[00:04:43]
+
+>> Kyle Simpson: And then in addition, and this is gonna sound a little bit strange since our whole purpose is to do caching, but we actually want to send the caching header that says no cache. The reason for that is that we wanna tell the browser layer, remember we're in the service worker, we wanna tell the browser layer, don't store this response in your intermediary cache, we want fresh results.
+
+[00:05:08]
+If we're making an Ajax request, we really want it from the server. If you don’t do this, it may just start feeding your service worker from that intermediary browser cache, which then sort of defeats the whole purpose of trying to have control over your caching. I don’t know why they don’t make that the default, it seems to me you’d almost always want that to be the default, but anyway.
+
+[00:05:35]
+
+>> Kyle Simpson: So now we're gonna make our fetch request.
+>> Kyle Simpson: We're gonna use the URL and we're going to use our fetchOptions. What we get back is a response object, and we need to just check if it was successful. So we can just say if res.ok.
+>> Kyle Simpson: And if it was successful, this is the most critical part of everything we're doing here, if it was successful, we want to do await cache.put
+
+[00:06:14]
+
+>> Kyle Simpson: And we're going to use the URL. And this is a really critical detail that's super easy to miss, you cannot simply put a response normally into the cache. You normally need to put a clone of the response into the cache.
+>> Kyle Simpson: In this particular case, we don't need a clone.
+
+[00:06:37]
+But let me explain why we don't need a clone. There's a little nuance here that a response can only ever be used for one purpose, like for a purpose once. So if you're gonna cache something, and also return it to the browser at the same time, you have to clone the thing you put in the cache and then return the original response.
+
+[00:06:59]
+If you don't, you get these weird errors about the headers already being closed, or something dumb like that. So it's usually a really good idea, if you're sticking something in a cache, just stick the clone into the cache. In this particular case we're making requests of our own.
+
+[00:07:14]
+There was no request from the browser for that. So we don't actually need to clone here. But just keep in mind when you're doing cache.put, you're almost always gonna wanna do a clone on that response. And if we weren't successful, then we just sort of shrug our shoulders and say, well, I guess we weren't able to cache that resource.
+
+[00:07:35]
+So this is gonna end up sticking stuff into our cache for us.
+

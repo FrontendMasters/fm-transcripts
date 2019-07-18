@@ -1,0 +1,60 @@
+[00:00:00]
+>> Kyle Simpson: So, we have talked about, adding some basic routing rules into our router. We have some special cases that we definitely have not yet handled. So I'm gonna do another hand wavy magic and skip an hour and a half of me mistyping code. We're gonna pull in another update to this code, and then I again will walk you through how I implement some logic, specifically for those three pages.
+
+[00:00:28]
+And I also am gonna do some refactoring into a helper function, so there's less repetition in our router. So, there was my hand wavy magic. Now, let's go look at our updated router rules. Same thing as before, we have our API handling, but now you notice that I'm using a utility called safeRequest.
+
+[00:00:50]
+And it's much simpler, it's because I'm, again I'd moved, I saw this same pattern over and over and over again happening, where I was sometimes checking the cache first and checking it afterwards or checking in both places or whatever. So, what I did, was I set up a safeRequest which can take my request URL, my request, my options.
+
+[00:01:14]
+But I can also control, when I want these things to happen. Whether I want it to cache the end response, whether I want to check the cache first, whether I want to check the cache last. And whether I need to actually use the request directly, which I'll talk about in a moment.
+
+[00:01:30]
+So this little safeRequest handler, this is now going to be used everywhere else in my router, instead of replicating that logic over and over. And also, so this may not actually make any requests at all, because if we're offline or if there's a cached response, it just does that.
+
+[00:01:46]
+So, that's why I called it safeRequest, cuz it may not even go out to the network. All right, so let's scroll down and look at safeRequest and just see kind of what it's doing. This should all look mostly pretty familiar. Here, we're opening up our cache. And then if I've passed in the Boolean flag, check the cache first, then I go ahead and do exactly that.
+
+[00:02:07]
+I check to see if the cache has a value for that req.url, and if so, I return it and then we're done. If not, then I check to see if we're online. And here I have my try catch handler, so I don't have to repeat that over and over again.
+
+[00:02:23]
+Now, there's a couple of scenarios that, actually one in particular here, but there's a couple of scenarios where you can't pass along your own request URL like I'm doing here. Where you literally have to pass the actual request object. And one of those cases is when it's a post request.
+
+[00:02:45]
+It should allow me to access the request, the post body in the request, but for some reason, I'm not able to get access to that. It might be a bug, I have some people I've been talking to about that. So the workaround essentially is, don't try to access the body at all, just pass the request directly.
+
+[00:03:04]
+So that's what I'm doing here. And again, I only use that in the case where there's a post. Otherwise I can use the URL in the options. If it was ok, or, and this is a little interesting nuance, because my server, the server logic that you're using in this workshop, if you go to slash login and you're already logged in, you might have noticed that it automatically redirects you to add post.
+
+[00:03:31]
+Cuz you don't need to re log in if you're already logged in. So there's some redirects that occur. Same thing with slash logout, if you go to that you URL and you're currently logged in or not, either way, it redirects you to the homepage. So the server can return redirects is the point.
+
+[00:03:49]
+Now, in those particular scenarios, where a redirect might happen, you want for the redirect stuff to make, you want for that machinery to make its way to the browser and you don't want to cache it. And so I am going to check to see if, and by the way, when that happens, your status is zero.
+
+[00:04:13]
+You don't know anything about it other than the fact that, it's a response that, I mean, it's a redirect that the browser is gonna handle. So we don't know anything about it, if it was 301 or 307, I guess for privacy reasons, so it's just zero. So I can't just check res.ok, I've also got to check if it's one of those that's coming back that's going to be an opaque redirect, okay?
+
+[00:04:35]
+So, if it is an opaque redirect, and I want to cache this response, that won't actually be the case. I won't ever pass that when it's a redirect, cuz I don't want to cache redirects. But otherwise, if I'm caching the response, I'll put it in the cache, and here I might just be returning just the response.
+
+[00:04:53]
+And it might be one of those opaque redirects, that redirects the browser. And then of course, my checkCacheLast, if we have gotten here and we don't yet have a response, we do the same thing, we check the cache again. So, in other words, instead of repeating this over and over again, in some combination of them, I just wrote a little thing that can be configured with Boolean flags to do any of those variations of the strategy that I need to handle.
+
+[00:05:19]
+So in the case of our API requests, the strategy is, don't cache any of them. And you remember I talked about caching gets? I'll say why, don't do unconditional caching of them, don't ever check the cache first, but do check the cache last. And use the request directly, because we might be a post request, okay?
+
+[00:05:43]
+But the reason I say cache response false, is because I only want to cache the request in the get case. So I tell this little helper, don't cache the response automatically and I'll handle the caching here. And I still have the not found response. Okay, now we're handling the regular HTML pages.
+
+[00:06:05]
+Let me skip over the login aware request for a moment and just show you the refactoring of the non-login web page requests. I call this network and cache, so these are the regular pages that we wanna request. Here's my options, safe request. And I'm going to not cahce these responses, and again, we'll see why.
+
+[00:06:27]
+I don't wanna check the cache first, but I do wanna check the cache last. And the reason I'm not caching is, because I want that only conditionally cache, in that case. If it's not the friendly 404 page. All other files that I might have been requesting are gonna use safeRequest.
+
+[00:06:47]
+And they are gonna allow the caching to happen, and they're gonna check the cache first, rather than last. So basically this helper has dramatically simplified me writing out this router logic, cuz a bunch of that repetitiveness is now in a helper.
+
