@@ -1,0 +1,94 @@
+[00:00:07]
+>> Steve Kinney: So I added some purposefully entropy into the API, you can kind of see it there. You saw a flash of other characters for the L when I had already typed the U. And basically all I did on the server side was I said, before you respond, set a timeout between somewhere between one and zero seconds, right?
+
+[00:00:26]
+So like the APIs intentionally flaky, right? You're response will come back either a second for now or ten seconds from now. So it's hard to, because it's randomness and stuff like that, it's hard to see all the way. But we saw it as a flash there. Yeah, you saw it again.
+
+[00:00:43]
+You saw all of them. Then you saw a bunch of them again, and it's really, really kind of wonky. Yeah, this is simulating a bad network condition. But this could happen on your very well meaning APIs. You do not control your client devices. So what if we wanted to do this, where we could cancel we could cancel a, like handling any of this stuff.
+
+[00:01:09]
+Don't transform it, because all of the fetch characters will fire but the epic is in control of whether or not you take that fetch character action, and morph it into a fetch character fulfilled. And so you can be like, hey, stream, hey RXJS. Listen, if this other thing happens, just never map it.
+
+[00:01:29]
+Which means Redux will never get it, which means you can effectively cancel API requests, which is super cool. It does have a little bit more complexity to it, but I think it's manageable.
+>> Steve Kinney: Right, and this is why we chose to go this route, right? Does it make onboarding a little longer?
+
+[00:01:48]
+Yeah, it does. Do I think it adds stability of we're not trying to figure out all these edge cases ourselves, absolutely. So we've got this map, we can also pipe it through another one, right? Which is gonna be called, takeUntil, right? So keep taking these actions, right, keep basically allowing things to come through the stream.
+
+[00:02:11]
+Keep reading from the stream until something happens, right? So we can say takeUntil and we'll takeUntil, hook into that stream again of all of the actions. So we're going to, every time a fetch characters comes in, we're going to take those, we're going to find the AJAX request.
+
+[00:02:35]
+And we're going to wait for the AJAX request to come back until something happens where that should cancel it. So, on a FETCH_CHARACTERS, here's what we're going to do. Start the stream, read them, fire the AJAX request, but if another FETCH_CHARACTERS comes through before the first one is fulfilled, cancel the first one.
+
+[00:02:55]
+Cancel that one, the new one is the one we want. The most recent thing in that input field is what we want to have, right? So we'll kind of pipe through all the actions again. And this is where that merge map helps, right? This will all become one flat stream.
+
+[00:03:11]
+So I'm just gonna do that tap that you saw before, I'm gonna move it down here.
+>> Steve Kinney: Nope.
+>> Steve Kinney: So we'll be able to see it.
+>> Steve Kinney: And then we'll say, of type FETCH_CHARACTERS. And put a comma at the end there. All right, looks a little bit intimidating, but I think if we read through one more time, it will help.
+
+[00:03:46]
+Anytime, and actually comes in fetch characters, those that were console logging, take that individual action and get some JSON. When the JSON comes back, take that response and fire off, morph into our new, hey, we got the characters, right, and Redux will get that. And this stream of the AJAX, any event that comes in, eat them, right?
+
+[00:04:13]
+Because we're hoping to hear back from the API, unless another one of FETCH_CHARACTERS comes through. Then stop this kind of middle internal stream, right? So like even if the API request comes back, you're like, yeah, we're done. We closed the door. Last call is over. A new autocomplete has come in.
+
+[00:04:33]
+We're not dealing with this current stream anymore, but thank you for your interest. So let's try it out.
+>> Steve Kinney: Right, and so you can see that we're not getting that kind of intermediary, we're only getting one set. It's still slightly delayed cuz of that purposeful entropy, the ten second ones are bad.
+
+[00:04:57]
+Right, but you're not getting those flashes of other content. Because if more characters were typed, we are cancelling all of the other listeners for the previous characters, all right? So some really powerful stuff that you can do with redux-observable. The cost of course is, you're not getting through this without reading some documentation [LAUGH] right?
+
+[00:05:21]
+And like this is all RXJS, the redux-observable part is simply the epic and the idea that you're running that middleware. And it's taking all those actions and passing it into an RXJS stream. So it definitely, if you see value in this, if you see value again there are, hundreds of might be an overstatement.
+
+[00:05:43]
+But let's just assume if you ever use like low dash or underscore there are about as many helper functions in RXJS to do stuff with async as there are with local low dash underscore, right? And so a lot of this is if you feel like you're going to need to do complicated stuff, and the bar for complicated Is not very high.
+
+[00:06:03]
+Cancelling the autocomplete, it's not an insane request, right to get from product. But it is absolutely that trade off. So Redux itself doesn't deal with async at all, but a middleware can handle that for you, right? And theoretically, there's like a Redux promise library as well. You could hypothetically write your own middleware that does this, right?
+
+[00:06:29]
+We saw that you can get the state, you can pass along in the next action, you can fire off additional actions. A lot of this is really cool. We have chosen redux-observable. There was a little bit of complaining at first, right, cuz, yeah. It was like, this is complicated, but I think at this point, we're all on board, we're into it.
+
+[00:06:48]
+And we're happy with our decision, even one year into this code base. So I highly recommend it, but let's not sugarcoat it. I think once you wrap your head around it, it makes sense but like don't feel like you have to use it for a very simple application.
+
+[00:07:05]
+Awesome, so-
+>> Speaker 2: What are some of the main RXGS functions that you found to be valuable at this point?
+>> Steve Kinney: Yeah, so for us a lot of it. The reason I chose this example of a cancellation is like that is the main one for us and a little bit of debouncing.
+
+[00:07:21]
+Right, maybe I don't wanna, let them type a little bit, [LAUGH] right? Let them type a little bit before I fire off the search request, debouncing so I'm not slamming the server. And the ability to cancel, right, one that is in flight. Those are kinda the main ones.
+
+[00:07:38]
+I'm gonna be really honest, we use those into great effect but we do not do incredibly complicated stuff right? We needed those features we knew we need we. The nice part about rebuilding the core part of a product is you kind of already know the problems that you're going to have to solve, right?
+
+[00:07:57]
+So we knew that we're gonna be drop downs, so we were gonna have to pull up. So when you go to send an email, you can have many lists of contacts or segments. But the average user has maybe like what five, ten, okay? I'm not gonna drop any names, right, but we have some very large clients who have hundreds of thousands of lists.
+
+[00:08:22]
+And so that drop down would become untenable [LAUGH] right, and they're absolutely gonna be searching. So we already have an existing customer base, and having some at scale we knew some of the problems that we were gonna have to deal with which is why we walked down this road.
+
+[00:08:39]
+But I would say we're still using just some very basic ones. RXJS is not meant necessarily only for AJAX either, it can be doing all sorts of, you can listen to mouse cursor events, you can build a game with it, right? And there is usually some kind of reactive programming library for every programming language, like Swift has one.
+
+[00:08:57]
+I kinda said at the beginning of this course, we're talking about giving libraries but some of this is approaches to programming that is totally separate from React or from Redux. And so, reactive programming is a thing, right? It's used, there's a Java library for it. And so, if you find yourself needing to deal with a stream of events, then I think you can find use for it.
+
+[00:09:24]
+But if you squint at this one long enough, it begins to make sense, right? And I might abstract it. I might say you could create a function that is the action that comes in an endpoint and the action that should come out the other end and use that function everywhere.
+
+[00:09:43]
+I'm a big fan of making helper functions like to the point of ridiculousness right? Cuz every function that you make that's a helper function, you have to give it a name, right? And you're kind of like, I am not of the man, your code be self documenting. That's great if you can do it but it's obviously a little bit easier said than done, a good comment sometimes is appreciated or documentation, right?
+
+[00:10:08]
+But if you pull it on the helper functions, I think it's super helpful. So we're gonna actually kind of look at a totally different way of managing state in React application and look at a library called mobx.
+
