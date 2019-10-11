@@ -1,0 +1,116 @@
+[00:00:00]
+>> Speaker 1: You know what our language doesn't have? I mean a lot of things [LAUGH] but you know what our language really importantly doesn't have? The ability to find variables.
+>> Speaker 1: So there's a bunch of ways that we could do this, we could do it at parse time, absolutely.
+
+[00:00:20]
+And it sometimes might make sense to do that. it depends on where you want to keep that complexity. Right now I think that the interesting part for us is to figure out how this visitor pattern which I think is super useful. Because of one of my goals is talking about the patterns of parsing and of ASTs and of the visitor pattern.
+
+[00:00:40]
+I don't want to get too much into like LISP specifics. We chose LISP because it wasn't going to be figuring out how to parse a for loop for four hours. [LAUGH] But this is not a course on LISP. This is the course on the tools that we use to navigate languages.
+
+[00:00:59]
+So LISP has this idea of what they are called special forms, cuz it's a very simple language, that's why we chose it. And everything's a LISP, but right now we have the ability pretty much to execute functions. Special forms don't really follow the regular rules and there's tons of examples of this.
+
+[00:01:19]
+We know that if this language hadn't if while we thought really a function per se. It should only be calling one of those branches, so on so forth. Defining a variable, it's not, don't call that second thing, don't use it as a value. You're using what we're gonna set in the environment as the first thing.
+
+[00:01:36]
+And what we're gonna what set it to, as the second thing. So the pattern we're gonna take, but the syntax wise is suspiciously close to a call expression. Except we're gonna take the first argument and have it be the thing that we set it to. Take the second argument be the value that we're setting it.
+
+[00:01:56]
+So we can kind of create a new type of node using this pattern as well. So on top of doing large code shifts, on top of, it can be compiled JavaScript. We can also add additional syntax to our language. So we're gonna give that a shot. And so what I would imagine this will look like when we use it, I'll just type it here for now.
+
+[00:02:17]
+Is we'll have something like, (define x 2). You're in charge of your language, you want to make it an equal sign. You're gonna have to have the tokenizer respect equal signs, but other that that's easy. Just go and add an additional role in the tokenizer. I'm gonna go with (define x 2) where x is the name of the variable, and 2 will be the value.
+
+[00:02:41]
+All right, so what happens when that happens? I need to turn that into a different kind of node because it's not a call expression, and it should not behave like one. We can make a new variable declaration kind of node. So we'll have to transform pretty much define functions into these new variable declarations.
+
+[00:02:59]
+And then we're gonna have to add logic to our execution, because our evaluator doesn't know how to deal with that. It knows about things the value, it knows about things that are call expressions and it knows about identifiers. It doesn't know about what to do about variable declarations.
+
+[00:03:18]
+And then we're gonna have to play in the [INAUDIBLE] and see it work, cuz it's really rewarding. So let's get into it, cool. So if we go up into this idea of special-forms here, there's not a lot going on. What I might wanna do is effectively use it as a visitor.
+
+[00:03:46]
+And so it's gonna be the same thing that I might do otherwise. Earlier we saw when we were looking at parts evaluate that we had a transform layer. And this is useful as a place of after we've created our initial tree, to do any transformations that we need to do to the tree.
+
+[00:04:01]
+So we will need to put that back into parts-and-evaluate. Let's actually do that now and then we'll go and do a transform. And se we put in there and let's just say transform. And I like this pipe syntax, cuz it makes it very clear about the processes that our language goes through.
+
+[00:04:16]
+It gets tokenize, it gets parsed, it gets transformed with additional features and then it gets evaluated. So we can go into transform, and you can see we have this right now it takes the data structure add it, returns it back out. Not bad, but this is a great place for us to do some stuff.
+
+[00:04:38]
+What kind of stuff can you imagine we are doing? Well, obviously I kinda spoiled it by saying we're going to define a variable. And we can see that we've got traverse kind of ready to go. So what we can do in this case is, we can go ahead and say, 4 go ahead and traverse the tree as it comes in.
+
+[00:05:01]
+
+>> Speaker 1: That's gonna be that root node in this case.
+>> Speaker 1: And we'll kinda give it a visitor in line. And we're gonna say when you come across a call expression,
+>> Speaker 1: Enter it.
+>> Speaker 1: All right, and what we'll do is basically kind of double up on the pattern a little bit.
+
+[00:05:28]
+Which is we care about define you can see us adding maybe if later or a lambda syntax or something along those lines. You can see us adding additional kind of special forms that don't follow the regular rules. So you're saying these will be, most of the languages we use have keywords.
+
+[00:05:49]
+Like reserves, words that you can't name stuff, right? You can't have a variable called var, right, in JavaScript. And so we can have our set of things of, hey, if you see. Cuz LISP has a very consistent syntax, if you see any of these, and we'll kind of keep them.
+
+[00:06:08]
+It's very similar to how we did the environment lookups earlier. We can say if you see anything in here, intercept and do a thing. And so it's kind of a general purpose transformation, so let's just get that in place. We can say hey, I see that this node has a name.
+
+[00:06:30]
+Well, if that name is inside the specialForms of [node.name] go ahead and just call it,
+>> Speaker 1: And pass it the node.
+>> Speaker 1: So now the transformation's looking at every call expression. Now obviously you could add other types of nodes as you add them to your language, so on and so forth.
+
+[00:06:59]
+But say check this hash map down here, and if it is one of the keywords that we have implemented some special syntax for. This is gonna be where we kind of generally purpose do the transformation. So I decided that I was going to use define as my syntax.
+
+[00:07:18]
+If you want to use something else, you can use set, anything you want. It's your language, you do what you choose, I chose define. And so now that this is a key on this object, it will hook in to this kind of general purpose transformation layer. And what we can do is we can manipulate a little bit.
+
+[00:07:39]
+So my ideal syntax I'm thinking about is, so we know that I. Let's pseudocode this a little bit. You know that a call expression has a name and arguments.
+>> Speaker 1: That doesn't really make sense. Especially because the name is gonna be define in this case, so we already have that spoken for.
+
+[00:08:16]
+And the arguments are gonna be, the first one is going to be the variable that I want to assign, so the assigning value. I'm gonna call that just the identifier of the variable and of what value it should be assigned to. You get to decide especially if you have opinions on what your call target is going to be.
+
+[00:08:46]
+Then you might wanna change it to something else. I don't so, I went with this. So if that word comes in, I'm gonna say that I wanna have this thing called a variable declaration.
+>> Speaker 1: And that variable declaration will have like we said before, an identifier and and an assignment.
+
+[00:09:11]
+And then you can also delete the properties we don't care about. When we did those babel transformations before, I just left extra properties on there. Because I knew that babel didn't care. You've seen the implementation of the pattern before, we're not checking for properties that we don't know about.
+
+[00:09:27]
+We're only protecting the properties that we do care about so I knew that it was safe to leave them on there. But in my language, I don't need extra crap around so I'll remove the ones I don't care about. So we will delete the name and arguments, we'll add identifier and assignment.
+
+[00:09:42]
+We'll effectively get this new syntactic form in our language, that will just be available all the time everywhere. So let's go ahead and we'll say define, and we'll say we know that we're getting these out of the arguments. So I can just kind of use array to start training syntax.
+
+[00:09:59]
+I can say identifier and assignment equals node.arguments.
+>> Speaker 1: And then we'll say that the node type is no longer gonna be a call expression.
+>> Speaker 1: It's gonna be variable declaration, and the node.identifier,
+>> Speaker 1: Is going to be that identifier. And the node.assignment will be that assignment that we pulled off.
+
+[00:10:46]
+All right, cool, and then we will delete node.name because that's not important anymore, it's just gonna be defined. You can keep it if you want. We'll delete the arguments now that we're done with them.
+>> Speaker 1: So now, since every single node runs through the transformation layer. And this visitors visiting every single call expression, now you can just use this new define syntax.
+
+[00:11:13]
+It's got some problems. Does anyone know what the problem is?
+>> Speaker 1: We don't have any way to evaluate this new kind of node, right [LAUGH]? So that's gonna be slightly problematic. But every node will come through and the AST will reflect that we can now define variables in our language.
+
+[00:11:30]
+We are in complete control of how this language works. We can do any other special syntax that we can conjure up. We might have to change, do some transformations. Or perhaps depending on what you like, if you wanna use arrow functions. We didn't include the ability to collect an arrow.
+
+[00:11:47]
+But you know that you could write the tokenizer like, hey, if it's a fat arrow. I see an equal sign, check if the next one is an angle bracket, boom, you have an arrow [LAUGH]. And then when you get to the syntactic parser, you're like, cool, I'm expecting, x, y and z out of this.
+
+[00:12:04]
+So you can basically add any features that you want to this language.
+
