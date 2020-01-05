@@ -1,0 +1,90 @@
+[00:00:00]
+>> Jason Lengstorf: We told Gatsby to expect a body, but we haven't done that yet. And the reason for that is that not all of the node types fully resolved by the time we get to on create node. And so that creates a challenge. If I wanna get the MDX body, which is that kind of processed code that we can use on a site to display MDX.
+
+[00:00:24]
+I can't just call it here, it's not set. So that means that I have to create a custom resolver. And so this is where we're kind of getting into the fun part, the really nitty gritty of how Gatsby works. So we're gonna go ahead and create the custom resolver.
+
+[00:00:38]
+And we do that using the createresolver API hook, which gives us, sorry, it's plural createresolvers. And that gives us a function called createresolvers. And we call that. And if you've ever used GraphQL before, the way that resolvers work is they reflect the data structure. So if you have a type of docs page, you can define resolvers by creating an object that has docs page as the object key, and then a field name as a sub-object.
+
+[00:01:18]
+By default, what it'll do is it'll look for the node, so this docs page node that we're creating. And it will say on that node, give me the property that matches the field name. So for title, it'll look for node.title. And in these cases, for the ID title updated in path, that's what we want.
+
+[00:01:37]
+We want the default behavior. So we don't need to modify that. Resolvers will work as expected. But for body, we don't have a body on here. So we need to change that. And that means that we need to do a couple things. So first, we need to set up a couple things that I just realized I forgot when I got excited about setting this thing up.
+
+[00:01:58]
+So in a createNode call, every Gatsby node needs to have this internal field. Remember, we talked about that a minute ago. It includes the type name and those sorts of things. So we're gonna set up the type and we'll just use DocsPage. Again, this can be whatever we want, we just wanna make sure that it's unique.
+
+[00:02:19]
+You could do something clever in here to have a guaranteed unique type name. But unless you're doing a really really complex Gatsby site, this is pretty easy to manage. And the next thing that we need is we always wanna give it a content digest. Because Gatsby uses the content digest, which is like a hash of the node content to decide whether or not it should throw away that node and build a new one.
+
+[00:02:41]
+That's a way to do less work during the build. So, in this case, we don't really need to create one because we're just using an MDX node. So we'll just use that node's content digest, so we don't have to do any extra work. Because if our MDX node changes, our docs page will change.
+
+[00:02:58]
+That's a fairly safe assumption. Now that we've got these, these internal and type, we can actually use them. So in our createResolvers we're going to get into our DocsPage type, and then we're gonna set up a body resolver. So, a body type declaration in a resolver like this has two properties.
+
+[00:03:22]
+The first one is a type, and so that's gonna match our declaration up here. Let me collapse these down so it's easier to move between. We've got our body, which is a string and it's required. So in here, we're gonna say it's a string and it's required. And then we have a property called resolve.
+
+[00:03:40]
+And that is a function. So that gets four arguments. This is a pretty standard GraphQL pattern. The first argument is the actual data, so the node itself. Then you get any arguments passed to that node. So if you had a filter or when we're using the date format if we wanna set how to format things, that would come in this args argument.
+
+[00:04:03]
+Then we get context, which is information about the request or the node. And finally, we get info, which is kind of general information about the GraphQL Schema and all the things that we might be doing. And because we are diving into the internals of Gatsby, we are gonna use all four of those.
+
+[00:04:20]
+Typically, you'll find a lot of times you'll just use the source. But when you get into these kind of fun things, it will get a little wonky. So the first thing we wanna do is we wanna load the resolver for the MDX type, and specifically we want the body field.
+
+[00:04:44]
+So we do that by creating a new constant and we'll just do info.schema.getType ('mdx'). And then below that we're going to get all the mdxFields. And that's going to be type getFields.
+>> Jason Lengstorf: So what we've done right now is we've said in the Gatsby schema, the whole schema, we want to load the whole schema definition for MDX nodes.
+
+[00:05:15]
+That gives us our type. So then we're gonna load all of the fields for MDX and that gives us the field. So among other things, it will give us that body field. And then I wanna get the resolver for it. And I do that by getting mdxFields.body.resolve. And this resolve is defined the same way as this one is.
+
+[00:05:42]
+So what we're basically saying is, I want to be able to resolve the request to the docs page body type, exactly the same way as we resolve MDX node request to the body type. Does that make sense? So what we've done in doing this is we've made a pass through resolver.
+
+[00:06:02]
+And that means that our docs page is going to handle requests for MDX data exactly the same way as MDX does. And we're not reinventing the wheel, we're not re-implementing MDX. We're just using the work that MDX is already doing. So once we've got this resolver, we can I get the mdxNode, which will do by going into the context.
+
+[00:06:27]
+And we'll go into the nodeModel and get the node by its ID. And the ID is the parent node because remember our docs page, set a, or did I said a parent? I hope I did. I have the parent. But I didn't set it. So let's set that as well.
+
+[00:06:46]
+So we will set the,
+>> Jason Lengstorf: Node id of our MDX node as the parent of our DocsPage node so that we're able to reference that in this resolver. So having this source node.parent means that we can pull out the MDX node itself. Once we've loaded this MDX node, we can now just resolve it.
+
+[00:07:13]
+So we're gonna run this resolver function that we pulled out of the MDX body field. And our arguments are the mdxNode that we wanna get data from, the args that were passed in in case we wanted to do pass through, the context of the request in case that's needed.
+
+[00:07:30]
+And then we just wanna tell the meta that we're using the body field.
+>> Jason Lengstorf: So now that we've done that, what we should be able to do is query for our docs page type and load MDX data into the body field. And then get all the other data, from the front matter, from the file system, all in one place in one kind of simple node API so that we're not doing anything.
+
+[00:07:59]
+We don't wanna have to do all these workarounds in our business logic. We wanna set this up once and then have simple queries for the frontend developers to use. So if I stop and restart, and now in order to do this, because we just changed the way that nodes work, we're going to want to get Gatsby to pull a fresh start.
+
+[00:08:19]
+So to do that, we're gonna run gatsby clean. But the way that you run gatsby clean and yarn workspaces is we're actually gonna do yarn workspace theme-dev. And then I can just execute an arbitrary command within the context of that. So I wanna run gatsby clean. And it's going to remove the public and cache directory so that we're basically starting from scratch.
+
+[00:08:44]
+So then I can run yarn workspace theme-dev develop. And assuming all went well, what will happen is this is gonna boot up with our GraphQL layer in place. And we will be able to actually query for our homepage. So now we've got our docs pages. And those are pulling out the data that we told it to, right?
+
+[00:09:10]
+So now we've got custom data coming in to our GraphQL layer using a variety of different nodes as data. So we're using the file system. We're using custom data that we're creating for the path. And we're using the MDX data for the body field. This is all kind of transparent, or this is all kind of hidden from anybody who has to implement this.
+
+[00:09:30]
+They just know I want docs data, and they get it. So they don't even have to care that this comes from MDX. They just need to have data to use. And to look a little bit at kind of how this a lot of things get done for us, let's just set from now to true.
+
+[00:09:47]
+And this is a built in helper to do relative time. So right now we can see it gave us this time stamp. It's a little small. So let's make that a little bigger. And if I change it to from now equals true and hit play. Now it gives us a relative change.
+
+[00:10:00]
+So 41 minutes ago was the last time that this document was changed. So we can just use that in plain English when we display this on the site. We only change the Gatsby node. So let's add that. And then we'll commit (theme-dev): add schema customization. And let me push that.
+
+[00:10:24]
+And so this is all being pushed to the fen-progress branch on the repo if you want to kind of reset to where we are at any given moment.
+
