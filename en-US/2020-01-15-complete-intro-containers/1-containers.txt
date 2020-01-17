@@ -1,0 +1,140 @@
+[00:00:00]
+>> What are containers? So that's probably more simple than some of you may think. Some of you might already know this, the answer to this question. But there's actually no such thing, one single thing that is a Linux container, right? We like to have this idea that a container is this, we say, all right, Linux, containerify that and it just works, right?
+
+[00:00:19]
+And it's not quite that simple. A Linux container really is actually a combination of at least three different kernel features within Linux. That kind of culminate in this idea of what a container is. And again, this is gonna be all here in the command line. So if you have any issues with it, go ahead and check out Jem's course on it.
+
+[00:00:41]
+It's a great course. So, Before we kinda start getting into what is a container, I'm going to give you a little bit the history of why we need containers, right? Kind of lead you through the journey of how we got to where we are today. So I want you to picture for a moment that you are head of a engineering team at a big corporation, right?
+
+[00:01:06]
+And you need to host your website somewhere. I don't know how you became a head of engineering with no website already. But this is the situation that we find ourselves in for this hypothetical, okay? So if you had been 15 years ago, or 20 years ago, doing this, you should start thinking about, all right, well, I need to buy a bunch of servers.
+
+[00:01:24]
+And I need to figure out where my data center's gonna go. And I need to hire a bunch of people that are gonna manage racking and stacking servers, stuff like that. As I call it here, you're working with the bare metal, right? So you're actually going to Dell, you're going to EMC.
+
+[00:01:39]
+You're going to some of these really big cloud providers. Or not cloud providers, but hardware providers and saying I need x amount of servers and I need these kind of things. And then you have to worry about physical security, the data center. You have to worry about the temperature.
+
+[00:01:54]
+You have to worry about upgrading things that that are no longer powerful enough. You have to worry about all sorts of stuff like this. For me, the developer that just wants to sit here and write my JavaScripts all day, that sounds like something I very much do not wanna do, right?
+
+[00:02:10]
+There are trade-offs here, right? There are still reasons that people do this, right? There are still lots of company running on bare metal. I imagine many of your companies are still running on bare metal servers, right? It's more secure, right? Because you are not sharing anything with anyone, right?
+
+[00:02:22]
+You control everything. You control your entire destiny. If you have these economies of scale, it can be cheaper for you, right, than doing something in the public cloud. And if you have anything that's extremely performance sensitive, you can tune your boxes to be as whatever you need out of them.
+
+[00:02:42]
+But it comes with a lot of problems, this is expensive, right? You have to buy more capacity than you can use, right? Because if you're hitting your capacity, that means that you're dropping stuff on the floor, which means that you always have to have more capacity than you're using.
+
+[00:02:54]
+And a lot of has seasonality to our apps, right? So if you have enough capacity to handle Singles Day or Black Friday, that means you have a bunch of service just sitting idle the rest of the year, right? You have to worry about stuff breaking, right? Sometimes RAM just goes bad, right?
+
+[00:03:11]
+And then you have to go in and fix that. That's also still your problem now. And let's say you need to buy more capacity, right? It's not like where you can just say, hey, Kubernetes, give me another node, right? And you just have one. You have to call up Dell again and say hey, I need more servers, right?
+
+[00:03:28]
+I actually thought about writing a Kubernetes provisioner that made a purchase request, right? And then eventually when it comes back and comes online, then it spins up your node, right? That's the worst idea. It would be terribly expensive and that's why I have not written it. I also don't have enough money to do that.
+
+[00:03:41]
+So, Yeah, that only takes a month or two, right? It's pretty much instant. [LAUGH] So hopefully you're getting the point now. Bare metal has its ups, right? But it has a lot of downsides. There's a reason why a lot of companies don't do bare metal service anymore. So let's get down into virtual machines then.
+
+[00:04:04]
+So if I have a Web server, I'm running it on one server blade within my data farm, right? I'm running everything on bare metal operating systems like that. Well, what would be really cool is I could actually just have a farm of server and then I could have an arbitrary amount of servers running on them, right?
+
+[00:04:20]
+And that's kind of where virtual machines come into the picture, right? So I can have one server but I can have multiple different operating systems running at the same time as virtual machines, right? They're virtual servers, in that sense. And that gets to be very helpful because now I can scale up and scale down within my capacity of my data center, right?
+
+[00:04:39]
+And that that's helpful because then I just have to manage capacity. Cuz if I have one team go offline, they take down their service, I can then reclaim that immediately and add more stuff to it, right from this other team that's coming online, right? So this kind of virtualization strategy allows us to separate VMs, right?
+
+[00:04:58]
+At this point, we're still having to manage our own hardware and we still have to manage our operating systems, and drivers, and all that kinda stuff. But, at least, we can scale up and kinda scale down within our own capacity. So, let's talk about something else that this solves for us.
+
+[00:05:15]
+Let's say that now we're running a hosting provider, right? Some sort of shared hosting provider. Let's say I had two different clients and I just dropped them both with root access to the same computer. And they're just say, all right, now run your servers. Now if you're skin is starting to crawl, good.
+
+[00:05:32]
+It means that you already understand some of this, right? But if your skin's not crawling, let me make it crawl for you. So let's imagine that you have two sort of providers. Let's say one them's name is Coca-Cola and one of them's name is Pepsi, right? And Coca-Cola decides to store on their server recipe.txt, right?
+
+[00:05:51]
+Now, hopefully you can see what I'm getting at here. If we have Pepsi on the same server, they could just change directory over into Coca-Cola's directory and say secret recipe. I got it, great. I don't know why I made Pepsi the bad guy in this situation. But they're definitely the bad guy, right?
+
+[00:06:04]
+[LAUGH] All right, so this ends up being not great, right? So that's why virtualization can also help too because now they're in different operating systems. They can't even see each other, right? They don't even know that they're on the same server. To them they just, all right, here's a copy of Ubuntu.
+
+[00:06:23]
+You're just chilling out on Ubuntu and that's it, right? We still have problems here though, right? If I if I'm running a hosting provider and Coca-Cola and Pepsi are on VMs on the same computer, well, if I'm Pepsi I can just say run a fork bomb within my particular VM.
+
+[00:06:44]
+Which consumes all of the resources, and CPU, and memory, and all that kinda stuff. And it would take down the server and it would take down everyone on the server, right? So that way they could cause downtime for Coca-Cola and that would be a big problem. And much less nefarious than someone dropping a fork bomb, if you haven't heard of a fork bomb I dropped a link in there.
+
+[00:07:05]
+It's a little short command that just takes down an entire system almost immediately. It's kinda fun. Don't run it on your own computer. [LAUGH] But yeah, much less nefariously, you cannot just have someone that wrote a bug that leaked memory and took down the entire server. And you want them to just take themselves down.
+
+[00:07:24]
+You don't want them to take down everybody, right? So that's kind of we still have a problem here by just having the same people on VMs. Now, with VMs, as you may guess, you can also limit how much. All right, you only get this many cores, you only get this much RAM.
+
+[00:07:41]
+And you can kind of mitigate some of those solutions. But I'm gonna show you how to do that even more with something called C groups. So we still have a bit of a performance problem here, as well. It's not, let's say that I have ten servers running as VMs all within one racked server in my data center.
+
+[00:07:59]
+But we still have some overhead here that's making this still an inefficient system, right? We have to run ten copies of, if we have a server that's running ten different, a silicon server that's running ten different Web services, right? We still have to run ten copies of an operating system.
+
+[00:08:16]
+And we're wasting some of that capacity on ten copies of the operating system. It would be great if we could just run one copy to the operating system, right? So this is what I'm hinting at with containers here. So again, if you want to play with VMs directly, Jem's course does that.
+
+[00:08:36]
+And VMs are still very much a very valid option. I know a lot of people out there are still using Azure VMs and AWS, EC2, right? Very, very valid things still to be using, and there's still reasons that you want to use VMs. And so you should definitely play around with those as well.
+
+[00:08:52]
+And like I said, Jem's course on Frontend Master does that for you. So I think he goes out and plays out with DigitalOcean. Okay, so that brings us to the public cloud kind of situation, right? So this is gonna be Microsoft Azure, Amazon Web Services, Google Cloud Platform.
+
+[00:09:13]
+Which you'll often hear me saying GCP and AWS, because I work in the business and I cannot help myself but use acronyms. I'm sorry. [LAUGH] they've taken me. So this is great because now I've moved the data center away from my particular company, right? I no longer have to have these admins.
+
+[00:09:33]
+I don't have to buy physical space. And I don't have to worry about temperatures or anything like that. I just say hey, Amazon Web Services, or hey, Microsoft Azure, give me another VM and let me provision something. And those companies have massive data centers all over the world, each one of them has like 30 or 40 different regions.
+
+[00:09:54]
+So that's really great. We get the economies of scale here and I just pay them for the spinning the meter of how much CPU I'm using, how much memory I'm using. And they handle all those service for me. They handle updating the hardware. You never have to worry about hardware basically ever again.
+
+[00:10:08]
+Now if you're still using VMs, you still have to worry about the operating system, right? They give you the server. But if there's a big security vulnerability, you have to patch it, right? You have to go in there and say Ubuntu, upgrade to the latest LTS or something like that.
+
+[00:10:25]
+LTS stands for long term service, I think?
+>> Support.
+>> Support, thank you, long term support. Yeah, and that just means that's a version that they maintain for a very long time. So public cloud, this is great. You end up paying perhaps a bit more than you would have if you're running it yourself.
+
+[00:10:44]
+But the trade-off here is you no longer have to hire people. And people are usually very expensive, right? To manage physical data centers, right? So that's kinda the trade off. Usually, it's almost always a good idea to be in the public cloud for that reason. It's usually cheaper from the human perspective.
+
+[00:11:00]
+And it's getting to the point now that a front end engineer can manage their own servers, right? Which would have never been possible 15 years ago. So in these kinda situations tools like Terraform, Chef, Puppet, Salt, things that we won't be talking about today. Cuz I don't know them and you don't wanna learn them from me.
+
+[00:11:18]
+These will be useful because this allows you to spin up servers, provision them. And when I say the term provision, what I mean is install the correct software. Make sure everything's up to date, download your code, start running the code, all that kinda stuff. That's where these tools can be super useful for you.
+
+[00:11:33]
+Definitely check them out if that's something that you're interested in doing. But we're still paying the cost of running a whole operating system in the cloud. And we still have to manage the operating system. It would be nice if we could just say here's our code. Here's the environment it needs, execute this, right?
+
+[00:11:50]
+Here's this artifact of some variety, execute this. And that brings us to the idea of containers. Containers give us all of these security features and all these resource management features of virtual machines. But they're much lighter weight, which is a term that I hate but I'm still gonna use here because it's a absolutely meaningless term, right?
+
+[00:12:12]
+What is lightweight and compared to what? I feel like every JavaScript framework comes out is lightweight, right? [LAUGH] It's the worst. And but here I actually mean it, right? You can say for sure that a virtual machine is lighter weight than running bare metal servers. And the containers are lighter weight than running a whole virtual machine.
+
+[00:12:34]
+So basically what I'm doing is I'm just freezing a file system. I'm dumping that into a container image. And then I'm shifting that off, and then I have some sort of host operating system that's executing these containers for me. So you're still gonna have multiple things running in one host container system, right?
+
+[00:12:54]
+And we kinda have this same worry about the Coca-Cola Pepsi problem that I'm gonna be running this container and then, next to me, another container's gonna be running. And I don't know whose it is or what it's doing, right? So I have these same, similar concerns but let me assure you that with the features of containers, they can't see each other.
+
+[00:13:13]
+They can't interact with each other. They can't even know that each other are there. And a lot of very smart people have been working on this for a very long time. And I feel pretty confident in saying this is secure and you should definitely go down this path.
+
+[00:13:24]
+It didn't always used to be that way. It is now that way.
+

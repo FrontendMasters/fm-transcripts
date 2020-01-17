@@ -1,0 +1,59 @@
+[00:00:00]
+>> Networking is a very deep, very deep pool of knowledge that I have just the surface layer of this. So I'm going to introduce you to what networking in Docker is, but recognize that we're just scratching the surface here. There are people that their entire job is just working on networking stuff, so I'm not gonna pretend that I have that kind of knowledge, here.
+
+[00:00:21]
+So let's come back to our TERMINAL. If you say docker network ls, you should see something akin to this, I think this is docker-node-one is I have from a previous Kubernetes project, but you probably see bridge, host, and null, those are the three you very likely are seeing right now.
+
+[00:00:46]
+I could probably even just say docker network rm that one. Okay, so now you can see I just have three, and I imagine you see something akin to that, right? So docker allows you to one, connect to the default bridge network, which is called bridge, right and that's the one that we're gonna be working with, is bridge networks.
+
+[00:01:13]
+And then this allows you to connect two containers to each other, right? So if I have this particular microservice needs to talk to this particular microservice, I can create a docker network that allows the two containers to talk to each other, right? It's kind of the idea here and generally don't recommend that you use The default bridge network they ask you to create your own.
+
+[00:01:34]
+So that's what we're gonna do we're gonna say Docker network, create -- driver=bridge, and then you can call whatever you want, but we're gonna call ours app net cuz I'm creative. So now if we say Docker network LS, you can see here we have an app net bridge, right?
+
+[00:01:57]
+So now we have like an arbitrary network that we can connect various containers to, and then any containers that are connected to that or network can talk to each other. So let's connect something to it, let's connect a running micro or a MongoDB server to this network. So MongoDB, for those of you that don't know is a NoSQL database, it's one of my personal favorites, it's familiar to a lot of node developers, but allows you to speak JSON to a database and it's unstructured which is great.
+
+[00:02:32]
+So I'm gonna say docker run-d --network=app-net, then I have to expose the port that it's on, which is 27017.27017, that's the default MongoDB one, we're gonna give it a name of db. You can be more creative than that, I'm just lazy -- RM to remove it at the end, and we're gonna do Mongo:3, there's a newer version of Mongo but everyone stick to three because I have all the drivers working for Mongo three as well, Okay?
+
+[00:03:10]
+So you should run that and it'll start up on the background, so now if I say docker ps I should see that I have a Mongo server that's probably still starting up, Okay? So, what I'm gonna do now is I'm gonna start a second Mongo container because the Mongos container contains both Mongod which is actually the server that runs in the background, it also contains the Mongo client.
+
+[00:03:39]
+So I'm gonna use one container to talk to the other container, does that make sense? So let's try it, I'm gonna say docker run -it --network=app-net --rm, and we're gonna get the Mongo 3 container, and we're gonna say -- host db, I have to type Mongo again. So after you type Mongo three, we want it to run with the Mongo client, right?
+
+[00:04:08]
+This is the command we're giving it, Okay, so docker run- it network=app net --rm, mongo 3, mongo which is actually say run the mongo client, right? The database client where you can connect to it and run queries against it, right? And then --host db, right? So what's cool about this is I called this db right up here in the names, that's going to make the URL of db right instead of like localhost, it's gonna be db connects to the other one on the network called db, right?
+
+[00:04:52]
+That make sense? So if I run this, it should drop me into MongoDB which is did, right? So if I say show DB's, I can see that this that and I can say use tester, okay? So then I can say db.someCollection.insertOne({ x:1}) wow I'm impressed with myself that I remembered how to do that.
+
+[00:05:24]
+Okay so now if I say like show collections, I've created a sum collection here anyway, point being, this is a real database, it's storing stuff somewhere which is in another MangoDB container. Now, I could use volumes to have this MongoDB instance right out to a volume and then this would be persistent between runs as well, right?
+
+[00:05:42]
+Not doing that right now, because that's not the point of this but, the point here is that I have this Mongo container over here, talking to this Mongo container over there. And just to kind of prove my point, if I say docker ps in a different shell, you can see here I have one mongo 3 here, and this is running on 2707, or this one is rather, and this one's called db, right?
+
+[00:06:06]
+That's actually the running database and you can see here if I say docker top db, it's running Mongod, right?
+>> Mongod.
+>> What's that?
+>> Mongod.
+>> Mongod, something like that yeah.
+>> And network into each other because they're on the same network?
+>> Yeah, they're allowed to, right?
+
+[00:06:28]
+Cuz they're both connected to App net, and so now DB inside of this one refers to this database particularly, so if you say ping http://db, it'll hit the other container over there, does that make sense?
+>> So the volumes would In the db database.
+>> You connect the volumes to this one yeah, to db, and then you can configure mongo where it stores its data, you would just configure it to store the data on the volume.
+
+[00:07:04]
+And then to read it when it starts back up, I'm showing you how to do this by hand, again, because I'm gonna show you later how to not do this by hand, right? Typically you're not going to be messing with Docker networks directly, you're gonna have tools that are setting those networks for you, but I wanna show you there's really no mystery here, you can do it by hand.
+
+[00:07:22]
+So I'm gonna leave db running, if I say docker ps, you can see the db is still running, now we're going to write a node application that speaks to the Mongo.
+

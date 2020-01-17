@@ -1,0 +1,55 @@
+[00:00:00]
+>> So the next section is layers. And we're gonna talk a little bit about build performance. Which is not something you have to worry an enormous amount about. But I will tell you that while you're developing this app, every time that you a change a file. This is a file inside of the project is changed, right?
+
+[00:00:18]
+So let's say I decided, this should run on 5000 instead of 3000, right? And I go in and change that. Now if I run Docker build again, it is going to go to the points like okay, this didn't change, this didn't change, this didn't change, this didn't change, this didn't change, this didn't change.
+
+[00:00:35]
+Right, here, this line, COPY, this line. Because the file system is different it takes a quick hash of what it looked like before. It's like, they changed something. So it's gonna start from this instruction right here, right? So these ones that just uses all the cached layers from before, right?
+
+[00:00:52]
+I showed you those numbers. It just starts here, but what's annoying about this is, is that it'll copy this over and then what does it run immediately after that? npm install which takes a lot of time, uses bandwidth, and it's wasteful right? Wouldn't it be nice if we could just run npm install and then do the copy?
+
+[00:01:11]
+That's kind of the idea here with layers. As if you think about things in the proper order, right? Then you can leverage this caching to be able to take advantage of the fact that this is cached. So, I'm just gonna do this on the same projects right now.
+
+[00:01:26]
+There's a layers, this is relatively the same thing. So I am just gonna stay here in the more complicated node project. So here in WORKDIR, they are going to come in here and we are gonna do a copy here first. So we're gonna do two copies. I'm gonna say copy, --chown node:node.
+
+[00:01:46]
+And I'm gonna copy the package-lock.json and the package.json to here, right? You have to put the slash that to know to put it in the directory, right? Okay then I'm gonna run npm ci. RUN npm ci, and then I'm gonna do everything after that. I'm just gonna say copy node:node, period, period, right?
+
+[00:02:17]
+And I'm gonna get rid of this. Now, this made this a little bit more complicated. But now any time I change one of my files, it's gonna keep that cached layer of npm installs, right? So just to drive home my point, I'm gonna do docker run build, or docker build, right?
+
+[00:02:40]
+So it's gonna run the ci one first, right? Cuz it hasn't done that yet cuz I just changed the order of all that stuff. Now let's go ahead and change this, I changed this to 5000. Let's change it back to 3000. Previously, it would have done the npm install again.
+
+[00:02:57]
+But now if I just do this and do it again, notice it just skips right to the copy at the end, right? And that rebuilt really fast.
+>> Is that because package lock or package json did not change?
+>> Right, I didn't change anything in package.json or package lock.
+
+[00:03:12]
+As soon as I change something in there, then it'll run that step again.
+>> So it already knows it's kinda conditional on that.
+>> Yeah.
+>> Come in.
+>> Right, it assumes if nothing changed, then this is-
+>> Now with the cache.
+>> Right, it's about cache, you'll get a cache hit.
+
+[00:03:24]
+That makes sense.?
+>> So the order is really important.
+>> Very, yep, cuz it's, it's like an onion, right? It's building layers on top of layers on top of layers on top of layers. That's how Docker containers work. It's really clever when you think about it, right? Cuz it's repeatable.
+
+[00:03:40]
+So the one concern with this, right? In particular, if your CI system is maintaining a Docker cache. Many of them don't, actually, for this reason. Is that, what happens if there's a security patch, right? So let's say I'm looking here at my package.json. I have hapi 18.4. Let's say 18.4.1 comes out, right?
+
+[00:04:00]
+If I do an npm install right now, I would get that, right? Because this is a relative version here, that's what the caret means. But I'll have that cached Docker layer that it won't pick up that, cuz it's not running npm-install again, right? So in that sense, you can get a stale cache from that particular perspective.
+
+[00:04:20]
+It usually only affects you in development. And I don't really care if I get a security patch when I'm running it locally. 999 times out of 1,000 probably. But it's just something you should know that might be happening to you.
+

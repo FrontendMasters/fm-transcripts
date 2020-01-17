@@ -1,0 +1,72 @@
+[00:00:00]
+>> So I'm gonna show you a little, kind of cheat way, to get on to Kubernetes. And we're gonna use a project called Kompose. Kompose with a K. So coming back over to our project here, Kompose. I want you to click here on Kompose, which is kompose.io. This is an official project from the Kubernetes organization, which is part of the Cloud Native Foundation, which I believe is part of the Linux Foundation.
+
+[00:00:27]
+Okay, and then I want you to come in here and I think there is an installation tab right there. And it's another curl command that you're gonna download and run. And right there, that's the one that you want. You're gonna have to do the same kinda song and dance, make it execute a little plus X, and then move that into your path.
+
+[00:00:51]
+And it looks like it will work on Windows as well. It looks like we have a binary that you just install from GitHub. But again, I think you're stuck in PowerShell land. Okay. So now that I have Kompose. It's just version. There you go, I have 1.19, 1.19.
+
+[00:01:24]
+And the next thing that we need to do is we need to go modify our docker-compose file a little bit to work with this. So that's what compose does for you, is it takes the docker-compose file that we wrote, and it turns that into a Kubernetes configuration. Which is pretty cool, because docker-compose is pretty easy by comparison to understand to Kubernetes configurations.
+
+[00:01:46]
+So as long as we're good building Docker-compose files we can be using Kubernetes. And what you can do and what I do personally, when I'm messing around with Kubernetes I'll start with the Docker-compose file, I'll use compose to convert everything to Kubernetes output and then I'll go from there.
+
+[00:02:03]
+Okay, so we're gonna come into our docker-compose.yml. We're gonna change the image or the build to an image because it won't do builds for us. That's one thing that compose will not do for you nor Kubernetes. So once you change this to btholt/node-app, so this is on Docker Bub, it's literally the app that we've been building this whole time.
+
+[00:02:26]
+I just built it and pushed it to Docker Hub so that we can do this, but you have to go through a registry. So whether that's running your own registry locally or that's pushing it to a Git Hub package repository or pushing it to Docker Hub or Azure Container Registry.
+
+[00:02:41]
+There's a bunch of different places you can push these. For now we're just gonna use Docker Hub because that's the easiest one. Okay, ports 3000. And we are gonna get rid of this volumes part because you do not use Kubernetes for development purposes. So that's all this stuff is not useful.
+
+[00:03:02]
+When I put ports back if you took that out like I did, which is 3000:3000. Links db, that's fine, environment, that's fine, we gotta add one more though, which is labels. So there's certain things that Kubernetes needs to know about our particular service. And one of them is that this is a load balancing service, which means that it needs to have like some sort of load balancer in front of it.
+
+[00:03:32]
+So if you wanna have ten containers running at the same time Kubernetes can do that load balancing for us. So Docker compose doesn't have this concept of load balancing built into it. So we have to kind of indicate to compose like hey, please put this into the Kubernetes load balancing situation.
+
+[00:03:48]
+So you say compose.service.type, and you just say this is a load balancer. So labels are typically more used for things like, this is a database container. And then it makes it easy for like search through your clusters defined things. They're just labels in that sense. Okay, and last thing here on we have to give the database explicit ports to be using.
+
+[00:04:24]
+So we're gonna say please put this on 27017. Okay, so now we've kind of composified this Docker compose file. All right. So the one thing that I wanted to point out to you is we did this load balancer thing right here. If you try and push this to something like Amazon or to Azure, they know how to deal with it, load balancers, they have built in services for you.
+
+[00:05:09]
+Typically, they're not cheap. So if you have like 15 different services, and they're all load balancers, that's gonna get really expensive really quick. What you're actually gonna wanna to do for the most part is not have each one of your services be load balanced. You're gonna wanna have something like NGINX in front of everything in that load balances across everything.
+
+[00:05:27]
+So just be aware of that, I don't want someone to call me with like I had a $10,000 bill and I'm going to kill you, please don't. I put a nice note in here inside of the Kompose. Where is it? A great blog post from Google Cloud explaining load balancer.
+
+[00:05:48]
+There's another thing called NodePort, which is just like exposes the same thing on everyone's port. So like if I say expose on Port 3000, it'll be exposed on every container inside of my clusters, Port 3000 will be that one container. And you can also use LoadBalancer and there's another thing called Ingress.
+
+[00:06:04]
+Ingress is not necessarily a thing, it's just an idea, which is like NGINX, right? Having NGINX manage all of your Ingress traffic into your particular cluster. Kind of a deep topic you don't really need to know this is gonna work for our development environment. All right, so I need you to do like kind of a hack here, this is for how Kompose is expected to work.
+
+[00:06:28]
+It needs someway to talk to your kubectl. So you're gonna run this kubectl proxy --port-8080. And it's just gonna start serving traffic imported. You can actually take a look at it, I think. It's nothing exciting, if I remember correctly. Yeah, it's basically an API for anyone to interact with your cube control, right?
+
+[00:06:52]
+It's kind of exposing that to your local computer. Okay, so I don't wanna run that in the foreground. You can actually just say, if I put & here at the end, it's gonna run it in the background. So now if I look at my computer, which I obviously have a lot of things, so if I do ps aux grep kubectl, you can see here, it's running here in the background.
+
+[00:07:19]
+That's what that end, does it the end is it forces stuff into the background. You can do that with like screen and T Max and a bunch of other stuff to just lazy and don't use this. All right, so now that's running, and this won't work by the way if you don't do that.
+
+[00:07:37]
+So now that we have kompose, we're gonna say kompose up. And you can see here it create a db service, it created a web service, it created a deployment for both of these and everything's running in the default name space. So in theory, we should be able to come here and say local host 3000.
+
+[00:08:01]
+And it's working now within Kubernetes. So pretty cool, you are now running a Kubernetes cluster on your computer. Which I find to be very cool, like this is very difficult and it's spent a bunch of time getting it down to be this simple. So I need you to be dammit, like I need you do the impressed by this.
+
+[00:08:27]
+So let's take a look at what's actually happening underneath the hood. So if I say kubectl, get all, You can see here, I have this deployment, this deployment going out, and I have replicasets going, I have some ClusterIPs. But the part that I'm actually most interested in is the services, right?
+
+[00:08:47]
+I have a service for db, I have a service for web, this one is a LoadBalancer, this one is just some static IPs. And in this case, your ClusterIPs, keep in mind these are internal ClusterIPs. So if I tried like ping this, it wouldn't work, because this only works inside of Kubernetes, inside of its virtual network.
+
+[00:09:05]
+But this one does have an external-IP, is it's exposing a localhost on port 3000.
+

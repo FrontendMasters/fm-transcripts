@@ -1,0 +1,134 @@
+[00:00:00]
+>> So these features that I'm showing you so far have relatively been built into Linux for a long time. These are features of the kernel they've intended, like I think this has been around at least since, like root has been around since the 70s at least, right? Namespaces I think are slightly more recent, but I think we're still talking 2000-ish, you may wanna fact check me on that.
+
+[00:00:17]
+But I think that's about right. This last one is relatively recent. It was invented at Google. It's called control groups, right? So Google had a problem that they would like be running multiple different processes, they'd be running these, and like they trust each other, right? So they are not worried about like stealing each others' secrets inside of Google, right?
+
+[00:00:38]
+So they were like cool, we're just running processes right next each other, you run your web server, I will run my web server, we won't have different VMs form, right? We'll just have them in their like limited environments. And they kinda had this problem though like if someone on the Google Maps team were to run away process, that might kill like the Google Docs team's process, right, cuz it kills the entire server, right?
+
+[00:01:02]
+So what they wanted to do is they wanted to limit how much resources that one of these processes would have access to, right? And basically said like, look, you get one core, or you get 10% of this CPU and then once you're out of that, I'm sorry, that's all you get, right?
+
+[00:01:16]
+Cuz I'm not gonna let you crash this other team's running process, right? So they came up with this idea of control groups. I think there was another name for it previously, actually they called it containers, is what they called it. But then they, that kinda started applying to more than just control group.
+
+[00:01:33]
+So they changed that to C groups, right? So that's what C groups are for, it's this idea like, I wanna limit how much CPU you have, how much memory you have. How much network bandwidth, like there's a bunch of stuff that you can limit on. We're just gonna be looking at CPU and memory, but you can do control groups for a lot of things, right?
+
+[00:01:55]
+So that's where it came from, but then it turned out that this is a really cool and interesting idea, because now, I can do these unshared environments, and then I can assign control groups to them. And also now I have these contained processes that can't do anything besides what I tell them to do, right?
+
+[00:02:14]
+So you can execute arbitrary amounts of code and do whatever you want. But the only person that you're gonna screw over is yourself, right? You can't screw over anyone else and that's kinda the idea with containers here. So, again, like a more real life example, if we're running a hosting service, right?
+
+[00:02:32]
+And we have Bob and Alice that are running their servers within our hosting environment, we don't want it so that Eve can connect it to the environment and start messing with the other people's processes, right? She can just drop like something that's gonna peg the CPU at 100%, take all their resources, and bring down their servers, right?
+
+[00:02:51]
+We wanna prevent that kind of thing from happening. So we need to have it so that it has limited access to physical resources, or physical, because most containers are still run within VMs, right? There's multiple levels of virtualization here. But for all intents and purposes, we'll call these physical resources, how much CPU, how much RAM, those sorts of things.
+
+[00:03:18]
+Okay, so I'll say that like this is a little bit more difficult to accomplish than the things we've done before that's more technical in nature. So I invite you to just kind of bear with me a little bit. So the first thing we need to do is we need to say apt, this is again still within our Ubuntu VM or container.
+
+[00:03:38]
+Apt get install, then we say -y, cgroup-tools and we're gonna install htop as well for some fun later. And neither one of those is very big. So we just installed htop which is one of my favorite tools, this'll actually give you a nice visualization of what's going on with your computer right now.
+
+[00:04:04]
+So even this container, I think my computer has eight cores on it or six cores or something like that. You can see that this container in and of itself using cgroups only actually has technically access to two, which is kind of interesting. And I have eight gigs of RAM.
+
+[00:04:15]
+This one only actually has access to 1.95 gigs of RAM. So it's actually using cgroups to accomplish this, right? This little container can't see anything else. Okay, quit, quit, quit, okay. So that's what htop is, I quite like, it's a fun tool and you can use it on Mac as well.
+
+[00:04:39]
+Okay, so the first thing we're gonna do is we're gonna say cgcreate -g. And we're gonna create a new control group, that's what this does. And it's gonna limit on cpu.memory io which you type blkio.devices and freezer, okay? And then, we're gonna say :/sandbox. Okay, this creates a new C group for us.
+
+[00:05:17]
+So I'm gonna come back over here to my other Docker container. And we're gonna run that same unshared environment. Actually, we can just do it from here because I already ran it from here. So this one. So we're gonna have one of these go back into an unshared environment.
+
+[00:05:35]
+Right, All right, exact same command that we ran before. So now this one is in an unshared environment and now I'm gonna go and actually assign a cgroup to this, to control this one. Now, you have to run this from the host, right? You can't run it from with like, you can't say limit myself right?
+
+[00:05:52]
+I have to go back to the host and do it from the host. So I have another, I can see here, I can see my unshared batch environment here. So this is another process that I have connected to the same container. So I ran ps aux and I can see here this batch right here is running.
+
+[00:06:15]
+So what I need is I need this PID right here, 7607, this will be different for your computer, right? Cuz how it assigns the PID will be different based on the computer you're running on. So I need you to run ps aux. And I need you to find the bash, this one here.
+
+[00:06:34]
+That's the highest one probably, unless you have multiple, right? So you can see here I have 104. 104 is probably the one that I'm actually doing right now, or might have been the other one. Doesn't matter, needs this one, right? It'll come directly right after the unshare. So 7607, it'll be different for you.
+
+[00:06:53]
+And now what I want you to do is I want you to say cgclassify -g cpu,memory,blkio,devices,freezer :sandbox. If you can't tell, sandbox is the name of the control group I've created here. You can call it whatever you want. And then I'm gonna put 7607. So now, this bash and all of its children processes, right, because processes spawn other processes.
+
+[00:07:33]
+They're all part of a process tree, right? I'm saying, everything inside of that process tree is now inside of this control group. Right now that doesn't mean anything, right, because I haven't done anything. But we're about to. But if you wanna see what's actually in there, we can say cat/sys/fs/cgroup/cpu/sandbox/tasks.
+
+[00:07:57]
+And you can see here, 7607, right? So we can actually just directly add to that as well, but that's what CG classify does for us. As it classifies that as inside of this control group, okay? So I want to see how much resources it has so I'm gonna say cat /sys/fs/cgroup/cpu/sandbox/cpu.shares.
+
+[00:08:30]
+You can see here it has 1024, which means that it has access to a core, I believe. No, this is the priority, right? So what you can say is like this is a low priority control group, right? So I can say that if this was like a five, anything that was at 1024 would get prioritized above it, right?
+
+[00:08:49]
+So if I have two competing things it'll compare like what their priority is. Now let's get into actually limiting what's happening, right? So we're gonna say cgset -r cpu.cfs_period, I would invite you to just copy and paste this, I actually really don't understand all of the everything that's going on with these.
+
+[00:09:16]
+Like I said control groups are kind of above my pay grade here. But 100000 -r cpu.cfs_quota. So what we're doing here is we're gonna try and limit this to only use 10% of the available CPU, right? So it's actually gonna be 10% of what's available in my container, or 10% of the two cores that this container has available to it.
+
+[00:09:45]
+Equals and then we're gonna subshell this out to 5000 times, this might even be 5%. I think this might be 5%. getconf N, that's a space, NPROCESSORS. And that's gonna be for sandbox. Okay, so I recognize that that's a mess of a command. But the idea here is this particular c group, we said, hey, anything inside of this tree, it can only use 5% of the available processing power.
+
+[00:10:36]
+Okay, and then we're gonna do one more cgset, this one's a little bit easier to understand, cgset -r memory.limit_in_bytes= and we're gonna say, this has access to 80 megabytes, right? Anything above that, it just runs out of memory. And we're gonna say sandbox, Okay, and then here we can check it out.
+
+[00:11:06]
+We can say, cgget -r memory.stat for sandbox. And this'll output a bunch of stuff, but we can see here this is the physical limit of what it could go to, but we're saying, hey, this is what 80 megabytes would be in bytes, right? This only has access to 80 megabytes.
+
+[00:11:32]
+Okay, so now I'm gonna say htop just so we can watch. Right now there's not a lot going on in my container, right? And you can see this is the PS ox down here. So now I want you to go back into your Docker container here. And I'm gonna show you how to pin a CPU just for fun, right?
+
+[00:11:52]
+Now, I don't recommend dropping a fork bomb in here, you have to do a bit more stuff to prevent fork bombs from taking over your computer because of how they work. So don't do that. Unless you want to crash your computer in which case be my guest. So one of my favorite things in Linux is you can do yes and all it does it just repeats Y forever, right?
+
+[00:12:17]
+Or you can say yes, crap and now it just says crap infinitely. So if I say yes into /dev null, which is just a scream into the void basically that's the equivalent of what this command is. What this is gonna do, is it's going to pin the CPU for this particular process, right?
+
+[00:12:36]
+It's gonna take as much CPU as it possibly can. So if go back over here to Docker, you can see here it's taking about 12%. Where is the, yes, it's right there, right? Now if this wasn't inside of this, this would totally pin the CPU for us, right, 100%.
+
+[00:12:57]
+But because we're using C groups, it's keeping that contained within this one particular secret. That's pretty cool, right? We've artificially limited this particular process. And despite the fact that it's trying to screw us over, we just say nope. The only thing you can do is you can take everything inside of here and you can burn that.
+
+[00:13:16]
+And then you're just out of luck after that. Cool. So let's do it for the memory too. Stop that and we'll say, We're gonna use the S again, but we're gonna do some more fanciness, which honestly, I don't understand exactly what's going on here. I pulled this 100% off of stack overflow like most of my code.
+
+[00:13:48]
+But this is going to consume as much memory as it possibly can. The idea here is it's going to continually fill our memory until it runs out of memory. So again, if we look back back here at our hswap. You can see here, our memory usage went up quite a bit, right?
+
+[00:14:13]
+But this has 1.95 gigabytes worth of RAM, and it's only consuming about 80 megabytes of it, right? So you can see here, I think it'll show it, there's a CPU percentage. Can I scroll down, there you can. So you can see here it's consuming 3.2% ish worth of memory, right, which is not a lot, right, cuz we limited to only 80 megabytes.
+
+[00:14:45]
+And actually, since I didn't show you that with the other one, let's run the other one again just for fun. We'll go back over here to this htop and you can see the CPU here pegged at 10%. So we basically created a container by hand, right? Not totally, you still need Docker, believe me.
+
+[00:15:06]
+But this is essentially what Docker is accomplishing for you underneath the hood, right? Again it does more for you there like create volumes and networks and manage a bunch of stuff for you. But at its core, the container system is this.
+>> So Docker will handle all the C group?
+
+[00:15:26]
+
+>> Yep. I would say most people that use Docker don't know what C groups are. [LAUGH] Cuz you never have to know, right? It just manages all that stuff for you. So now you can go and be like snooty jerks to your obstacles, like I know what cgroups are and then just walk away.
+
+[00:15:47]
+That's what I would do. I probably should stop this over here. So, just for funsies. Let's try this, yes into, so at now I'm outside of my change of environment. And if I say yes into/dev/null. This might be painful. You can see here, it's totally pinning one of these cores.
+
+[00:16:17]
+Because now it's outside of the cgroups, right? And again, if we go back and look again, it should be unpinned. So this is as far as we're going to go with manually creating containers by hand. LIke everything that I've shown you so far, this has been an academic exercise so that you understand what Docker is actually going to do for you.
+
+[00:16:42]
+For the rest of the class, we're going to be using higher level tools that's just gonna manage all this stuff for you. Again, I don't think you really ever need to know these things that I've shown you, but now that you do you know exactly what's happening. And I think again, if you understand the complexity of your tools, you embrace them, right?
+
+[00:16:58]
+Now you understand that what Docker is doing for you, you're gonna be a lot more grateful that someone took the time to build Docker, right? Rather than, next time you have a Docker problem, you can just wanna throw your laptop. At least you'll be a little bit grateful.
+

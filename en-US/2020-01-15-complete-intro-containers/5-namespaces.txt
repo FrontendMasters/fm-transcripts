@@ -1,0 +1,128 @@
+[00:00:00]
+>> So we're gonna go on to the next section now, which is namespaces, right. So far we've just been worrying about the file system, but we haven't been worrying about other things, right? So if I have two chroot'd environments next to each other, right, they can actually still see each other's processes, right?
+
+[00:00:16]
+So if inside of one chroot'd environment, I say ps, right, which is how you I can actually see that right here. This shows me that I have this running and this running, right? These are the two processes running at any given time, right? So if I do this within each chroot'd environments, assuming that they both had all the necessaries libraries and all that kind of stuff, they can see each other's processes, right?
+
+[00:00:37]
+So again, if I'm Company A, and Company B is also running in there, Company A can just say. You know what? Kill their web server, right? Because they can see each other's processes, right? Seems like it would be problematic, right? So that's what namespaces are. Namespaces are these the idea of these various different facets of Linux that we can limit each one of these particular, prop these jails processes to write or these container environments.
+
+[00:01:04]
+So I can say, hey, you can only see your own processes and you get your own process IDs, and you get your own networking layer and you can't mess with anyone else's. You can only mess with your own environment. So I'm going to do something I'm gonna say tale -f my new root or secret.txt.
+
+[00:01:23]
+So what this is gonna do, this is gonna start a long running process right now, right? So it's just running this tail-secret.txt, what this does is anything added to this, it would start showing that. But I'm just doing this to show you, what happens if something is just a long running process.
+
+[00:01:40]
+I'm gonna open another shell here. And I'm going to connect to that same Docker environment. So I'm going to say Docker exec -it, Docker -host bash. This is going to open another shell in the same container. Right, so now 1 and 2 here are both connected to the same container.
+
+[00:02:08]
+Does that make sense? So if I say ps here, you can see, That it has the same things running. Right, cuz I have to do ps aux. So you can see here it has tail -f, right? So in order to see that, I had to ask for more things, right?
+
+[00:02:29]
+That's what the aux does. So you can see here, I had this PID 103 which is the tail that's running in the other process. So if I say, docker kill, or not docker, sorry, kill 103. Now if I go back over here, notice that this stopped, right? It says, Terminated, right?
+
+[00:02:52]
+That's because from the other connected shell I just said kill that process, right? So this is the issue that we want to prevent, right? We want to prevent people from doing this to each other. And so that's what namespaces allow us to do, right? So if I have these two different processes.
+
+[00:03:08]
+I can say, hey, this one you can't see what's happening over here and vice versa and we're gonna do that with a environment called, yeah, with namespaces, right? That's what we're gonna do and we're gonna use a command called unshare. All right, so So I'm here in my same container, and I have my new root here.
+
+[00:03:33]
+I'm actually going to create a better root, and I'm gonna show you how to do this. So the first thing I want you to do is say, apt-get update. This is gonna go and update your list of packages that you can download. This should take, you can see it's gonna download 11 megabytes.
+
+[00:03:55]
+And that did that. And we're going to say apt-get install deboostrap and I was, I debootstrap that TST always messes me up, -y. And again this little, download a couple of tools so that we can use a school called debootstrap instead of having to go and hand copy all of these various different.
+
+[00:04:25]
+It's gonna download a few things, all these various different tools, one by one and looking at their libs to get the right things. I'm going to show you how to use a tool called DBootstrap that's just gonna set up an entirely new, totally valid change readable environment. So now that you've downloaded DBootstrap, we're gonna say, dbootstrap, --variant, Equals minbase which is gonna download just the, the most minimal amount of tools that you need possible.
+
+[00:05:03]
+You can tell what kind of you Ubuntu or deviant to download for you. I'm gonna say bionic because that's what we've been using 18.04. But you can probably say stretch here, and it would work, stretch is Debian, not Ubuntu, Ubuntu is based on Debian if you're not aware of that.
+
+[00:05:20]
+Okay, and I'm gonna put that into slash better root and again just so you know this is gonna do about 150 megabytes worth of download so just be aware of that. If that's a thing for you, then you can just watch and you'll get most of this without having to do this yourself.
+
+[00:05:36]
+So I'm going to run that. This is gonna take probably about, depending on how fast your Internet is, up to three to five minutes, maybe? Hopefully, since we have pretty fast Internet here, this should only take a minute. But what this is actually gonna go do for you is it's going to get a bare minimum set of a file system that you need to run a Debian based Ubuntu.
+
+[00:06:01]
+So DBootstrap is actually Debian bootstrap. So when they're building containers for Debian and for Ubuntu, they actually use this tool to bootstrap a brand new environment. It and it's done with the idea that you can chroot directly into it. So they actually use this to like build Ubuntu and stuff like that.
+
+[00:06:19]
+So we're kind of co-opting it for own nefarious purposes. So now this is finished bootstrapping, dbootstrapping, right? So if I go into better root. You can see here, it's got basically everything that I saw up here, right? It's got a tmp, var, usr, sys, srv, run, all that kind of stuff, right?
+
+[00:06:44]
+So now I can say change route dot right to be inside of this better route dash. And you can see here it everything works now much better because it has all of the various different tools. So I look inside have bin, you can see I have quite a bit, quite a bit more tools that I can use right.
+
+[00:07:01]
+In fact it's kind of even hard to tell the difference of am I inside of the change root environment or am I inside the normal environment? It's hard to tell. Okay. So now I can get out of this, and I'm back into the normal one. And now, we're gonna do something called unshare, right?
+
+[00:07:24]
+So I'm gonna say unshare. And here I have to tell it everything to unshare from this new process I'm creating right. So I'm saying unshare the network, unshare the file system, unshare the UTF which is like the the process managing system right? So I'm gonna say unshare dash dash mount, so unshare all the mounts.
+
+[00:07:45]
+The UTS which is the processes IPC, which I cannot remember what is it at the time. The network, the PIDs which is the process IDs, fork which again I don't remember, users like all the users parts, the map root-user. Okay, and then you're gonna tell it what to run with that unshared environment.
+
+[00:08:10]
+So I'm gonna say, run chroot, and I wanna do it in /better-root, and I want you to run bash, right. So this chroot part, that should look familiar to you. That's exactly what we were doing before, but now we're just adding unshare, [INAUDIBLE] unshare all these name spaces, right?
+
+[00:08:34]
+So now I'm in this, right, and if I look at ps aux, it's gonna say, hey, you need to mount the process system first. So go ahead and run these commands with me as well inside of your chroot'd environment. I wanna say mount -t proc none /proc, which is for processes.
+
+[00:08:55]
+And we're gonna do it again for sysfs, sysfs none/sys. And mount -t tmpfs none /tmp. All right, so now that we've done that, we can say ps aux, and we can see here that it cannot see outside of itself, right? You look here that this bash, right, the bash that we're in at the moment is PID one, which is what we would expect, right?
+
+[00:09:26]
+But that's the one that's running inside of the unshared, chroot'd environment. It's not the one running outside of it. In fact, if we come back to our other shell, that we've connected to this if we say PS aux. We can see the unshare, we can see the bash, we can even see all that kind of stuff running cuz we can.
+
+[00:09:44]
+From the host, we can see inside of the child but the child cannot see outside of itself, right? So let's say if I say again did the tail fs or tail- F my rootsecret.txt right so now this is running again. If I go back to the other environment and I say PS aux still can't see it, right?
+
+[00:10:11]
+And if I'd say tail F, let's just say touch text or text.txt and I said tail dash F.txt that come here, stop this. And I say ps aux again, you can see this one can see the tail because it's the parent process looking into the unshared environment. You can also see this bash here, which is the one that's running down inside of the unshared environment.
+
+[00:10:42]
+It's PID is actually like, 7536, right? So it actually does, it maps these pits to the host environment. Now I'm showing you just processes right? We actually unshared the network, we unshared a bunch of other stuff in this environment so it is truly containerized in terms of the name spaces that it can access, right?
+
+[00:11:04]
+So if I wanted this to be able to connect to the network I would actually have to create a separate network inside of here and connect that to the host network, which then would connect to the broader network, right? Not going to show you how to do it, mostly because, I'm not really sure how to do it.
+
+[00:11:16]
+I could figure it out but it would take a while and this is kind of to drive home the point that. You can unshare these namespace capabilities, right? So change routing is like I am sharing a file system right? Namespace is about sharing capabilities from these particular processes or controlling the capabilities that flow into these processes, right?
+
+[00:11:39]
+It makes sense.
+>> And Brian, why do we need you to run the mount command? What did that do? Do, often then shared.
+>> So, the mount one, so that the environment could know like taking assets and the process system and the system file system. It doesn't do that automatically by itself.
+
+[00:11:54]
+Whereas, when you start up the Ubuntu process, it does do that stuff for you. So, you just have to like mount all this various different capabilities to the operating system. It just tell him, this is where you find the stuff.
+>> Kind of the usual library so to speak, the index just go there there.
+
+[00:12:07]
+
+>> Yeah. You had a question.
+>> So the exit command that terminates the process, does that also get rid of the profusely created container, at all, when you exit on your terminal?
+>> Yeah, so if I went back, let's see, to this one and I said exit here, this would terminate this unshared environment.
+
+[00:12:29]
+And we go back to wherever it was, right? So in this case because I'm just doing it directly from the host, it would send me back to the host. But if you're connecting to my computer and I want to limit you, I would just have it if you exit it, it would just exit out of the connection entirely.
+
+[00:12:44]
+
+>> Would be the housecleaning command to see how many containers I have? If I want to manage them, delete some, how do you usually go to navigate through them?
+>> So typically, you're not gonna be creating containers by hand like this, right? This is a wildly wasteful process, it's more an academic exercise than something you would ever do.
+
+[00:13:07]
+Docker has a bunch of stuff that just does that for you, right? So there's a thing says Docker PS, and I'll show you all of you running containers. Does that answer your question? Cool. Let's go back to tell just one more fun exercise I'm telling this text thing as well, right?
+
+[00:13:23]
+And if I do Docker or not talker ps aux again, to see all my running processes. You can see here that I can actually grab this PID right here and I can totally say kill 7555, right? Now if I go back over here inside of the unshared environment, it's been terminated, right?
+
+[00:13:41]
+So the host can still control everything that's happening in the child process, but the child process can't see out of it, which is kinda fun. And I could totally just terminate the entire session. In fact, let's do that as well, right? Again, here if I do ps aux, you can see this is PID 1, but if I come back over here and I say, I don't know why I keep wanting to do that, docker ps aux.
+
+[00:14:10]
+If I come here and I grab 7356 and I say, kill 7356. You'll notice if we come back here, it's done, it killed the entire process, you can actually just kill the entire container.
+

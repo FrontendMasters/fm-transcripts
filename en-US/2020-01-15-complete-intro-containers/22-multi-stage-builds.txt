@@ -1,0 +1,64 @@
+[00:00:00]
+>> How can we make this even smaller? Well, the first thing I might think is what things do I only need for just the build? And I kind of hinted there, and I don't need when I go to production, npm, right? I actually don't need the package manager when I'm in production.
+
+[00:00:21]
+I just need it when I'm building it, right? Again, npm is so small, it's tens of megabytes, if that. Don't really need to do this, I just wanted to demonstrate a point to you. Sometimes if you're building things like Rust or LLVM or things like that, these things are quite large tool chains.
+
+[00:00:40]
+And you don't wanna send those out to production, cuz there are security vulnerabilities again. So I'm gonna show you the concept of how to do this, but please don't do this for npm, it's just not in general not a good a idea. Well, I guess there are scenarios, and we'll actually get into that later, when eliminating npm could be a good idea.
+
+[00:00:58]
+But for a node application like this, it's not a big deal. So let's go even further, all right. So Docker allows you to do what's called multistage builds, which is like let's build something first, copy the output into a new container and go from there. So I can actually basically build multiple containers multiple times.
+
+[00:01:20]
+So let's go ahead and do that. So from the first one, because this first container is going to be just for building stuff, I'm just gonna say, cool, give me node : 12-stretch, right? And we'll move this all stuff down here because it doesn't matter. Hey, so you might as well give me the kitchen sink, right?
+
+[00:01:42]
+Because I'm gonna build a bunch of stuff then I'm gonna throw this container away. So I'm gonna make a directory called WORKDIR /build. Everything can be done as route because it doesn't matter because the end user will not be route. So I'm gonna say WORKDIR /build. Okay, and then I'm gonna say copy.
+
+[00:02:00]
+Actually, this stuff right here, you can totally do this down here. Here on the chown because it can be owned by root, that's not a big deal. Okay, RUN npm ci and then we're gonna say, copy.., all right? And so this everything above here or below here, this is the build stage.
+
+[00:02:29]
+
+>> And copy .., is copy whatever is in this directory into the same container directory.
+>> Exactly, yep, yeah it just copies everything. Okay, and then down here, we're gonna have a runtime stage. So what you're gonna do is gonna say FROM again, but we're gonna start with a different container.
+
+[00:02:49]
+So FROM alpine: 3.10, okay? Here we're going to run APK add nodejs. But we're not going to do it with npm cuz we don't need that in the build stage, we're goona do our RUN addgroup, we're going to do our usernode, we're gonna do mikdir, who can do WORKDIR.
+
+[00:03:14]
+And then here, we don't need to do this again, because it's already happened above. In fact, we don't need either one of these copies. But what we're gonna do now is we're gonna say copy,and we're gonna say --from, that's what this from is right here, right? And we're gonna say from stage 0.
+
+[00:03:33]
+Now you can also get these names, I don't remember the syntax off the top my head, but you could call this as build or something like that.
+>> As build.
+>> Good has everyone remember the last time I had my head, that was a real risk. So in that case you would see copy from build, right., You see for words numbers also were because numbers that can be a bit brittle of multiple stages cuz you can have like five stages, right.
+
+[00:04:01]
+So from build, we're gonna say --chown =node:node. And then we're gonna say FROM /build, everything that you put in /build, put it in here which still can be this working directory. And then down here the CMD stays the same. Everything's all good. By the way, these like instructions, you know how I'm always putting them in upper case, they actually don't have to be in upper case, just so you know.
+
+[00:04:41]
+But literally everyone makes them all upper case so that the file is a lot easier to read. So you don't have to, but always do it. I actually think that VS code will change this for me. No it won't but it's gonna say hey this is real dumb, don't do that.
+
+[00:04:58]
+Instructions should be written in upper case letters, you idiot. Okay, it would still work though. All right, so let's see if this works. It's anyone's guess. What's actually even cooler, which I'm now gonna show you, you can actually build a bunch of containers in a row. So you can say like, here's my dev container, here's my build container.
+
+[00:05:32]
+You can build them all in on dockerfile and it'll export all of them for you, which is kind of cool too. So now I have this my-node-app latest. Let us go ahead and give it a run to see that I am not full of crap. Might be, no one ever knows.
+
+[00:05:52]
+Still working right, still seeing our success. Let's go ahead and stop this. I must say docker inspect my-node-app | jq. And let's take a look. We are down to 39 megabytes. So we got even smaller, so we saved ourselves 20 megabytes with npm being gone, something like that.
+
+[00:06:23]
+I mean, in theory, I guess you could even drop package JSON and package lock JSON and save some extra kilobytes. Good for you, don't do that. But kind of get the point where you kind of get through that like, okay, what don't I need in production, right? That's the idea that I wanna get through you.
+
+[00:06:40]
+Sometimes you have multiple docker files in one directory. In general, that's not true but it can happen, right? So let's say I had another one here that was maybe like my dev environment. I would call it like dev.dockerfile. There's also a lot of debate, should it be dockerfile.dev or should it be dev.dockerfile?
+
+[00:07:00]
+I'm going to show you this way because that way syntax highlighting works and everything in my life is based around syntax highlighting. I can't develop without it. So we're just sticking with that. So let's just say this, I don't know something really dumb FROM Node : latest or something like that.
+
+[00:07:24]
+The question then becomes how do I build this without, cuz this just immediately finds whatever the name of the docker file is. So you can also put in-F. And then here you put in dev.dockerfile, and that's how you pointed out a different docker file, or it can be like outside of the directory or something like that.
+
