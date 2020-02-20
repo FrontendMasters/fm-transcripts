@@ -1,0 +1,45 @@
+[00:00:00]
+>> We're not replacing the grudges that weren't forgiven. So those are the same ones as well, right? So what it would be really great to do is to say to a function, if all of your props are the same as they were last time, maybe you don't rerender, right?
+
+[00:00:17]
+You have nothing new. There's nothing for you to do here. Take a load off, right? And so React gives us a bunch of ways to do that. And we'll talk about why it would have been slightly problematic before we did this refactor in a second. So React has a few different ways of doing this.
+
+[00:00:32]
+It has react.memo. Because they're just, these cases, they're just functions, right? react.memo takes some function component and returns you one that says, if it receives the same props, just don't render it. So we can wrap functions in that one. We also have two hooks, only one of which we're gonna use, the two of them kind of do the same thing.
+
+[00:00:54]
+There's useCallback. And there is useMemo. These have, they're very similar with one slight difference. useMemo will call the function, it will call the functions as dependencies haven't changed, right, it will not call the function again. useCallback will give you a new function that you can call. Right, so it gives you the function rather than the result.
+
+[00:01:19]
+So we'll go, let's go ahead and do this really quick refactoring. I'll tell you why switching to this reducer pattern gave us the ability to do this. So real quickly, we'll go in and we will wrap NewGrudge in react.memo. And what I would love to caution you against is just throwing everything in react.memo, right?
+
+[00:01:45]
+Because the act of checking to see if the props have changed is work. My golden rule for performance is that not doing stuff is faster than doing stuff. If you throw a react.memo around everything, even if the prompts are changing all the time, you are asking it to check, which means you've slowed down performance by trying to be fancy, right?
+
+[00:02:05]
+On the other hand, if you do get to skip out on a lot of renders, well, then react.memo has saved you work because not rendering is faster than rendering. So we know that this onSubmit in this case is add grudge, right? If we're gonna get the same function every time, we're not currently, you're gonna see this doesn't work originally, right, then we don't need to necessarily rerender it, right?
+
+[00:02:27]
+If the grudges change, this doesn't need to know. And then the individual grudge, yeah, if that grudge has changed, sure. But if it's one of the unforgiven ones, it's the same one. Now, if we do this, We're gonna notice that it doesn't work. That'd be great, thanks. So if we go ahead and I click, you can see them all rerender again, including Rendering New Grudge.
+
+[00:02:52]
+Right, cuz there's another part here. If we look very closely, the culprit, once again, is our good friend JavaScript, right? We are defining a new function for addGrudge, and for toggleForgiveness, every single time. So it is a different addGrudge, getting past the new grudge on every single render of the application.
+
+[00:03:14]
+It is a different toggleForgiveness getting passed to the individual grudge every time. So react.memo's like, yeah, yeah, yeah, this is a different function. Well, it does the same thing, right? But we have to tell JavaScript that, otherwise it doesn't do anything. So in this case, much like useAFact, we say useCallback, which, if it gets the same dependencies, will return the same function reference.
+
+[00:03:38]
+In this point, the only thing that this uses from the outside world is dispatch. Right, and here we do the same thing. Cool, and now we should see is that we haven't included useCallback. So now if I forgive one, you can see here, let me actually clear so we can see a little bit better.
+
+[00:04:19]
+Only the forgiven grudge has been rerendered. NewGrudge didn't rerender, none of the other grudges rerendered, only the one that we cared about rerendered, right? Because dispatch didn't change, which means addGrudge and toggleForgiveness didn't change. So you might be asking, why couldn't we do this previously? Well, if you look at addGrudge and toggleForgiveness with useState, they both rely on the current grudges, right, which are changing.
+
+[00:04:54]
+There's a new array in the case of toggleForgiveness and addGrudge, which would have invalidated the dependencies in useCallback, cuz it would have required, it would have depended on grudges and set grudges. Any changes to that array, cuz we are replacing it to make React do its thing, would have invalidated the useCallback and given us a new function every time.
+
+[00:05:13]
+Which means we could have react.memo'd up and down the entire component tree, it wouldn't have done anything. We could've wrapped everything in there because it would have generated cuz of dependency change. The idea that we separated all of our state from the actual components and that all we needed was dispatch.
+
+[00:05:29]
+We didn't need to know about the current projects, that was handled in the reducer, right? We just needed to announce that something happened. And the function for announcing that something had happened could actually be the same function memory, which allowed us to optimize performance really easily because we separated our state management from our component hierarchy, and made things arguably in code more complex, but arguably a little more elegant at the same time.
+

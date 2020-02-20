@@ -1,0 +1,66 @@
+[00:00:00]
+>> We're gonna talk about some State Management in React. We'll kind of get into the weeds on some ways that we have done State Management in the past. Some ways that we might consider doing in the future and some patterns for handling some of the trickier parts of managing State and an application.
+
+[00:00:17]
+My name is Steve Kinney and I am a Senior Principal Engineer and frontend architect at Twilio. So if you've ever gotten like a programmatic text message when you're like lift is coming or something along those lines. Somebody else who works in my company made it possible for you to send that.
+
+[00:00:35]
+Or if you get an email when you lose an eBay auction that you shouldn't have been on anyway. That email comes on this single side where I used to work before we become one big happy family. We're used to work on a large email, like marketing campaign email editor built in React, which is really cool cuz you get to use like modern technologies.
+
+[00:00:55]
+And then to build HTML emails which use like tables and have to render in Outlook 2003, which uses Microsoft words HTML rendering engine. So it's a lot of fun. And so a lot of this comes from the experience of kinda building some of the more complicated applications at Twilio.
+
+[00:01:11]
+That kind of inspire some of the thoughts and patterns around what we're gonna talk about today. So this is a course for talking about how to keep your state actually manageable when your application is no longer a like little toy application. Now, the irony is not lost on me that in so far that it takes a lot of time to wrap your head around a big code base.
+
+[00:01:32]
+We will be using relatively small toy applications to highlight the problems that you'll see in a bigger application. But I like to think of the more as like the vignettes, right? We'll kind of isolate some of the problems, solve them, think about how we could refactor them. Think about some of the tradeoffs that we make as we go about doing some of these different approaches.
+
+[00:01:51]
+Sometimes we'll solve a problem and introduce a new problem. And it will go solve that problem and then reinvent the old problem, right? At least, step one is understanding the trade offs you're making rather than half writing blog posts and just throwing stuff in there and hoping for the best.
+
+[00:02:04]
+Not that I have ever done that. It's happened. In this course we're just gonna be talking about React. There are other frontend masters courses on Redux and MobX. I heard they're wonderful. And I heard the instructor is hilarious. You should totally watch them. But that's not what we're gonna talk about today.
+
+[00:02:24]
+What are we gonna talk about today? Well, we're gonna talk about what a state actually mean, right? That seems important if we're gonna spend this time together talking about how to implement it and some of the trade offs. We'll learn a little bit about the inner workings of this.setState and kind of based component state.
+
+[00:02:40]
+Then we'll look at class-based components and the new React Hook API. Hooks came out about a year ago. So they're here to stay at this point. They're not going anywhere. Which gives us an interesting position that we're in, right? Like most of future code, would probably written using Hooks.
+
+[00:03:00]
+But we can safely assume that all code written prior to one year ago was not using Hooks because they didn't exist. And that is how time works. So we'll talk a little bit about the subtle differences and how things that look like they behave the same do not actually behave the same, right?
+
+[00:03:18]
+Cuz as you begin to refactor some of the code, if you're not aware of those things. It's like those little tiny bugs that make you lose a morning and consider not doing this awful engineering thing anymore at all, and maybe just starting a vegan food truck instead. So well, we'll kinda talk about some of the reasons we refactor some things that will influence some of them.
+
+[00:03:37]
+Most of the course will be using Hooks. But we will kind of make certain nods to the differences between how things have been from about 2013 to 2018 and how things will be going forward. We'll explore some of the APIs for navigating around prop-drilling. We'll also talk about what prop-drilling is.
+
+[00:03:54]
+We'll look at reducers for advanced state management. We'll writing some of our own custom hooks and we'll do fun stuff like store stuff in local storage. We'll store some state in the URL parameters. Maybe we'll even get state from a server using an API call, cuz I've been told that's a thing that people do in their applications.
+
+[00:04:14]
+So it seems important that we should cover it. But first, before we get into all of that, let's talk a little bit about understanding what State actually is. So from a very high level, the job of React is to take basically, the state of your application, the business logic, some amount of data.
+
+[00:04:36]
+And figure a bunch of rules to turn it into some DOM nodes on the page, right? And this is a little bit different from how we did it ten years ago, even where you might have had a page, right? And the markup might have included all of the data on the page.
+
+[00:04:50]
+Or it might have included all of the catalog items for the catalog. And then if something user clicked on, so you might have like read the DOM you might have gone like .parent() .parent() .parent() title to get the title, so on and so forth. And the actual UI held the state of our application, we read it from there and then manipulated based on that.
+
+[00:05:11]
+And that becomes really hard to maintain as we all found out together as one big industry as we just accrued so much tech debt that it was crushing us. So one of the things React brings to the table is we can keep everything in an object or an array or some set of regular old JavaScript data structures.
+
+[00:05:28]
+Hand it to a bunch of rules about how components should look and what should happen when a user interacts with them, right? And as that state data changes, our application should change. And there's a bunch of fancy stuff, this is obviously a giant oversimplification, right? There's stuff like the virtual DOM which figures, okay, things have changed.
+
+[00:05:45]
+What is the least terrible to do that, to update the DOM in the most performant way possible? There's a whole bunch of other obvious cool stuff going on in React. But the oversimplification is data, rules, what shows under the page, right? Events and stuff like that, right? And so this kind of how we think about and work with our data is critically important, right?
+
+[00:06:08]
+Because a lot of times we can start to do all these fun performance optimizations and stuff like that. But a lot of this comes down to the basic data structures in our application, how we think about it, how we work about it? I would argue that when client side applications become unmanageable, is usually cuz managing the state has become just incredibly difficult, right, and tricky.
+
+[00:06:29]
+So by kind of thinking more in advanced about these things. And one of the things we do at Twilio is a lot of times we have a blueprint process, which is we write out how this system is supposed to work before we implement it, right? So we can think through these kind of externalities as we go forward.
+

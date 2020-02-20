@@ -1,0 +1,123 @@
+[00:00:00]
+>> So the context API, this is from the docs, it's a way to pass data through the component tree without having to pass the props down manually through every level. That is solving that problem we talked about with the very simple example in the grudges and the much more complicated example I showed on the screen mostly to just stress you out.
+
+[00:00:19]
+In fact, that wasn't even all the components. There were more drop downs and stuff but my PowerPoint slide was only so big. So I could have made it all smaller to make it more stressful, but I think I got the point across. So the context API just basically gives you this kind of thread that anything can tap into.
+
+[00:00:34]
+Now, you're going to have these self-contained components that can be rearranged and moved anywhere and will automatically hook into our state management, which is incredibly powerful. And we will get some tradeoffs along the way. So just like we had use reducer and all those things, and memo, and use callback, they're all on the react object.
+
+[00:00:53]
+The ability to create a context is in react.createContext. Now, there will be a little tricky part that we have to talk about, which is when you call that, you get two components, right? You get a provider component and you get a consumer component. And this will get a little worse because we also use a pattern where we call another component provider.
+
+[00:01:16]
+I will try to walk us through it as best as possible. But that is the general convention. I could like lie to you and make it seem different, but I'm .we're gonna talk about how you normally will see it in the real world. So when you call, that you'll get out two components, provider and consumer.
+
+[00:01:30]
+If you are using hooks, you can probably get away with never even touching the consumer. I'll show you an example pre hooks where you would use the consumer using the render pattern. But here's an example more in code, which is we can bring in react we can call react.createContext.
+
+[00:01:45]
+And you can say they are properties of the context. They're components in their own right. And how this works is you've gotta provide a component that gets a value as a prompt, right? And this is pre hooks, we'll actually it see with hooks in a second. And then any child component anywhere in that component tree, they can call the consumer component, and they'll have access to that value.
+
+[00:02:10]
+You'll see as this render prop pattern, which if you've never seen before, it's basically the idea is the child is a function that gets the data that you can then use it. We won't actually see this cuz we're gonna use hooks. And there's a use context hook that basically hides this all from you.
+
+[00:02:25]
+But generally speaking, you will get anything that you pass as the value, as a prop, will be available anywhere in the component tree. This can get a little tricky though. Because you'll notice that that is simply a prop. It has no state management of itself, right? And so the way that we're gonna handle this is we're gonna take that provider and we're going to hug it with some state management, right?
+
+[00:02:46]
+And that state management the value, if it was account, it would be the count or the list of grudges, or all those things will get passed in as the value so they'll kind of be another component sitting above this that hugs the provider. Does all this state management and then passes the result into the provider, which then can give it to the rest of the tree.
+
+[00:03:04]
+So this is what it might look like with a counter. And this is that hugging provider pattern that I talked about before. And what I don't love, but I don't make the rules, my job is just to tell you about them, is that typically, you'll notice that the state management is called CountProvider.
+
+[00:03:21]
+And it calls the CountContext provider below, right? It is basically all the state management. And then whatever happens then gets passed in as a value. If this stresses you out right now, it is okay. When we actually implement it, right? It'll be a little clearer. What I wanna do is kind of set the mental context now.
+
+[00:03:38]
+And then we'll get a little bit deeper into it as as we implement. Because the value prop is simply a prop. So we just have a component above it. They'll handle all of the adding, removing of grudges, the forgiving, the not forgiving, and then passing those in through the tree.
+
+[00:03:54]
+All right, so what we're going to do is we're going to take our current implementation, and we're going to refactor it. And the end goal that we're trying to get to is to make it so that this grudges does not have to take it from the application and pass it to the individual grudge.
+
+[00:04:10]
+Because if we're using the context API correctly, any given component can get access to either all the grudges, the ability to add a grudge, or the ability to forgive a given grudge, right? And so if we wanted to add like the ability to add another grad from an individual grudge, like, hey, all that functionality is available everywhere.
+
+[00:04:27]
+We don't need to thread it through the proper tree. And again, we have a very simple example. But most examples will have many children. And you think about current user, Ends up being needed everywhere, right? Should you show them a delete button on the tweet? Is it their tweet, right?
+
+[00:04:44]
+You kind of need stuff like that everywhere and those become the most pervasive ones that end up needing to be thread through the entire tree. In those cases, we'd make a user contacts. And we'd have any component that needs to know about the current user be able to hook into that context and get it.
+
+[00:04:58]
+And the ones that don't do not have start passing stuff along. Right? So this is kind of a microcosm that lets us think about that. All right, so our goal is to get this out of Grudges. Now, this will start out with a certain amount of moving code around, which is pretty great.
+
+[00:05:16]
+So we're gonna make a new file, we'll call it grudge context. And we're gonna take all of our state management and move it out into this context, right? So that'll start out with pulling in react. UseReducer cuz we're gonna take our current implementation of state and just use it.
+
+[00:05:50]
+So we'll pull on useReducer then createContext and use callback. Use callback is going to end up being pointless, spoiler alert, but I just wanna be able to copy and paste code for now. But I want to leave it in there so you can see it not do its thing.
+
+[00:06:09]
+Cool, so let's actually do a little bit of copy paste action here. We can grab initial state in the ID. Cuz application's no longer gonna even think, none of this is gonna live in here anymore. So we'll grab these two dependencies. We'll grab our action types, we'll grab our reducer, and we're gonna take all of that out and pull it with us.
+
+[00:06:36]
+We'll see how the actual componentry is gonna end up being a lot cleaner at the end. And this is ultimately a maintainability play that we're doing here. So paste this all in, right? And in a more complicated application, would you maybe break the reducer out, if it was very complicated, into its own Reducer.js, you'd break the actions out?
+
+[00:06:55]
+Yeah, probably. So we'll do this as well. And then we're also going to grab an application, all of these methods here. Now, the application is not gonna run for a little bit as we conduct our open heart surgery on this application, but that's okay. So the application is already shrunk down a lot.
+
+[00:07:22]
+It's actually going to get even lighter momentarily. Actually, hold on, I need that, Top line, as well. So we'll grab all that. Because we're going to pull this out of application and put it in that kind of hugging provider component that we talked about before. And then any component that needs this, because application itself doesn't need any of this state.
+
+[00:07:46]
+Application doesn't need to know about the grudges. It doesn't need to know about add grudge, it doesn't need to know about forgiving a grudge. It was only there cuz it was the topmost part of the pyramid. So it had to do with the coordination, right? By pulling it out into the context where any of the components that need this stuff can use it, we don't need to keep it in an application, right?
+
+[00:08:04]
+So application is going to get very tiny. And we begin to think about our UI as the individual pieces and how we want to arrange them. Less about, okay, where do I have to put all the state and kind of thread it through? This idea of separating out our state management from our react application, I think is really, really key for a maintainable code base.
+
+[00:08:22]
+So we'll start by ripping that out. And we gonna move that in here as well. And what I'm gonna do is I'm gonna say export const GrudgeProvider. This is just a component. We'll start just by pasting all of that in. Right, so it's got the reducer. It's got these action dispatchers.
+
+[00:08:48]
+These are just functions that format the dispatch, right? Could you theoretically just call dispatch and dispatch these obects? Totally, but if you flub any of this, it'll just not do things. And so we make a function that generates the objects so that we are less likely to mess them up later.
+
+[00:09:06]
+This is mostly us protecting us from ourselves. You could theoretically just call dispatch anywhere in the application as well. And later we'll kinda see something like that as well. But we only make these functions to make it a little bit easier for ourselves. Great, so we've got that in place.
+
+[00:09:27]
+So now what we wanna do is right now, there's only the functions and the using of the reducer in here. So we've got all of that in place. What we need to do now is, We'll return that provider. We actually haven't made the context yet, so let's go back up and do that.
+
+[00:09:46]
+So we'll just say const GrudgeContext with createContext. Nope. And so again, that gave us, actually, I think if I type it here, you'll see VS Code auto-complete it for me. All right, you can see, I have the consumer and the provider. Consumer, because we're gonna use a hook, again, is gonna be hidden from us.
+
+[00:10:16]
+Provider is gonna be the one that we end up using. So here we're just going to return Grudgecontext.Provider. And we want to then render any of the children handed to us, right? So the child components that come in are available as a prop called children. So we'll grab those.
+
+[00:10:40]
+And again, all we're doing right now is taking the state management that was an application that didn't actually need to own any of it because it doesn't care about any of it. And we pointed out to this separate component totally separate from our UI. So we're gonna say, hey, we now have this grudge provider component.
+
+[00:10:57]
+And all it's gonna do is take our state management pieces, the ability to shoot it down the component tree to anything that needs it. And then render whatever. So all of our state management now is completely separated out. Now, we need to give it that value, and so I'm gonna give it an object because we can only pass in one value, right?
+
+[00:11:19]
+In that example I showed you on the slide, it was zero, or one, or two, or whatever. The value I'm gonna give it is here's an object, it's got the grudges, the ability to add a grudge and the ability to toggle forgiveness. Anyone in the component tree that needs any of those things, go grab it.
+
+[00:11:33]
+We're gonna make it available to all of you. So we'll just say, I'll call it my const value. I could do it inline too. I'll actually show you the difference. So I'll just say, okay, we've got the grudges. We've got addGrudge and, And we pass it in here, this value equals that value.
+
+[00:12:03]
+Could you theoretically just do it inline, Like that? Yes, you could. The big question is, one, how many things are you passing in? And two, one time, I forgot that I needed two sets of curly braces, one to use JavaScript and one for the object. And I lost 20 minutes of my life, and I have the scar tissue there, I'll never do it again.
+
+[00:12:26]
+So some of that is the fact that I am broken as a person. It's up to you, if you would rather just pass it in line, there's nothing stopping you. It's not the Steve said you had to do it like that, he didn't. He did not say that.
+
+[00:12:35]
+Don't put words in my mouth. So there it is. So now we have this ability. Anything that is a child of GrudgePeovider can use the use context hook and hook into any of these three things. We have an obvious problem right now, which is nothing is a child and GrudgeProvider.
+
+[00:12:50]
+Cut it's just a component we wrote on a file we didn't use, right? This is an easily solvable problem, but it is still a problem that we need to easily solve. So one way that we can handle this is we can go to index and just wrap application in this.
+
+[00:13:10]
+Right, and so now, We'll go ahead and we'll just wrap the entire application, In GrudgeProvider. So now anything in the application can hook into that context and get it anywhere, which means application does not need to hold on to any of this stuff for us. It's available anywhere from the components that need it.
+
