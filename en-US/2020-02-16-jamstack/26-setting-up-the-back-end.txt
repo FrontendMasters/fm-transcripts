@@ -1,0 +1,87 @@
+[00:00:00]
+>> Okay, so we've already got our API key setup in that .env file, we figured that out on the Fauna dashboard. So the next thing that we can do is actually just write a function. So, before we write that function, let's make sure that we can run it locally.
+
+[00:00:17]
+So I'm going to just create that netlify.toml. And in it I'm going to specify that our functions, Are in the functions folder. And then I wanna use that same API redirect, so I'll just add it now since I'm already in here. We're gonna do redirects, and we're gonna go, from = "/api/*", to =, "netlify/functions/:splat.
+
+[00:00:59]
+And we'll set the status to 200 on that. And just for consistency, I'm gonna leave out the leading slashes on those. And then for us to be able to access that .env stuff, I'm gonna make this a little shorter, you can still see it. We're going to need .env, again, so that we can get the environment variables.
+
+[00:01:30]
+And then I'm gonna use axios, because axios will let us send requests on both the client and the Node side without any polyfills or anything, which unfortunately, fetch doesn't quite do yet. So let's add that. I'm gonna yarn add axios and dotenv Okay, And then I'm going to, Let's see, Let's create a function in here called get-all-todo's.
+
+[00:02:10]
+And that's gonna be a JavaScript file. So I will just start the Netlify dev server. And that did pick up our Lambda server, so we should be good to go here. I'm gonna bounce back out to our localhost. And that's gonna give us nothing for now, because we haven't actually set up a site.
+
+[00:02:28]
+So it's just sitting at the standard nothing to see here server. And then inside of this, I want to define that query. So let's call it GET_ALL_TODOS. And we're just gonna set this up as a plain string. And we've already written it, so there's no need to write it again.
+
+[00:02:52]
+Let's go back over here. And we can just copy this thing right out and drop it in. Whoops, And I'm gonna leave out that comment. We don't need that. So this is one of the things that I like most about GraphQL, is that the same code that we just wrote in our testing environment to see if it would work, will work on the client-side.
+
+[00:03:15]
+So we can go validate that the query's giving us the data that we want and copy and paste it right into our apps to use it. Now, one thing that I know is gonna happen, we're gonna have functions to get, create, update and delete todos. So I know that I'm gonna be sending a lot of queries.
+
+[00:03:33]
+And the way that we're gonna send those is the same. So I'm gonna write a helper function to simplify sending these queries. So in my utils folder, I'm gonna create a sendQuery.js. And this one is going to load the dotenv and configure it, so that we've got that FAUNA_SECRET_SERVER in there.
+
+[00:03:56]
+And then I am going to also load axios, From axios, and then we're going to module.exports. So the default export here is going to be an async query, and it's gonna take in the GraphQL query that we wanna run. And then a feature that we haven't looked at yet, but that we're gonna need, is variables.
+
+[00:04:22]
+So that we can send in different data to this function and get different results from the query without having to rewrite the query itself. So inside of this function, we're going to get the result of a call to axios, and we're gonna set this up as a call to URL.
+
+[00:04:48]
+So the URL that we want is actually this one right here Which is graphql.fauna.com/graphql. Another nice thing about this is that the URLs are pretty visible. You're not hunting around for, what is the API URL? It's cuz when you're using a REST API, they only show you the slash something.
+
+[00:05:09]
+Well, but yeah, but what's the first part? [LAUGH] So this is really handy. And then I want to send in, we're gonna use the POST method so that it sends it as a post body as opposed to as a query string. Then I wanna send in headers. And so headers in axios, we can just say what we want those headers to be.
+
+[00:05:32]
+We are using a JWT JSON web token, or JOT, depending on how you've heard it pronounced, to send this authorization. Or, I'm sorry, the token is being sent in as an authorization header. It's not a JOT, I just had a brain moment.
+>> So the URL is the same for everybody, you don't have an individual specific to your Fauna URL?
+
+[00:05:56]
+It's all in the .env.
+>> Yeah, because it's all in the server key that we're sending in. So they're handling all of that for you, which, in my opinion, is just wonderful. Because it simplifies the documentation process. It simplifies the ability to share this code between projects. It really makes it nice to not have to put, in addition to the the server API key, to also have to put in the URL.
+
+[00:06:25]
+Because that's how you end up with things like REST APIs that only show you the slash users, or slash whatever. Because the URL changes between clients, and so there's a little bit of security through obscurity there. But it's not really like anybody who looks at your network tab is gonna know exactly where this is.
+
+[00:06:44]
+So to me, it's just a convenience measure that I don't see a downside to it, personally. So we are gonna gonna send in that FAUNA_SERVER_SECRET. Let me wrap that so it's easier to see. And then we also need to send in some data. So the data that we're gonna send in is the query and the variables.
+
+[00:07:09]
+And this is a pretty standard format for sending in GraphQL queries. Now you could use a GraphQL library, something like Apollo or whatever, but in this particular case, we don't need any of the extra stuff that something like Apollo would offer for us. We're not managing a cache, we're not sharing state, we don't have any components or anything.
+
+[00:07:34]
+These are serverless functions. So what they're gonna do is they're gonna spin up, do a thing, and then they're done, right? So we don't need to load a heavy library, we can just use something to send off a request, get the result and then we shutter the function.
+
+[00:07:47]
+So this is just sending a GraphQL query over a standard HTTP request the way that you would do any post request. And then what we're gonna get back in result, we're just gonna actually drop that back as result.data, and we'll just return that. So what we've done here is we've written an abstraction so that we can just call sendQuery on the query and the variables.
+
+[00:08:15]
+And then get back the result so that we don't have to rewrite this logic in all four of our serverless functions. Okay, so now up at the top here, I'm just gonna get my sendQuery helper from utils/send-query. And then we're gonna write our actual handler. So, exports.handler, and that's going to be an async function.
+
+[00:08:44]
+Doesn't take any arguments. And we're going to retrieve the data and errors from sendQuery. And we're going to await that so that it's asynchronous. And we're going to send in this GET_ALL_TODOS that we wrote. So, the result of this will be if everything went right, the todos from Fauna will show up in this data object.
+
+[00:09:17]
+And if we have an error, that error will show up in this errors object. That makes handling what comes next pretty easy. We just say if there are errors, then we're going to return statusCode, and we'll just say 500. There might be a better status code, but this is good enough.
+
+[00:09:40]
+And then we will stringify todos as data.allTodos.data. The way that GraphQL requests work is that the data object that comes back from axios is going to basically be an object that looks like this. So we access it the same way that we would access any JavaScript. So data.allTodos.data, and then that'll give us an array all the todos with this information.
+
+[00:10:11]
+
+>> Would you want the error returned in that body? Do you know what I mean?
+>> Yeah, I jumped a head, good call. Okay, so save this for later, and we are going to stringify the errors, thank you.
+>> Yeah.
+>> So if we don't have an error, then we're gonna return status code 200.
+
+[00:10:34]
+And the body will be this stringified todos with all the todos. Netlify dev is still running. So we should be able to call /api/get-all-todos. Invalid database secret, no. Well, I guess I'm gonna be showing a database secret after all. Actually, I know what I did. Let me freeze my screen real quick and fix that.
+
+[00:11:18]
+Okay, so now that I have the right thing, let's make this a little bit bigger. We're gonna go to /apis/get-all-todos. Well, I have to stop and restart because we changed that secret. So let's run netlify dev, running it again changes the environment variables. And so now that that is running, now we get our todos, there we go.
+
