@@ -1,0 +1,81 @@
+[00:00:00]
+>> If you're in the repo, you'll probably see a test folder. There's some snapshot stuff in there. And we'll talk about that in a little bit. But there's a file in here called helper js. I wanna walk you through this file right quick, cuz it's doing some pretty interesting stuff.
+
+[00:00:11]
+And I want you to understand what's happening here, cuz we're gonna use it to write some tests. So this file tests helpers js, a couple things that are happening, is basically creating a, there's a function here called createTestServer. And it takes in a context object. And what it's doing is it's creating a completely new Apollo server based off our type definitions, based off our resolvers.
+
+[00:00:34]
+But you'll see these two new properties that you've probably never seen before. This first one here that says mockEntireSchema, so I have this set to false. And this basically is a property that coexists with this one below it, mocks. So let's talk about mocks first. mocks basically means, and this is where a graph feels legit.
+
+[00:00:50]
+Because all your type defs are typed, as in they have a type. It's really easy to generate mocks for them now, right? If I know a field is a string, then I can just use any generator that I want to return a random string. If I know a field is an integer, I can use any generator I want to return an integer.
+
+[00:01:06]
+If you put mocks true on a server, that's exactly what it's gonna do. It's gonna ignore your resolvers, and it's gonna mock them out with random data. And they're always gonna fit the type that you put in the schema. They might be weird things that don't make sense, but the data is valid, and it fits your schema.
+
+[00:01:22]
+So that's the sweet thing about GraphQL, is that you can just turn on mocks and never have the right server. This is a good feature if you're on a front end team, and the backend team is still writing the resolvers. And they're still doing all this stuff. You can just turn mock true on the server.
+
+[00:01:34]
+And you can build your whole front end app without any of the resolvers being done. And then when they turn the resolvers on, you still have to change your code, nothing changes for you. So you're good to go. We're gonna use them in the test. So by default, we get all the resolvers mocked out for us for free.
+
+[00:01:49]
+And in this field up here, mock entire schema false, this is basically saying, hey, don't mock all the resolvers because I'm still gonna give you some resolvers. Only mock the the resolvers that I don't use. That's basically saying with this option in combination, it's gonna allow us inside of our test to mock out specific resolvers that we're testing in that instance, and still have the other ones be automatically mocked out.
+
+[00:02:14]
+So it's given us the control over to opt into whatever resolvers we want to control for this specific test case. And then later saying, actually, this one, I don't really care. Cuz sometimes inside of a resolver, where you're testing it, you might wanna say, well, I wanna see what happens if the database returns an error.
+
+[00:02:27]
+Or I wanna see what happens if you're not authorized. So you want a different test cases, so you need more control over it. So that's why we have this option to be able to opt in opt out of having an automatic mocking on a resolver level. And then, obviously, we have this context function that just returns whatever context that you pass it.
+
+[00:02:45]
+And that's it, and then we use this really nifty createTestClient function from ApolloServer testing that does exactly what it says. It takes a server, and it creates a test client. This is gonna return an object with a query method and a mutation method. Just like you would use in GraphQL playground, you use a query or mutation.
+
+[00:03:03]
+That's what's gonna return. We can use query in our tests. We can use mutation in our tests and issue a query and a mutation against the server that we created. Now we can get a result. So for instance, if we go to the query test, you'll see an example of that.
+
+[00:03:16]
+So you can see here I'm requiring my query test server. I'm making a query for a feed that has all these items on it. So just like you would on the client, I'm making a query, and I create my test server. And this is where you can mock things out.
+
+[00:03:31]
+So the name of the test server takes a context object. So I know some of our stuff in our server requires authentication and requires a user. So I'll mock the user out on the context object and put a user there. I know that most of our resolvers have this models object.
+
+[00:03:45]
+So I mocked that out. I say models. I know that the feed resolver is only interested in models that I post. So I put that there. And I know it's using the findmany method cuz I looked at the code. And I'll just mock that out with jest. So if you've never use jest before, don't worry, you literally don't have to use this.
+
+[00:04:02]
+You can use a regular function here. This is only appropriate if you wanna spy on it and figure out how many times it was called, what it was called with. But if you're not interested in that, which actually, in this case, we're not, you could just put regular function error.
+
+[00:04:15]
+It doesn't matter, as long as it returns something. And this is what I was saying. Sometimes you wanna be able to override the resolvers yourself with their value. So you would say, don't mock the entire schema, because I still wanna do things like this. If you didn't have that Boolean for not mocking the entire schema, this resolver will get ignored.
+
+[00:04:32]
+And GraphQL would mock it out completely different every single time, which is not predictive. Cuz every time you start the server, it's gonna generate new mocks for it. Those mocks get generated. So they're not predictive. So you can't really write tests against them. So you wanna do this.
+
+[00:04:47]
+And here is something that's really cool. If you think about it, we're gonna get back a JSON object. And it's always gonna look the same no matter what. So we can do what's called snapshot testing. Anybody ever heard of snapshot testing, right? It's mostly for UI, right? So you would, for React, you might do snapshot testing where you wanna render this component.
+
+[00:05:07]
+Get the HTML output of it, whatever the output of it is, and you save the output to a file. And then next time when you run the test, you get the output of that you compare the two, they're not exactly the same, that snapshot failed. So that's basically what we're doing here, just as automatic snapshot testing built in.
+
+[00:05:21]
+We don't have to do anything. All you have to do is just say to match snapshot. And basically what's gonna happen is if you look in this folder called snapshots, this will be an example of a snapshot. So I ran this test before, and the response I got back was exactly this.
+
+[00:05:38]
+So if I run the test again with the exact same values, I should get back exactly the same thing with exactly the same format. So it should just match. And that's what snapshot testing is. Sometimes you actually did make a change, and you do wanna update the snapshot.
+
+[00:05:53]
+So then, jest has a function that says, okay, actually, I did wanna make this change, the format should have changed. So update all the snapshots. And it will go in and clear out all the old ones and make new ones as new baselines. And now your new snapshots will be updated.
+
+[00:06:06]
+So that's one way, and that's pretty much what we're gonna do here. But you can also do the other ways, I mean, you can just get the data back from this response. And this is like I expect res.data.id to be one. I expect res.data.feed.message to be whatever message that I put in here, you can do that.
+
+[00:06:27]
+But I mean, at the end of the day, you're checking all the properties you got [INAUDIBLE] a snapshot. So it's automatic. Okay, now to execute it, I'm just gonna do yarn test. So once the test run, you can see it passed because my snapshots are exactly the same.
+
+[00:06:47]
+If I changed one of these two, that's gonna completely change the snapshot, and it's probably not gonna match. Well, it failed and you can see it shows you the difference. We got one in the snapshot that saves on the file, but the new one generated too, so that's wrong.
+
+[00:07:05]
+So now you know your stuff's not right. So you can fix your test. Unless you mean to make that change, and you will just update all your snapshots.
+

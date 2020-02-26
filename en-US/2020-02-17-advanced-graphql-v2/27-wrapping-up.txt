@@ -1,0 +1,150 @@
+[00:00:00]
+>> The questions on caching GraphQL directives, server side stuff, resolvers, any stuff we covered today.
+>> We didn't talk about directives, and if I heard you correctly, use the qualifier that these are Apollo directives. And correct me if I'm wrong, these are kinda non-standard, they're not part of the GQL spec, is that correct?
+
+[00:00:21]
+
+>> Which one specifically?
+>> I guess, maybe you can speak to them generally-
+>> Okay.
+>> Are there directives that are part of the GQL spec, and others that are just implemented by Apollo, or are directives, just an Apollo thing.
+>> No, directives are definitely a GraphQL thing.
+
+[00:00:36]
+So GraphQL spec and all the ones that I showed you that are already implemented, which will think was skip, include and deprecated. Those are built into GraphQL, had nothing to do with Apollo. The only specific Apollo ones that I think I showed you where the cache control ones, that's Apollo specific.
+
+[00:00:52]
+
+>> Got it.
+>> And there are some other Apollo specific directives, but we didn't talk about that because that kinda gets into what's called Apollo federation. Which is something new that they came up with. Which is basically allowing users to have like a one GraphQL API, that federate to other GraphQL API's through one unified schema.
+
+[00:01:15]
+So, I was gonna talk about that and have an exercise for that but actually just so hard to do, just as an exercise like you would have to like deploy your thing and deploy many other apps and then connect them all together. It would take us all day just to do that.
+
+[00:01:28]
+But yeah, there's they have other directors that they use for that as well.
+>> Yeah, which was part of my other question was, what kind of familiarity do you have with Apollo Federation, because we're working on building up a proof of concept around that now. And only recently realized that the subscriptions through Federation currently supported all three.
+
+[00:01:50]
+So, I don't know if you had any insight on?
+>> Yeah, that sucks. [LAUGH]
+>> Yeah, that sucks. The only way to get around that is far as federation goes, it's actually pretty legit. I was, I haven't deploy a production rate for the federational though I went through a couple times, but I did use schema stitching before they kind of phased that out, and know that, that's no longer a thing.
+
+[00:02:13]
+And schema system was pretty cool, it's a hell complicated but really cool. But from my experience with the Federation stuff was just relatively new like the last couple months. It seems pretty straightforward. You've got to use those directives as long as you understand that stuff, and enables a really good workflow for you and your team.
+
+[00:02:30]
+I think the problem with the Federation stuff is basically, it's gonna come to performance, it's gonna come to caching, right? Like you got this one gateway GraphQL API talking to all these other GraphQL API's, and then those are all talking to each other like, man, if someone just sends this query that does this round trip, like this, like man, how you gonna handle that?
+
+[00:02:50]
+So I think, in order to do Federation well, you should just work on caching well. First, like, what is our caching strategy? How do we handle caching? Because in something like Federation, where all the services are going to be blocked publicly and only accessible by the gateway. Then there's no way that they could be cached, like on a network level probably, they probably cache on application level.
+
+[00:03:11]
+They're just not accessing those over the network. So, unless you like put them behind some internal know thing inside of, some internal IP VPN or something like that. There's really no way cuz they're not public. So yeah, the caching strategies that seems crazy, I think, again, if Paul's like, well, if you use our product, it just works.
+
+[00:03:29]
+So I think that's kinda how they get you, but yeah, you'd have to get the caching strategy down for that, cuz to me, that just sounds like, wow. Yeah, that could be crazy, but seems like it'll work pretty well.
+>> How do you limit query depth?
+>> Wow, that's a good question.
+
+[00:03:44]
+So security, security, security, security. So there is a very, very. So, I'm gonna tell you then I'm gonna show a very good article that talks about it way more detail. But basically, there is no one way to limit query. So the question is basically this. So if I go me, and I have post, and post has an author, and author has a post, and post has an author, this goes on forever.
+
+[00:04:11]
+So like how do you limit someone from doing this to your server? There's not one way, there's a lot of ways, and I can give you some examples of what some of the best GraphQL APIs that are running live in production now are doing, and I can kinda give you my advice.
+
+[00:04:23]
+So, something like GitHub, GitHub has a really good GraphQL API. And basically what they do to help limit this is because if you think about it, this is just one request. So you can't rely on a CDN to help you from DDoS. And because the CDN's like, only one request came in how am I suppose to block that.
+
+[00:04:38]
+So CDN is not gonna help you. What you have to do, at least is what GitHub does, is they count how many nodes you do per some interval, whether it's per second, per minute, whatever it is. And they only allow you to query for a X amount of nodes up on that interval.
+
+[00:04:55]
+And each object is a node basically. So they keep track of how many nodes you have, and there's a lot of ways you can do that. You can literally add a directive on every single type that logs somewhere, how many nodes this request has and then just counts it.
+
+[00:05:09]
+And then after that they block you. They check how many nodes you have and the block you. So that seems to work for them. The downside of that approach I think, is you have to be explicit about like how many nodes you want. So you have to say like post, like from 12 to 300 or something like that.
+
+[00:05:27]
+You have to tell them how many you want, so they understand how many nodes you can get. That seems to work. In my opinion, there's just not one way. So there's a couple strategies. One is, well a lot of people do is they will limit query depth, they might say, well, I don't want a user to go four levels deep.
+
+[00:05:43]
+Well, that's not actually gonna help you a lot, because there might be thousands of nodes on one level. So, it's not really helping you. Then some people might actually come up with directives, that give different types of scores. And they might say, you can only make a query that's 100 points, and this type has four points.
+
+[00:06:00]
+This type has five points, and combine this many points. Well, then you get to the point where it's like, well, how do you rank these points? Which one has a high priority? How do you know, it kind of never really works out? And then from there, people start doing things like basically just a combination of all of that.
+
+[00:06:17]
+So they'll count the nodes. They'll see how far you can go. They might do a score query analysis like that. And then they try to figure out what to do. But, at the end of the day not doing something, yeah, somebody is gonna break your app. And that's it.
+
+[00:06:29]
+So now that I said all that, there's a really good close, a here we go. So this one talks about a little more detail. They talk about the maximum query depth that I mentioned. And you know what it does, and why does it work. They also talk about query complexity, which is basically adding points to every single thing, and why it works and why it doesn't.
+
+[00:06:50]
+They talked about throttling and while you can just say, well, I'll just time out after X amount of time. And I talked about why that works and why that doesn't. But basically at the end of the day, they're just saying, yeah, you just gotta do all the things.
+
+[00:07:04]
+So, there really is no one answer that people will give you. We've. [CROSSTALK]
+>> A lot of those solutions by the time you've determined that they've gotten too many nodes, and that it's gone too long, like the damage is done.
+>> Is done yeah, it's definitely done, yeah.
+
+[00:07:18]
+So, there isn't just one thing, that's the one thing where graph cues cuz it is a GraphQL API. People can do whatever the hell they want. So you got to get pretty creative with figuring that part out. But there are solutions. You just have to combine them. I think what GitHub is doing is pretty good.
+
+[00:07:33]
+I think their approach is pretty solid. I tried to DDoS it before. Didn't work. I did, I actually tried it cuz I wanted to see if it worked. It worked pretty well. So, pretty good approach, yeah.
+>> What are your favorite documentation tools for GraphQL?
+>> Well obviously, definitely Playground, doesn't get any better than that.
+
+[00:07:54]
+Playground is pretty legit, although Playground is base of GraphQL. And GraphQL has this one feature that I like now, I don't think Playground has, let me see if I can find a live version of GraphQL somewhere. Here we go. They don't have it on here. No, I guess not all GraphQL has it, but there's this really cool feature where you can like open up on the left side here, and it'll show you every single field, every single query, every single mutation.
+
+[00:08:26]
+And when you click on it, it'll just auto-write it in here for you. So you don't have to write it. That's really cool. I've only seen it on GraphQL, I forgot what it's called. Other documentation generators. That's it. Those are always the things I use. I actually, no I didn't, there's one there's, man.
+
+[00:08:44]
+It's on my computer right now, I'm trying to get the name of it. Insomnia, so you can use an Insomnia app and you can do all different types of GraphQL tuff in there. I don't know. I'll do it right now. I haven't used in a while but, God, no.
+
+[00:09:00]
+So yeah, this one works pretty good. I think Postman is really good too. They support GraphQL. I just don't use it. But for me, this is GraphQL Playground. And sometimes GraphQL. I've never really needed anything else. Yep, Mark.
+>> Is there any data validation directives available in Apollo?
+
+[00:09:21]
+
+>> There are no data validation directives built into Apollo, but there is a library that has a lot of those custom directives. GraphQL, this is one library with his developer made a whole bunch of them. I don't know if it's this one or another one. I think this was just transforming things, and also not that one.
+
+[00:09:50]
+It came library but, I saw library sometime this week. A whole bunch of validation directors, but now that you know how to make directives, you can take something like validator.js. My A key doesn't work. So something like validator.js, and make a director for all different validations that exist in validator.js, or start like tons of different things.
+
+[00:10:16]
+Its currency, its decimal, its divisible, you can make a director every single way. In fact it's a really double resource project, I guess as you may I will totally use it, so yeah. But I can't think of anything other top of my head. Any other questions? Yeah.
+>> Didn't have a time to discuss frontend clients at all.
+
+[00:10:36]
+Do you have a preferred or recommended approach for evaluating frontend clients, Apollo client,
+>> if you're using Apollo server, always use Apollo client 100%. I mean, is it a Greenfield project?
+>> Yes.
+>> If it's Greenfield, definitely 100% use Apollo client, because not only will it'll work 100% well with Apollo server, but it also manager state.
+
+[00:11:02]
+So we have the intro to GraphQL on a frontend that we taught. It goes over that. And really good detail was widely covered in this course. But yeah, Apollo client, and you won't even need Redux if we're using React, you only view x if you're using View. It will handle all of that.
+
+[00:11:17]
+And you can write a schema on the frontend for your local state, to emerge that schema with your API schema. And you can query data on API and your local schema in one query. And your app doesn't really care if it came from local state or from the API.
+
+[00:11:31]
+So, you get a lot of that stuff for free. So, I highly recommend doing that. Especially in React, cuz they have hooks supports now too, which is really cool.
+>> Yup.
+>> You got any questions? Nope. Well, let's see if [INAUDIBLE]. Looks like it did. Yehey! I forgot to change the host, look at that.
+
+[00:11:55]
+
+>> [LAUGH]
+>> Look at that, it's a local host. If I go to, I guarantee you it won't work. It's not working. Yeah, I think, I don't know what the environment available is for the host. Yeah, I need the chance to host on there. But, I think you get the point of deploying, you don't have to do much.
+
+[00:12:15]
+If there are no other questions, then you are now a GraphQL API pro. I promise you no more than most, this stuff is really challenging. And I hope you go forth and actually get to use some of this knowledge in your endeavors at the companies, personal projects. Teaching other employees or friends, coworkers, that would be really awesome.
+
+[00:12:34]
+And if you need anything else, my email is scott@typeIO just hit me up, and thanks for coming. [APPLAUSE]
+
