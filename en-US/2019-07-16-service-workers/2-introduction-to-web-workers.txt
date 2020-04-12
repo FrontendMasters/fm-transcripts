@@ -1,0 +1,97 @@
+[00:00:00]
+>> Kyle: Before we talk about service workers, some of you have never actually written a web worker, which was the precursor to service workers. Service workers are a special kind of web worker that has a very specific kind of purpose in the web stack. But we're gonna start by looking at web workers and then we'll circle back and look specifically at service workers.
+
+[00:00:22]
+So if you are in your worker-exercise directory, you should be able to start up the server that we're gonna be working on by typing node server.js. And then when you hit Enter, it should tell you server started on. And 8049 is the port that we're gonna be using for today's exercise.
+
+[00:00:45]
+If you get any error that pops up about a missing dependency, you should have, from the distribution, any modules that you needed. But if you need to, you could say npm install which will install any of the dependencies if they happen not to be in your distribution.
+>> Kyle: Sometimes NPM can be very slow, and then you should be able to issue the node server.js to start the server.
+
+[00:01:13]
+
+>> Kyle: And you notice that we're just gonna leave it on. With that started, we're gonna go over to our browser and type in localhost:8049. And that's gonna load up this basic little website that I've put together. Now this website doesn't do anything yet, but that's what we're gonna be doing a little bit together.
+
+[00:01:33]
+And I used one of the most canonical examples for web workers, which is you want your web worker to do some heavy-lifting work. For example, recursively calculating Fibonacci numbers. Just so we're entirely clear on this, calculating Fibonacci numbers, not something you're ever gonna do on a real website, okay?
+
+[00:01:53]
+I totally get that. But what we wanted to do was, in a very simple way, illustrate the idea that you might have some heavy-lifting work to do in the background. That is the use case for web workers is when there's gonna be a bunch of processing-intensive stuff. So what is a web worker?
+
+[00:02:09]
+It is a JavaScript file that runs on a separate thread from the web page thread. So you have your JavaScript that loads into your web page. And then you can have a separate JavaScript file which acts as a separate program, running in a background thread. Running independently of the web page, which means if it's running and running and running, it doesn't affect any of the behavior while you're on the web page.
+
+[00:02:33]
+If you ran a bunch of heavy processing in the code that was on your web page. You know that you're not gonna be able to scroll around and click on buttons while JavaScript's running because of that thread being tied up. So the key ideas, if I have some heavy-lifting processing work to do and I need to do it front end, then I can offload it to a web worker.
+
+[00:02:54]
+Some things to be aware of. All the web browser guarantees is that if you spin up a web worker, it will be on a different thread from the main page. If you spin up multiple workers, in general they will often have separate threads. But there is no actual guarantee that every single thread that you make will have a completely separate thread.
+
+[00:03:20]
+Because if that was a guarantee, then this would be very easy to denial of service somebody's browser, somebody's device. So the only guarantee is that you can spin off at least one extra thread to handle web worker work, okay? There are a variety of quirks around web workers.
+
+[00:03:40]
+Where in some browsers and configurations, a worker can spin off another worker which is called a child worker. And in some configurations, that doesn't work. But the page can spin up multiple workers and then try to ferry communications between them. There are specialized web workers. For example, if you spin up a worker for a web page, that's called a dedicated worker, which means it belongs to that web page.
+
+[00:04:07]
+And when you close that tab, that worker is immediately killed. And then there's another kind of worker, and if you had multiple tabs of the same site open. You'd get multiple dedicated workers, each one tied to that page. But then there's another way of creating a worker, and again not all browsers and configurations handle this often.
+
+[00:04:28]
+When we're talking about limitations, mobile devices will limit some of this stuff more than a desktop typically will. But there's a type of worker called a shared worker, which is if you had multiple tabs. If you had a web app or site where it was common for your users to have multiple tabs of your site open, maybe a shopping site or something.
+
+[00:04:50]
+You can have a shared worker which is running once. And it's able to communicate with each instance of all the open pages. And it lives as long as there's one open tab. So somebody could have five tabs open. Closed four of them and that shared worker's still running.
+
+[00:05:04]
+Open another tab, now it's able to talk to both of those tabs. And there's some tricks you can do where you could have one page talk to another page through that worker. There's other ways to do that with postMessage as well, but you can keep two pages in sync.
+
+[00:05:19]
+So if somebody types in something over here, or they add it to their cart on this page, now all of a sudden the cart icon over here is synchronized. So you can do some of those things. But just be aware shared workers are not absolutely guaranteed to work everywhere sort of thing.
+
+[00:05:33]
+You're gonna need to gracefully handle if that's not, don't build your main functionality on it. But it's a nice graceful, I mean, progressive enhancement, if you will, for the page. Yes.
+>> Speaker 2: Is there a fallback from a shared worker to a dedicated worker if the shared worker's not available?
+
+[00:05:49]
+Or is that not something you could do?
+>> Kyle: There's not a fallback from the perspective where the browser automatically falls back. You can feature detect that your shared worker is unavailable or it doesn't start and then start a worker instead of a shared worker. The one we're gonna do here is just gonna be a regular dedicated worker.
+
+[00:06:07]
+And we'll see how to do that in just a moment. But I've used shared workers maybe once or twice in my career. It's not something I use a lot. I've used dedicated workers a number of times. So they're more useful. That's why shared workers are maybe less common for you to see.
+
+[00:06:27]
+I think there was at least one browser that didn't implement them for the longest time, I forget. It might have been Firefox, it might have been Microsoft IE or something. But anyway, shared workers weren't guaranteed cross browser for a long time. I don't think shared workers work on mobile devices.
+
+[00:06:45]
+So just be aware that if you're gonna build it with the shared thing in mind, you need to handle the case where that doesn't work. Or just not doing the work or doing some other kinda workaround. Anyway, so web workers are a way to run some code somewhere else other than what's happening in the tab at this moment.
+
+[00:07:05]
+In all of those cases that we've talked about, they belong to the tab. And as soon as the tab goes away, or all the tabs that are sharing it go away, that thing dies. What is gonna be unique and different when we get into shared worker, I mean, into service workers is that service workers survive in the background beyond the tab going away.
+
+[00:07:28]
+Beyond the tab being closed, or beyond somebody navigating away to another page. Now before that terrifies you and you think my god. Somebody's gonna run this code in the background forever and it's gonna kill my site or it's gonna spy on me or whatever. There's a ton of security model involved where just because it's running in the background doesn't mean that it's spying on you.
+
+[00:07:48]
+It can still only communicate with the pages that it was spun up from. So you don't have to worry about that. But also, the browser manages the life cycle of that. And so it may live for 5 or 10 or 15 seconds in the background while it's doing some stuff.
+
+[00:08:04]
+And then once it's idle, it'll be shut down. It could potentially spin back up. And we'll talk about advanced use cases where a service worker can be spun up in the background, even when your page isn't open. But again, it would only live for a matter of a few seconds and then go away.
+
+[00:08:21]
+So the browser manages all that stuff for you. But the point is you basically have this worker that is almost like a zombie. It's living outside of your tab. And that's a special power that normal workers don't have, okay? So let's get into how we would write and build a web worker.
+
+[00:08:40]
+What we're gonna eventually be able to do is click this button which will fire off a web worker that starts generating Fibonacci numbers recursively in the background. I intentionally did not do optimized Fibonacci generation, cuz we're intentionally trying to create a bunch of processing work that goes slower, and slower, and slower.
+
+[00:08:58]
+Yes, I know there are much better ways of doing Fibonacci generation, okay? But you'll see that when we spin it up on my machine. It's able to get up to the Fibonacci of 42 or 43 before it's taking way too long to generate the next number. Anyway, so we're just gonna spin up a web worker, fire it, tell it to just keep generating Fibonacci numbers and sending them to the page.
+
+[00:09:20]
+And then if we click Stop, it's gonna kill the web worker. Now, the reason why we need to kill the web worker is because the communication that happens between the page and a web worker is based upon asynchronous eventing. If you've worked with Ajax events like fetch, if you've done things like postMessage before, postMessage is how we communicate.
+
+[00:09:47]
+It's an asynchronous event. But an asynchronous event cannot be processed if some code is already running. So if we have some code running that's churning for seconds or minutes on in trying to generate a Fibonacci number, and we try to send it a message. That message is gonna just sit there, waiting for somebody to pick it up.
+
+[00:10:05]
+So we can't rely upon sending a message to a worker that is busy to tell it hey, stop doing what you're doing. So the better way of telling it to [LAUGH] stop doing what it's doing is to terminate the web worker. So that'll be our general strategy.
+
