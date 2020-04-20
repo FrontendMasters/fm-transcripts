@@ -1,0 +1,93 @@
+[00:00:00]
+>> Let's do this next approach which is gonna be probably the more complex approach, but it'll show some really nice ways of working with shaders, and it'll get us a little bit more comfortable with putting data into shaders, and thinking in this sort of shader way. So what we're gonna do, instead of doing this with geometry is on the edge of each of these circles on the edge of the sphere, we're gonna do it all in a shader.
+
+[00:00:34]
+We're gonna say we still wanna use the points that we've defined here, we want to use the icosahedron points because we like the way that those are placed around the sphere. But we want to put that data into the shader somehow. So what we're gonna do, I'm just gonna delete this stuff, make sure you backup your file so that you have it on hand in case you wanna come back to it.
+
+[00:00:55]
+Once you've backed it up, you can delete the the circle stuff, but we're gonna leave the icosahedron stuff. Because we're gonna wanna keep using these vertices. And so the goal here is to say, let's take these points and let's put them in the fragment shader. And then what we'll do in the fragment shader is we'll say for each pixel how far away is the current pixel to the nearest point?
+
+[00:01:25]
+So what's the point nearest to it? The nearest icosahedron point. And then based on how far away it is from that point, we wanna create a step function just like we did in our earlier shader, with the noise and with that kind of stuff. So we're gonna start by just passing this points array into our shader.
+
+[00:01:46]
+So we're gonna go into uniforms, we're gonna give it a uniform called points, and the value is called points, because that's the name of the array. And so when you work with an array, so this is an array of vector threes, so I can just double check by console logging points, it should be an array of vector threes.
+
+[00:02:16]
+So when you work with an array in a shader, we can pass in an array of vector threes. And then in our fragment shader we can say uniform vec3 points and then square brackets like this. Now the problem is with GSL, you actually have to specify exactly the number of elements within this array.
+
+[00:02:37]
+So I have to say something like 25 or 24 or whatever. But this number that I'm putting in here, it might not match the number of the actual array that we're putting in. We can't just put in another uniform and then access that other uniform, we have to do something a little bit different.
+
+[00:02:56]
+So just to test let me just console.log points. So we actually have 42 points. But sometimes depending on the detail we might not have that many, we might have less or may have more. So what I'm gonna do is I'm gonna add a define, and a define is something that we can access in a different way than uniforms.
+
+[00:03:19]
+And so I'll show you how this works and I'll explain it a bit. So we're gonna say defines, this is, sorry, it's plural with an s, defines. We're gonna say POINT_COUNT in capitals because kind of like a constant, and then we're gonna say points.length. So what we're doing now is we're adding in what's called a pre-processor define or a macro or something like that.
+
+[00:03:46]
+And it's a feature of some of these C based languages where in these languages you can have defines, so you could have something like this. A common one would be define PI 3.14, and it's basically like a constant, you can think of it like a constant but it's not just defining a number it's defining any expression.
+
+[00:04:11]
+So I could define something like this, I could say clamp or maybe I could say something like I don't know, define saturate is equal to max 0.1 or something, you could basically put in any expression here. And you'll have to be careful if you put it in a semi colon, it might actually break but you can put in any expression of code.
+
+[00:04:36]
+So I could say, define foobar is 5.0 + 2.0, and now whenever I use foobar in my code, this is just going to get replaced automatically before it even runs the shader. So during compilation it's gonna get replaced with whatever code I have in my define here. And so commonly we're using it for things like Pi, and occasionally we'll use it for functions that we want.
+
+[00:05:06]
+But in this case we're gonna use it to define the point count. So we're gonna say points, in the bracket we're gonna say POINT_COUNT Which we didn't define manually in our shader code, but we did define in the three.js defines. So three.js is going to inject into the defines, it's gonna inject something that equals points.length.
+
+[00:05:31]
+And so if you run your code you should have everything running and compiling. So just to reiterate, this approach is very simple, we've just defined lots of meshes and we've placed them around this sphere. And we've turned them instead of being spheres, we've turned them into circles. And that looks pretty good until we start to get shapes that are very large.
+
+[00:05:59]
+So in our previous approach, the circles on sphere example, We can see that at most angles it looks okay actually, it looks exactly like what we want. But the larger these circles get, the more we start to realize that they're actually not really part of the sphere. It's just as if somebody's taken CD-ROM discs or something and placed it around this sphere.
+
+[00:06:26]
+And so it actually doesn't look at all like Yayoi Kusama's spheres, where hers are very clearly spheres that have these circles on the surface. It's very clearly on the surface of the mesh and it's wrapping around as if it's a sticker or something like that, and that's what we're going for as opposed to this sort of CD-ROM that just is a flat disc that sticks out like that.
+
+[00:06:51]
+And so what we're gonna do is we're gonna use a shader to actually draw these circles on the surface of the mesh as opposed to draw them as geometries. So it's just gonna be like we've taken this instead of having a thing like this is as if we've taken a sphere, and we're just drawing the circles with a marker right on the sphere.
+
+[00:07:14]
+So that it's actually these circles are exactly on the surface and they're wrapping around. And that's basically what we're gonna achieve with this shader. So wee're getting there. We've got an array called points. We've got POINT_COUNT, now we're finally we've defined the POINT_COUNT in the shader here. And now what we're gonna do is we're going to define a distance, and we're gonna make it really big just to start off, it doesn't really matter, just make it a really big number for now.
+
+[00:07:45]
+And what we're gonna do is we're gonna go through all of the points. And we're gonna say if the current distance from the current point to this point is smaller than this big number, we're gonna use that small value. So we're basically we're just trying to say we have all of these points that are the icosahedron points.
+
+[00:08:06]
+And now we wanna say what's the distance from this pixels point to the nearest icosahedron point. And actually the way we're gonna have to do that, before we get into this is one more little thing is we're gonna have to pass down another varying from the vertex shader.
+
+[00:08:22]
+So we're going to say varying vec3 vPosition, and then we're gonna pass that down by just saying vPosition = position, which is built in from three.js. And then whenever we have a varying in the vertex shader, we have to copy the declaration exactly into the fragment shader here.
+
+[00:08:45]
+So just make sure you copy it exactly so that exists in both places. And so now in our fragment shader we have these two values. We have the uV coordinates which is really useful for doing two dimensional stuff like texturing and things like that, but what we wanna do, is we wanna actually get three dimensional coordinate, the three dimensional position, the xyz position of the pixel within this view.
+
+[00:09:11]
+And then compare it to all the other three dimensional coordinates of the icosahedron points. And so we're gonna say using this vPosition we're gonna create a for loop. We're gonna say, for (int i = 0); i < POINT_COUNT; i++. And so this is how we're gonna start to iterate through the points.
+
+[00:09:37]
+Then we're gonna say vec3, let's say p= points and then access it just like we would JavaScript with the square bracket annotation. And now we have the point, and these are all the icosahedron points, so we're just going through each of these. And we're saying what's the distance from vPosition, which is the current position for this current pixel, to p.
+
+[00:10:06]
+And then we're gonna say, make distance the minimum of d and dist. So what this line is saying, it's saying well, we might already have dist but make dist the minimum of dist and d here. So we just wanna do this whole thing to basically get the minimum distance from the current position to the closest polka dot point or the closest icosahedron point.
+
+[00:10:34]
+And if you've done that correctly, and you output dist you should get this kind of cool graphic. And now we're finally there, finally we have achieved what we want to achieve. And just like in the earlier demo, we can use a mask and we can say step with some threshold dist.
+
+[00:10:56]
+And then I would put that mask to the final color. And again just like in the earlier demo, so again like in the earlier demo we can say mask = 1- mask to invert that if you want. And now we have these circles which are exactly mapped onto the sphere.
+
+[00:11:26]
+So no matter if these circles are rather large, it's not gonna look like dics just sitting on the surface of the sphere. It's actually gonna look like it's been drawn onto the material itself. And so just as before, let's say we just do what we were doing earlier with fragColor = mix, lets say color to white depending on the mask, and then we output with fragColor.
+
+[00:11:59]
+So we finally achieved this like Yayoi Kusama type of sphere. And if you wanted to take this a step further maybe what you'd start to do is start to introduce some random colors. So I'd like to use a module called riso colors, I made this module, it's on NPM.
+
+[00:12:23]
+I use a lot of my own modules, and this one here you can NPM install it, you can require it, you can bring it into your code, and you can start to access random riso colors which are sourced from this Wiki here, lots of nice colors. And this is going to work really well with Kusama's work because her work is really bright, and vivid, and bold.
+
+[00:12:48]
+You can also start to introduce randomness in these circles. Maybe using some noise, passing in a vPosition some kind of to noise, and then offsetting the size of these circles based on that.
+
