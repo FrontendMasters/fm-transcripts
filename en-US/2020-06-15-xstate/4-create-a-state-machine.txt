@@ -1,0 +1,81 @@
+[00:00:00]
+>> So let's talk about some ways that we can make state machines without any libraries. And this is going to be the same for most mainstream languages. This is not specific to JavaScript. The difference between how we usually manage states and how we should manage state with state machines is instead of doing the bottom up approach, or even an event action approach, we don't start with the event.
+
+[00:00:27]
+And so that's the big distinction. We start with what the finite state is and so on in this case, when we're modeling this promise state machine, where we have the idle pending result in rejected states, we're going to switch on what the state is first. So in this case, we have an idle state and then in this idle state We switch on the events.
+
+[00:00:53]
+So we determine what event has happened such as fetch, and we transition to that state based on the events. So they are nested switch statements. It does look a little bit verbose, but this is how you could properly structure a state machine using these switch statements. Now one important thing to consider, is that these states, another way to think of them is that you could consider them the behavior of your app or of your machine.
+
+[00:01:21]
+So when you're in the idle state, for instance, you have to think about what is the behavior of my machine in this idle state. So in this case, we can accept a batch events which will do something, it will transition to the pending state, or we just returned the state.
+
+[00:01:39]
+And this is one of the important points because consider the other events that might happen. We might have a resolve events, we might have a reject events. And when one of those events happens, we want to make sure that we're in the right states to accept that events.
+
+[00:01:56]
+So when we're in idle and we didn't really start fetching yet, accepting a resolved or rejected events doesn't really make sense. And in fact, when we're in the pending states, and when we get a result events, now we're in the results date, but what if we received by some weird coincidence or weird glitch a reject events.
+
+[00:02:17]
+So that sort of doesn't make sense. And I'm sure you've seen that in some maps where it says, congratulations or success or here's your data, and then immediately it shows an error, and you're like, this is sort of an unexpected flow. I don't really expect that to happen.
+
+[00:02:31]
+And so that's why we separate our app logic in terms of behavior. How does it behave when it's in this state like the pending state. Or when it's in the idle state, or when it's in the resolved, or rejected states. And that way we could prevents what's called impossible transitions from happening, which are transitions that should never ever happen even if you are 99.9% sure that some event will never occur in a certain state.
+
+[00:02:59]
+It's always good to model your logic so that even if that does happen, it's impossible for that to affect anything. So personally, I like using objects instead to represent a state machine. And this is something that I thought about early on when making x date is that I really don't like writing those nested switch statements.
+
+[00:03:22]
+And I could see why people do event first because they only have to write one switch statement and then use defensive programming in order to make sure that those impossible transitions are covered. But that's still verbose. And using a machine, or using an object actually makes things a lot simpler.
+
+[00:03:41]
+So over here, this is a plain object. Again, I'm not using any libraries, and we see that we have a couple extra properties now. We have this initial in which I'm just keeping track of the initial state. Then we have our nested states. So we have idle, pending, resolved and rejected.
+
+[00:04:01]
+In each one of these states, I have an OnProperty. And that's where I'm going to store my transitions. Each transition is going to be an object where the key is the events. And the value is the next state that's going to happen. So when we're on the idle state, and that fetch event happens, now we're on the pending state.
+
+[00:04:21]
+And so you can see that over here we have a transition function where we first grab the states. And we're using this ESX syntax in order to say if it doesn't exist, just return undefined. And then we dive into the on object, grab that transition from the events and then we returned the states.
+
+[00:04:45]
+So let's take a look at I'm gonna go into our scratchpad, which if you can remember is 00/index.html. And we're just going to make an example over here just to play around with it. So I'm gonna go ahead and I'm going to copy this machine over here. Just gonna.
+
+[00:05:14]
+There we go. So we have our machine as an object. And so what we also want is we want to transition functions. So let's say const transition. And I'll move this up here equals and I'm using the ESX arrow fat arrow syntax for defining these functions. So we have our current state and we have in events and we want to look up first, this dates.
+
+[00:05:39]
+So we're gonna look that up on the state's property. So we're going to return the machine.states and give it that state if that exists, and then we're going to look up the transitions, so on. And then we give it the events. And that's gonna hopefully return our next states.
+
+[00:06:01]
+But in case the machine does not accept this event in the current state that it's in, we just want to return the states. And so, let's see what this looks like, let's say that we transition and we're going to output this. So we're going to output transition from let's say we're in the idler state and a FETCHER can happens.
+
+[00:06:25]
+See what that looks like. All right, so we have the NPM start first. Perhaps it should be already running. Let's see. JS, yep, we're in here. Okay, well let's console.login. So let's start outputting it console.log transition I will FETCH all right. So you will see that we're in the pending states.
+
+[00:07:06]
+And so now let's try if we're in the pending state, and the FETCH event happens, which this obviously shouldn't happen, we shouldn't be trying to FETCH while we're still in the pending state. And so you could see that we're still in the pending state. So we assume that nothing really happened there.
+
+[00:07:22]
+Now let's assume that we're in the pending state and we get to resolve events. So what should happen is we get the result, the results string, which is exactly what we want. And also, if we do reject, we could get the rejected string as well. All right. So, in order to actually use this, doing this pure functions is fine, but we need some sort of way of keeping track of the current state.
+
+[00:07:53]
+And obviously, that's a little bit side effect, ie we can't really use pure functions. And in fact, any application that you work on is not going to be 100% pure, because after all, you need to output things on the screen or you need to do some sort of side effect or something.
+
+[00:08:09]
+And so that's where we get into interpreting state machines. So let's just make a very simple interpreter. And what interpreter is, is it takes a state machine and it says, I'm gonna keep track of your current state. So whenever you send an events to me, I'm just going to internally update the current state just so that we could track it.
+
+[00:08:31]
+So let's create a simple interpreter over here. I'm going to say send, we're gonna have a send function and that function is going to take an event and so this is gonna be one of those fire and forget side effects functions. And let's also keep track of the current state.
+
+[00:08:48]
+So the current state should be the machine that initial state first. And if you remember, this is going to be the idle states. So when we send an event, the first thing we want to do is we want to determine what the next state is. So const next state.
+
+[00:09:04]
+And we do that using our transition function that we created, so transition (currentState, event) and lets log that and then we will return it. So return, sorry we wont return it, we will set currentState to the nextState. Okay, so what this is going to do is whenever we send in an event, it's going to mutate this currentState so that we keep track of what the currentState is, and then it's going to log out that nextState, so let's try that.
+
+[00:09:45]
+All right, so we actually have to send. So let's go ahead and put this on window. All right, so now, when we send, let's say FETCH, we get pending, great. So now when we send RESOLVE, we get resolved. So you see it's internally keeping track and we're outputting the nextState based on the currentState in the events that was just sent.
+
+[00:10:19]
+And so that's how you can make a really simple interpreter using just a few lines of code. In fact, even this console log is unnecessary.
+
