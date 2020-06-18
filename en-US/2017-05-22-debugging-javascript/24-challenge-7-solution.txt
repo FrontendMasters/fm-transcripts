@@ -1,0 +1,60 @@
+[00:00:00]
+>> All right, let's debug it together. So the issue that we are seeing was on the sign up page, when a user attempts to fill out the form to sign up, It doesn't sign them up, doesn't do anything. And we get this error in our console, form.submit is not a function at analytics.js line 25.
+
+[00:00:24]
+And the rub here is that analytics.js is a vendor script. So we are unable to actually change this file. But we can still see if we can figure out what the problem is. So it's line 25 that's blowing up. So let's attach a break point here on line 25.
+
+[00:00:41]
+I'm gonna go ahead and just submit this form again, and we should break here just fine. And we can see what's going on in our scope and what calls are happening. It looks like this is something entirely happening inside of analytics.js. If we look at the call stack, at no point here is any of my code really involved.
+
+[00:01:02]
+It's analytics.js called by analytics.js, called by analytics.js, called by analytics.js. The specific area that we're trying to solve is that form.submit is not a function. But form.submit is usually a function. It's usually how you go about submitting a form, a form object from JavaScript. So let's see what is form.submit.
+
+[00:01:27]
+So if we just mouse over form, we see a handy pop up that shows us here's what form is. It looks like it is the HTML form element that we expect. It's got a bunch of stuff, it's supposed to post against this action and have a bunch of stuff on it.
+
+[00:01:43]
+What is form.submit? form.submit is a button. It's got a bunch of classes on it, it's a button, button large, button orange. It's highlighted on the left-hand side, so it is that button, it is the start free trial button. Why would form.submit being input and not a function? Normally, if we have a form, it's a instance of HTMLFormElement.
+
+[00:02:19]
+And all instances of HTMLFormElement should come up with a prototype where they have a submit function. So that should be what it is, But here at our broken code, submit is the button. Now, here is an override, a tricky piece of override behavior that a form can do in the DOM, is that form controls, the names of form controls within a form will override other behavior.
+
+[00:02:54]
+So for example, form.submit will be an input if there is a field with the name of submit in the form. form.action will be an input if there is a field called action in the form. form.target will be a different thing if there is an input called target. Interacting with the properties of form is not a safe activity, if you don't control the form itself, which they do not.
+
+[00:03:23]
+This was a mistake in analytics.js. They should not have called form.submit, because obviously we have a form here where submit is not a function. Fortunately, I can't fix their code for them. So how do we fix this? Well, could try just not naming our input submit. So the field in question is on signup.html where we have this form.
+
+[00:03:50]
+This form has a tagline join millions of people ranting online. We ask for their name as the value Name. We ask for their email as the value Email. And then, we have a button down here with the name of submit. Why does it have the name of submit?
+
+[00:04:12]
+I don't know, not really needed, I suppose. If we remove that attribute and save it, and reload our page. We'll leave the break point here just so we can check what this happens. test, test@domain.com Now, when we hit our breakpoint, form it's still our form, but submit is now the function.
+
+[00:04:41]
+Now, this is a little bit of trickery. But anytime you're interacting with a page that you don't control, there's a lot of base level HTML elements that can have overriding behavior in hostile environments. So if we were, hypothetically, going to try and fix this for them, how can we go about doing it?
+
+[00:05:05]
+Rather than interacting with the submit function directly on the form instance, we can interact with it on the prototype. So we could do HTMLFormElement.prototype.submit.call(form); What does that do? It interacts with the root object that all forms inherit off from and call the submit function on it. But when we call the submit function, we specify what the value of this will be by invoking it with the call method.
+
+[00:05:42]
+And say call form.submit using this as the form. And this way we can take a back run around the form control override behavior that we are running into. So if we were to back this out, I didn't ask you to make this change, I'm just playing. If we were to actually make this change, With, The name submit still existing on the page, This would actually still work.
+
+[00:06:18]
+That's how analytics.js should have implemented their code. This was the third-party bug. And there's a couple of interesting things to think about with third-party bucks. I bet you were all using a third party on your applications today. You're pulling in some code from a source that you don't control.
+
+[00:06:41]
+You're probably doing it with like a CDN. Like you might be pulling in jQuery from jQuery CDN. Or you might be pulling in stripe for a payment provider. Or you might be pulling in Twitter, or Facebook, or Google, or whatever for various other reasons provide stuff on your page.
+
+[00:06:58]
+But whenever you pull in a third party a piece of JavaScript from a source you don't control, you're introducing risk onto your page. You're giving another team, or another group, or another company, the ability to make changes on your page without you knowing it. jQuery could push a change to their CDN anytime they want and break millions and millions of pages.
+
+[00:07:23]
+They don't, but they could. Stripe could push a change to their API and steal credit card numbers from everybody. You'll probably think their business, but they can do it. We're probably using third party scripts from a lot of less reputable places. And so as you're adding third party scripts to your page, make sure you understand the risk that you are introducing and the ability for other people to make changes.
+
+[00:07:49]
+How can you get around it? Many vendors will allow you to take copies of their scripts and host them locally. Pull them in through NPM, pull them off of their CDNs and put them on your own. It's still their code that they wrote, but you get a control when it changes.
+
+[00:08:08]
+So some concepts we talked about here, this external risk factor of third party JavaScript. And specifically, this bug is an inconsistency pattern that is pretty pervasive across the DOM. Specifically happens a lot in form where form inputs can override all kinds of other expected behavior. What if you couldn't set the ID on form because there was an input named ID inside of that form, which is not all that uncommon.
+

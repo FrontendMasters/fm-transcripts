@@ -1,0 +1,69 @@
+[00:00:00]
+>> So now, let's write a piece of code that's gonna make a post for every user. So what we can do, I'm just gonna use the existing code, and I'm gonna call this one, mkpost, like that, with an mk. Okay, so we're gonna want the name just like adding the user, but we're also gonna want a message that's like the content of the message.
+
+[00:00:23]
+So I'll get that as the remaining arguments. So you can just type a message and you don't have to worry about quoting it. Now, so we could call db.put, except for us, we're also gonna want a timestamp. Here I'm just gonna use the integer date to do that, which has another interesting complication.
+
+[00:00:50]
+So if we use integers for our dates, then they're not going to lexicographically sort. Because the date one comes before anything that starts with the two, right? So 20 would come after one, right, if we're counting up seconds since the epoch on January 1st, 1970, you can imagine.
+
+[00:01:12]
+So that's not gonna work. Fortunately, there's a module to do that. So we could either use this module called lexicographic integer, which I wrote, that just turns these integers into lexicographic strings. Hard to remember, the other way that we could do this is if we use an ISO8601 string for formatting the dates.
+
+[00:01:42]
+You know how there's all of these date formats? I don't know which one we use in America cuz I don't use these. I don't use our date format cuz I think it's ambiguous, but this is the correct date format to use. And Europe has its own format. I don't know which one that is either.
+
+[00:01:59]
+But it's either month, month, day, day or day, day, month, month, and then I don't know usually the year, sometimes two, sometimes four, something like this, right? Who knows which is which? You never do unless you know what country. But even then it's like, well, maybe they're in that country, but they're actually from another country.
+
+[00:02:16]
+Or maybe they're just confused, and they're from that Europe, but now they're in America so they take on our customs. I don't know. This is ridiculous. Also, these don't lexicographically sort. However, if you format your dates a little differently, like this, which is the correct way, by the way, of doing dates, these have an interesting property if they're zero padded of lexicographically sorting, which is very interesting, including if you do hours, minutes, seconds as well.
+
+[00:02:44]
+So these both will lexicographically sort, there's an ISO standard for it, which you should all use from now on. Now that you know the truth and you know the correct way of formatting dates. Well, you could also use the epoch time and then pack it with lexicographic integer if you want.
+
+[00:03:02]
+I think maybe we'll do it this way. There's also another module called strftime, which is fantastic. So this is a way, on command line day, a few days ago, we did a lot with the date command. So you know in the command line how there's date command, and you can do fun things like like +%F %T, well with the strftimepackage from NPM you can do the same thing, hooray.
+
+[00:03:39]
+So why don't we use this format for our keys, and we'll use the strftime package. Or another way of doing it is I think date has a method called toISOString() that gives you something that's basically the same thing. So you can use these as well. I like these though.
+
+[00:03:57]
+They're a little bit prettier. I don't know which one is more ISO 8601 than the others, but whatever, just pick what looks good. Okay, so let's undigress from this tangent about dates and actually format one. So I'm gonna load the strftime package. Strftime('%F %T' and we could use new Date, or it's implied, I think, if you don't pass any arguments in.
+
+[00:04:30]
+All right, so how our keys are gonna look now is we're not just gonna be able to put our post in because we have two keys that we wanna insert atomically now. One that's gonna have the date before. And one that's gonna have the date after the username.
+
+[00:04:49]
+So the two keys that we're gonna want to have are gonna look like this. So start writing this array. We're gonna have one key that's like 'post!' + name + '!' + time. And we're gonna have a second key that's gonna have the timestamp and then the username.
+
+[00:05:09]
+And we want to insert these both at the same time. So we can create an array to do that. And we can call db.batch, which will insert them both atomically, and everything should be good, should also have a value. So this is the other thing, if we don't want to have to duplicate the data, we need to pick one of these as kind of the primary key where the data is gonna go.
+
+[00:05:31]
+And the other one, we can just put a dummy piece of data, like the number zero or something in. So, another thing is the prefixes we need to change because if we wanna do a list of usernames, we don't want timestamps to start showing up in our list.
+
+[00:05:50]
+So I'm gonna call this one post time. And we can call maybe this one even post-name. Maybe we can even have a third key that's gonna be our primary store, so we can give our posts an ID based on some entropy. So in Node, there's a package called random bytes that works in Node or the browser.
+
+[00:06:13]
+Well, I already know that we're gonna be in Node, so I'm just gonna load crypto.random bytes. And in the browser random bytes,I believe will use the secure rng. But I should definitely look at that during the breaks that I don't give you all terrible information. Okay, so now we can generate an ID based on some entropy.
+
+[00:06:33]
+So random bytes, maybe 16 bytes of entropy or 8 bytes, whatever you want. You can do the birthday paradox calculation for yourself, if you like, and then we can put our value. So I guess body: msg, we could have things like title and whatever as well, but I'm not gonna do that.
+
+[00:06:55]
+And then for our value, we can pass in the id. We could also put the id into the key, but the timestamps should be unique. Yeah, it's probably good to put the id in here,so that we don't accidentally overwrite one of our existing values. And then we don't need to store the id again.
+
+[00:07:14]
+All right, so that was a lot to cover. Why don't I just go through this a little bit more slowly again, and hopefully that will. Okay, so what the heck does this program do? All right, so we set up level db with the value encoding of JSON, we load some libraries that we're gonna use in a bit.
+
+[00:07:34]
+We get some data from the command line and from the system clock, so we get a name as the first command line argument. And then we get the message that we want to post into our database as the additional arguments after that. Then we get the current time, and we format it as an ISO 8601 string.
+
+[00:07:54]
+We generate a unique ID. This could also be, for example, based on the hash of the content would be another good way to do it. But here we're just using some entropy. And then we generate these three keys. One of them is the primary key, and it contains the actual body of the document.
+
+[00:08:12]
+The other two are just ways they're secondary indexes. So we're only using these keys so that we can generate different kinds of queries with createReadStream that are gonna pull out different orderings that we can then go ahead and pull out the ID to look up the primary document.
+

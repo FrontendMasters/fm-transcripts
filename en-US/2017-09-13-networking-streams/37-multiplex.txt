@@ -1,0 +1,63 @@
+[00:00:00]
+>> There's another really great module for taking streams that are duplex, for example, RPC stream and packing many of them, maybe some bulk streams, maybe streams that do all kinds of things into a single stream. Because for example, in browsers you only can establish so many outgoing connections, maybe they're WebRTC sockets, maybe they're WebSocket connections.
+
+[00:00:26]
+But you don't necessarily want to have to open up a new WebSocket connection to deal with a new streaming interface. So this package multiplex lets you pack multiple streams into the same one. So here's what that can look like, so this is a pretty complicated example but these ideas tend to be somewhat more complicated in practice.
+
+[00:00:47]
+So in this example, we're starting up a new multiplex system on it's just a TCP server like before with a duplex stream. So we create plex which is also a duplex stream because we see this pattern here is stream.pipe(plex).pipe(stream), very familiar. Then we can create a client just like before, like RPC stream in this case.
+
+[00:01:15]
+But the RPC stream function is also creating more streams inside of it. So this is just getting back cuz I love that satellite example we talked about way in the beginning. Where you kind of have your FTP style port where you've got your control signal, and then you've got like your high bandwidth other signals that are opened up this is sort of the same idea.
+
+[00:01:36]
+Where RPC signal is we're talking text to the satellite over some low frequency that's more reliable. Then we have our higher frequency band that we're gonna use to just pull down dumps of like cloud imagery. I don't know whatever satellites do. So here in our read function we taken the name as an argument.
+
+[00:02:02]
+If the name has some screwy characters in it we're just gonna say nope not gonna do that and bail out early. Otherwise, we can create a ReadStream from files in a files directory and if that file doesn't exist then an error will happen, so that'll just call the callback with an error response.
+
+[00:02:22]
+Otherwise, we have yet another duplex stream. Notice a.pipe.b.pipe.a again where we take the, or sorry that's a ReadStream, so I don't even know how that would not blow up but. Wait, I see. Yeah, okay, whatever. So we can call plex.createReadStream or .createStream which sets up a different channel on the same multiplex system.
+
+[00:02:49]
+So we've got our RPC channel, and then we've got however many other channels that are sort of for bulk data. So we don't have to sort of squish that kind of stuff through an RPC system which was inefficient, it doesn't really make much sense. Multiplex uses protobufs behind the scenes, so it's got a lot better framing protocol then we would probably come up with very easily.
+
+[00:03:13]
+So and then at the end, just call back null no error, it's fine. We still hook up the RPC stream to the duplex connection and that's it. It's a very complicated example, but hopefully it'll shed some light. The client is a little bit easier to understand. So what the client does in this case is it pulls down, so it sets up a connection, duplex connection with TCP socket listening to the server.
+
+[00:03:45]
+And then every time there's a stream that is created with createStream on the other end this function is gonna fire. If it's a stream that starts with file then we can print out a message that we received it, and we can just dump the results to standard out.
+
+[00:04:03]
+We could also dump it to other kinds of writable streams like for example, like fs.createWriteStream or create G zip or whatever you like. Then finally, we wire up the multiplex to the RPC connection as well on the SharedStream which our server has, so you notice that these lines are the same between our server and our client.
+
+[00:04:25]
+And then finally, we can call some of these remote methods. So we can call remote.read with a command line argument that's gonna be the name of the file that we wanna read out of the files directory, so that was a lot. I can step through it again if people are still wanna do it, but I wanna run through actually running it first and I can show you how it works that way.
+
+[00:04:49]
+Okay, so I'll make a directory plex. Gonna Copy > Paste these examples cuz these are real tricky to get working the first time let me tell you. Can't live code everything. [LAUGH] And then our client, here we go. So I'm gonna run the server so that opens up, TCP connection on 5000.
+
+[00:05:16]
+I need to make a files directory because that's where our client is gonna read from. And I can go ahead and make some files like hello in there. And I'll make a second file too. Some of these dog sounds. They sorta say like rawr, rawr, as well, so I'm gonna put that in there.
+
+[00:05:44]
+Okay, so we have two files in our files directory and now I can run the client which remember is gonna take an argument from standard in or from the command line. So it's gonna, Open up hello. RECEIVED FILE hello with the contents from the server. I can also do dog.sounds.
+
+[00:06:07]
+RECEIVED FILE dog.sounds. Dogs sound. Right, so that file didn't exist so it didn't do anything, but we've now received both of our files. So this is sort of like, kind of like an ad hoc implementation of something like HTTP but pipelines so it's all in the same connection.
+
+[00:06:25]
+And not that much code, I mean, you could step through it in two slides. Although, it's nontrivial just the same. Just to go over what's in those again. So we have our TCP server. We've got our multiplex connection which is a duplex stream. We pipe our TCP connection into our duplex multiplex stream and this sort of like just gloms them together so that the multiplex can communicate on the TCP connection when it comes in.
+
+[00:07:06]
+We then establish an RPC connection on one of the channels that multiplex provides which is wired up right here it's called 'rpc'. We can name them if we like. Then when the client calls our read: function we can load a file from the files directory and pipe it into, should actually, Be like that.
+
+[00:07:33]
+And we can pipe those file contents into a shared stream. Meanwhile, on the client side of things, the client does the same thing setting up the connection. And when the client calls that function defined on the server with the name that we give it on (process.argv) then it's gonna kick off this function that fires with the stream and the id.
+
+[00:07:59]
+And we can pipe the stream to standard out or wherever we like, and we can print out what the id is for the file that we've received. So that again is how you can wire up something that's pretty powerful, pretty sophisticated with a couple of modules and some very interesting ideas like duplex streams.
+
+[00:08:22]
+So that is all I have for this workshop. So if anyone has any questions both on the chat or in person you can ask them but otherwise, that's all I have.
+

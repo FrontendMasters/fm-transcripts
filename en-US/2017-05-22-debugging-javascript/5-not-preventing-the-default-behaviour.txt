@@ -1,0 +1,108 @@
+[00:00:00]
+>> So let's jump into our first bug, this is a bug that our QA group identified for us. And they said that, hey, and when the users are interacting with it, they can't actually delete a rant from their timeline, even though we have a delete button. So let's jump in and see if we can recreate, and fix that problem.
+
+[00:00:21]
+So here is our app, let me just do a Refresh here to make sure we have the latest running. And I'm going to try and delete this first rant that I made. And as you can see, nothing happens. Now, this is just my dev account, now, whenever you're debugging something, it's always a good idea to try and use real data and real users whenever possible.
+
+[00:00:54]
+Because dev data can get all wonky and weird with a lot of people just trying new things. So it's always a good idea to have a way to like impersonate real users and use real data. So fortunately, getRANTr actually has that, so I'm going to actually jump in and change out my user.
+
+[00:01:13]
+Now, you can do that by going into your console, and you have to stop the service from running, and you just type in node import and I have three users one, two and three. I'm gonna switch to user two, which is what I call my Keystone user and now, I'm going to relaunch the application with NPM start.
+
+[00:01:39]
+Now, if I reload getRANTr, I can see now, this is my most prolific user of get ranter. Now this user has been trialing getRANTr for some time and they've been putting all of their their different rants in here and that's been great. And you can really see that my ad.
+
+[00:02:00]
+My advertising targeting is right on the spot, I am gonna make a mint with this thing. But so let's try this again, let's say that this user wanted to delete maybe an unfortunate tweet and remove it from their timeline. But unfortunately they can't, they experienced the same bug that I was seeing in Dev.
+
+[00:02:22]
+So let's pop open our debugger and see if we can figure it out. So in Chrome, there's lots of different ways you can pop up in the debugger. It varies a little bit from Windows to OS10, it might be F12 on Windows. I think it's option Command I on OS10 or you can always just right click and say inspect.
+
+[00:02:43]
+There's lots of different ways to open this up. So I want to take a look at our console and see what what all is going on here. So when I try and delete something, what happens in our debugger console? Well, nothing like it looks just empty and you see a flash happening on your screen.
+
+[00:03:07]
+And that's because the whole page is reloading every time we do this. So let's see if we can figure out what's happening before the page reloads. So here in the console, we can have some controls about what's going on. One of the things you can do is you can preserve the log.
+
+[00:03:22]
+And what this is gonna do is it's going to not clear out all of the things that have happened between when pages have changed. And helps you debug problems where a page navigation is part of the problem. So at this, let's try and delete something. Now, we can see a whole bunch of things on this now, we see a console message that was printed at the start of the page.
+
+[00:03:45]
+We caught an error, uncaught error track GS caught cannot read property destroy of undefined, and then we navigated the page. [SOUND] so the first thing I kind of notice here is that there's some noise here on this page, it's showing this file tracker all over the place. And that's part of my infrastructure code, that's something I don't really need to worry about just yet.
+
+[00:04:13]
+So Chrome has this concept of black boxing, where you can say, infrastructure scripts that are not part of some stuff you need to worry about. You can tell Chrome to exclude them from stack traces and reports. So we're gonna navigate in here to tracker and notice that it's empty, there's nothing in tracker.
+
+[00:04:39]
+If we go back to console, maybe we can look at what's in rantListView, but that's empty too. And it's because these navigation links that Chrome provides to you happen to before a navigation event. And so the pointers that it has are gone, those specific instances of the scripts aren't loaded anymore.
+
+[00:04:57]
+And so the first thing we actually need to fix here is this navigation before we can really do anything at all. So let's figure out why this is navigating, well, so rather than looking at the error. Why don't we look at how the user is doing this interaction.
+
+[00:05:15]
+So I'm going to start by looking at the DOM itself. I wanna look at this delete button, so to do that, there's a couple of different ways we can do it. We can thengrab this little selector tool from the debugger panel and just move on to the button that we're looking to interact with.
+
+[00:05:34]
+And by clicking on it, it will bring us up this full listing of all of the entire document and we can see how this is structured. This is the HTML document as interpreted by Chrome. So we can, kinda move around this, it'll hover other objects as we interact on the page, so you could locate other things.
+
+[00:05:58]
+What I specifically care about is I wanna know what pieces of JavaScript care about this button. And so to do that, I can look at this event listeners section, now, this is really cool. This show is you all of the pieces of JavaScript, listening to this button or maybe listening to this button, because it's listening to one of its parents.
+
+[00:06:20]
+You can see the difference between the button itself and the parents by toggling the ancestors checkbox. If you uncheck ancestors, it will list anything that is listening specifically to this button, which is nothing. But a very common pattern in JavaScript and a lot of JavaScript frameworks will be to use a pattern called event delegation.
+
+[00:06:41]
+Where you're actually listening for an event at a higher level, but you really only care when that thing got hit. So if we consider the ancestors, there's all of these different things listening, somebody caring about blur, click, error, popstates, submit, unhandledrejection, a bunch of stuff. All we care about is click, the user is gonna click the Delete button, so what's listening?
+
+[00:07:05]
+So there's three things listening actually, we have a couple of things in tracker listening, but if you recall, that's framework code. We don't need to worry about that. And we have rantListView listening, now, here's some of our code that we actually care about. So directly from here, I can navigate in and I can see where are we actually listening to this code or to this event.
+
+[00:07:33]
+And so here's the event, the event is using a jQuery syntax event listener attaching to the event, click with this callback. And the event is using an event delegation pattern to see if did the thing that were actually clicked on match? The selector js-delete and if so, we're gonna call some function called Delete.
+
+[00:08:01]
+Well, that seems okay, why is it reloading? If we go back to the elements themselves, we see that button is inside of a form. What happens when you click a button inside of a form on HTML.
+>> Submit actual list. Post, it submits, it submits the form. It might be a post, it might be a get, it does the Submit action of the form.
+
+[00:08:25]
+And so nowhere in the code itself are we actually stopping that default action from happening. So even though our JavaScript is running, the page itself goes on with what it's doing and doesn't stop it. And so we need to add, we need to prevent that default behavior of this event.
+
+[00:08:40]
+Now, it'd be great if we could just make that change here. We found the code, I don't want to drop out of this view and find it in my editor and make the change and reload. And we can do that with a concept called work spaces, so I want to actually edit this file live, so I can tell Chrome.
+
+[00:09:00]
+Hey, this file that I'm looking at is on my file system as well. I do that by just opening up the context menu and I want to add a new folder to my workspace. Now, my workspace, you'll just point at wherever you downloaded the stuff. I downloaded getRANTr in Projects, getRANTr, here's the root for me and I'm appointed at the source public folder.
+
+[00:09:28]
+When I do that Chrome will say, hey, I'm asking for the rights to talk to your file system are you sure you want to do that? And I do, and now, I can map this file to an actual file on my drive. So that pops up with the name and it says this file as served from the web server was called rantListViewjs.
+
+[00:09:51]
+And hey, I found a file called rantListView.js on your file system and that folder you just told me about, is it the same thing? And it is, so now, I should be able to go directly into this file and make the changes I want. And let's test to see if that works, let's make a trivial change just to see if it's working.
+
+[00:10:15]
+So I'm just going to interact with this initialize function and I'm going to add an alert. And if I save that, if this change actually went to the file system, I should be able to just reload the page and see my alert. And hey, it works.
+>> How did you, get to the file on your computer?
+
+[00:10:43]
+Connecting the two, I miss that?
+>> There's a two step process, the first step is from your sources panel. If you just right click basically anywhere. You select add folder to workspace, adding the folder to your workspace pops open navigation on whatever system you're using. And I selected the public folder inside of the getRANTr directory.
+
+[00:11:13]
+What that ended up doing is you'll see here in the sources panel. There is now the public folder, this workspace and I could actually navigate directly and see what all is in my file system. The second step is from a file that came down from the web server, I can glue that together with something in my local workspace by saying, I've already fixed that one.
+
+[00:11:41]
+I don't think I can do it twice. [LAUGH] It's like map file to file system resource will be a third option in here. And they'll bring up a little search panel that's already populated with the name of the file, you should just be able to hit Enter and it finds it.
+
+[00:11:59]
+All right, so I'm gonna remove this alert now, because we actually don't want an alert. But now we know that changes are going directly against our source, so now, we can fix this bug. So the bug is that we're not preventing the default. So here, we only care about this event really, if we're inside of this condition.
+
+[00:12:21]
+If we're inside if (evt.target.matches|'js-delete')|. So before we pass it on to do whatever it is we wanna do, let's call event.preventDefault. Event.preventdefault is part of the standard set of API's available to us in the browser. And it will tell the browser to not do the default behavior that that event would normally do.
+
+[00:12:46]
+We're gonna handle this entirely ourselves with JavaScript. So with that saved I should be able to reload the page. And if I take a look at my console this time, there's a ton of stuff in it because I've had preserve log on a while. So I'm gonna turn off preserve log now and reload the page, and should be all cleared out.
+
+[00:13:09]
+So now, if I try and delete a rant from my timeline. Now, there's still an error, but I didn't reload the page anymore, I fixed one step of this.
+

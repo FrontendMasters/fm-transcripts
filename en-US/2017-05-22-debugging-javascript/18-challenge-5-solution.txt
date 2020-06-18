@@ -1,0 +1,128 @@
+[00:00:00]
+>> So this one was a little challenging, I think in part due to a poor example for me here in the timelines. So I'd like to go ahead and kind of do that again. There's a lot of information on the screen and unfortunately it didn't carry over particularly well with some of the constraints I have on the projector.
+
+[00:00:17]
+So, I ran another timeline here with some of my screens rearranged here a little bit, and I think it makes for a clearer picture. So, I can go ahead and zoom in. If you look in the upper third graph, the upper third graph shows us very high level information about what's happening in the frames per second what it takes to render the page.
+
+[00:00:45]
+The amount of CPU time being consumed, network activity and memory heap size. But it doesn't actually show you any more information as you get closer. It is a useful navigation tool. You can use it to like select and zoom in on particular areas. Now the middle sections, which I have exploded way out considerably larger, shows us the details of network requests.
+
+[00:01:10]
+And then what JavaScript execution points are actually running at that point. So, in my capture here, there's one big tick up here in the JavaScript heap. And so that's where I want to zoom in. So, once I have selected a relevant area, I can put the focus by simply clicking in this middle area.
+
+[00:01:31]
+And navigate in further using the key commands WASD on the keyboard. W zoom in, S zoom out, A strafe left, D strafe right. So using that we can zoom in more and more and more on this memory heap increase and trying to understand better what exactly is causing it.
+
+[00:01:53]
+And as we continue to zoom in more and more and more, we see that this tick was actually two different things that happened. We see a timer being fired, a JavaScript timer being fired. That calls down through a whole bunch of different functions, most of them being framework code.
+
+[00:02:12]
+What's interesting is way down here at the bottom is a blue box. That blue box indicates that this function increased the JavaScript heap size, this operation. And this operation was a send request to /api/ads. We can then see here in the network tab above, that a network request was fired at this time and took this gap between these two stacks of functions for it to process the server communication.
+
+[00:02:45]
+When it came back, we see another stack of activity. We see a couple more things that increase the memory heap size by grabbing the response payload from the server. And just the act of grabbing that XHR off the wire. And this was processed by some more JavaScript functions.
+
+[00:03:03]
+A lot of it's jQuery anonymous functions, a bunch of jQuery GUI we probably don't care so much about. But if we scroll down, eventually we get to some things that look a little familiar. We see a function called render, which is a normal thing in my code. We see collection.each and renderAd and render, and a whole bunch of other things that look like code function names that I wrote.
+
+[00:03:26]
+And all of these exist inside of stacks that increase the memory heap size. And so that's why these are good symptoms to look at. Because these things, as part of their operations, either directly increase the memory size or call other functions that increase the memory size. So I'm going to click on this one and use it as a starting point.
+
+[00:03:47]
+Once you've selected any one of these frames here, the summary tab on the bottom of your screen will show more information about it. Specifically, how long did it take for that function to run for its own execution, and how long did it take for all the downstream functions?
+
+[00:04:05]
+I'm just using this right now as pointer so that I can easily navigate to adlistviewjs, line 38. When you do this navigation, the Sources view is enhanced a little bit with the information from your timeline. So execution times are actually printed in this column right to the left.
+
+[00:04:28]
+So I can see that this particular call to this.el.innerHTML, this empty string took 0.4 milliseconds. It printed this because this was a non trivial amount of time for it to execute this operation. This is actually kind of an expensive operation on its own. And if we didn't only have to do it once, we might consider this a performance optimization.
+
+[00:04:50]
+But that's not really the cause of our memory leak. Let's take a look at this code, see if we can find out what might be leaking out of this. So we have an object here called AdListView that is responsible for dealing with our ads supposedly. Now, the render function and the render ad function featured prominently in our performance stack trace.
+
+[00:05:14]
+So we see that when render is called, we clear out the contents of an element. And then we loop over a collection and for each thing in that collection we call renderAd on it. RrenderAd itself creates a new object called an AdView. And sticks some contents from that into a parent element and then saves it in this object called this.children.
+
+[00:05:43]
+Which just by highlighting, it looks like it's just a simple array here at the top of the file. So every so often render fires for each item in the collection, it calls renderAd and renderAd creates some new things. We can go ahead and attach our debugger and see if we can understand more of what's happening here.
+
+[00:06:02]
+So I'm just gonna place a break point there. And then if I wait a few seconds here, I should actually catch something. We've landed on this render function, and we can see the contents of el, el is if you look on the left hand side of my screen by mousing over an HTML element that is in the DOM.
+
+[00:06:28]
+Chrome will actually highlight in the DOM. So we can see this.el is that box on the right hand side of my viewable screen that has ads for Russian getaway vacations and gold plated bathtubs. We clear it out, we go through a collection which looks to contain three things, and render each one of them.
+
+[00:06:50]
+Let's take a look at one of them that's being rendered. I'll set a break point here on line 47, side of the renderAd function and let this run. When I catch renderAd, I see an ad object. It contains some things in it, looks like a reference to a URL and an image URL or an image path and some junk.
+
+[00:07:16]
+So we would create a new view off of it. And then we're going to render some contents into the element, and then we're going to push it into children. Well, what's in children? At this point, because my page has been operating for a little while, children contain 252 ads.
+
+[00:07:36]
+252 ads have attempted to be rendered on this page. Now what's missing in this whole operation is that we never remove any children. And so every ad that has ever been attempted to be run is still on the page. There are thousands of shirtless pictures of Vladimir Putin hanging about, but you can't see them because we're just hanging on to references to all of these inside of the children array.
+
+[00:08:06]
+And it doesn't appear that there's any reason to keep them around after we've cleared out our innerHTML. Once they're not visible anymore, why should we even have them? And so I think we just need to do a little bit of our own cleanup code, our own like force some garbage collection to happen, here when we're cleaning it up.
+
+[00:08:26]
+So that first line where we're zeroing out the innerHTML, that'd be a good place to drop anything else that we have. And so maybe what we should do is say, this.children, which we know is an array, we can use some new JavaScripty stuff. And so we'll do a forEach loop around it.
+
+[00:08:49]
+So let's perform an operation to each child. And maybe we'll say child.remove. Yeah. Delete the child. And then we need to actually let go of them from the array itself. Now, we've all seen that arrays have a property on them called length. And you use that length property as a way to see how many things are in an array.
+
+[00:09:18]
+JavaScript is weird. And you can use that length property to clear out an array as well. By setting an array's length to 0, you actually zero out the array. Or you can create, I imagine there's use cases to set the length to other things too. But the only use case I've ever found with this handy little feature is zeroing out an array.
+
+[00:09:45]
+By doing this, if we grab this again after we saved, the next time this code executes which should be in some point less than 10 seconds. So, at this point children contained 288 pictures of Vladimir Putin, we're going to loop over it and do an operation. Before we execute, we have 288 things, now we have 0 things.
+
+[00:10:13]
+We've dropped our only reference to it and now we are at the whim of Chrome's garbage collector, but the next time a garbage collection event has happened they should all get cleaned up.
+>> I've got a question.
+>> Yeah.
+>> The for each loop then, what was that doing as opposed to the children.length equals 0?
+
+[00:10:33]
+
+>> Technically, I think we could probably have gotten away with that.
+>> Okay.
+>> The forEach loop is elsewhere in the code. It talks about deleting or calling remove on views to like clean up themselves, but that's probably a confusing aspect that should be dropped. We probably just get away with that.
+
+[00:10:55]
+
+>> Could you also just reset this.children to an empty array?
+>> We could. It's, I believe, slightly more expensive, but it's fine. The question was, could you just reset the children array to be a new array? And yes, you could. That would also be perfectly viable. Now, we don't know that we fixed the memory leak until we run another profile.
+
+[00:11:21]
+So let's go back to the profiles and you'll notice that our snapshot from before is still there even though we've done a bunch of stuff. I've reloaded the page several times, I've run other tools. And you can even save your snapshots off, save them to disk. You could store them and put them in your code repository.
+
+[00:11:40]
+So you can understand how does your memory profile look at different stages in your development cycle? You could compare, what is your memory profile look like each iteration, each week, each month, each release, each whatever time period makes sense to you. Because this is a fairly trivialized example.
+
+[00:11:58]
+In real applications, there's going to be lots and lots of things running in parallel and you won't always know which one caused the leak to occur. For our example, we've made one change here. Here's our original snapshot where we can see every ten seconds about 100k getting allocated and 50k getting retained.
+
+[00:12:19]
+I'm going to run another snapshot, which will just be done here below. I'm also going to run it for about 30, 35 seconds or so, so we have about the same amount of time to compare it to. For the first comparison, I saw it jump up about 50K and now it is dropped significantly below 50K.
+
+[00:12:40]
+We're looking at about 10K still being retained. Now let's go one more cycling and we'll stop it. All right, so as a reminder on how to read this. This top chart is showing you each time your JavaScript application allocates memory from the system. Each time it asks for new memory from the heap, it's going to show a line.
+
+[00:13:12]
+If that line is still shown in blue, it means that your application is still holding on to that memory. There's still something being used in that memory. If it's gray, it means it's been released, which means you did need that memory at one point, but you're no longer using it.
+
+[00:13:31]
+And so that's usually fine. Now what we see here, if we compare these two snapshots, the one that we had before would allocate about 100k and retain about 50k every cycle. And in the new one, we're allocating about 100K, we're only retaining about 10. Some of that is just going to be due to Chrome's garbage collector.
+
+[00:13:54]
+Cuz it's not always the most efficient. If we were to let this run for five minutes or so, most of this would actually get cleaned up. But there may be another subtle memory leak somewhere in here. Using this for your application can help you point out whether or not, over longer periods of time, memory is still being retained from your applications.
+
+[00:14:14]
+So this was a trivial memory bug and we looked at it unreleased objects. Specifically, we are creating a lot of things as part of cycling our advertisements and we weren't like clearing them out. We didn't actually like drop all of our references to them when we were done with them.
+
+[00:14:30]
+And this is one of the biggest sources of memory leaks that I've seen, is you're creating some part of like dynamic elements. Some dynamic visualization in your UI but you're not always getting rid of it when you're done with it. You need to make sure you drop every reference to it, even in EventHandlers or Callbacks or anything like that, so that when the Chrome garbage collector comes along, it will let it go.
+
+[00:14:54]
+Specifically, there's two tools that help you to understand this. The Profiler is more helpful to understand whether or not a memory leak is occurring. And then if you believe there is, you can use the timeline to try and understand where.
+

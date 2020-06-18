@@ -1,0 +1,45 @@
+[00:00:00]
+>> So we've been doing a lot of these streaming pipelines. And it's actually kind of easy to mess up when you write things in this way. I mean, I've been doing it this way for brevity, so far, so I don't have to explain all of the caveats why you wouldn't wanna do that.
+
+[00:00:14]
+So, in a more realistic setting, you probably wanna use a module that's gonna handle the error propagation in all of the streams. So, how error propagation works in node is, anytime, I think our HTTP example was guilty of this, or maybe something with one of those long pipelines, let's look at one of those.
+
+[00:00:34]
+So, our vpn-client, maybe, yeah. Although it's better, in a server. All right, so here's our VPN server from earlier. It's got this long list of events that happen. The problem is, that if any of these has an error, streams are also event emitters. And if an event emitter emits an error event that has no listeners, the node will crash.
+
+[00:01:00]
+It's designed to do this, so that if there is a problem, your server will just crash instead of it being eaten and stuff's silently tearing itself apart, it's probably better if it just crashes. So, one way that we can rewrite this sort of thing to be a little bit more robust is to use a module like pump, that's going to pipe all these things together for us.
+
+[00:01:27]
+So, if you call pump with a bunch of streams, it's gonna set up the pipes internally between each stream. So, it's doing stream1.pipe, stream2.pipe, stream3, but in a way that's gonna deal with errors. And, in fact, you can also put a callback at the end of that, that's gonna handle errors.
+
+[00:01:47]
+So, I'll require pump. Pump is also better than just doing it this way, sort of cleaning up after streams, as well. So, sometimes you can get file descriptor leaks and things that pump is a little bit better at dealing with. So there are some questions earlier in the chat about this sort of thing.
+
+[00:02:09]
+So now, we wanna take our stream is the first one. And now instead of calling that pipe, we just replaced these all with commas. And, I think it ought to work. If there's an error, you can optionally listen for one. So, I'll just print it out. Okay, so I think if I stand up our VPN echo server from earlier, now, It should be more enterprise ready.
+
+[00:02:40]
+[LAUGH] And I'm gonna send it a bigger chunk this time. Great, so it's working. And, if I kill the connection. So, this message was printed because it's coming from our handler, and it didn't crash the server, all right? It otherwise would have, so, useful to do with pump.
+
+[00:03:05]
+Actually, I think if you use pump it's just gonna eat these errors and you won't see them. But if you do pass in a function at the end of that chain, you can handle them, if you like. Because most of the time, when you have one of those pipelines that's coming off a duplex socket, it's errors are probably caused by the network transport just ending abruptly.
+
+[00:03:25]
+And so, it's not really something that you need to worry about, although it might cause some different kinds of file descriptor leaks or custom memory leaks of some sort. So it's just easier to wrap your pipelines with these kinds of tools, all right? That's all working well. There's just a version called pumpify.
+
+[00:03:47]
+And, unlike pump, where it's gonna just pipe everything together, with pumpify, you get back a stream that you can write to and read from. So this is often more useful if you have a module like an API where you wanna return a stream that sort of encapsulates this whole streaming pipeline end-to-end.
+
+[00:04:09]
+You can use pumpify for that. So, you need to do that? There you go. One of the final things is, streams are actually really, it's really difficult oftentimes to know when a stream is over, when it's done with. So, there's this fantastic package called end-of-stream that knows about all of the obscure subtle ways about how streams can end, be they readable, or writable, or whatever.
+
+[00:04:36]
+Because also, if there's an error, then the stream is over but it won't admit an end event because end is for a successful termination. So it just sort of encapsulates all of those use cases into something where you can just stick your cleanup logic into one place, and you don't have to worry about all of these edge cases if you use this package.
+
+[00:04:55]
+So, how end-of-stream, whoa. How end-of-stream works is you provide it with a stream, as an argument, and you provide it with a function that's going to be called whenever that stream is done, whether it errors out, whether it closes cleanly, or what have you, then this function is gonna fire.
+
+[00:05:30]
+Okay, so, I'm gonna pumpify the vpn and push that result. I don't know if we wanna take another little short break, maybe, to play around with this stuff?
+

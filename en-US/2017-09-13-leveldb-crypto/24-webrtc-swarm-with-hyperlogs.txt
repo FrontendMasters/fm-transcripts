@@ -1,0 +1,138 @@
+[00:00:00]
+>> So for the last section, I wanted to just clump as many of these things as we can into one big fun demo. And so we're gonna be creating a gossip network with hyper log for replication, we're gonna be using webrtc-swarm to create peer to peer connections in the browser.
+
+[00:00:18]
+And we're gonna maybe also using hyperkb and then we can make kind of like a shared Wiki by some very loose sense of that term, probably just like a text area that you can change and other people can see what the documents are. All right, so let's get started, here's some of the modules that we can use.
+
+[00:00:47]
+So oops, gonna create a new directory I'll call it wiki, okay, so the first thing that we need to do is we need to get our swarm setup, and we need to get our logs replicating on top of that swarm, then we can layer on more pieces once we have that working.
+
+[00:01:07]
+So, first thing that we need to do, Is create a new file main.js, this is gonna be running in the browser. So I'm gonna be using a lot of the same libraries we've already covered like local browserify and yo-yo to just, whip up a quick little interface. So the first thing that we wanna do is we'll require level, so that's gonna be level-browserify cuz we're gonna be in the browser.
+
+[00:01:33]
+We'll instantiate that call it wiki.db, I don't know call it whatever we want. And then we're gonna load hyperlog, so I think in this case, we're also gonna want to use sub level down to partition that database. So we're gonna require a sublevel down, we've got this database now that we can use for stuff.
+
+[00:01:56]
+So I'm gonna put a hyperlog into separate sublevel, so that we don't have to have a bunch of index dbs floating around. So we require hyperlog, and then we'll make a new log that will be hyperlog(sub(, so I like to call it subdb of call it 'log') and a set value in coding to Json as well, handy thing to do.
+
+[00:02:29]
+Okay, so now we've got some of the basics of our database set up, the next thing that we need to do is we need to set up a swarming logic over webrtc. So we can do that by requiring this module, webrtc-swarm, So webrtc-swarm does take a server that's going to do the introductions between peers because that's not something that webrtc can do by itself in a completely peer to peer fashion.
+
+[00:03:01]
+But this server is only used to set up the connections. It doesn't mediate that connections in any other way aside from just connecting people together. So we're gonna use a few modules through that Webrtc-swarm and signalhub. So we can create a new swarm, based on a signal hub name, so we'll call this one wiki, cool-wiki, we'll call it and then we need to pass in a list of signal hub addresses.
+
+[00:03:36]
+So there's one that happens to be running at signalhub.mafintosh.com who's the author who wrote this package. And I uses his server all the time for my little demos. So the swarm instance, will emit peer events when we have a peer connection, and that peer is a duplex stream.
+
+[00:04:00]
+So it means that whenever we get an incoming connection, we can write to it and we can also read from it. So, what we can do now is we can do log.replicate, and we can do live replication, which just means that once the two endpoints of the log are synced up the stream will stay open and then anytime either log gets a document written to it, it'll be synced up right away.
+
+[00:04:30]
+In true duplex stream fashion, a .pipe b.pipe a again, there we go, And then we're gonna need a way to add documents to our log. So I'll just bust out a quick little interface for doing that. So here we go, and then I'm gonna need to create do some dumb stuff.
+
+[00:04:58]
+So we need to append the document to the body, And we need to have a little update function. So our update function is just going to take little pieces of state, little variables in our program and it's going to update the DOM based on that information. So, one thing that we can do just to make sure that replication is working, is we'll have maybe a little text area where we can just log pieces of information.
+
+[00:05:32]
+This would be sort of like our wiki editing interface. And the pieces of information that we're gonna wanna keep around to start with would be maybe just a list of documents. So I'll just create a little array to do that, And now we need to set up our HTML so, We'll have a form.
+
+[00:06:00]
+It's gonna have a submit event, And then a text area with a name we'll call it content or yeah contents to find name for text area. And then in our submit handler, what we need to do is write out these documents to our database. And actually, I think we'll also want an input box that's gonna be like the title of our wiki page and we'll use this for the key later in our database.
+
+[00:06:40]
+Put some divs around that, Okay, so now in our on submit handler whoops. We're going to need to do this.elements.title.value to get the title name, in this.elements.content.value to get the message body. So content equals that and then like to get, we can reset, perform whatever okay, so then we need to write that data out to the log.
+
+[00:07:17]
+So we could do log.add if we knew the previous key. There's actually a shortcut in hyperlog called log.append, that just uses whatever the latest hash was that was written. So, We can use that in this case. Except what I'd actually like to do is wire up hyperkv to start with right now because it's gonna format the keys and values in a particular way.
+
+[00:07:40]
+So this will just make it easier for us to deal with. So, to set up hyperkv, we require it like so, we need to give it log in a database handle, so to instantiate it so, We call hyperkv with the hyper log, and then a database handle that's going to be a sublevel on our existing database.
+
+[00:08:05]
+So I'll call this one kv, right? Makes sense so far? Just using all of the pieces that we've seen. We haven't seen hyperkv in action until now, but this is how you set it up. And then you can call different methods like kv.put and kv.get, or in kv.createReadStream as well to list out all of the documents.
+
+[00:08:27]
+Okay, so now we can call kv.put with title and content, whoops. So the title is gonna be the key and the content is gonna be the value. I think we said JSON encoding, so why don't I do that, all right? By default, hyperkv is gonna do the same thing that log.append would do, where it's just kind of like a little shorthand, but for the latest known document.
+
+[00:09:04]
+But if we wanted to have explicit control over that, you can pass that in as a third option argument that is a links array. But we don't need to do that right now. I'll print out an error if there is one cuz that's good to know. Otherwise, we can print out the node object so we can see what it looks like in the hyper log, and then, Maybe we can take that documents array, turn it into an object, and then also set.
+
+[00:09:43]
+Set the document content, so, I think what we wanna do, though, is probably do, well, anyways, this is just gonna print out a message. I think this is enough code to write without testing it for now. So let's go ahead and run this thing. I'm just gonna use budo, like I've been doing for the other examples, run main.js.
+
+[00:10:10]
+Make sure that I call the update function right away, I do.
+>> I think you're missing the TLD on your signal address, the .com.
+>> Thank you, good call. I would just an awkward, I'm also gonna log out when I get a peer connection cuz that's, That's helpful to see.
+
+[00:10:29]
+Okay, so here we're now running. I'm gonna launch Chrome. I'm gonna do a normal Chrome, and then an incognito Chrome. Although the incognito will lose its database, which will be kinda useful because then the other one can sync to it when it pops back up again. Okay, so we go to localhost.
+
+[00:10:50]
+No, I thought I'd installed that one as well. Okay, so apparently I hadn't had that package as well. All right, now I have that library, took a while. Good, I just did not signalhub as well. All right, sorry, we gotta wait again, apologies. Now let's see if it works this time.
+
+[00:11:20]
+Okay, so it requests it. There we go, 4 megabytes of JavaScript, hooray! So that's fine. Excuse me, ignore those errors. So I'm gonna create a new document. I'm gonna call it hello. Gonna put a cool message there. I forgot to make a submit button, but I think if I hit Enter, I forgot to ev.preventDefault.
+
+[00:12:01]
+That's a common mistake, so I'm gonna go ahead and do that. Ev.preventDefault, cool. And, right, I have to be on the first box and hit Enter to make a submit, whatever. Okay, here we go. So we wrote a document now you can see it scrolled by. It's just like we were seeing on the command line with the kind of output.
+
+[00:12:36]
+So it has a key which is a hash. We could also have identity and signature if we had enabled the hyperlog sodium. And we see the links and we see the value, which is this message. So the messages in hyperlog are simple little key value internal to another key value format, yet another layer of keys and values.
+
+[00:13:02]
+k is the key, v is the value. So that's the body that we put into the textbox. So that all looks like it's working. So next thing that we need to do with this program is we need to go in and somehow list out all of the documents from our key value store.
+
+[00:13:18]
+So to do that, what we can do is I'll put that in a little function here at the bottom. Call it getlist, something like that. And our getlist function can modify that object that we have, the docs object. Okay, so there's createReadStream function is part of hyperkv. And I can pipe that into to.obj, like we've been doing a lot.
+
+[00:13:48]
+And just to start with, I'm gonna call getlist when the code loads, and we can just look at what values are in there. Hopefully we should see the document that we just created. Row= row next. Okay, so back here in the browser. Indeed, we see row=, and then we see the message that we already put.
+
+[00:14:18]
+So it's persisting in the browser into hyperlog. Without building a whole new interface, one really quick way that I can test to see if this is working is if I load this code into this incognito window here, which is not on the same IndexedDB. So it should be a clean IndexedDB.
+
+[00:14:39]
+Hopefully what I should see is if it can connect over WebRTC, But maybe it can't if it's seeing insecure response. Maybe I need to put HTTP instead of HTTPS for the signalhub. That may fix it.
+>> It's like the Chrome course.
+>> What?
+>> It's one of the cross origin.
+
+[00:15:27]
+
+>> I'm just gonna check really quick what I did yesterday cuz that worked. [LAUGH]
+Okay, here's what I did yesterday, but it totally worked. All right, it was HTTPS. I think there's a bug where if you didn't put a slash in one version, then it wouldn't work. Maybe it is connecting and I should just leave it alone for a second, all right?
+
+[00:16:15]
+We'll see. All right, so another thing that I can try really quick is I think a budo has an option to do an SSL server. I might have to do that. You have to ignore the scary warnings So here we are, I have to put a new message because https is on a different origin policy from the default one.
+
+[00:17:15]
+I'll write that into the database, still not getting any peer connections though. Just too bad. Okay, yet another thing I can try, I installed Signal Hub, right? So it's going to be installed into here. Signal Hub happens to come with a bin package, which is like some library.
+
+[00:17:43]
+So if I listen, I can do a local host version of Signal Hub on a different port. So that might work. 5008, all right. I'm gonna Ctrl Shift s to reload this time. Now it's not happy about loading from an http page. So again, go back to the http version.
+
+[00:18:20]
+This stuff is super finicky sometimes but, When it works, it's really great. [LAUGH] Here we go, compiling four megabytes of JavaScript, takes a little bit of time. Okay, so, Hey, we have a peer connection. That's good. So what we need to do now is in that other database, so we have our get list function, which seems to work.
+
+[00:19:01]
+I'm just gonna, for a really simple hack, is I'm just going to put it in a set interval instead of wiring this all up properly, just so we can see if the replication worked. So, Look at that. So now, in the incognito window, we in fact see our documents from our key value store.
+
+[00:19:29]
+I could take the time to like build the proper interface, but I think by now it's good enough. In fact, if I add a document over here, I bet we can see it on the other side. So I'm gonna try that. Hi from incognito, hit Enter, and then gonna reload over here.
+
+[00:19:53]
+So it gotta establish a peer connection. Hey, there we go, hi from incognito. So we're syncing our key value store, which is built on a hyper log, which is a Merkle DAG, which has a materialized view sitting on top of it that gives us a really unusably obtuse wiki.
+
+[00:20:16]
+So there we go. [LAUGH]
+>> Which could be refactored into something useful?
+>> Yeah, which you, if you took the time, could make something quite useful. Use web technology, you could do that. Okay, great. [LAUGH] Any questions both on the Internet or in here? Sorry for the long pauses, but we finally made it to the end result that I was looking for.
+
+[00:20:42]
+So this was LevelDB in crypto. I think we did some of each of those things.
+>> Awesome, thank you.
+>> Great.
+>> [APPLAUSE]
+

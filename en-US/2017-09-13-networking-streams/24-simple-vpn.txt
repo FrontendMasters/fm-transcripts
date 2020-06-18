@@ -1,0 +1,100 @@
+[00:00:00]
+>> Question.
+>> This is maybe too much of a sidetrack. But I'm just curious if we added some encryption into that, would we have the beginnings of a VPN we could use or is that totally-
+>> Yeah, we can do that. If you want, I can do that, that sounds fun.
+
+[00:00:13]
+
+>> [LAUGH]
+>> Okay, so actually, a bit later, I'm gonna talk about core streams, so we can use one of these methods like create cipher. These algorithms actually aren't great. This is more like a topic for tomorrow's workshop. But I would use something like the lib sodium implementations available in node.
+
+[00:00:35]
+But whatever, we'll just use some aes or whatever I guess for this purpose. Yeah, let's build the crappy VPN-
+>> [LAUGH]
+>> [LAUGH] With just like a password, sure so, It's getting interesting. Okay, so we'll copy your proxy server and we'll call it vpn.js now. So our VPN will be an echo server VPN, it'll connect to our echo server inside of our network and back out again.
+
+[00:01:03]
+So there's a crypto module in node that provides different kinds of streaming endpoints. So what we need to do is we need to, So our client now is gonna have to be crypto aware. So we're gonna have to write a separate client. I'll write this server first. So we need to create a password.
+
+[00:01:29]
+That's pretty secure. And then we need to create a cipher for that, so I'll call it enc = crypto.createCipher, I believe, and then it takes the algorithm. That's in algorithm ab, right? readme crypto, there's a great command that you can get at NPM called the readmeNPM install-greadme. And I actually wrote this patch, you can read the core docs offline in your terminal for any kind of package.
+
+[00:02:00]
+So just find an exit, whoops, createCipher. So here's an example right there, we'll just use that, whatever that is aes192, who cares? [LAUGH]
+>> I'll be doing my banking on this later so please do it right.
+>> [LAUGH] So this is gonna be a transform stream, this createCipher provides us.
+
+[00:02:26]
+So we need to take the incoming data that's gonna be encrypted. We need to decipher it actually. So we would call createDecipher, I think. Yeah, createDecipher with the algorithm name and then the password, so just a standard symmetric cipher. So we'll pipe our encryption into a stream. Or sorry, our stream goes into our encryption like so.
+
+[00:02:59]
+Actually, we could do this in line and it will look cooler. Although I'll cover a better way to sort of set up these pipe chains a bit later with a module called pump defy that it's better for production purposes. But whatever, don't do this in production anyways, don't roll your own crypto please.
+
+[00:03:15]
+And then so our echo server is gonna be a piece of legacy software so it's not gonna be able to support encryption. So we're gonna pipe plain text to it behind our VPN. And then at the other end, we need to encrypt the data on the way out again.
+
+[00:03:37]
+So right, and then, of course, this is gonna be vulnerable to all kinds of terrible things like replay attacks and whatever. So [LAUGH] again, it's just an example, don't use it.
+>> What's a replay attack?
+>> It's when you take a packet that's been sent and you just send it again.
+
+[00:03:57]
+
+>> Okay.
+>> [LAUGH] And if the if the crypto doesn't set a sequence and doesn't do a bunch of other tricks, then it'll just accept it. And so if you know when somebody submitted something, you can sort of figure out what packet that was and send it again and again and again.
+
+[00:04:15]
+If somebody sent you $5, you just capture when they did it, and then just send it again and again, and you have a million dollars, anyways.
+>> Let's do that next.
+>> [LAUGH] It'd be a little bit trickier to do that just on the fly, unprepared. So we can pipe the other end into createCiphers that it's also encrypted on the way out.
+
+[00:04:37]
+That's another kind of transform stream. And then we could pipe that back out to our stream. So here's what our pipeline is, this is still sort of a basic duplex pipeline because it starts with a stream and it ends with the same stream. And in between, we have another duplex stream, but we sort of sandwiched in two transforms in the middle.
+
+[00:04:58]
+So we're gonna take our encrypted stream. We're gonna decrypt it, we're gonna pipe that data to our echo server and our VPN and then we're gonna encrypt it again and send it on out. So that's what this should do. And again, this is on the fly. So we're playing with fire a little bit.
+
+[00:05:16]
+So we need to make a custom client now, vpn-client.js. Whoops, so I just copied the existing VPN server and we're gonna modify this client to try to get it to work. So instead of net.createServer, we create our stream now with net.connect. And we can give it a port and I'm sorry, our port is actually a 5005 is where our VPN server runs.
+
+[00:05:47]
+So our VPN client is gonna take standard in and we're gonna pipe that to encryption. So all that we need to do is sort of swap the order of the decipher and the cipher, like so. And our decipher goes there. And we put the stream in the middle, and then we pipe the standard out.
+
+[00:06:14]
+And now we are the duplex stream. So notice how process standard in goes into a duplex stream, goes out to process standard out. But then, we are the duplex stream that's gonna type things into the keyboard and also read them. So we're sort of supplying the input and interpreting the output as our human meet machine can uniquely do.
+
+[00:06:38]
+So I don't know, this might work. Let's give it a shot. So node vpn.js, and now node vpn-client.js. A digital envelope routing, weird, connection refused. All right, I'm not running the echo server. So I need to run the echo server, port 5000. I'm the sysadmin now, so standing up all of the servers to run the vpn.
+
+[00:07:06]
+Now I run the vpn client, I say hi. And no data comes back which I think is because, yeah, so it's-
+>> There was an error on the [INAUDIBLE].
+>> What?
+>> There was an error on the echo server.
+>> No, what it's actually doing is it's buffering.
+
+[00:07:25]
+So the way these crypto streams work is you have to actually fill them up with enough data before they'll provide output. And this is done for some good security reasons but if you notice, once I typed a bunch of gibberish, and indeed told us back, hello. So with some other improvements to do filling, I mean I wouldn't really mess with this anymore cuz it's horribly insecure.
+
+[00:07:52]
+But in due time, you could have a semi decent kinda thing if you wanted to spend a lot of time-
+>> Could you trace through what happened again, just like all the servers and where everything went and went back to?
+>> Yeah, so to recap, we have our echo server.
+
+[00:08:05]
+Our echo server is very simple. We were testing it with Netcat. So it takes input and writes out the output again. We can also stick it to uppercase stream in there if we want it to, the uppercase echo server or whatever, but it's just a simple echo server.
+
+[00:08:21]
+We have our VPN server, runs on port 5005. And it connects to the echo server which runs on port 5000. It takes incoming connections, unencrypts them. And then sends the plaintext to our echo server, our echo server sends the response back to the VPN server. And the VPN server then encrypts the data and sends it back out to the client.
+
+[00:08:48]
+So it's encrypted both ways on the boundary of the network. Then in our VPN client, it does the same thing but in an opposite order. So it takes input from standard in, pipes that to our encryption, pipes that back out to the stream, which is the connection to the VPN server.
+
+[00:09:10]
+And anything that comes back from the VPN server then needs to be decrypted which is done right here. And the plaintext is written to standard out, so that's what we have.
+>> We could validate this by running TCP dump and listening to see if it's encrypted or not encrypted?
+
+[00:09:24]
+
+>> Yeah, you would see encrypted data on on the port. But you'd see unencrypted data on port 5000 if you're gonna get all on the same machine, so yeah. You could use some of those TCP dump commands from the networking section to do that.
+

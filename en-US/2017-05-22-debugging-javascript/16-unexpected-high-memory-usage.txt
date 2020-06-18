@@ -1,0 +1,117 @@
+[00:00:00]
+>> So let's fix some more bugs in our get rancher app, now we have four more to go through this afternoon. And these are gonna be a little bit different than than the ones we fixed this morning. Here's one that we found during developer time. So I was working on the app, and I noticed that after a while of using the app, the fan on my Mac started like blowing real hard and I looked at the memory utilization and like Chrome was just eating up multiple gigs of memory.
+
+[00:00:30]
+So I kind of feel like maybe there is a memory leak somewhere inside of get ranter, and so let's see if we can figure out how to prove that there's a memory leak. And if we can diagnose where it might be in the application. And so in order to do that, first we need to go back to our Keystone user, the main user that I wanna interact with.
+
+[00:00:52]
+So I'm gonna switch back to my terminal and I wanna load back up my primary user, so that's node import 2. Should bring Donald back in, And then I'm going to npm start and get this whole thing going again. So if I reload my page here, I should see my main user here again, excellent.
+
+[00:01:30]
+So let's figure out first if a memory leak exists here, cuz there's a couple of different tools that Chrome makes available to us to inspect the memory utilization of our applications. Some of you might be thinking, it's just a JavaScript applications, we don't need to worry about memory like that's a server side thing.
+
+[00:01:49]
+No, JavaScript consumes a lot of memory, and the more advanced applications that we start building in the web, the more we need to be concerned about it. How many times have you seen have like 17 tabs open in your browser, and notice your computer's running really slow. Chances are a lot of those web pages are running a lot of JavaScript, and they're eating up a lot of the resources on your machine.
+
+[00:02:12]
+So all apps, even JavaScript browser apps need to worry about memory. So there's a couple tools we can use, the first one we're gonna look at is called profiles, and profiles allow you to take a bunch of different kinds of metrics about your application. The one that we particularly care about right now, is the allocation profile.
+
+[00:02:34]
+And the help text even shows error, tells us what this is good for, this records, the allocation profile show memory allocations from your JavaScript functions. And so it's useful for us to help understand whether or not, memory is leaking out of our app. So I'm gonna go ahead and start this running, and it's good to let this run for a little while so we can see what sort of things are happening as the application goes on.
+
+[00:03:03]
+This is recording anytime a piece of JavaScript is running in my app, it does something, when does it allocate new memory, versus when does it release old memory. So I'm just gonna let this keep running for probably about 20 25 seconds and we're gonna get a good picture of what sort of activity is happening in the background of my application here.
+
+[00:03:24]
+So I think hopefully that should be enough time, and I'm going to stop it. Shit, I did the wrong one, my apologies, [LAUGH] rewind we need to do the record allocation timeline. I even read the wrong one, [LAUGH] the recording the allocation timeline, shows memory allocations, but use this profile type to isolate memory leaks.
+
+[00:03:57]
+It even says it right there, we're gonna record the allocation timeline. So we're gonna run start there and this time, it's more intelligently gonna tell me for how long it's been running. So this thing we have this little timer going across, it's impossible to see cuz the contrast ratio is too low until it did that right there.
+
+[00:04:15]
+And what this is showing is it's showing us different times our application has allocated memory as part of its actions. Now the line shows as bright blue for memory that is still being held on to, so our application grabs a new memory from the system, and it's still holding unto it.
+
+[00:04:33]
+Whereas the grey lines which are kinda hard to see on the projector screen, but hopefully you will be able to see that when you playing with it yourself, is memory that was allocated at one point, and then later released. So I'm gonna go ahead and stop this now, And we can take a look at this chart, hopefully.
+
+[00:05:05]
+So this chart just kind of hard to see cuz of the contrast ratio, has a memory allocation happening about every ten seconds is what we see our application doing. And the overall allocation is right where my mouse cursor is, it's about double what it is here, but we're still retaining about 50 kilobytes of memory on each one of these cycles, the overall allocation at each new time period looks to be about 100 K.
+
+[00:05:34]
+And then we clean up about half of it before continuing on. So if this pattern were to occur, we're retaining about 50 kilobytes of memory, every ten seconds forever. This doesn't seem to ever clean itself up. We never see those blue bars dropping all the way down to 0 at the start.
+
+[00:05:52]
+And so if we were to be running getRANTr for hours, days or months at a time, this could add up to fairly large amounts of memory. Now, the other data on this page is fairly low level and kind of hard to reason about. There's a lot of objects down here in this table that describe the actual objects that were created and are still holding on to memory.
+
+[00:06:15]
+But unless you're really familiar with the low level operations of the browser, you're probably not gonna understand what's going on there, I certainly don't understand all of them. Fortunately, we don't have to, this is useful as evidence that there is a memory leak occurring. But it's not the best way to find out where that memory is leaking out from.
+
+[00:06:34]
+For that we'll use a different tool, we're gonna pop over to the timeline tool, The timeline has a couple of different really valuable things that we can do and they just changed, there we go any moment. The timeline shows us a couple of different interesting things that we can do.
+
+[00:07:00]
+It can take pictures of what kind of network requests are being made, what kind of memory is being consumed, and what does your app look like at different points in time. And so it's useful for different kinds of bugs, for what we're gonna do today, I wanna look at what memory is being allocated over the course of the timeline.
+
+[00:07:21]
+If you go into the Advanced Settings, you can see like you can change other parts of it or other kinds of data to capture, we're not gonna turn any of these on. This would enable you to disable captioned JavaScript details, I want to know JavaScript details, and advanced paint instrumentation, which is actually very slow to run.
+
+[00:07:40]
+So for this timeline, I'm just going to capture memory. So I'm going to open this back up, and I'm going to record the operations. Now if you had an app where most operations happened during the users interaction, you'd wanna be doing that right now you'd want to be going in and doing some sort of interactions on the page so that your JavaScript would actually be exercising itself.
+
+[00:08:08]
+So I'm going to do that, I created a new rant and now I'm going to delete it, and that's basically all my app does here. So I've exercised all of the code and then anything else that's running in the background should have had 30 seconds or so to run.
+
+[00:08:23]
+So I'm gonna stop that, And this is going to produce a whole lot of information And don't be intimidated because we'll go through it, it's all very well organized once you kind of understand it. At the very top here, we see the actual timeline with all of the data that we've captured.
+
+[00:08:45]
+Not all of this is relevant for everything that we wanna do, it's capturing things like the number of frames per second the browser was running, CPU consumed, network consumed and memory consumed. These are overall values, so they might not necessarily be helpful pointing you at what exactly is going on.
+
+[00:09:03]
+For us, we're concerned about memory, and so what I wanna point at specifically, is the heap, which is the blue line here at the bottom. The blue line here in this section at the top where it says heap, shows that we're running high on memory, there was some garbage cleanup event where we see it dropped down.
+
+[00:09:26]
+And then we seem to get into that pattern again, we're about every ten seconds, there was a tick up in in memory utilization. So it seemed to match what we see in the profiles, but we need to find out more information, so that's where the rest of this comes in.
+
+[00:09:45]
+Another way to look at the same information that might be a little easier is the line charts at the bottom allow you to make it a little bit bigger, and showing more macro level information. So it shows things like in blue, the JS heap size, in red, the number of documents which for us is not really relevant, in green, the number of nodes, so the number of HTML nodes in your document.
+
+[00:10:07]
+And that's important from a memory aspect, because storing HTML nodes is one of the main source of the memory of the browser. The number of HTML listeners that attached, and GPU if you're doing heavy graphics stuff, which I am not. So we can use this to as like a roadmap to start guiding into where we want.
+
+[00:10:29]
+So I wanna look specifically at what's going on in these big step functions, what are these things that are allocating all this memory, because that'll be a good way of looking at what code we need to examine. My screen is not big enough for all of this, all right, so what I wanna do is I wanna zoom in here on one of these.
+
+[00:10:54]
+In order to do that I can zoom in using that top toolbar, notice when you mouse over it, you get a blue line that shows you like an indication that you can select in. Not only can you select in just by dragging and dropping an area, you can use gamer style keys if anybody used to play like video games on their computers.
+
+[00:11:16]
+The keys W A S D on the keyboard, or did they change that too? No they didn't, the keys W A S D on the keyboard, work just like as if you were playing a video game where you can zoom in and zoom out and strafe left strafe right, y tou can like, have a little bit of fun kind of exploring that's going on.
+
+[00:11:37]
+And you'll notice, as you kind of explore around this timeline and as you zoom in, that all those weird little lines at that big chart in the middle, they start getting bigger. They start like, showing you that there's a lot that was actually going on, and notice we're really close in like, we're at at the ten millisecond timescale here.
+
+[00:11:59]
+But as we keep zooming in on this step, this memory increase, we see that it's not one memory increase but a bunch of little ones, all happening right in a row. That's not even the one I wanted to look at. So as you continue zooming in on this, you'll see that those little ticks in that center area are references to code executing.
+
+[00:12:30]
+That little tick of yellow that's happening here in this 7 millisecond time frame, is an XHR load event. And we can see the entire call stack here and how long that that call took, the XHR load called this jQuery function, which called into this anonymous function. And we can scroll down and interact with this entire call stack to see what parts of our code we're actually running as part of this memory increase.
+
+[00:13:00]
+Now there's a couple of different ones here, the one that I want to look at, must be that one there. So we can see here's a call that was happening that was initiated by some code here on a call to /api/rant/ some weird ID, the winter send and called a bunch of other Ajax stuff.
+
+[00:13:56]
+We can see exactly how long each step of this took, but we don't see where the memory is coming from. You'll see particular calls that increase the overall memory size, will be shown in blue, the things that create a limitation on frames per second will be shown in green, a GPU memory in pink, all the color coding should work throughout this this exercise.
+
+[00:14:19]
+I'm looking for a particular one, and I don't know why I'm not finding it. Here we go this one's it, So here we see another call stack, that is a call to XHR Load /api/ads. Now this call stack also is increasing the memory by the time it is completely done, and this time we see a whole bunch of different framework goo that I don't really understand and doesn't really make any sense.
+
+[00:14:53]
+Until I get down here, where I started seeing some functions that make sense to me, they are functions names from my code, things like render, and render ad, and collection each. So I can punch into this, and if I select a given key in here, I'm short on space maybe shrink that up.
+
+[00:15:15]
+If I select a given key inside of that, I should be able to see some information in the summary below including a link out to the file that it's in, and so I can navigate directly to it this adListView.js. Now, adListView.js is now a suspect for us, because in our timeline, this is our code that's running at a memory step up point.
+
+[00:15:42]
+And I'm sure it is one of them in the other memory step of points as well.
+

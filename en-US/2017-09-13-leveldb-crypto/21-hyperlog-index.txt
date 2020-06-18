@@ -1,0 +1,81 @@
+[00:00:00]
+>> I think it's important to cover some of these other tools that you can use on top of hyper log to build cap architecture with materialized views and this kind of stuff. One of them, something I made on top of hyper log called hyper log index. You can use this to kind of walk the documents in the lug piece by piece.
+
+[00:00:22]
+And then once you see every document, you can kind of update an index. One of the best things about a cap architecture is that you can, because the log is the source of truth whatever indexes you make, you can just delete them and regenerate them if you change your mind about how they should work later.
+
+[00:00:43]
+So if you've ever had to do a migration with a more mutable kind of database, it really is painful and it's not something that people should really have to work so hard to get right because if you use a different kind of architecture instead like a cap architecture, you could just delete that database directory or like delete your index DB or what have you, and just build it again.
+
+[00:01:10]
+And so long as that operation is cheap enough, then, you don't have to think very hard. And you can change your mind later about how your indexes work. As your program evolves as your requirements change. So here's what it looks like to use hyper log index. What we can do here in a moment is build a little Key value system that uses an idea for a conflict strategy called the multi value register.
+
+[00:01:44]
+And this is the way of solving conflicts where you don't actually decide anything because it's subjective and really maybe the only true thing that you can say about a fork is that there are two forks and maybe your program should just be able to deal with what's true instead of fabricating some comforting lie about your data.
+
+[00:02:06]
+That's not actually true. So here's the API for hyper log index, you pass in a log, you pass in LevelDB handle, if you want to just reuse the same LevelDB handle for your hyper log DB and your hyper log index db, you can use sub level for that or you can have two separate ones.
+
+[00:02:29]
+And then you provide a map function. So this map function is gonna run for every document in your database and It's your job to sort of store whatever data you need to store in whatever kind of index in that could be a SQL database, that could be Maybe you have a human who's like gonna tally some marks on a piece of paper and then press the Enter key to call next.
+
+[00:02:52]
+I don't know, whatever you like. So once you do that, then you can ask questions about the index. Like based on whatever kind of scheme you have for doing that. Okay, so I guess our data is probably in an okay enough state to do this. It just so happens that one of the easiest things that you can build is multi value register conflict strategy.
+
+[00:03:22]
+It happens to be the read me example and hyperlink index, I'am just gonna copy it, I guess this one is a bit longer, anyways, right here's the example that I'm just going to copy that does this, Conflict strategy that's not really a conflict strategy at all. It just preserves the forks if they exist, because that's a true thing.
+
+[00:03:47]
+Not a false thing. I'll call this file dex.js and paste that in. Whoops. And then I'll load in some of the other stuff that we had in the house. So, just gonna take the first bit, and we'll load from our log that we've already built. I think we have messages, and timestamps, and that kinda stuff.
+
+[00:04:11]
+So for example, we wanna make an index that's gonna save ISO 601 strings into LevelDB. We can do that. So I'm just gonna make a new index database instead of using sub level down for this because that's a little bit easier. So here we've got our log file, this index is gonna walk the log document by document and it's going to be instead of this example, I'll just I'll save that Timestamps instead.
+
+[00:04:46]
+So, db.put(row.value.time), I think it was that we were saving, I can ask our add function again yeah the time which is an integer but we want to save that a little bit more in a format that a little bit more nicely. So I'll use strf time to do that.Strf time and so our key is going to be strf time of new date with that epoch seconds and then percent f percent t.
+
+[00:05:23]
+Okay, cool. So we put the key into our database. And for the value, we can just store the row key. I think that'll work. And I could have a function error, and then call like, if error next error, etc. Alice next, but that's the same as doing this.
+
+[00:05:45]
+Okay, so this is our map, we can also ask questions about the index like whether it's caught up with the latest known document in the log. You can pass in index dot ready and it'll be true in this case. Just going to write things out to the log and we can write a separate program to just dump the stuff that we index just to make sure that it works.
+
+[00:06:10]
+Okay, so if I run that program now whoops I have to actually include hyper log index. So you do that really quick, hyper log index.. Okay, so now there's a new directory called ix.db. And, we're gonna write a new list program called ix list and it's gonna dump things by the timestamp.
+
+[00:06:35]
+So, if we load that database, then we'll just print everything out that's in there. Hopefully there's something in there. Goodness, what could it be? Okay, I'm just gonna verify that our indexer actually does something. Luckily, it's an index database. So with this architecture you can blow this away whenever you want and try again.
+
+[00:07:13]
+Okay, so we do get the database documents written into there, so I wonder what's going on here. We have the key, is gonna print out what the key will be. I think maybe it's because we didn't, No, did that too. So they key is that and the value is gonna be row.key.
+
+[00:07:38]
+So just make sure that this is gonna work. Aren't rf x db do that? Okay, so it should have stored those as the keys and those is the values. That all looks good and we load that database. I see what it is. We shouldn't be loading a hyper log in our list indexer that's a bit silly.
+
+[00:08:16]
+So let's just get rid of that. And that should be db.creatReadStream, of course. Silly mistake. All right. So hopefully there's something in there. Alright. Required too to, and looks like we're not calling next or something. Just blow away the database again because we can do that whenever we want and rerun our indexer, now rerun our list function is not looking like it ought to be I see what the problem is.
+
+[00:09:03]
+I was writing into DB as well, not into the other database. Common problem when you're juggling around different database handles, so you have to remember to write into the correct one. So, if I change this now. And rerun the indexer, and now rerun that, it's probably messed up because I was reading all kinds of garbage into the logs.
+
+[00:09:27]
+So let's just a. Let's start from a little bit earlier and add some add some more data, good data this time. Hello and we don't need to have a first message, our first set of keys so like I and the second message and we need to link to the first one and then I am 3, needs to link to that.
+
+[00:09:55]
+That's probably enough data to test this. So a run our indexer we just wrote then I'm gonna run the list and still not getting anything. Well, this didn't print out any messages though. I see another problem. So many problems, this is writing to log 2 that. So starting from the beginning [LAUGH] all right, so again, get rid of that database, get rid of that database.
+
+[00:10:30]
+And we can write out some messages. So here I'm gonna write out a message Hello. We can write it out to another message that's like I am doc number two. We can link to the first message by passing it in as an argument. Can write out a third message, just some threes and blink to the first document, like so.
+
+[00:10:50]
+All right, so now we've got some data in our log. And now we can run the indexer program, which should look at every document in that log. It should walk it one by one, and it should save the timestamp out to another database called ix.db. Then later, we're gonna list out the records in that in that database.
+
+[00:11:12]
+So, I'm gonna run the program. Good. It prints out the keys and the values like I would expect. And now if i do i x list. There we go. So, now we have our materialized view on top of our source of truth append only immutable log. Very good.
+
+[00:11:30]
+[LAUGH]
+Show they can fix that up in post. It'll be very good.
+>> Honestly I think the repetition helped me understand a lot better.
+>> Maybe not. Maybe just leave it
+

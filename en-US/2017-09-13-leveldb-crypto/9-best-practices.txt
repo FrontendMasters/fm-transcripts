@@ -1,0 +1,111 @@
+[00:00:00]
+>> I just wanna talk about what kinds of things make sense to store in LevelDB, and what kinds of things don't. And we'll whip up a fun demo. I think we'll do image hosting service or something, cuz that's a good example to kinda demonstrate the basic pattern of having Blob Storage separate from your local DB that can do things like storing metadata.
+
+[00:00:24]
+So if you have things like images or media files, or big arrays, or whatever, things that are kind of static in character, it's usually best not to put those in LevelDB. It's good to stick them in another kind of secondary storage. They might be backed by the same things, like in the browser.
+
+[00:00:43]
+Of course, all you have to work with this IndexedDB. But there's wrappers. There's a package called idb-content-addressable-blob-store, for example, that you can use. Or if you're node, you can use this package, whichever they like called content-addressable-blob-store. Which, you just write data to it, you call createReadStream, or createReadStream function.
+
+[00:01:04]
+You pump a bunch of data into it, which is gonna live on the file system. And it gives you back a hash of the content, and you can use that hash to, To store a reference to that document in your LevelDB data, which is gonna be a lot smaller.
+
+[00:01:24]
+There's also some other fun blobstore modules like torrent-blob-store. So you can put files onto BitTorrent with a really tiny node package. That's all pure JavaScript that speaks the BitTorrent protocol. And it's pretty good. I recommend if you wanna swap out any of the content. I'm gonna be using a content-addressable-blob-store for the next demo.
+
+[00:01:43]
+But if you want to have a project, you can swap that out with the torrent store, and then it will live on BitTorrent. There's also packages like hypercore, which is part of the DOT project, and hypercore is actually also a log structure. It has kind of a basic cap architecture behind the scenes.
+
+[00:02:00]
+We'll look maybe a little more at that later. But okay, so let's make another demo. I'll call this blob. Maybe we'll write a little commandline program to populate a database with some data. And then maybe we'll write a little server that will just display some of this data.
+
+[00:02:20]
+Okay, so the first thing that we can do is make a little program that can add records to our database. So we could also do something with batching up secondary indexes and stuff, but I'm just gonna skip that kind of features. This is gonna be pretty simple. And we'll also use the package-content-addressable-blob-store to put the data in there.
+
+[00:02:45]
+So call this one addimg.js, and it'll take an image file as input, maybe on standard in, or maybe on, yeah, standard in is good place to put that. So what we're gonna do is we're gonna load this package-content addressable-blob-store. We're also gonna load LevelDB, like normal. And we're gonna instantiate our call it img.db, whatever.
+
+[00:03:20]
+And valueEncoding: json. Okay, so If we look at the readme for content-addressable-blob-store, you can see that all that you need to do is you require it, and then you give it a place to live. So it's a similar kind of API to LevelDB itself. Then you can call a createWriteStream method, and you get a key that you can use.
+
+[00:03:48]
+So what we're gonna do, I'll just test out. First, we need to give it, call it img.blob. So there's gonna be img.db, that's gonna be our LevelDB storage in this directory. And img.blob, that's gonna be the location of our image data. Okay, so we're gonna have an image coming in on process.stdin.
+
+[00:04:12]
+We can pipe it to a blob.store.createWriteStream. I believe you can give it a callback, and we've gotta save that to variable. So we can either listen for a finished event, which is a property on all writable streams, or we can I think passing a callback here. So I'll try it with a callback.
+
+[00:04:43]
+And so if there's an error, we wanna know about it. Otherwise, we wanna, for now, I'll just print out the key. So we can make sure that this part works, before we add in the part that writes to LevelDB. So I could do console.log.w.key. Okay, and then not an image, but I'll just add in this file, just to make sure, yeah.
+
+[00:05:08]
+And then I think whatever kinda SHA that is, 256 maybe. Yeah, so this is just SHA-256 of that file is the address. So we're gonna put this hash into our database. And then if we provide the hash as input to a createReadStream function, we can get that data back out again.
+
+[00:05:34]
+Although, now we've got some garbage in there. Cuz we're gonna wanna store images in here, not just like any old file, gonna delete those, and we can get back to our program. So what we wanna do is every time we have a new image, we're gonna wanna call db.put with a key and a value.
+
+[00:05:54]
+So our key is gonna be something there, and our value, there's an error. We wanna know about it. Well, I have a thing called that. And we can use the w.key, which is a hex string to reference the data. And maybe we wanna store some other kinds of documents, like the timestamp.
+
+[00:06:20]
+So date that now is a handy thing to do, to put that in a value. If you want some ideas for how you might extend this example, we could do the same thing that we did in the user post example, where we have a secondary index for the timestamps or whatever.
+
+[00:06:37]
+Whatever, I think this is fine. Okay, so now we've got our db.put, so I ought to be able to add a file from my Photos directory. I think I've got a photo of my cat, put it in there. So now there should be some data in our database to play with.
+
+[00:06:59]
+So if we look in the blob directory, we can see that this is a similar trick to what get uses if you've ever poked around in the bowels of .git. I think in Objects, right? So this is just a way of taking the first two digits in hexadecimal.
+
+[00:07:20]
+And using that to prefix, because of how file systems work, it's actually really slow to have way too many files in a directory. So this is a way of expanding the branch size to be 256 or something. All right, anyways, so we can take our img.js script, and we can modify it to maybe just print out all of the hashes from our database now, so list-files.js.
+
+[00:07:49]
+Okay, so all of this can be the same. It's just our setup. But now we need to do store.createReadStream with that hash, which we can get on as a commandline argument. Sorry, that would be the reader function. What we wanna do is db.createReadStream, and then we can consume that stream, which is an object stream.
+
+[00:08:18]
+So do to.obj. And then we're gonna get every record in the database, and just print it. So here we see the key that we put in with the hex string. And the timestamp could format it more pretty if we wanna, but we don't have to do that. Well, actually, I'm gonna just take the key and slice it.
+
+[00:08:49]
+Get a slice off the first bit, so that we just see the hex part. Now, you can just be the same. All right, there we go. So we've got this hex string. Now, it'd be pretty nice if we could also print out the contents for this. So there's a method in content-addressable-blob-store called createReadStream we can use for that.
+
+[00:09:15]
+So I'll say read file.js. Now we can do store.createReadStream. We don't actually have to do any LevelDB in this particular file, because we can just take the hash. Yeah, not require process.argv, and just type that to standard out. So if we run that program with this hash, and then write it to a file, if I open that file, there we go.
+
+[00:10:00]
+It's a cat. That's pretty cool. So let's turn this into a little web service, that'll be fun. Okay, so we can take one of our existing files, maybe our list files, because our server's also gonna have to have a list of the files and call the server.js. We need to load the HTTP module, in addition to all of this other stuff, aAnd we can do http.createserver.
+
+[00:10:31]
+We get a request and response. And then inside of our server, after we listen on a port, we can maybe, on the main page, we'll just have a really bare bones HTML output for this. This data, otherwise, we can just say not found. We won't even set the correct header.
+
+[00:10:57]
+I don't care that much. Okay, so can we have our createReadStream, instead of two I can use through. And we're gonna quickly pipe that out to the response.
+>> Yeah, but that's [INAUDIBLE].
+>> Which? There's a two at the end of there.
+>> Yeah.
+>> Yeah, it's supposed to be like that.
+
+[00:11:18]
+
+>> Okay.
+>> All right, so now, instead of doing console.log, what we need to do is we can call our next function with a little bit of HTML that we wanna send for every piece. So you can use template strings, and node is a nice way to do that.
+
+[00:11:37]
+So we can have multiline output. And then what we're gonna do is we're gonna use the same values. But I guess we can have like an h1 tag, I don't know, I like h1 tags. We can have the hash, that'll be the heading. And then we can have an img tag that will refer to another URL that we can specify that will load the data.
+
+[00:12:07]
+So image/, and then the hash, which is gonna be this bit. Actually, we're already doing the hash of the content in the image src. So why don't I put the timestamp in the h1? Beautifully formatted as a number [LAUGH]. All right, so that looks like in order to work.
+
+[00:12:40]
+We're gonna just be able to run this. It's gonna show us a broken image, because we haven't implemented the image right yet. But we can do that really quick, and then it'd be a fun little demo. So if everything's working, you should be able to go to localhost 5000.
+
+[00:12:55]
+And indeed, there is a timestamp and a broken image. So let's go ahead and implement that route that image are to live on. And then we'll have a nifty little example using LevelDB in a blob storage module. So I'm just gonna reuse regex really fast to test if the URL starts with image.
+
+[00:13:19]
+So it's gonna be /image/ test(req.url). If you wanna use a router, I like to use the package called routes. A lot more in this stuff tomorrow, but for the time being. So if we have a request for image, we need to call store. createReadStream with that hash. So we need to cut off the first part to get the hash, which we can do with another regex.
+
+[00:13:49]
+So reg.url.replace, whatever that is with nothing. And then createReadStream for hash, and just pipe it into the response after we set a content type header. I'll just always say it's a JPEG, even though it's probably not always gonna be one. Once we do that, there we go. It's really big, but that's a picture of a cat.
+
+[00:14:19]
+And can add more images using the image script, or we could implement a put request, or whatever. But I think you get the basic idea of how you can string some stuff together with LevelDB, and different kinds of binary storage modules.
+

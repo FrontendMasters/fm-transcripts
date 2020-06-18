@@ -1,0 +1,111 @@
+[00:00:00]
+>> So there was a little bit of confusion about what people were supposed to look into. We were just looking at what were generically some of the causes of a slow load time. And so I intentionally did not give you any limitation on what you could have looked into, because I wanna just see what kinds of things that people see in this.
+
+[00:00:20]
+So what did you see? People in the room, shout out, what did you see?
+>> Scripts that were blocking other scripts and had to load sequentially each at a time.
+>> Yep, yep, there's a lot of scripts that were all loading sequentially. What else did we people see?
+
+[00:00:37]
+
+>> Images took a long time to load.
+>> Yep, long load time screen images, anything else? Okay-
+>> Is there a font?
+>> Yeah, there's a couple of fonts to come down from Google APIs. Let's kinda go through this and break this down. So I wanna zoom in even farther on this than I already was.
+
+[00:01:05]
+So we can kind of break down what's going on. So at the very beginning of this series of events, we see the first network request, the request for the document itself, the request for get ranters root page. Now, in each of these network requests, they're color coded just based on like the traditional or the Chrome standard on types.
+
+[00:01:30]
+So documents are in blue, CSS are in purple, JavaScript are in yellow, images I think are in green, and Ajax I think are in gray, I believe. And then within each there's two different tones. There's a light tone and a dark tone. The meaning on that isn't necessarily as important for what's taking a long time because it's the entire length of it, that is the low time.
+
+[00:01:59]
+But the first part of it is what's called the time to first bite, as in that's all the time when our browser is just sitting there twiddling its thumbs. Literally nothing has come back from the other side yet. So this can be described as either, it is the sum of the latency in both directions, and how long the remote server took before it knew how to fulfill its request.
+
+[00:02:22]
+The remaining time is how long it took to actually flush all the bytes through the pipe. So we see this first request, we spent the majority of our time waiting and a little bit of time actually transferring data. The document itself took, what 70 milliseconds or so, 61 milliseconds.
+
+[00:02:39]
+And then we kicked off a whole bunch of concurrent requests while we're parsing the document. So we had to load something from fonts.googleapi.com, and we loaded a whole bunch of different JavaScript. And then we were in fact, we were loading so much JavaScript, that we hit the maximum concurrency limitation of the browser.
+
+[00:02:59]
+The browser can only download so many things in parallel, and eventually it says hold on, I'm gonna wait. So it waits for analytics JS to be done and then it starts adModel. And then it waits for adModel to be done and it starts rantModel and waits for that to be done and starts Donald's userModel.
+
+[00:03:16]
+If you remember the code itself, these are all just script tags on the page. There's no inherent dependencies between these. They're just kind of all listed on the page. But we've just hit this maximum limitation on how fast we can pull stuff down. So now we have a whole bunch of network chatter happening.
+
+[00:03:36]
+The requested fonts.googleapis.com took particularly long. How many times have you just been browsing around the web? And whatever page you're going to hasn't quite loaded yet. And you see in the lower corner in the status bar waiting for Google.com. Have you seen that? Have you noticed that before?
+
+[00:03:55]
+I tend to see it all the time. And it's this, maybe just because I'm always looking for it. It's this fonts.google.com Is really popular service because it's really good. If you want custom fonts on your web page, you can go out to their tool, you can say I want these three fonts on my site and I'll give you a little snippet code drop in and you can use them,it's awesome.
+
+[00:04:16]
+Downside is that their default recommendation is you drop a piece of code like this in the head of your document to load your fonts, which means your page has now taken a blocking dependency on Google. And if accessing Google APIs for whatever reason is slightly slower, your whole page just kind of sits there and waits for Google to be done before it shows anything.
+
+[00:04:39]
+The opposite consideration on how can we fix that is some other pages you visit, you've probably noticed where the page renders in one font. And then at some point, the font changes. Have you ever noticed that browsing the web? Any of you? That's the other more performant way of solving this, where you say I wannna deliver my content to the user first.
+
+[00:05:03]
+And then once the content is done, I will load the font. The downside is when the font is slow, you'll see that that flicker, that changeover but it is more performant. So what's more important to you in your application, that you only want the content delivered in the correct font.
+
+[00:05:21]
+Or that you'll subject the user to a flicker when the fonts change. That's a performance consideration just as much as a user experience consideration. So all of these JavaScript files, how can we solve that? Well, my approach was incredibly naive, I just threw a bunch of script tags on the page.
+
+[00:05:46]
+Maybe what we should do is we should introduce some build tooling, webpack or custom or just concatenating all the scripts together. Just put them all into a single package and deliver them as one load. What that would do is it would stop all of these chatty requests. For every single one of them there's this overhead of the amount of time to actually make the request and ship something back and forth from the server.
+
+[00:06:09]
+All of these time to first bytes could probably go away or be shrunk considerably if we only collapse these together into a single request If we keep going, and take a look at one of these actual cause, I'm gonna pop over here to the network tab for a second, And take a look at one of the jobs for files that came down.
+
+[00:06:36]
+Let's take a look at say, Rant list view, now rant list view, Is 2 kilobytes and took 600 milliseconds to download. It's kind of a long time for 2 kilobytes. 2 kilobytes is a lot of text. If we look at it, the actual file that came down is very easy to debug.
+
+[00:07:04]
+That might not be the best way to actually ship code down. There's no minification at all happening here. A lot of times in a build step, we might decide to shrink this down to deliver fewer bytes. Or at the very least use a compression tool, serving our files with a GZIP type compression on it so that we are shipping fewer bytes.
+
+[00:07:25]
+If we look at the headers that came down here on the response, we see that there is nothing about how about how this file is compressed, which means it's not compressed. And if we look at the cache control header, it means we're telling the browser explicitly that they cannot cache this file.
+
+[00:07:46]
+Which means every time the user hits this page, they will have to download it again, and again, and again, and again, which doesn't seem every efficient. Things like jQuery or our main JavaScript probably doesn't change that often, but we can never cache it. As a point of comparison, let's take a look at another site that takes more appropriate use of caching to see how that would act.
+
+[00:08:08]
+So here is the main site of trackjs.com. If we take a look at the JavaScript files that come down here, there's only a handful. Here, our main JavaScript file is this right here, this nasty long looking thing. The response headers that come down for this have a couple of different things in it.
+
+[00:08:27]
+Notice here first, that the cache control header has max age have a really big number? That saying that go ahead browser, you can cache this file for a really long time, because it's never gonna change. And it's never gonna change because I've generated what's called a cache busting header on it.
+
+[00:08:46]
+This file name is generated based on the contents of the file. And so whenever we do a deploy, a new version of this file comes out, there would be a different request that wouldn't previously be cached. And you can use this so that even if the first time a user hits your page, they have to download all of your scripts.
+
+[00:09:07]
+Maybe the second time they don't. The second time they have better experiences. All right, let's go back to our timeline. So we have all these separate files that aren't compressed and aren't concatenated and aren't being cached and will be a pain for the first slow user connection every single time.
+
+[00:09:29]
+What happens after that? Well, once we're we're still downloading files, now we're downloading the fonts themselves and that takes a while. Still downloading JavaScript, still downloading JavaScript. Great, now we're done. We have a handful of Ajax requests that need to get made, because this is a JavaScript client side application, it doesn't know anything about what to display initially.
+
+[00:09:53]
+It's got to make all those requests, which if you're fine tuning your performance, you might wanna consider not doing that and maybe shipping your initial data structure down on the first request, so you don't have this Ajax. But then by far the biggest impact is this thing that comes next.
+
+[00:10:11]
+We're less than two seconds into a four and a half second load time. And now we start on images. We have the profile image, taking 300 milliseconds, and then three ads for the golden bathroom at 2.6 seconds, the Russian vacation at 2.5 and the hairspray at 2.1. All of these taking an incredibly long time to load.
+
+[00:10:41]
+Why is that? Again, let's let's pop over to the network and see if we can figure out why. So I'm going to filter this down to images. And I see the three images, in particular the ads. Let's take a look at golden bathroom. Golden bathroom came down, everything is fine.
+
+[00:11:02]
+Again, it is not cached at all, so every time it's requested, it has to be rebrought down. We might wanna consider adding better caching headers. It is 200,000 bytes long, it is about 200K. That is a huge image for this little thing over here. That little thing over there is 200K.
+
+[00:11:30]
+If we take a look at it here, we can even see some preview information about it. If we go, Here, to this actual image and select it, we can see some things about it. If we just hover over it here, we see that we're displaying it, it reloaded on me.
+
+[00:11:52]
+We're displaying it at 200 by 100 pixels, but it's coming down from the server is 600 by 300. So we're serving images that are far too large not compressed in a bigger resolution than what they need to be, and we're telling them that you have to ask for them every time.
+
+[00:12:11]
+So our ads themselves are the biggest slowdown of this page. So this is a couple of different performance bugs. All these are a little bit more involved to solve. And so I'm gonna leave this as an exercise for your teams to go and figure out what are your performance bugs and how to look at them.
+
+[00:12:31]
+Blocking assets and uncompressed assets, are probably the two biggest sources of performance issues for most web applications. So looking at what sort of things can you get away with to send fewer bytes over the wire and make fewer requests. We looked at the timeline and network preview
+

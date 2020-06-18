@@ -1,0 +1,104 @@
+[00:00:00]
+>> Let's kinda walk through it together, shall we. So here was where we left off. We have this bug where if a user is trying to delete a rant out of their timeline, it's now no longer reloading because we added evt.preventDefault to the event handler. But we're still seeing this problem of cannot read property destroy of undefined.
+
+[00:00:20]
+So let's see if we can figure out where that's coming from. So I can look at this at this stack trace right here in the console. And I can see that it's pointing the rantListView js line 34. If I take a look at this rantView js line 34 is pointing me to this onDelete function.
+
+[00:00:40]
+Now, rather than just jump right in, I wanna understand how do we get to be called this onDelete function. Because the function that we were interacting with before, where we added the event.prevent default was an initialized function. And so somehow we make that leap from initialized to onDelete.
+
+[00:00:59]
+But that wasn't showing up in our stack trace. So I wanna turn on an optional feature inside Chrome debugger so that we can understand a little bit more about that. That feature is down here in the Callstack windows, and this little checkbox called Async. What Async lets us do is it lets us understand better all of the asynchronous things that are happening inside of the JavaScript runtime.
+
+[00:01:25]
+It'll capture stack traces that occur across these asynchronous boundaries that happen with event call backs, setTimeouts, network requests, etc. There's a small overhead to do it, but I feel like it's totally worth it. So I'm gonna turn that on and reload the page just so I can see what information we get with it on I'm gonna pop back over to my Console and try and delete the rant again.
+
+[00:01:54]
+This time when I pop open my stack trace, you can see I see a lot more lines in it. I see a couple of things coming here from tracker, which is part of our infrastructure. It's kind of not very helpful. But I see that we have a setTimeout in italics here.
+
+[00:02:17]
+In an async stack trace by Chrome, it's going to show you those asynchronous boundaries as these italic lines. So I see that the error came from rantListsView.js Line 34 which was called on the other side of a setTimeout. Which was called by this onDelete function, which was called by an anonymous function on rantListView.js line 22, which was called back through jquery and tracker.
+
+[00:02:43]
+Now I can see a lot more information to trace back where did this bug originate from all the way back to the earliest code that is of my stuff, line 22. Which is this call right after our call to evt.preventDefault.this.onDelete. And so that enabled me to trace those breadcrumbs a little bit better.
+
+[00:03:03]
+Now there's still a lot of noise in the stack trace that I'd kind of like to get rid of. The fact that jquery is in here and tracker is in here isn't so helpful because I don't want my framework code showing up all over the place. And so I can do something called Blackboxing these, which I mentioned earlier.
+
+[00:03:20]
+We can actually turn that on. So I'm gonna go here into jquery. Often if you're debugging code, eventually you'll find yourself like trying to step through minified jquery or minified, angular or minified react or whatever you're using, and it's not very fun. It ends up being very confusing.
+
+[00:03:36]
+And so you can tell chrome to don't do that, don't show me the error is never inside of jquery. You do that simply by right clicking on a file that you don't want to be included. And you have an option called Blackbox this script. Blackboxing will make it so any debugger will step over this file.
+
+[00:03:59]
+And if it occurs in a stack trace, it's going to be kind of muted out so that you know what's happening. But you know it's probably not relevant. Scripts that are Blackbox will have that banner hanging over it so that you know later. So I want to Blackbox jquery.
+
+[00:04:13]
+And then I'm also gonna blackbox tracker. Because I know that there's nothing in that piece of framework code I have. So now with those two things Blackbox, we can see some better information. We can see that some log messages where they're actually coming from. We can see that in our stack trace, all of the lines that are framework code are just kind of muted away.
+
+[00:04:41]
+So now we can actually go and try and make the real change here. So this cannot read property destroy of undefined is hanging out here rantListsView.js line 34. So let's dig into that. So we have an onDelete function. And onDelete, for some reason calls a setTimeout. And now after that timeout, we destroy the model probably destroying a rant.
+
+[00:05:05]
+And then remove it. So, it's saying cannot read property destroy, of undefined. And so interpreting that error, that error is saying that destroy is being called an undefined. It thinks this.model is undefined, which probably means that this is not what we think it is. Because this doesn't have a property called model.
+
+[00:05:37]
+Well, let's see if we can figure out why. So this sources panel in Chrome is a full on debugger if you're not already familiar. You can interact with the code as it's being executed here. On the left hand side with the line numbers, you simply click in to add a Breakpoint.
+
+[00:05:53]
+The next time the browser attempts to execute this code, it will stop here and let you evaluate what's going on and let's allow you to step through things. Got some bunch of advanced features that I think Mark has another awesome course for that maybe it'd be cool to like cross link it right here at the screen at this point in time or something.
+
+[00:06:11]
+
+>> Yeah, like Chrome Dev Tools one.
+>> [LAUGH] But there's a ton of other really cool features here that what you can do. But with this Breakpoint set, I'm going to go ahead and try and delete the rant again. And I fall here. So I know this is the right code.
+
+[00:06:26]
+This is the code that is responding to that click. But while I'm broken here, I can look at all kinds of different things. In this information pane, I can see what's the Callstack, like what are the other pieces of code and I could live navigate between them. I can see what Breakpoints are and I can look at what are the values in the current scope.
+
+[00:06:50]
+So for example what is this at this particular line? Well this at this particular line is this object here. This has, a couple of properties on it's got $el, it's got a cid, it's got an el and it's got a model. So at this point, this has a model.
+
+[00:07:10]
+But if we, allow this thing to step into the function. Now, we can't simply do a step into at this point, because we are about to cross an asynchronous boundary into this setTimeout. So in order to do that, I'm gonna need to put another Breakpoint inside of this function, and let it go to the next function.
+
+[00:07:30]
+When that gets called back I also have my breakpoint set there. And the value of this is definitely different than what it was before. this is now window. And we have a bunch of different things on here. And it's not entirely surprising that we don't have a model.
+
+[00:07:50]
+So this is the most common problem the people run into in JavaScript. It's a misunderstanding of context. We lost what the value of this was when we called into this function. The callback function inside of setTimeout, will execute under a different context than the outer function that we called it from.
+
+[00:08:09]
+And if not specified, it will just use the default global object or window. So there's a bunch of different ways we could have fixed this. And a lot of them are valid. Probably the most compatible would have been to save the value of this out in the outer closure and then reference it again later.
+
+[00:08:29]
+So something like var that = this, or var self = this depending on which JavaScript book you happen to have read first. At that point, you can reference the value that inside of it. Let's just check to see if that works before we expose some other ways we could have solved that.
+
+[00:08:47]
+So that change saved. Let's reload this. Take a look at our Console when we do it. Let's try and delete another Tweet, rant. This time we can No errors and if we reload the page, those rants are gone. So that was a solution that was a viable solution to that book.
+
+[00:09:15]
+What other things could we have done Sorry. Accidentally closed it. RantListview. There we go. So what other ways could we have solved that? Well, rather than saving the closure we could have forced what the value of this is going to be inside of that function. So rather than saving that value out there, let's remove that and put these back to this.
+
+[00:10:07]
+We could force what we want the value of this to be using function.bind. By calling function.bind, bind hanging off of any function, you can force the value of this when it executes. And so by binding that function to the value of this from the outer closure, we should be able to guarantee it.
+
+[00:10:28]
+Let's say this and just make sure that that works. Now one caveat to remember with bind, is that bind can only be used once. As in if you call bind on a function subsequent times, it will never change what the value of this will be after the first time.
+
+[00:10:49]
+So, it's kind of a weird use case. But when you're using bind, you're already kind of in a weird use case. All right, so that should be the solution to that one. So what did we talk about with this bug? There are two different problems that work here.
+
+[00:11:07]
+First, we are missing an event that prevent default. Anytime you're using JavaScript to hook on to the native behavior of the browser, you probably want to stop that native behavior from executing. in this case, I had a traditional form that was doing the delete. Probably meant to some sort of progressive enhancement approach, and then I was intercepting that with JavaScript.
+
+[00:11:28]
+But I wasn't stopping the normal operation. The second problem here was that I was losing context. I didn't have the correct value of this. Some debugging concepts we talked about is one Keystone Users. I think this is really important when you're designing your app. Is have a good way for you to impersonate real users use real data.
+
+[00:11:52]
+Developer data is messy. And often times it can muddy the waters on what you're actually trying to solve. Second, we looked at the DOM Inspector, and using the DOM Inspector is an entry point into your code. Rather than starting with your code to understand the bug, start with what the user is interacting with, and navigate into your code from there.
+
+[00:12:11]
+And third, we played a little bit with Async Callstacks. We also played with workspaces Blackboxing.
+

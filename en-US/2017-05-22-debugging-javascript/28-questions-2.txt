@@ -1,0 +1,85 @@
+[00:00:00]
+>> Those were the eight bugs that we are gonna fix. The next thing is I want to talk a little bit about some ideas on how to design your apps for better debug ability. But before I move on to that, are there any questions or remaining things that people are concerned about with getRANTr?
+
+[00:00:16]
+Other than, when can you sign up and how soon can it be ready? Any things that you wanna talk about with how getRANTr was put together or remaining bugs or things that might not have been totally clear that we wanna talk about before I move on? Yeah.
+>> Could you explain the thing you mentioned earlier about needing to put window dot in front of certain variables for them to be called.
+
+[00:00:38]
+
+>> Yeah, so that's just a really annoying thing that I don't entirely understand why it needs to be there. So let's say here, if we've just popped this open, open console. So the global object inside of the browser is window. And so you can generally access anything on window by just calling it directly.
+
+[00:00:59]
+So for example, window.infinity is the thing. So rather than having to say window.infinity all the time, I can just say infinity. And it's there. Or window., I don't know, window.backbone because this is a Backbone app. I can access it directly saying backbone. But if there is a thing that is not defined on the global, like undef, if I just try and call undef by itself, if I even say, here, let's create a little function here.
+
+[00:01:37]
+If I create a little function that tries to call if(undef), This shouldn't work. If I try this little function where I check to see if some undefined global variable is the thing, it blows up. There's no variable that you've ever declared called undef. It's not there. Because there's nothing on window called undef.
+
+[00:02:15]
+And so I need to tie this down to something and say what global object to reference it on. Why this is valid at all is because maybe I have a variable that I declared up here called undef that did something. If I simply declare that variable, this now works.
+
+[00:02:35]
+I mean, it doesn't go into the if statement but it doesn't blow up. Because there is something, there is a valid variable called undef. It's not the truthy value. Does that make sense?
+>> Yeah.
+>> All right, cool. Other things Anything online?
+>> If you have like a build that bundles up all your JS files instead of the index with a whole list of things, is that help a little bit to mitigate, in case some JS fails, at least all would fail?
+
+[00:03:09]
+
+>> Yes. So if you've bundled all of your scripts, so that you bring down scripts.js and it's the only thing that comes down, you've basically set yourself up for it's either catastrophic or nothing. I mean, it does solve a whole set of problems, right? But you do still need to handle for that catastrophic use case, is what happens if your scripts.js isn't there.
+
+[00:03:29]
+Is it a bit is a blank white page with nothing? Maybe your default document should have an error message or something in it that shows if the script hasn't loaded within five seconds or something like that. Even if you have that major script file that just comes down, you need to check for maybe a third party that might optionally come down later.
+
+[00:03:55]
+I've used a pattern where I have a scripts.js file, and it's just one major app, except if I'm on the checkout page, then I also pull in these other things that I need here. And so you'll just need to be aware. Make sure you handle the cases for those extra assets you pull in.
+
+[00:04:12]
+Make sure you have a fallback in case those fail. But yeah, good question. Yeah.
+>> Could I understand that you were saying that you could actually manually set the cache time limit on certain JS files or certain-
+>> Yeah, you can set a cache timeout. So there's multiple levels of caching, right?
+
+[00:04:31]
+There's the cache that your browser itself will do, right? So when your browser makes a request, before it actually even makes the request, it checks to see inside of its local cache that already has that asset that's about to be request. And if it does, if it was instructed the last time, then it can go ahead and reuse it.
+
+[00:04:52]
+The second level of caching is the browser will say, I had this file once before, but my version has expired, either because we maxed out the timeout or because there was no expiry. Here, let's actually look at that maybe while we're talking. So for example, here's an asset.
+
+[00:05:11]
+This is back on that trackjs website. So we're pulling down our main JS file. And when this thing came down the first time, we told the browser that it can keep it for a really long time. Keep this file, you don't need to worry about it again. So the next time, if we disable the cache here and we reload the page, notice it pulled down this file again.
+
+[00:05:39]
+But the size says, from a disk cache. The request wasn't even made to the server. The browser itself said, no, I have this file, I'm good. And I'm not gonna create any overhead at all. I have the asset with this name that is within the cache timeout that the last time I asked for it, the header said I could keep it for.
+
+[00:05:57]
+The next level of caching is if that header expires, it'll still make a request. And it can use this header right here, this ETag header, which is basically like a checksum that says, hey, I'm asking for this file, and the last time I had this file, here was my checksum of this file.
+
+[00:06:18]
+And if the server is set up to do this, it can say, that file is the same one you asked for the last time. Just go ahead and use it, and it'll ship down empty content. And say, just use what you got, man, just keep going. That's the second level of caching.
+
+[00:06:33]
+You can have all kinds of additional levels of caching if you have a CDN and assets to disk and stuff there behind it. But those are the ones we talked about with the web itself. So those levels of caching, you need to think about two things when you're setting those caching headers.
+
+[00:06:48]
+You need to think about how long are those assets going to be viable for. And what do you do when you want to change them? So if you have a single script.js file like you did, and you set a long cache timeout, like say, you can keep this file for a week.
+
+[00:07:08]
+What happens when you wanna change that file sometime during that week? You found a critical bug and you need to get that fix out. But you have a whole bunch of clients that have cached that file for a week, and they will not get the new version until the next time their browser requests it.
+
+[00:07:24]
+So that's where we get into kind of another concept here called a cache buster. Is how do you make the request different so that your browser doesn't look inside of its own cache to do it? How I do it inside of this particular application, is I use a little bit of build tooling.
+
+[00:07:43]
+That when I assemble the file main.js, I generate a hash for the contents of that file. I just use a short check sum and generate the hash code for the contents of the file. And I append it right there to the end of the file name. So main-, there's its check sum right there.
+
+[00:08:02]
+And the HTML file that references it, references it by that name. That's why this has a really long age. Because that file will be cached, will never, ever, ever, ever change. Because when I have a bug and I need to fix it, and I hit a new build, the name of the file itself changes, and the name of how it is referenced in the index.html document changes.
+
+[00:08:27]
+So lots of different other strategies on how to do cache busting. There's lots of literature on how you do it and have lots of opinions. Some people like changing the name, some people like adding query strings. There's pros and cons to all of them. You can look into lots of options on how to do it.
+
+[00:08:42]
+
+>> Thanks.
+>> Yeah.
+

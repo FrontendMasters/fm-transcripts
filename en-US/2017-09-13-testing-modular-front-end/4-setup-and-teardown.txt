@@ -1,0 +1,60 @@
+[00:00:00]
+>> So another thing that's really coming with tests, is, how to do kind of a setup phase and a teardown phase. So for example, if you need to speed up an HTTP Server, Cuz your HTTP Server is required to do some other piece, and then, you need to have a phase where you kind of set up everything, you initialize the database and you create a connection and then in your tests, you're gonna use that SIR or that database connection.
+
+[00:00:28]
+And then finally at the end you need to be able to clean up. So a really simple way of doing that, is to use the the Tap and Tape APIs, both execute commands serially, so the first thing that you can put, can be your setup and the last thing that you do can be your teardown, for example, and there's some even better ways to do it, but this is a really simple one.
+
+[00:00:52]
+And then if you wanna separate things out by files, you can just name because the tests are gonna be sorted in a glob. So you can name your teardown like AAA and your, sorry you can name your teardown ZZZ and you can name your setup AAA. You can also, there's an unfinished event that's part of the Tape API, but if you wanna have something that's less hacky, but still works pretty fine and is robust.
+
+[00:01:20]
+So let's make this test suite into kind of something that's gonna require a little bit of setup, and a little bit of teardown. So we're gonna make an HTTP Server, and then we're gonna ping that server with the request, and it's gonna asynchronously perform this calculation for us.
+
+[00:01:40]
+Okay, so the first thing that we wanna do is that, any kind of state that you're gonna have throughout your test, you can declare in the module scope. We'll have our setup phase. The cool thing too about, kind of rolling this kind of functionality yourself, is, for example, if you have different kinds of setup in teardown, it's completely up to you how that's gonna work.
+
+[00:02:07]
+So for example you might need to set up one server for one batch of tests and another server for another batch of tests. So this is all just ordinary code, there's not really any magic going on here, which I really prefer, because if there's too much magic, you can't really reason about how it works, in order to do kind of the customizations that are necessary over time, so I really prefer this approach.
+
+[00:02:32]
+All right, so if we make an HTTP Server, we're gonna need the HTTP library. And we'll do http.createServer, and inside of our server function, we're gonna, I mean probably this would live in another file, if we're setting up the server, but just for brevity, I'm gonna include it in line in the setup.
+
+[00:02:55]
+So, we're gonna take the req.url, which begins with the slash, right? So, it's gonna be /1, I'm gonna have run elevenizer on 1, and 3 is gonna run it with 3. So, we can slice off the first character, which is always gonna be a slash, and that'll be our input.
+
+[00:03:18]
+And then we can run eleveniser on that, and get a response back. Results, because we're already using something called res. If there's an error, what we need to do is send that error down the pipe, and maybe set a status code. 400, I don't know. Else we'll just call res.end with the result.
+
+[00:03:50]
+And that's gonna be a number. So we actually have to convert it to a string. All right, so now this is little HTTP Server, instead of calling elevenizer in our tests now, what we should do is make some HTTP request. So I'll do http.request, I'll give it the host, local host, and the port is, you can get the port if you have a handle on the server by doing this.
+
+[00:04:18]
+And the path, which I think you can provide like that, maybe it's path. So, /1 should give us a result. So we're gonna get back a stream of data. So, gonna require a little module to help us out with that, called concat-stream. So you can install it by doing npm i concat-stream, like that.
+
+[00:04:49]
+And then we're gonna pipe the response into that package, and we'll get back the data. So, you don't really have to know too much about how this part works. But basically, it's gonna take all of the data, and just glom everything together into a buffer, and then we can compare the results.
+
+[00:05:06]
+So, let me call body.toString, then convert that to a number. And then we can t.equal, finally, that should be 111. So maybe in our test now, we wanna do this again for a few other values, right? So we can write a little loop, or write a little function that's gonna help us out.
+
+[00:05:31]
+So testDigit (n), and now instead of hard coding those values we can sort of, And we can also pass in the expected value. Okay, so now we can testDigit for a number of things like 1, should be 111, 3 should be 333, 9 should be 999. And that's gonna be, so right now, we have a single assertion, but we probably also wanna test that the status code is correct.
+
+[00:06:09]
+So we can do t.equal(res.statusCode, 200), okay? So that's two tests per assertion. So, 2 times 3, is 6, it's over, we have the correct number of assertions. Okay, so, if I did everything correctly, that server should be running, and then finally, we're gonna wanna tear it down. So, I'll put the teardown at the very end of our test.
+
+[00:06:37]
+And we can do some things like, I think just server.close(), that's all that we need to do. And think that server.close() takes a callback. So we can just end the test. You don't actually have to have any assertions at all on your test. If you call t.end, it'll just accept.
+
+[00:06:52]
+Let's try to run it. Okay, here we go, test exited without ending, so it looks like we didn't plan something correctly. Test operator fail, operator fail. I see what it is. So in our setup code, we also need to make sure to call t.end, or we need to plan out a number of assertions, so forgot to do that.
+
+[00:07:13]
+All right, so all that our setup code really needs to do, is clean up the server. It so happens that, when the server is, well, first of all we need to call listen. So it needs to listen on a port. If you pass in 0, then the operating system will allocate you a random port.
+
+[00:07:32]
+And because we're not hard coding that, cuz we're using server.address.port, that shouldn't be a problem. You can provide a callback to the listen function, that is called when your server is ready to go for the rest of our tests. So I'll call t.end in there, and then, pull out, maybe, Test hangs, but it got past the setup phase.
+
+[00:07:54]
+All right, so what's going on now? I see what it is. When you do http.request, you also need to call end on that request object. Just know the implementation details, but common mistake, I just made it. So there we go, and our test succeeds now, finally. So kind of a more involved example of something that has setup and teardown, has some asynchronous components, sort of, hopefully a little bit closer to what kinds of tests you'd need in kind of an ordinary workplace, you've heard about, I've heard about them, so, [LAUGH]
+

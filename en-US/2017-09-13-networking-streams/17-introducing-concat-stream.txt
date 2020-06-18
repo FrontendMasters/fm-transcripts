@@ -1,0 +1,56 @@
+[00:00:00]
+>> Let's take a look at another UserLAnd module. We saw this a bit earlier in the networking section, it's called concat-stream. You can use concat-stream when you need something that's just gonna go against many of the ideas of streams and just concatenate something to fit into memory. But, you got to make compromises pretty often when you're programming.
+
+[00:00:22]
+So if we want something that will just take all of the standard in, and once the standard in is closed, it'll give us back just a big blob of memory like a buffer that contains all of the data. We can use concat-stream like this. So I can show you what that looks like, we could call it cat.js.
+
+[00:00:42]
+You require a concat-stream. You might also do something, like you might transform the input before you pipe it to concat-stream. But here I'm just going to take process standard in, pipe that to the concat-stream module. concat-stream can take some different options, but it always takes a function. And the function is where you can handle what the input is going to be.
+
+[00:01:09]
+So I can print out the body.length, and this should work similar to the wc-c command that counts the number of bytes from standard in. Although this is a very memory intensive version of that program because the WC program will actually not buffer everything up. It'll just count it as it comes across the wire.
+
+[00:01:29]
+So we'll build an example that's more memory efficient in a moment. But for now, here's just a simple way of doing that. So, if I write some data to standard in and then I press CTRL+D to standard out, then I get a count of how much data was sent.
+
+[00:01:47]
+So 20 bytes in this case.
+>> So CTRL+D and standard in?
+>> Yeah, CTRL+ D from standard in is how you tell the program that you're finished typing. Whereas Ctrl+C is like just stop the program, kill the program. Stop has another meaning like SIG stop, but yeah. Okay, so a more practical use of when you might want to use something like concat-stream is, again, if you have an HTTP server where you need to, parse some format that's, maybe you don't have a streaming parser for it, you just have a parser that works on big blocks of memory, like you need to parse your encoded data.
+
+[00:02:37]
+So why don't we, we did this already in the streaming section, but I can type it out again, or in the network section, but I can type that out again, so we can, little HTTP server. Maybe this time we'll do it properly and we'll only let a certain number of bytes go through and we can use the through to module to do that.
+
+[00:02:57]
+So I think this would be a good example. So we'll listen on the port, now instead of process standard in, we can use request.pipe to our concat. So when you have an HTTP server, the request object that you get is a readable stream. And I'll go more into the difference between readable and writable and duplex and transform streams in a moment.
+
+[00:03:20]
+But for now, so we have a readable stream and a writable stream. We can pipe the readable stream into this concat-stream module. And maybe we'll just parse the form upload. So we can use the christian module qs.parse(body). And, it just so happens that you can pass an encoding of string, in this case, which saves us having to call to string on the body ourselves.
+
+[00:03:55]
+And then we'll just console log the parsed parameters and call res.end. So this will work but someone could send us a 50 gigabyte input and then our server would crash because it would run out of memory. So we'll fix that in just a moment. But for now, I just want to make sure that it works.
+
+[00:04:29]
+Yeah. So the server works using concat-stream. Now let's add our through stream to make sure that we're not getting too much data. So let's set a real hard limit of 20 bytes, we're gonna be really aggressive about making sure that people don't send us too much data. So what that might look like is, I'm just gonna move stuff around a little bit so it's easier to deal with, so call that onbody.
+
+[00:04:59]
+This is another useful thing to do if you find yourself in some callback soup it's just to start naming your functions a little bit. And then it can be easier to work with. So now we need to put a new piece into our pipeline. So we're going to use through which you got to require.
+
+[00:05:21]
+And we're gonna have a counter function that's just gonna count the number of bytes that have been sent so far. So call that function counter. We write it like that, I guess. Now we need to save some state outside. So, actually, it might be better to do that inside of the functions.
+
+[00:05:45]
+So we'll have the counter function take care of creating the through stream. We have our buffer, encoding and next. And we also need to save our piece of state, that's the number of bytes that we've seen so far. So every time we get a buffer, we need to increase the size by the buffer length.
+
+[00:06:07]
+And if the size is greater than 20, we need to just end the stream prematurely. We can do that by not calling next, but then we need to terminate the stream. But in this case, I'm just gonna call next with null, which will just end the stream input.
+
+[00:06:31]
+So the body function will actually see a truncated input. We're not dealing with sending a different response, but we could. Otherwise we're just gonna call next with the buffer, okay? So, if I run this program now, then it should truncate the input. So, it works properly with the previous input but now if I provide too much data, like if I hold down the O key that should be more than 20 bytes.
+
+[00:07:03]
+It says okay, but you'll notice that now it's actually not parsing the input because the inputs have been truncated. So, there we go. I'll add that to the get repo and, and we'll give everyone a little bit of time to play around with this example and see what's going on.
+
+[00:07:25]
+And then we'll talk more about the different kinds of stream types.
+
