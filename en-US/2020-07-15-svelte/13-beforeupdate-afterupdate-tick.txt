@@ -1,0 +1,75 @@
+[00:00:00]
+>> Here we have the Eliza chatbot. If I'm gonna make that a little bit shorter so that you see it sooner. You can see Eliza is now talking to us below the screen, and I have to scroll it, Every time I get a new response from her. And that's really not a good user experience.
+
+[00:00:39]
+So we're gonna use beforeUpdate and afterUpdate to make sure that the scroll position is kept current with the contents of the chat window. So first thing we're gonna do is create a new value called autoscroll. And this is gonna reflect whether the chat is currently already scrolled up.
+
+[00:01:01]
+Because what we don't want is for the scroll to happen automatically if you're not the latest point in the chat. So in here, in the beforeUpdate function, we're gonna determine whether or not that is in fact the case. I'm just gonna copy and paste the whole thing over, and then we'll talk about what's in it.
+
+[00:01:25]
+So if we have a reference to the div, because this function will run before first run. So we need to check that div does in fact exist. Then if the combined value of the div's offset height and its scroll top is greater than the scroll height of the element minus a little bit of a threshold, 20 pixels, that is, then we consider it to be in autoscroll mode.
+
+[00:01:49]
+So if we're not at the end of the chat, we're not in autoscroll. But if we are at the end of the chat, then we want the autoscroll to happen. Then once the update has happened, assuming that autoscroll is enabled, then we wanna scroll the chat window right to the bottom.
+
+[00:02:03]
+So again, just gonna copy that into here. And then it scrolls as the chat continues. There's one more life cycle function that, again, you're not gonna use very often. But when you do need it, it's pretty handy, and it's called tick. And it's unlike onmount, ondestroy, beforeUpdate, and afterUpdate in that you don't just run it at the start of the component's instantiation.
+
+[00:02:46]
+You can run it anytime, you don't need to call it inside the script block, you can call it inside event handlers, for example. What it does is, it returns a promise that resolves as soon as any pending state changes have been applied to the DOM. Or if there aren't any pending state changes, it'll resolve immediately.
+
+[00:03:03]
+And the reason that that's necessary is that when you update component state in Svelte, it doesn't immediately update the contents of the DOM. It batches changes together for the sake of efficiency. In that way, it's gonna wait until the end of the event loop. So if you have a value that changes on this line and another value that changes on this line, it]s not gonna do a DOM update in between them because that would be a little bit inefficient.
+
+[00:03:30]
+So it's gonna wait until the next microtask, and it's after that microtask that we wanna wait for, in order to do any follow-up work. And I'm gonna give you an example of what I mean by that. In this text area here, we can toggle whether or not the selection is uppercased, like that.
+
+[00:03:54]
+And every time I press it, the selection gets cleared out, because that's just what happens with text area elements. When you change the value, it's not gonna preserve the previous selection. But we can fix that because the tick handler is gonna give us an opportunity to reapply the selection after the value has been put into the text area.
+
+[00:04:28]
+So I'm gonna import that from Svelte, import tick from svelte. And then inside this keydown handler which is applied to the text area, we're screening out any events that aren't Tab presses. If it is a Tab, we're preventing the event default, because otherwise, we would send the focus to a different element.
+
+[00:04:58]
+And we're grabbing the selection state of the text area, and then we're figuring out what the replacement text for the entire text area should be. So we're taking everything before the selection, keeping everything inside the selection, inverting the case. And then taking everything from after the selection, and then we're just putting all that back into the text variable.
+
+[00:05:24]
+But this bit here where we're reapplying the selection start and the selection end, that's not working. Because it applies that, and then the DOM updates, because this and this happen before the DOM is affected by the state change. So I'm gonna replace this line here with an await tick.
+
+[00:05:45]
+And now when I select this text and toggle it, it's gonna preserve my selection. So I can toggle it back and forth like that. So this is pretty niche, this isn't a thing that you're gonna need to do a lot. But sometimes you will, and you'll be thankful that it exists.
+
+[00:06:04]
+
+>> So tick is blocking the DOM for you to update, is that what's happening, and then it updates the DOM again?
+>> No, so what's happening is, when there's a state change pending, a promise is generated. As soon as a state change happens inside your Svelte application, a promise is generated that represents the end of the event loop, essentially, and then any other work happens, and then that promise resolves.
+
+[00:06:37]
+And it's that promise that you're getting a reference to when you call tick. So it's not actually affecting anything, it's literally just a timing thing. It's just waiting for the end of the update cycle to happen so that you can do any follow-up work.
+>> So is it like setting a timeout 0 type thing?
+
+[00:06:57]
+
+>> It's kind of like a setTimeout 0, except that setTimeout of 0 visibly happens after the work has taken place. So in that previous example, instead of await tick, we had setTimeout, and then, Did the work there, like so, setTimeout 0, then now what we're probably gonna see is, actually, you can just kinda see it on some of these Tabs, you can see it flickering slightly.
+
+[00:07:34]
+I can make it more visible by making that 100 milliseconds instead. Do you see that? So you will get this flickering effect with setTimeout. But promises, because of how they work in the event loop and everything, The promise resolves before the browser repaints the DOM. So you can do everything in a way that isn't gonna cause flickering and whatnot.
+
+[00:07:59]
+
+>> I had a question about how many magical type of bindings you have. Cuz it seems like the two most magical are the media element working on setTimeout instead of values. And then the clientx and clienty, injecting an iframe. Are there third-party plugins and stuff that do more magical things?
+
+[00:08:23]
+
+>> No, there's no binding plugins. It's all gotta be baked into the framework because the compiler needs to understand it. We do have some others, which we'll come on to later. We have window bindings, for example, you can bind to the width and height of the window and the scroll position.
+
+[00:08:42]
+And we wanna add more, we wanna add scroll bindings for arbitrary elements and stuff like that. Anything that's useful, because we're a compiler, we can do that. If there's something that is useful to one person, then we can include it because it's only gonna get included in their application, rather than everyone else's.
+
+[00:09:04]
+
+>> If you use it, then the code compiles or gets added for it. If you don't use it, it doesn't affect the user of the framework.
+>> Yeah.
+>> Really cool.
+
