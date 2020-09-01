@@ -1,0 +1,97 @@
+[00:00:00]
+>> So what I'm gonna do is, we're gonna end up using the hasura logic twice. We're gonna use it for reading from hasura. And then a little bit later, we're gonna write the hasura. But the boilerplate for doing that, is the same in both directions. So, I'm gonna create a utility function instead of duplicating this code.
+
+[00:00:15]
+So I'm gonna to create a new file, I'm gonna call it util/hasura.js. And I'm putting that right in my functions folder. I like to keep my utility functions in the functions folder, if they're only used with functions, because I want to contextually group those things. I want to know that this utility is for use with my functions.
+
+[00:00:36]
+I don't know if there's an official right way to do this, whether you should keep it outside or somewhere else. This is just the way that my brain likes to organize these things. So don't take this as something that you have to do. Take this as a thing that I like to do, and that if you also like it, you can do as well.
+
+[00:00:55]
+Inside this function, what I'm gonna do, is we're gonna use node fetch again. So I'm going to load that, require node fetch. All right. Then I'm gonna define a function called query. And the way that graphql works, is we send in two things. And we can figure it out what these are, by looking at this pem.
+
+[00:01:17]
+We've got the actual query, which gets written up here, and then down here, we've got the opportunity to send in variables. At first, we're not gonna use variables, but I want to make sure that we're set up to support it. So I'm gonna except query and variables, and I'm just gonna default variables to be an object.
+
+[00:01:34]
+If we're not, if we don't pass it, so that way it's optional. And what we're gonna get from this, is I'm going to get a result of the query, and I'm gonna get that by awaiting a fetch call. And my fetch call is gonna go to, process.env.HASURA _API_URL.
+
+[00:01:58]
+And remember, we set that in our .env. So we're using HASURA_API_URL. And then as a second argument, we haven't done this with fetch yet. We're gonna pass in an object for config, and inside of this, we're gonna tell it to use the post method instead of the default get.
+
+[00:02:19]
+We're also gonna pass in some headers, because we need to tell the hasura who we are. So the first thing, is I wanna tell hasura that we're sending it json. And we do that, because we can actually send in different data types. And so we need to specify which one we're gonna send in.
+
+[00:02:36]
+And then we also need to send in that admin secret, which is what gives us permission to do things in hasura. And that's why it's important to put this into a serverless function. And not into the front end of our site, because if we put it into the front end, then anybody can do anything including deleting everything in our database.
+
+[00:02:56]
+But if they get hold of this secret, so this one is process.env.HASURA_ADMIN_SECRET. Okay, then we're gonna send in a body, and our body is json.stringify. And we're just gonna pass in that query and those variables. And when we get back, we're gonna do a dot then, take our response.
+
+[00:03:26]
+And our response is gonna be json, so we need to tell fetch to handle it that way. Now in a production app, I'm gonna skip this today, because I don't want to get too deep into it. But we would need to check to see if there was an error with the query, like if it was poorly formed or if something was wrong.
+
+[00:03:45]
+I'm not gonna do that here, because I want to make sure that we're able to get everything done. So, we would wanna show helpful info if there's an error. For now, if something goes wrong, we're gonna look at the way that things explode and we'll deduce the bug from there.
+
+[00:04:05]
+[LAUGH]
+But then, once we get this back, we know that the results is going to have, and this would be in result.errors. But we want to return, is result.data. And so, we're just gonna send back whatever comes back from hasura. We're gonna pass it straight out of this function, and give it back to whatever calls it.
+
+[00:04:30]
+And so then, down to the bottom, we're going to exports query. And so, what this function does for us, and that'll be equals query is what that needs to be. So we're doing a named export. So we'll be able to import query from our utility function. And it's going to take the graphql query, any variables that we need, send that off to hasura along with the credentials that we need to make calls.
+
+[00:05:01]
+And then when it comes back, it's gonna take that response, use it as json, and give us the data. So what's gonna happen next, is we are going to refactor our movies function to use hasura, instead of the hard coded data. So instead of importing our movies directly, we're going to refactor this to use query and we'll get that by requiring util hasura.
+
+[00:05:30]
+And then up at the top here, we're gonna get movies. By running await query, and then we need to pass in a query. And I use backticks, so that I can format it. You could, if you wanted to turn this into a string, but it's just a little easier if you look at it this way.
+
+[00:05:54]
+And then to actually use this, I'm gonna head over. I'm gonna copy paste this query in. So, this is a name like a label for it. So, we could call this like all movies or it's optional, you can leave it out. If I'm not doing a lot of these, I like to leave it out.
+
+[00:06:14]
+Because it doesn't, there are reasons to add labels, like if you're gonna look for operations and like screen for them and stuff. I usually, I'm not building stuff that's complex enough to merit that. So, I like to keep it simple until I need to add things. And in this case, just loading the movies, we don't need to do any fancy stuff.
+
+[00:06:37]
+So we can just put in this query like so, and that gives us our movie data, and that's it. Like what we're doing now, is we're loading from hasura instead of loading from json. And if I stop and restart the server, let's see it's already stopped, so let me start it.
+
+[00:07:00]
+And assuming I didn't type or anything, we should see one movie on the page. There we go, Batman versus Booperman. That's our one movie that's in our database right now. So, we now have a functioning database call, and we need to, Like, that's it right, we're good. We're in very good shape here.
+
+[00:07:25]
+I'm very excited about this. And the next thing, is we need to figure out how to save movies to this database. So we need to add stuff, we don't wanna do it through the interface. I wanna use this handy little forum for it, let's use that. So I already set you up, if you go to slash admin, we've got this nice form where we can add movies right from our web app.
+
+[00:07:48]
+I want to wire this up, I want to use a serverless function to save these new movies to our database. So, let me commit where we are right now. Let's see, git status, make sure we're not doing anything weird, all good. Let's get at everything. All right, I'm gonna commit load movies from hasura.
+
+[00:08:21]
+All right, I'm gonna push, and we're ready. So, the next thing that we're gonna do, is we're gonna figure out how to insert a movie into our database. And we're gonna use graphql for this as well. So let's start by just actually writing the code in hasura. So let's go back to our console here, and I'm still in this graphical tab.
+
+[00:08:45]
+And instead of doing a query, I'm gonna pull out and I want to do a mutation. And the reason it's called a mutation, is that we're changing something, we're mutating our data. So I'm gonna choose a mutation here, I'm gonna hit the plus button. And now we can see, we've got a mutation, which is gonna change the data in our database.
+
+[00:09:06]
+And we have a new set of options here, to change this. So I want to insert one movie, so just a single movie. That's what we're gonna use today. And this is going to give us an ID, a poster, a tagline and a title. That's what we have to tell it.
+
+[00:09:24]
+And you see, when I hover over these, I get a little dollar sign. I want those to be variable, so I'm going to click this dollar sign to make these into variables, okay? And then what I want to get back, is the ID, poster, tagline and title that we just created.
+
+[00:09:41]
+Now, we could do this a bunch of ways. Like we could just get back the ID or we could send back something else, but it's nice to just return the whole thing. Make sure that it worked the way we expected. And so, let's take a look at what actually just happened here, cuz this is kind of cool.
+
+[00:09:53]
+So our whole mutation just got set up. And it's going to take an ID, which is a string, a poster, which is a string, a tagline and a title, all of which are string values. That lines up with what we expected for our database. They all need to be text values.
+
+[00:10:09]
+And then, we insert a movie and we pass in, like data object. With the ID, poster, tagline and title, all of which are set to these variables, and then we're gonna return the values that we just created. So we'll get back that movie object, but we need to set these query variables.
+
+[00:10:27]
+So what's nice about this, is that it's just json. So let's go into our movies.json. And let's grab the second movie, and I'm gonna copy, skip that last comma, but I'm gonna copy out this object, and I'm gonna drop it in as a query variable. Okay, so do you see here?
+
+[00:10:50]
+What we just did, is we took object like straight out of our json. And because our variables are named the same thing, we're able to run this directly. So let me run this mutation. I'm gonna run it, and this is where the names are helpful, so I'm gonna run my mutation, okay.
+
+[00:11:12]
+It saved our movie, so we got back Starship Troopers. All right, so now if I run our query, it's because the variables are there. So let me remove these, run the query, here we go. We've got two movies. So we've got Batman versus Booperman and Starship Troopers.
+

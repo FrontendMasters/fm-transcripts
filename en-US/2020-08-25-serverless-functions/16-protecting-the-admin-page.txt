@@ -1,0 +1,84 @@
+[00:00:00]
+>> The token has a few things. There's an access token, there's an expiration date, and there's a refresh token. And these are what we actually use to decide whether or not somebody is able to log into our app. So if I take this access token, this is what's called the JSON Web Token or a JWT and if we head over to jwt.io, this is a really cool thing provided by Auth0 that lets us debug a JWT.
+
+[00:00:28]
+So I can just copy paste it in here and it shows us here's the header which is like what kind of JSON Web Token it is. This is the body of the token which is what's actually in it and then this is the signature. And so in order to validate this, we need to have a secret, a kind of like a passphrase for JSON Web Tokens.
+
+[00:00:52]
+And that's what the apps that use this identity share to say that like, yes, this is in fact a valid JSON Web Token and not somebody just spoofing it and sending it over to me. We aren't going to worry about that here because Netlify Identity is going to handle all of that validation for us.
+
+[00:01:12]
+But if you want to dig deeper into that, there are really good resources on the Auth0 website on octaves documentation. You can dig into the OAuth Doc's jwt.io is going to take you through a bunch of information about that. But what we can see here if we look at the payload of this JWT, is that we have our expiration date.
+
+[00:01:35]
+We have our subscriber ID. So this is our Netlify user ID. We have our email address, and then we have app metadata and user metadata. And so this is what tells us that we have an actual user like we know that we've got a user. The user's token is valid for this long and this is what we know about this user.
+
+[00:01:56]
+So what we want to do is we ultimately want to include a role on this which will go into app metadata because remember the only way that we can affect app metadata is through the app, the users can't control that. And that's important because we don't want someone to say, hey, I'm an admin when they're not.
+
+[00:02:14]
+They can't update this data cuz they could say like, I'm Frank when I am actually Jason. And that's not a huge risk to us, that just changes what the UI says, it'll greet the wrong person. But if I could go in and change this and give myself admin permissions and stuff, that would be a problem.
+
+[00:02:31]
+So we need to make sure that that is not possible and that's what app metadata allows us to do. So now that we've got this user, we are looking at our login page, and we have the option to log out. So if I log out, it pops open the thing and I have to log out.
+
+[00:02:50]
+I don't love that experience, so I actually want to change it. So what I want is when I log in, I want to get logged in. And then I want this to bounce me over to the admin page so that I can just immediately start adding movies. And we'll just add a logout button to that admin page that will instantly log me out instead of this experience where I have to pop open the the widget and then close it.
+
+[00:03:15]
+So let's build that part first. Let's go into our code and we're gonna add some some script here, so add a new script tag, and we're going to add a function called handle login. And that's going to get a user object, and what we want to do is we want to check if there's not a current user or if that user doesn't have a token.
+
+[00:03:46]
+Then we want to return because that means that we should be on this page if there is no currently logged in user. We are where we're supposed to be on the login page. However, if we do have an active user if somebody is logged in, if we get here, it means someone is logged in.
+
+[00:04:07]
+So then we want to send them to the admin page instead. So let's change the window.location.pathname to be admin. Then we're going to get two events that happen. So what happens when you import Netlify identity widget is you get an object attached to the window called Netlify identity and so we can get this with window.netlifyIdentity and then I want to add a listener.
+
+[00:04:35]
+So on the init event, I want to check if someone's logged in, and also on the login event so when I actually run the login function. So this one fires when the page loads when we initially navigate to the /login page, we wanna check if somebody already logged in.
+
+[00:04:59]
+So if I have this bookmarked and I close my browser and then I renavigate to this later and I'm still an active user, I just want to get redirected to the admin page. I don't wanna have to go through a login flow. And then when I do go through the login flow, that's when login fires and we want to get redirected once we're done to the admin page.
+
+[00:05:18]
+So we can see how this works by going back out here, and it already happened. You can see that when the page refreshed, it bumped us. So let's go to /login and I am logged in. Cool, took me to admin. It's behaving as intended. So the next thing that we want to do is let's head over to our admin page and let's get this thing set up to send us to login if we're not logged in and give us the ability to log out.
+
+[00:05:47]
+So here's my admin page. I'm going to close that sidebar so we can see what's going on. And I'm just going to drop a logout right above the h1. I'm not going to worry too much about how this looks, I just want the ability to do it. So I just added a little bit of style to this that's already defined so that it kind of sits at the top and isn't like off to the far left.
+
+[00:06:16]
+So if we save that and we go look at our admin page, now we've got a logout button, that needs to let us log out. So we'll do that by let's see, we've already included the Netlify identity widget. So the next thing that we wanna do is let's add a function handleIdentityEvent and that's going to get the user object, right?
+
+[00:06:45]
+And inside of this, we want to check if there is a user, and that user has a token, then we want to do nothing. So this is the opposite of the last time that we wrote this because in this case if you're on the admin page, if you are an active user if you are logged in, we wanna keep you here so we can skip the rest of this logic.
+
+[00:07:10]
+However, if you're not, we're going to bounce you out window.location.pathname to the login page, okay? So we've got that now we just need to fire it. So we're going to do that same thing window.netlifyIdentity.on and we'll run this on in it. HandleIdentityEvent and we'll run it on the logout event.
+
+[00:07:46]
+Okay, so what we're doing now is we are saying that if you are not logged in, we want you to get redirected to the login page. So we can check this. Let's go to, now let's hook up the login because otherwise we're gonna have to do some some hacky stuff.
+
+[00:08:05]
+So let's hook up this logout button and what we're going to do to hook it up is we're just going to grab that document.query selector, we will grab the logout button which had a class of logout, remember and we're going to add an event listener for the click.
+
+[00:08:21]
+When you click it, we're going to take that event and we will event.preventDefault, because this link needs to perform an action. Come to think of it this probably should have been a button because it's not a link. It's a button. But we're gonna rather than refactoring this on the fly, we're gonna stick with the way that I wrote this function.
+
+[00:08:45]
+Functionally, these would be the same, the button would just be, instead of being an anchor link, it would be a button. But I don't want to restyle things right now. So let's just roll. So what we gonna do is we gonna listen for a click on this logout and we are going to then going to fire the logout function of nullify identity.
+
+[00:09:07]
+And now when I come out here, I should be able to click this and what should happen assuming that I didn't type or anything is when I click this link, it is going to log me out, which will trigger the handle identity event function which will redirect us to the login page.
+
+[00:09:26]
+So let's give it a shot. There we go, we're at login, okay. And now if I try to go back to admin, it redirects me to login, right? And so you can see here, this does give us a brief moment of the admin page and there is an issue where if we were to do this, you could disable JavaScript and get to that admin page.
+
+[00:09:48]
+It wouldn't help you in the case of this app because you need JavaScript to submit the form. So it saves us in that regard. But in a more production app, you would probably want to add something like role based access control, which is where you're checking for the cookie or you could do redirects based on who's logged in.
+
+[00:10:09]
+There are a lot of ways to handle this again, this isn't a strictly like authentication workshop so we're kind of sticking to the high level here. But the general rules apply. And really what we care about is sending in this authentication token to our serverless function which is what we'll get to next.
+
+[00:10:27]
+So now that I'm able to log in [SOUND] I get redirected to our admin page and now I would be able to submit a movie.
+

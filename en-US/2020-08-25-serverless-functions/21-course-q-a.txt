@@ -1,0 +1,69 @@
+[00:00:00]
+>> In a quick question, it sounded like you mentioned some limitations around triggering a serverless function. But did you also touch on, there's some window in it and some window statuses that we can use to trigger other than clicks or events?
+>> I mean anything that you can attach an event listener to you could call a serverless function from.
+
+[00:00:29]
+There's not really a limitation in that sense. The limitation is that your serverless functions themselves aren't gonna listen for things, they have to be explicitly called. So if you need something to always be running to listen for an event like, for example, that identity sign up in that stripe example that I showed.
+
+[00:00:52]
+So here is the stripe subscriptions, when we look at these, there is a sign up function. So what we want is we want this to fire every time somebody signs up for nullify identity. But the way that this works, this isn't listening, this gets called. The identity service whenever someone signs up is looking to see if there is a endpoint at identity sign up, if there is it calls it.
+
+[00:01:23]
+So you have to have an event listener that's going to say, a thing happened call my serverless function. It's not a passive thing where like we were talking about subscriptions, where events come in and you can just auto trigger it on an event. You would need to have something that is listening that will trigger that function.
+
+[00:01:46]
+Does that make sense?
+>> I think you said in most cases you had save money but are there cases where you wouldn't save money by going to serverless functions?
+>> I don't know that I'm qualified to answer that question. I suspect that there is always a way to make something super expensive.
+
+[00:02:09]
+But the general idea is that serverless functions are charged by usage, right? So, you pay for the actual execution time of your functions. And typically, there is a window every month of a number of executions that you get without paying anything. So knowing that, then the trade-off would happen if your function is running so often.
+
+[00:02:39]
+That it eclipses the amount of time that it would take for the for the server to just always be on. Then it could start to cost more to have the serverless function than to have a server. The amount of traffic that would be required for your serverless function to be running all of the time is pretty high.
+
+[00:03:01]
+The other thing to consider is that with that kind of load, you would probably need a pretty beefy server. And that server would probably have to be horizontally scaled to handle that sort of load. So my suspicion is that yes, it is possible but I think you would have to work at it.
+
+[00:03:19]
+
+>> We have a fauna specific question of, do you need it to be authenticated?
+>> With fauna, you need to have a key for fauna. So this particular app, we did similar thing where it's in a utility function. And the fauna call includes a fauna server key, so you need to generate that in the fauna app.
+
+[00:03:43]
+And you would treat that like a privileged API token cuz that's effectively what it is.
+>> When you're creating the handler why does that need to be an a-sync function?
+>> It does not need to be an a-sync function but if you don't return a promise, let's look at nullify functions.
+
+[00:04:05]
+If you don't include a promise, then you would instead have to use a callback. And let me see if I can find. There's an example in here. Yeah, so an example of a function using a callback is you get a third argument, that's a callback. And you have to call it with null unless there's an error, and then your return object, and I just don't particularly care for this setup.
+
+[00:04:35]
+I feel like it's kinda, they're just some cognitive leaps that you have to make. I'd much prefer to just return the thing that is coming back from the function. And by turning it into a promise, the handler does that for us. We were effectively under the hood, we're like resolving the promise with this here.
+
+[00:04:56]
+And in the handling code knows that if the handler returns a promise to use the result value is the function call. But yeah, to be more specific, you 100% do not need to use async away, you can use just a plain function like this. You just have to use the callback which is the third argument to the function.
+
+[00:05:18]
+And you have to call it back with your return value as the second argument to the callback.
+>> Do you have any tips for sharing serverless functions across applications?
+>> Yeah, I mean, they're, depending on what you are attempting to do with it. If it's something where you are kind of setting up a boilerplate, the stream-blitz thing that I set up is a pretty good example of that.
+
+[00:05:44]
+The handler here is exported from, like this is a package, it's a node package that does all the required work. And then return the required headers to allow for cores. And this is like the stuff that I need to do for every serverless function. So we're returning like we're setting up, if it's cores, this is cores handling so we look for an options HTTP method.
+
+[00:06:17]
+And then return the required headers to allow for cores. We grab in the expected fields for a stream-blitz command and parse that out to the body.We set up a response which is the function to get handled in. So that's the actual handler-event. And then we return the appropriate status code, including some headers that allow me to determine like which version of stream-blitz you're using.
+
+[00:06:47]
+We make sure that the access control is set. And then we format that object to be the right way. So if you've got some control that you need to assert over the way that your your functions are done, you can just export a handler like this. This is a package that I publish that I then import into multiple apps to use as a kind of boilerplate, right?
+
+[00:07:13]
+If you wanna share them in the sense that they are literally the same serverless function. Like our movies function is gonna be used as an API by multiple apps. You can just publish it as its own, you can have a repo called common functions and publish your functions from there.
+
+[00:07:34]
+And, like other apps would just call those and you could do that by setting up a API.oursite.com. That is all built up serverless functions and you could have a look up as part of your service you've got your movies UI, and that has the movies function. But maybe there's a home that would pull a few movies as a here's what's new in movies or something.
+
+[00:08:03]
+And that could just call the movie service and hit that function.
+
