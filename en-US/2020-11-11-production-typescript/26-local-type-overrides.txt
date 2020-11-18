@@ -1,0 +1,99 @@
+[00:00:00]
+>> There's also this concept of types that go along with libraries written in JavaScript or libraries that do not provide their own types out of the box. And that's where we see things like this, all of these packages that begin with @types. So these are packages from definitely-typed.
+
+[00:00:25]
+And we'll talk a little bit more about these declaration files here. But just know that if I were to follow these, just the standard way that you would track down something in your node modules folder. So if we go into types, and then we go into, let's say, node > fs > promises.
+
+[00:00:54]
+So we can see that these look like those declaration files that we were seeing when we were making our small library. Now, you're going to find bugs in these declaration files. And part of the reason you'll find bugs here is because of how definitely-typed works. So it's a community maintained repository where there's sort of some semblance of ownership, but not control.
+
+[00:01:27]
+So I maintain several packages indefinitely-typed, and all one needs to do in order to become an owner is, I can take you back to one of these files here. You just need to list yourself up at the top of one of these files. So here you go. This is the file as it is checked into to get.
+
+[00:01:51]
+And you can see there are bunch of different people who have just put their names on it. So these are the owners. Now when somebody opens up a change to one of these definitely-typed packages. It'll sit there, that poll request will sit there for seven days. And if nobody acts to approve it, it'll automatically get merged.
+
+[00:02:15]
+And if one of these people gives it a code review, and says this looks good, it'll get merged very quickly. And if somebody says this needs to be changed, then they'll be stopped. But what's tricky here is by default, things sail through. A decent percentage of code changes enter this type information, not node specifically.
+
+[00:02:39]
+I mean, you see how many of these packages there are in this relatively simple app. Look at all of these that I'm taking on through transitive dependencies, right? Dependencies of dependencies. So you're gonna be getting a lot of mystery code in your app. You will find bugs and you will be blocked, which is really bad, right?
+
+[00:03:05]
+This is the last thing you want to block you. You're hoping TypeScript is gonna be a productivity boon for your team. And this can really throw a wrench in the work. So I wanna show you how to make some local overrides. Because what I want you to be able to do as a viewer of this course.
+
+[00:03:21]
+Is find a way to fix the problem, apply that change immediately in your app, and then open up a poll request, and have that discussion and maybe it gets merged, maybe it doesn't. But I don't want you to be blocked while you wait for someone in open source to get around to reviewing your code.
+
+[00:03:41]
+So here's how you do this. We're going to create a folder in the top level of our project called types. And this is going to be a place where you can apply local overrides and changes to type information that sort of, remember this is a global concept. But this is a place where you can sort of patch things if you need to.
+
+[00:04:08]
+So we have this types folder, and then we're gonna go into our tsconfig, and we're gonna add a new compiler option here and it's gonna be this, paths. Okay, so what does this mean? Oop, I need one more thing, baseUrl. And it'll catch up in a sec, or it should.
+
+[00:04:47]
+There it goes. All right, so paths. Paths allow us to specify a path mapping to be computed relative to the baseURL option. So what that means is when your editor says, all right, you appear to be using types from React. I need to go and find that declaration file that matches React, right?
+
+[00:05:17]
+Where do I get that information? And there's a way, there's another flag here, by the way, this is a debugging pro tip. Trace resolution, if you turn this on, and then run tsc, you're gonna get a ton of extra output. And this will help you track down exactly what's going on and from where.
+
+[00:05:41]
+So I would advise not trying to read this in your terminal but type it to a text file. And then we can look for the module of interest. Like say you were having a problem, your editor said, I can't find the types for this thing. And you look in your package JSON, you say, I swear, we've included this package, it should be there.
+
+[00:06:04]
+What's going on? Why can't it be found? So let me follow my own advice and say pipe to out.txt. And here's our big output file. It's huge. See how many lines it is. Thousands, 6,000 lines. So here's what I wanna look for. Resolving module, React. So what's happening here?
+
+[00:06:39]
+Notice that my scroll bar position which is right up here, it's near the top. So resolving module react, this will be printed the first time we encounter a need to find type information for react. Every subsequent time, you're gonna see things like, I can't seem to locate it, so I'm not grapping for the right thing, but you'll see an indication that it is cached.
+
+[00:07:14]
+And you only resolve that type information the first time it's needed, and then you kind of reserve it. You keep referring back to the same thing. So if we look at the output here carefully, we can see, although it's not the most human readable thing in the world, it's a hell of a lot better than a stack trace.
+
+[00:07:36]
+So we can see basically TypeScript, how it's representing its lookup process. So right away, we can see that react-dom was used. So we imported react-dom, which is probably the step immediately before. Let's see. There's prop types, CSS type. There's react-dom. So first, we import react-dom and it goes through some of the other imports.
+
+[00:08:10]
+And then eventually it says, okay, I got to figure out what this react thing is. So it knows that we said we're using Node JS module resolution type. BaseURL option was set, paths option was specified looking for a pattern to match module name react. So we were just messing with paths.
+
+[00:08:30]
+And I want you to see that down here is where it's starting to look in other places. It looks for a TypeScript file. Oops, a TSX file, a DTS file. Down here, it's starting to look in at types, right? So the important thing to understand, if we provide that paths parameter, it'll be the first place that TypeScript looks.
+
+[00:08:51]
+It's a perfect opportunity for an override, because it's the first place that TypeScript will attempt to look. And that means that if we were to go into our types folder and have a reactindex.dts, And here, Something like this. Why is it unhappy? I need to ignore this, ESLint ignore this.
+
+[00:09:29]
+ESLint is not great with declaration files. I think it'll be fine though. I don't care if ESLint complains, to be honest. I care about what TypeScript is gonna do. So let's go and look at our source folder and go look at one of our components. So now note that some things appear to be a little funky.
+
+[00:10:05]
+Okay, it's saying that this file is not a module. That's the error message. I'm gonna move it down here. So it's pointing to that file we were just working on and it's saying it's not a module. Well, this is actually promising. It means that the compiler understands for that local file of mine to be where React types are found.
+
+[00:10:31]
+And that allows me, if I go and fix it, if I say export function foo, Get rid of this out.txt, doesn't really serve our purpose anymore. Go back into app. All right, so now it's happy. But it's gonna be really unhappy about this other stuff because all React has on it now is the function foo.
+
+[00:10:55]
+So I've kinda intercepted this type lookup, and I've provided my own types. And this is where you could create a local copy, make the tweaks you need to make, types are found here. So the compiler will never look in your node modules folder, doesn't need to, it's already discover something that should work, and there you go.
+
+[00:11:20]
+So you could create a copy, make a local patch, then get unblocked and now open up your poll request on the outside world. You could even relax the types, right? If you feel like, look, I don't know how to solve this problem. But I do know if I put a few any's here and just temporarily, let's just loosen things up a little just to get moving again, right?
+
+[00:11:41]
+To get the team unblocked cuz we shouldn't be stopped by this. The whole point of TypeScript is to improve your productivity. So it's not working if it's slowing you down. This is how you could apply those little tweaks and overrides. A local folder, I refer to this in a way that conflicts with a misleading concept here.
+
+[00:12:05]
+So I think if it as a local type of route, but that is unrelated to the type root option in the tsconfig. This is a local definitely-typed scope to your project. This stuff will not be included in your compiled output. You can think of it almost as just like the little fixes and adjustments necessary to get your project working.
+
+[00:12:31]
+Another use case for this kind of thing is something like this, global. And, You could do something in here, like electron. So you can modify the global scope here. When might you wanna do this? You might use a Chrome-specific or a Safari-specific API. I had to do this for a while with service workers when it was still so experimental.
+
+[00:13:13]
+It wasn't part of the declaration files that come with TypeScript. But this is a place where you can patch things up. You will need to do this, for example, if certain global's are made available to code that runs inside a Node.JS sandbox. So if you're using sometimes like Function as a Service type apps, they have a special environment that's set up around them.
+
+[00:13:35]
+And you might need to apply some types that will accurately represent the things that you need to call into. So these are the kinds of tweaks that you might have here. The key thing I want you to take away from this is, don't get blocked by definitely-typed. And be aware that this is sort of the rip chord you can pull if things aren't working out.
+
+[00:13:57]
+You just don't want this to be a snag that keeps you from being productive. And you can see that if this weren't working, I could just delete this. And really quickly, the compiler is gonna figure out, I should probably look at this other thing, and here we go.
+
+[00:14:14]
+Like you state, it's back. It's looked it up again. And now, it's found the node modules version of the React types. There you go. So that's how I deal with pure type information in my app.
+

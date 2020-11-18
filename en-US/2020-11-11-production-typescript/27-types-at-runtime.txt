@@ -1,0 +1,75 @@
+[00:00:00]
+>> I wanna talk a little bit about types at runtime. This is one of the big challenges and one of the places where people do a great job getting started and They feel a little bit let down by Information, by handling information that is not available to your app at the time it compiles, like an API response.
+
+[00:00:26]
+And really it all boils down to this. It's the fact that when we make our API calls, and I have my little function here, like get JSON, it's just gonna provide, here it is. It's a promise that resolves to an any, could be anything. How do we get from a promise that resolves to an any, which by the way, this is not casting or anything like that.
+
+[00:00:54]
+It's literally Fetches API, that's where it all comes from, right? A promise that resolves to a response, that's what fetch returns. So this is the first byte, that's when we get this. And then this is what has us wait until we get the last byte of the body.
+
+[00:01:13]
+It's a promise that resolves to any. So, how do we get from there to well-typed data? This is what I'm referring to as types at runtime. And we're gonna reach for our trusty concept of a type guard. And we're gonna check some values on the API response that we get back, so that we can get confidence around this thing being what we hope it is, what we think it should be.
+
+[00:01:41]
+And then we can give it a more specific type that will hold up as we move downstream. And I'm gonna build on the work that we've already done in this team's file, right, because I wanna return a promise that resolves to an array of teams. And right now, and kinda right here, I'm playing it real fast and loose.
+
+[00:02:01]
+Because this is a promise that resolves to an any, and just saying, a promise that resolves to an array of teams, just shove that in, that's fine, right? An any can be used wherever, but a lot can go wrong here, just right on line 7, and on line 17.
+
+[00:02:19]
+So, I'm gonna do this one exercise here. Now you could do it, maybe leave as an exercise for you to do on your own, to these other two files where you'll apply a similar concept. But just for, cuz I don't wanna be repetitive here, I'll just apply it once.
+
+[00:02:35]
+So here's what we want to do, we get an API response back, and what we want to do is say, I want to say .then, or you could use the async await equivalent. But I like the way this feels a bit better. So .then and we get this rawData.
+
+[00:02:57]
+And here we could say, assertDataIsWhatWeWant. This is approximately what we wanna do conceptually. So this assert should throw if things don't look right. And if things do look right, we should end up with the type we want. So we'll either get well typed data coming out of this promise chain, or we'll basically be hitting, we'll be throwing.
+
+[00:03:34]
+And then whoever's handling this promise, they'll have a catch, and they'll handle that, that will become a runtime error. So it's either we have the data we were looking for or we have an informative error. So let's work on fleshing this out, and really what I want here is assertIsTypedArray, pass in the raw data and then I'm gonna pass in an iTeam, or sorry, isITeam.
+
+[00:04:10]
+I want a function that will let me assert that something is an array, and assert that each member of that array passes a particular test. So I'm gonna actually implement this right up here. So we're all in the same file, it makes it really easy. So, first isITeam.
+
+[00:04:38]
+We're gonna take an arg, which could be anything. And the return value of this is gonna be arg is ITeam. So we're returning a Boolean, but this Boolean should be regarded as a signal to the compiler of whether arg is an Iteam or not. And what is an ITeam?
+
+[00:05:01]
+Well, it's got all these things here. So let's see if we can just check for these conditions. Return type of arg.iconUrl equals string, and type of arg.name equals string, and type of arg.ID is a string, and well, we'll relax a little bit here. Array.isArray channels. So it's important to get these right because I'm creating a piece of code here that's supposed to be a matchup of a concept to be honored at compile time, and a condition that is evaluated at runtime.
+
+[00:06:01]
+If these are misaligned, I have effectively baked a lie into my system, and the type checking will be weaker because of my lie. So it's really important to get these right. If these are not good, these type guards, if they're not good, they dramatically weakened the kinds of guarantees you get from from the broader system.
+
+[00:06:23]
+So there's your isITeam, and then we're gonna build something a little more complicated, and that is this assertIsTypedArray. We're gonna use generic here. So this will be generic over type T. And it's gonna return So it'll take in, sorry, it'll take you in any case that isn't necessarily even an array, gotta be prepared for that, and we'll say arg is, sorry, asserts arg is an array of T's.
+
+[00:07:06]
+That's what my return value means. Or whether I return or throw, because this is the new kind of type guard, the assert based one. So I'm gonna take in my, potentially an array, it's my job to check for that. And then I'll take in a type guard as an argument, and I can actually, I'll just call this my check, right?
+
+[00:07:29]
+I can say that I'm taking a function that accepts an any as an argument, and it returns val is T. We're getting very meta here. I have, it's like a higher order type guard. This checks for an array, but I give it a type guard that it uses to evaluate each member of the array.
+
+[00:08:01]
+So we can say return, so we'll write this the easiest way I can manage here. So if, The value itself is just not an array of any kind And why, sorry. We're calling arg, it's the value passed in here. Throw new error, not an array. And I might even, cuz I know where this is coming from, I might JSON stringify it cuz I know this came in a HTTP response, there's just no way that this is a non-serializable value.
+
+[00:08:51]
+Non-serializable value would be if child holds a reference to parent, you could just sort of go all the way down and recursively print forever, if you're trying to serialize that to JSON. So if it's not an array throw, okay, so now, we know that, TypeScript's smart enough to figure out if that check failed, is array, that's not true, we must be dealing with an array at this point.
+
+[00:09:21]
+So now, I'll say const violators equals arg.filter(Item Check(item)). So what we're saying here is, give me a list of violations, where violations are defined as those members in the collection who fail the check. There's a more interesting way to do this, and more efficient. So when I was designing this example I was torn.
+
+[00:10:17]
+This is clearly more efficient, array.some is faster because it will give up after it finds its first violation, doesn't need to make it all the way through the array. So in theory, like some of the best case scenarios do better, it's just a little bit more annoying to debug.
+
+[00:10:38]
+This goes wrong, you don't have a list of things that were found to be objectionable. And I can't print out any information about violators, because those are not available outside of the method. It could print out the whole thing, but yeah, maybe I'll print out the whole thing.
+
+[00:10:54]
+I was willing to do it up here. So there you go, we've got assertIsTypedArray, and look, it kind of just works. Look at the type of raw data. Now it's an ITeam, it's an array of ITeams. And look at what we return now, we can actually, even if we got rid of this type, we're still returning a promise that resolves to an array of teams.
+
+[00:11:20]
+This is how you handle runtime data, you want ta type guard and you just got to balance performance and safety, right? So these are not exceedingly expensive checks to perform on each member of a collection until you're dealing with thousands of items, not such a big deal. And then this will either throw and let you have meaningful error, or if you make it past this assertion and make it down here, now we're ready to return the type that we were after the whole time.
+
+[00:11:56]
+Go with this approach. Do not attempt to get TypeScript into the browser. And this will be considerably faster than something like React prop types, which is just an even more involved runtime type checking thing that many teams don't use anymore because it's generally understood to be high overhead.
+
