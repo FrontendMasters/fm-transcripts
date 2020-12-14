@@ -1,0 +1,99 @@
+[00:00:00]
+>> Let's build a quick node JS app with Postgres instead of MongoDB. It's going to look and feel very similar. In fact, we're going to use pretty much the same front end. Our very beautiful, well-crafted bare bones HTML. So again, just wanna call out, you can access all the samples here.
+
+[00:00:20]
+If you click on this, you can see here, there's the Postgres SQL one. All of the code for what we're about to do is here. So if you don't wanna write the code along with me, feel free to just copy it and take a look at it. So let's go back to our command line.
+
+[00:00:36]
+I'm gonna open a new terminal on my host computer. So I have a MongoDB sample here. I'm going to make a directory of postgresql-sample and cd into that npm init-y. I wanna say npm install express 4.17.1. And then we're also going to install pg, which is the name of the driver for Postgres, @8.4.1.
+
+[00:01:12]
+Now again, you can use an ORM for Postgres, there is connects, there is a couple of them. I do not use them. So I do not know but you feel free to use an ORM. We are just going to query Postgres directly. So install that, it should go pretty fast.
+
+[00:01:35]
+Make a directory of static. I'm just gonna copy from the mongodb sample static, index.html, and I'm gonna put that into my static directory. Because we're going to be using literally the same front end we're just going to change some strings. And then you can go ahead and touch server.js install.
+
+[00:02:05]
+And then we'll open code to this. So here in this index.html, this instead of being a MongoDB app, this is going to be a Postgres app. And instead of being the search here, we're going to put this as Board ID. And other than that, this is going to work exactly the same.
+
+[00:02:30]
+What's going to call a get, that's going to put a search.value in there and then it's going to return to us whatever the API returns, which is what we're going to grab out of the database. So save that and here we go. Let's go open our server.js and say const express = require express and const Pool capital P with the curly braces around it, = require pg.
+
+[00:03:17]
+So what is pool? Pool, what I'm gonna do for this whole project as well, I use prettier a lot just to keep everything really prim and clean. So I'm gonna create a new file here, called .prettier. Prettierrc, yes. Put an empty object here and now whenever I save these things, it's gonna fix them.
+
+[00:03:49]
+The extension you need for that if you wanna do it is Prettier, this one code forward matter and then just to format on Save. Okay, so if you see my code rearranging and looking neater for you that's that's why, otherwise it ends up looking a little gross. So let's talk about pool for just a second.
+
+[00:04:12]
+Whereas MongoDB was kinda managing all of our connections for us with Postgres, the way that it does is it creates a bunch of connections from your server to Postgres, and then it reuses them. So as soon as you say connect this it'll give you actually an old connection so that you can be instantly connected.
+
+[00:04:33]
+And that way in the process, if we're using them, one, you don't overwhelm your Postgres server with a bunch of open and close connections. And two, your connections will end up being faster because it doesn't actually have to do the handshake again. It's actually already, still connected to Postgres.
+
+[00:04:47]
+So that's what a pool is. It's a pool of connections, hence why the term pool comes from. So we're going to say constant pool = new Pool. And let's it's give it a connection string. And our connection strings going to look like this. Postgresqul://Postgres, which is the name of our user, we didn't change it.
+
+[00:05:14]
+So by default the name username is Postgres colon, whatever you called your secret password. I called mine, mysecretpassword. So if you just follow it along with me just go with mysecretpassword@localhost:532, which is the port that we're on. And then you want to connect to a specific database which is going to be message_boards.
+
+[00:05:42]
+So this needs to be the name of whatever you have. Where's my, here, right, this is the name of the database. For some of you, if you didn't change it, it might say Postgres here. If you see Postgres here, then put Postgres here. Right, that's the name of the database that you've been writing to.
+
+[00:06:06]
+If you see message_boards here, then put message_boards there. It's just important those things match up, cuz it's gonna connect to a specific database. Okay, so that's our connection string. Again, this is something that you'd use some sort of like secret manager like Key Vault to deal with. And then we're gonna have an async init function, init, and then immediately after we define the init, we're gonna call it.
+
+[00:06:43]
+So const app = express. Then we're gonna say app.get. We define a route called /get, define an async function to deal with this, rec and rez. Okay const client = await pool.connect. So this is how we're gonna get a client back from the pool. We're gonna say, hey, pool connect me.
+
+[00:07:24]
+If it has one to give to you it's like, all right, here you go, here's a client. If it doesn't have one available for you, it'll make a new connection and then hand you that back. So that's why we have to wait for it to give us back a connection.
+
+[00:07:36]
+Let's say we wanna give it a, Query where we wanna get the data back for a board, right? So if someone goes to the board 39 we wanna know that it's called the coffee board, for example, and we wanna know the description of the coffee board. And then we also wanna know all of the comments that are on the coffee board.
+
+[00:07:56]
+So we're gonna actually do two queries, right? We're gonna do one to get the data for the board, and one to get the data for the comments. We could accomplish this in one query if we did an inner join. But that would mean that we'd be sending back a lot of copies of all of the various different board data, we don't want to do that.
+
+[00:08:16]
+Let's just make this two queries at this, that would be more effective. So I'm gonna say client, let's do it this way. We're gonna do two queries at once. We're gonna do one that gets back comment response and board response. Okay, and then we're going to do = await Promise.all.
+
+[00:08:42]
+promise.all takes in multiple promises and then won't finish until everything finishes. In this particular case we want to send two queries at the same time. One for, yeah, one for each of those things that we're going to query for. So for the first one we say, client.query. Here we go, SELECT * FROM COMMENTS NATURAL LEFT JOIN rich_content right because if we want to get all the rich content for those comments WHERE BOARD ID = $1.
+
+[00:09:34]
+Okay, then afterwards we're going to provide a array, so rec.query.search. So let's talk about this for a second. This is saying wherever the $1 is replace that in here. So the rec.query.search is going to be put here. Why are we doing that? This is called parameterised queries. The reason why we're doing this is if we put this directly in there, we're gonna have a huge problem with what's called SQL injection.
+
+[00:10:17]
+I'm gonna show you how to do that here in just a second. But for now, just follow along with my lead right there. Put in our second query here client.query. SELECT * FROM boards WHERE board ID = $1. Same thing here, it's a parameterised query there as well.
+
+[00:10:57]
+Okay, so now we're gonna have two responses here, we're goona have one for the board one for the comment. Wait, this is supposed to be inside of here. So I just moved this highlighted block inside of the app.get. So every time that app.get gets called this is what we want to cause accidentally doing outside of it.
+
+[00:11:22]
+So again, all of that's inside I just copied and pasted that inside of the app.get here. Now, all we need to do is send this back to the client with a res.json. And we're gonna give back the status ok. We're going to give back the board with boardRes.rows0, right?
+
+[00:11:57]
+Because we either want to give it back the one board response we're going to get cuz there's gonna be exactly one board or nothing, right? If someone gives something that's out of bounds, we just want to give back nothing. And then here where we want to save posts, we just want to return commentsRes.rows here or we can give them back an empty array.
+
+[00:12:27]
+This actually will never be an empty array. It will never be undefined, it'll always be an empty array. So this is actually superfluous. We can just put that and that'll work just the same. Okay, so now outside of this app.get, so outside of this one here, let's say const PORT = 3000 app.use, same kind of thing we did last time express.static./static.
+
+[00:13:06]
+App.listenon(PORT) and console.log running on http://localhost:PORT like that. All right, so here we go, let's see if this works. I'm gonna open my terminal here and I'm going to say node server.js. It's running on port 3000. Get a nice little front end here, put in number 39, click Search.
+
+[00:13:50]
+And this should have returned already, so what happened? Here we can see it's not working. Where'd my code go, here. So I'm getting an unhandled promise error. CommentRes is not defined. CommentRes and I put commentRes. So yeah, I called this commentsRes in this commentRes, you just got to make sure that they're called the same variable name.
+
+[00:14:36]
+So I'll stop and start my server again. It doesn't automatically refresh your code so you have to stop and start it every single time. And let's go back to where's my Firefox, refresh the page, search and there we go. So you can see we get status ok. Board, this is the board information.
+
+[00:14:54]
+It's the coffee board. It's got a board description. And you can see here, here are all the comments. And you can see here some of these have polls attached to them, some of them have YouTube videos, all sorts of fun stuff. One of the things I'll throw out here is that I did the join on rich content.
+
+[00:15:20]
+You'll notice that some of these, see if I can show you one of them. Yeah, comment id 351 351. This thing had two different rich content associated with it. So it actually returns this twice, right? Because it's doing that join. In my code, I'd have to go through and de-duplicate this down into one thing or aggregate them in some particular way.
+
+[00:15:45]
+You could do some sort of like group by, without would be possible as well. I just didn't do that right now, just in your code, you would have to handle two different comment IDs coming back with both different kinds of rich content.
+

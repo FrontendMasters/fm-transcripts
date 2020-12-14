@@ -1,0 +1,57 @@
+[00:00:00]
+>> So we're going to kind of, I'm not gonna do this, I actually thought about getting Postgres running again and doing this with Postgres. We're just gonna kind of fake Postgres for a moment, but this is how you would combine Postgres together with Redis. So what I wanna do is I wanna do that caching thing that we were talking about earlier.
+
+[00:00:21]
+Let's pretend that we have a Postgres query that takes a very long time to complete. And we wanna do a caching strategy on top of that. So I have an rGet here, we actually already did this one. Let's do one more line here. We're gonna do r with set.
+
+[00:00:38]
+But the way that we're gonna do an XQuery is you actually have to do it with an EX here. So this is gonna be setex like this. So this allows us to do a set with an expiry, right. They just made it a different function name. Okay, and what we're gonna do now is we're gonna create a Function here called cache.
+
+[00:01:02]
+This function is gonna take in some sort of long running function and it's gonna create a cached version of it. So it's gonna take in a key, this is gonna be the key that we're gonna store in Redis. It's gonna take in some sort of ttl, how many seconds we want it to survive, and some sort of slow function that we want to cache, oky.
+
+[00:01:23]
+So here we're going to, this is a function that will return another function. So we're going to return an async function of some variety. We can even call this cached over here rather, cachedFn, right, so that our stack traces can look a little bit nicer. And this is gonna have some variety of props that are gonna come into it that we're just going to pass on to slow function when we call it.
+
+[00:01:57]
+So it's a higher order function, right? It's a function that returns a function. So what we're gonna do now is we're gonna say, const cachedResponse = await rGet(key). So the first thing we're gonna do is, do you have a cached response already in Redis? If yes, return it, right?
+
+[00:02:28]
+So you're gonna say if cachedResponse here, success return, we can call it a day, return cachedResponse, right? If not, then we're gonna say const result = await and we're gonna call slow function. And we're gonna just spread out those props that we got here, right. So let's say this is reading from the database.
+
+[00:03:02]
+We're just going to be passing in the prompts that we got in into the slow function here. In this case, it doesn't matter, but we're making a generic function that we can use a bunch. We're gonna say await rSetx, cuz we want to set it to our cache, so next time that we can hit it and we're just gonna say key ttl result.
+
+[00:03:26]
+So whatever came back from the database, that's what we're gonna cache. And we're going to return result. So this is great. Now we have this generic cache function that we can use anywhere that we want to cache some sort of result. So now we're just gonna make an intentionally slow function.
+
+[00:03:50]
+We're gonna call this async function verySlowAndEexpensivePostgresQL query, something like that. And you can imagine here, here you would do a big ugly query for Postgres, right? We're just gonna return an artificially slow thing. So first think I'm gonna say, I'm gonna say console.log('oh no a very expensive query No a very expensive query'), just so we can know when it happens.
+
+[00:04:36]
+We can even put this up here as well and say,right there, hooray, it is cached. Okay, and then here, we're gonna say const promise = new Promise (resolve). And then we're just gonna say setTimeout and resolve with new Date, .toUTCString. So all it's gonna do is after five seconds, it's gonna resolve with the date.
+
+[00:05:34]
+And then down here, we'll make it last, I don't know, ten seconds or something like that. Okay, and then down here, we're gonna say return promise. So all this does right now, is it just does a timeout and it'll resolve this promise after ten seconds, right, to kind of simulate a long running Postgres query.
+
+[00:06:00]
+So now here's the fun part. We can say const cachedFn = cache, ('expensive_call') or whatever you want to call it. Yeah, we'll stick with that. Let's say, we'll make this last for, This will be in seconds, make it last for ten seconds or something like that. Let's make this one last five seconds.
+
+[00:06:40]
+So this will get cached for ten seconds and then the ttl, it'll expire, so very slow and expensive function here. So now we have this cachedFn, which will cache the response for this and then every 10 seconds, it'll get you a fresh copy of that. Okay, let's make a new row in our app here, it's gonna be app.get/, I don't know, get, whatever you want to call it, async (req, res).
+
+[00:07:19]
+And all it's gonna do here, it's gonna say const data = await cachedFn. And say res.json, Data status: 'ok'.end. All right, so now we have this endpoint /get, That will call that endpoint. All right, so we need to stop and start our server again. And we're just gonna go directly to /get.
+
+[00:08:01]
+So notice this is gonna take a second up here, cuz the first time it's gonna get a cache miss. But now if I refresh it, it's really fast. And then after ten seconds we're gonna get another long time before, there you go, now it's taking a long time again.
+
+[00:08:22]
+So you can see here, no, a very expensive query. Hooray, it's cached and then down here again, no, a very expensive query. Okay, so now let's simulate thundering herd, right. So let's wait until this is gonna take a long time, and now taking a bunch of time. And I'm gonna refresh a bunch of times, cuz I definitely wanna buy that PlayStation 5, right?
+
+[00:08:45]
+I'm not upset [LAUGH]. But you can see here, I just thundering herded all over this server, right. Kind of my point here is you need to be aware and cautious of how you're doing these kind of caching strategies. This caching strategy is probably fine for something that's gonna be hit relatively infrequently, that your chances of thundering herd are very low.
+
+[00:09:06]
+It's probably okay. But if you're gonna be implementing a black Friday flash sale, not that I'm speaking from experience here, you don't want to do it this way. But again, yeah, this is one way you can definitely do a caching strategy.
+
