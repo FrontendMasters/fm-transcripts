@@ -1,0 +1,69 @@
+[00:00:00]
+>> You'll notice that we do have this pending thing, and then eventually it goes to active. Now, right now that pending, it's not really doing anything. It's just waiting for another events to happen. Now it could be waiting forever and there's really no indication of what exactly is happening for that success events to finally be there.
+
+[00:00:25]
+In this case, we just have a timeout that it's going to send success after two seconds. But we do have a split in logic. So we have the logic inside the alarmMachine. And we have the logic that's inside this useEffect. So how can we actually combine the two?
+
+[00:00:46]
+Because XState could also handle effects as well in the form of actions, invoking actors, and spawning actors. So let's go ahead and convert this so that XState itself handles it. Now, of course, you could use after, but we're going to make a fake promise in order to simulate this behavior.
+
+[00:01:08]
+So let's go ahead and create that promise. So let's say that we're just trying to save the alarm. And this is going to be in async function that basically returns a new promise. And that promise is going to resolve after, let's say two seconds. So setTimeout, resolve, and give it two seconds.
+
+[00:01:43]
+And so now this saveAlarm is a promise where we could have used it in this useEffect, but we want to move all of this logic to inside the alarmMachine. And just like the logic we have here, we have if status is equal to pending, which means we want this to run in the pending state.
+
+[00:02:05]
+So let's go ahead, you know what, we're just going to remove this real quick. And in the pending state, we're going to invoke that promise. So invoke, the source of this invocation is going to be that promise. So we could just give it that. Well, so this, where's our promise?
+
+[00:02:30]
+All right, this saveAlarm is going to create that promise. The source for an invoke is a function that takes the context in event and it returns something that can be invoked. In XState, that could either be returning a promise, an observable, a callback, which we'll get into, or another machine, which is something that we're going to see on the final task.
+
+[00:02:59]
+So in this case, we are just going to create that saveAlarm promise, which it's a function that returns that promise. And onDone, notice the onDone over here goes inside the invoke. onDone, we go to the active state. So now we don't have that success event. Instead, this is sort of built-in.
+
+[00:03:25]
+So we are listening for that promise to be done. And so now let's see if that works. So if we reload, after two seconds, it goes to active. Now because promises can fail and doing things async can fail, too, we also want to handle errors as well. Now all of these that start with on such as onDone, onError, and this on itself, these are gonna be transitions.
+
+[00:03:57]
+So this is the same as target active, which means you could add conditions, you could add actions, you could do whatever you would do in a normal transition inside of onDone and/or onError. So onError, let's go to rejected. Now, of course, we wanna simulate an error, so let's reject this.
+
+[00:04:24]
+And so it's gonna be pending, but it goes to rejected, which is exactly what we want to happen. Now promises, of course, can return data as well, and so we could just resolve this with just 100. And so we could say that we want to go to the active state on the condition, and, of course, conditions get context and event.
+
+[00:04:55]
+The event over here is going to be a special type of event called a done event. And that done event is going to have data. So we could say return event.data, let's just say if it's greater than 99, which it is going to be. Otherwise, go to target rejected.
+
+[00:05:20]
+So if the promise fails or if the event.data is not greater than 99, it's gonna go to reject it. So after two seconds, goes active. Let's make this 999. Now it's gonna go to rejected. Now you can invoke more things than just the promise. So instead of the saveAlarm promise, let's actually manually make an alarm over here, or, sorry, a timeout, which alarms are sort of timeouts if you think about it.
+
+[00:05:57]
+So you could return a function that takes two arguments. The first I'd like to call sendback, and the second one is called receive. Now from here, let's just setTimeout. [COUGH] We could send back pretty much any event. So we could send back, let's give it that type success event again.
+
+[00:06:25]
+And so we're gonna do that after two seconds. And so now we don't need this onDone because since it's a callback, there's no way to know when a callback is done. A callback could just send events back to the parent machine basically whenever it wants. So we'll add the success back in here.
+
+[00:06:46]
+And now let's make sure that it works. So we click this, after two seconds, it goes to active. Now, a callback function can also receive events. So receive is a function that takes the event that's received, and then it could do something with it. So let's console.log that event just to show you what that is.
+
+[00:07:15]
+And so if I toggle, let's do two things. Let's make the target inactive and let's also, Send an event. So this is going to be imported from XState, not this one. It's going to be imported from XState, and this is also an action creator. This returns a special send object that can send an event directly to a spawned actor or an invoked actor.
+
+[00:07:54]
+So we're going to, in this case, send type GOODBYE, just as an example. And we're going to specify that this is going to go to, let's give this an id of timeout. We're gonna say that this goes to that timeout actor. So we're giving it an id so that we could refer to it anywhere in the machine.
+
+[00:08:20]
+So let's say that we click here, and then we click again. Then we get unable to send event to child timeout from the machine. So the reason that this is happening is because, and this is another important lesson, a callback, or sorry, not a callback, but any invocation is only active within the state that it's in.
+
+[00:08:47]
+So let's take off this target and try this again. So if we click, you see that we received that type GOODBYE over there. So yeah, that's how a callback could both send and receive events. And also you could, T, timeout = setTimeout. Just like useEffect, you could return a function that cleans up whatever you have in that callback.
+
+[00:09:24]
+So callbacks are very, very versatile when it comes to invoking stuff. And so you could return, let's say, clearTimeout that timeout, and then it'll be canceled. So we're not going to get that success event if we get out of that state. So I'm going to do this. And I'm gonna console.log cleaning up.
+
+[00:09:55]
+And so now we'll see that when we click this, and then we click again to get out of that state, we get that cleaning up message, and so we know that cleanup is happening. So yeah, to learn more about this, in the XState docs, this is in the guides for invoking services.
+
+[00:10:14]
+And it talks about how to do them with promises, callbacks, observables, and machines.
+
