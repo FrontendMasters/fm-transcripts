@@ -1,0 +1,75 @@
+[00:00:00]
+>> All right, so the next thing we're going to do is we need to actually populate the list of folders here. So here we have like a list of folders that you can click on, these folders are gonna organize our documents that we take our notes in. So we wanna be able to just to get some folders here, and then eventually be able to click on the folders and look at the documents.
+
+[00:00:20]
+We'll get to the mutations where you can create this stuff later. We just need to query and get them, and this is where I think some really cool Next.js stuff is gonna come in. So let's do that. Let's go on to this next one here. So for this one, we're just gonna talk about connecting to the database.
+
+[00:00:37]
+So I know you might be thinking, well, I thought we're already connected to database. Well, yes, next off plugin connected to the database and did some database stuff for us. But we specifically haven't connected to the database to do our own work. So we need to create our own different type of connection and get that working.
+
+[00:00:54]
+So that's what we're gonna do. If you've never used a database in a serverless environment before, this might be kinda new. Because most databases were not built for a service environment, like what makes a service environment different than a regular server environment? Service environments are meant to be one offs, stateless.
+
+[00:01:17]
+Whereas most databases are expected to be running in some type of long polling service, right? Your servers are always on. So the databases are expecting that, they're built for that, they have like connection pooling, and buffering, and reconnecting, and all this stuff. That is the complete opposite of what you want in a serverless environment, because you could, I don't know, someone could just hit your API a thousand times and you hit your connection limit.
+
+[00:01:44]
+Cuz every time you do it, you're making a new connection, it's stateless, right? So what we can do to get around that is, one, you should use a service database. And service database, that's just a fancy word for a HTTP based database. That's literally it, there's some like real service databases built for that from the ground up.
+
+[00:02:06]
+But you could take any database throw like a RestAPI in front of it. And that's a serverless database now, so just think about that. Or you can do what we're gonna do, which is basically just cache our database connection. This allows us to reuse the same connection across multiple invocations of our functions.
+
+[00:02:26]
+And that's just because most functions depending on where you deploy them, even though they're stateless, they all share the same container. So for instance, AWS, when they're spinning up your functions, they will most likely reuse the same container. That is, you know the environment of which your function has been executed on.
+
+[00:02:43]
+And because we're using the same container, we can store some cash there. And sometimes those containers do get recycled. So eventually you will have to have a new database connection. But you won't be penalised every single request. So that's what we're gonna do, we're gonna do that. And this code is kinda exemplifies that.
+
+[00:02:58]
+So what we're gonna do is we're going to go to db/connect. And we're just gonna do that here. So I put a little note in here to talk more about what I just said. But basically here we're using global. So if you'd haven't heard of global before a node, that's just like the window and node, you put something on global, its global now.
+
+[00:03:16]
+That's literally what it means. So we're gonna just make a global.mongo here. And this is just for us to keep track on whether we connected already or not. If this looks hacky, I'm with you. But this is honestly the recommended approach. [LAUGH] I didn't make this up. This is the recommended approach.
+
+[00:03:34]
+I mean I've literally been working on servers for years now. I've even consulted with like the database experts that at Mongo before, unrelated to this topic. And I just happened to ask them, what do you all recommend? It was this, so there you go. I know Atlas does have something called MongoDB Stitch, which is their serverless version of MongoDB.
+
+[00:03:56]
+It's a little more money on top of what Atlas already costs, so if you wanna look into that, that might be good. But I think that's mostly to be used like client side, I think you're supposed to use MongoDB Stitch like actually on your client in like a React Native app, iOS app, or Android app, maybe even a React app on the front end, I don't know.
+
+[00:04:14]
+I think that's what it's meant for. But you could also use it on the servers as well. So you can look into that if you really want a serverless MongoDB instance, and you got the cash. So good luck with that. What we're gonna do is we're just gonna do this.
+
+[00:04:27]
+So first thing we're going to do is we're going to create a connection here. So I'm using the MongoClient, we're not using Mongoose here. I'm actually just been moving away from Mongoose for a couple of reasons. But I really moved away from it, actually this project because the connection management was a little difficult to manage as a proxy through Mongoose versus just using the raw MongoClient.
+
+[00:04:55]
+It was this a little easier to mess with the connection lodge. I could've gotten it to work with Mongoose, but I just didn't feel like working with it. So we're just gonna use the MongoClient, which is what Mongoose uses underneath, right? So pretty to use here. So what I'm gonna do is I'm gonna say, if not global.mongo.
+
+[00:05:15]
+So as in, there's no database here, then we're just gonna connect one. So we're gonna say const clients = new MongoDB Or MongoClient, and we're gonna pass in process.env.DATABASE_URL, which is in our ENv like that. And then we got some options here. So some of the options are gonna be, we have useUnifiedTopology.
+
+[00:05:49]
+I don't know, look into it. [LAUGH] New URL parser. This does allow us to use the MongoDB change the format of their URL, how they have URLs. So this assists with that. We wanna turn off both buffer. Or what was it? I thought it was buffer? Maybe is bufferMaxEntries 0.
+
+[00:06:16]
+Is that what I had here? Yeah, okay. Yeah, so I believe what this does is, yes, I'll set a cap on how many operations to drive a buffer up to before giving an error. So this basically means if you try to execute some commands on this MongoDB Client before you connect it to the database, it'll buffer those commands.
+
+[00:06:32]
+And then when you connect at a replay them, we're gonna turn that off because this is a stateless environment, we don't want any of that nonsense. We're gonna connect first and then we're gonna execute our commands and not the other way around. Whereas in the server, you might do the other way around.
+
+[00:06:45]
+You actually might start building models and making database operations before you actually connect somewhere later on your application. That's not gonna happen here. So we got that, and then I'm just gonna put a timeout like longer, like 10 seconds or something like that. Okay, so we got our client.
+
+[00:07:04]
+We're pretty good here. And then the next thing we want to do is we want to get the database. So we say const, actually let's store this in the global, so we'll say global.mongo., what am I calling this here? Client, there we go. Client = clients, like that.
+
+[00:07:29]
+And then the next thing we need is the database. So if we wanna get the database, we can say global, this is what I'll do. Actually I'll get the database down here. So the database will be equal to global.mongo.client.db I think, and you can press the name of the database, which I've been telling you all to use known as the name of your database.
+
+[00:08:01]
+This is where this comes from, so I can say that. And that should give us our database in a sense. And it was gonna pass those down like that. We actually need to connect to the database before I was just making a client. I'm so used to using Mongo where this doesn't both for you at the same time.
+
+[00:08:19]
+So yeah, we need to actually connect to the database.
+
