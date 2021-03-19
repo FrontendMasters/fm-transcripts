@@ -1,0 +1,108 @@
+[00:00:00]
+>> We're gonna move on to our second metric. And this is the most interesting metric, probably the largest contentful paint. So we know how to get the first bytes out the door. We can make some some infrastructure changes and make sure that we're getting our bytes out as fast as possible.
+
+[00:00:19]
+But how do we make sure that the bytes that we're sending in loading the page are the right ones to get to this point of completion as soon as possible. As a reminder, the largest contentful paint is that time between starts and when the user sees that most of the page is ready, or almost ready.
+
+[00:00:40]
+So how do we make sure that we get to the point get to the most critical content as fast as we can in our document. There's largely three things that we're going to focus on in order to improve this. The first is we're going to look at all of the resources that come down, all of the resources that are part of building our document.
+
+[00:01:01]
+And there's some of them that maybe we don't need right away. Maybe some of them aren't needed until the user does something or the user scrolls down, can we defer some of those until later? The second is images are a big part of most website sizes. What can we do to further crunch images down beyond just applying dumb compression algorithms.
+
+[00:01:28]
+And third, there's a bunch of overhead that comes in with most HTTP requests, how can we cut as much of that overhead out and still deliver our content? Okay, let's look at the sequence, here's a very simplified version of what we would see in the performance panel of Google dev tools.
+
+[00:01:55]
+We'll look at that in a minute but I want to show the simplified version first so you get a good understanding. At the beginning of a request, the first thing we need to do is fetch an HTML document. We need to get the initial document pull it down and have the browser parse it apart to figure out what we need to do.
+
+[00:02:11]
+And as the document is being parsed, the browser finds other resources that it needs to pull down. Like maybe there's a CSS file in the head of the page and needs to reach out and start downloading that CSS file. Oftentimes, that CSS file will then need other resources like a background image or a font or an import of another CSS file.
+
+[00:02:35]
+And so that can chain events and cause cause more time there. You'll also likely have images in the file, and images are going to all come down as the browser's gonna try and parallelize this as much as it can and download all of the images. But eventually, depending on how many resources you have the read the parallelism that the reason that the browser can do is and how many things that can download at once might get saturated.
+
+[00:03:04]
+And some of the images might get deferred until later when it can open up some time to download those. And most applications are going to have some JavaScript and JavaScript as we know. Has a lot of things going for it where it reaches out and pulls down more assets, it might need to pull down other JavaScript files, pull in this module, asynchronously load this asset.
+
+[00:03:28]
+And so JavaScript will load other JavaScript, which will then load other JavaScript is a very common pattern that we would see. Now if we attach our metrics here, the first contentful paint happened right after we brought down that HTML. So brought down the HTML and we could show the first inklings of the screen, FCP but the largest contentful paint is when we're ready when we have all this other stuff.
+
+[00:03:57]
+And so that might not happen until clearly on the other side, clear at the end. We've pulled down our images, all the JavaScript has run, all of the CSS has come down, and we render the rest of the page and the LCP. And between that is all the things that we're doing to get to render the page, to render that first bit of content that the, to render the biggest bit of content that the user seen.
+
+[00:04:21]
+So how do we do that faster? We do that faster by doing fewer things there. How can we reduce the number of things we're doing and focus on getting to the user's intended most important content as fast as we can? Now, this chart is called a waterfall and it might look familiar.
+
+[00:04:41]
+This is a very simplified version, because the Chrome dev tools can be kind of overwhelming at times. But if we go back over to our Chrome tab, and you visit the from your lighthouse report, you scroll down, there's this button here called view original trace. This is gonna open up the performance tab and show you all of the things that went into building that lighthouse report.
+
+[00:05:05]
+The waterfall is, don't have a whole lot of space here, there we go, the waterfall you can see right here in this network section in the middle. And so close that out, hi that, Okay, we can see, all right, so the waterfall is this thing happening right here in the middle.
+
+[00:05:35]
+Where we see at the beginning, the initial HTML document request which then leads to the CSS files, it tries to download one CSS file, which indicates to load another CSS file and another CSS file. There's some JavaScript that happens and then we hit some sort of parallelism block.
+
+[00:05:54]
+And we have to wait until a bunch of other images start coming down. Images after images after images after images, all kinds of different things chaining after each other as different dependencies hit and different limits get set. On this chart, we can also see where the different metrics are happening.
+
+[00:06:16]
+So this metric or this waterfall chart lines up with these markers below and so we can see at this point is document content loaded. And then the first paint and the first contentful paint, and then shortly thereafter the largest contentful paint. And then a whole bunch of other stuff happens and eventually the load event fires, so there's still a bunch of stuff happening on this site, even after LCP happens.
+
+[00:06:43]
+But at LCP, we think that the page is done. Now, here's what you can use to dig into your specific pages and blow that out, but for the purpose of our conversation right now, let's stick with our simplistic viewpoint. So we're gonna figure out how to do fewer things here.
+
+[00:07:06]
+So the first way that we can do fewer things, is to defer resources until later. Maybe not all of these things need to be done in order to hit LCP. What are the only things that we really need to do? For example, maybe a couple of those images aren't even visible on the first screen.
+
+[00:07:28]
+Maybe they're like way down the page, the user is not gonna see them right away. And maybe the JavaScript doesn't need to be there. In the case of request metrics, the JavaScript is optional, it enhances the page, it's not required for the page. So why are we wasting all this time pulling it down and executing it, when it's not actually necessary to get to LCP.
+
+[00:07:52]
+So how do we differ these resources specifically until later? Well, there's a couple of ways to do it, here's a simplistic example of an HTML page, so in this page, we have a couple of scripts in the HTML head, there's a main.js and a banner.js, and in the body we have a couple of pictures, picture and picture2.
+
+[00:08:17]
+But, maybe we don't need all of these right away, maybe we can defer these some of these till later. In the current model, this is what a waterfall chart would look like we have all of the resources just on the page and so as the HTML is parsed, it starts downloading all of them.
+
+[00:08:40]
+The first JavaScript that comes down and finishes, goes first, and it executes. And then once the first JavaScript file is executed, the second JavaScript file is executed, which then allows the images to render. Because the scripts are just in the head, they are blocking. The browser is going to stop and wait for this JavaScript to come down and execute before it continues on.
+
+[00:09:05]
+But it doesn't have to be if we don't need it, we shouldn't execute it and download it at this face, so there's a couple of ways we can do that. The first and probably most common way is to decorate the script with an async attribute. Now async instructs the browser to say, hey, download this file when you want when you can get to it and then process it, do it later.
+
+[00:09:37]
+But it doesn't quite have the behavior that we would expect because the browser's really eager to get started. And so even though that first file is decorated async, the browser says, okay, I will do that one right now. Starts looking the second one in the image, and then it realizes, hey, I still got plenty of time, I still got stuff to do.
+
+[00:09:59]
+Let me start download that and as soon as it starts downloading it, it commits itself to executing it. And so once it came down, it's going to execute it. The async one, even though the other one Is not decorated with a sync. It's purely on the order that they finish downloading, which causes unexpected congestion, right?
+
+[00:10:21]
+We haven't actually improved LCP at all, we've just created like this weird race condition where we don't know which JavaScript is going to load first. With async if the script finishes fast, it's still going to block your load events. So the other annotation that we can use is called defer.
+
+[00:10:46]
+And this one Is probably what we should all use, but seems way less common in the wild. And the first is telling the browser, don't load this yet, you don't need this right now, do it later. Defer is essentially saying, hey, you can download it whenever you want.
+
+[00:11:05]
+If you can parallelize the download fine, but never execute it until we're done. And so it goes ahead and it loads all the different assets it needs. But even though our first script loaded first, the execution is delayed until after the load event. It is no longer going to be a blocking factor for us and this led to a small improvement here.
+
+[00:11:32]
+Now there's one more thing that we can do is we can just change the order that things happen. So as the browser is reading your HTML file, it's doing things kind of in the order you wrote them. And so if you have all of your script tags and all of your CSS tags in the head of your document, even though that semantically kind of makes sense to us, we're telling the browser hey, get all these things first.
+
+[00:11:58]
+Start getting these things, even if you don't necessarily need them. And so you can take those scripts that you might not need, like analytics or like, enhancement kind of things, and you can put them at the end of your HTML document, get all the other stuff, get all the important stuff done first.
+
+[00:12:19]
+Then download the Java scripts. And what impact does that have on our waterfall? Well, now the JavaScript isn't going to load right away. It's going to take a little time for the browser to process all the document and then it when it gets to the script tags, it says great, I'll start loading them.
+
+[00:12:37]
+And the first one that is marked defer is still delayed until after LCP. The second one without a defer is executed as soon as it comes down, leading to another slight improvement in LCP. What about these images, how do we make these images slow down? Maybe that first picture needs to be on the page as part of LCP, it's part of the main content.
+
+[00:13:01]
+But the second one is something down and down in the body of the document, we don't want it. Well, there's an annotation for that as well, that looks really attractive. It's called loading and loading can be lazy, we can tell the browser, hey, load this thing later load it when the user could possibly see it, don't load it right now.
+
+[00:13:22]
+And that seems that seems great, that seems like exactly what we want, it's the differ of pictures. If we were to do that and apply everything here, we would if you do not load the second image until the user happened to scroll down to it and not bother rendering it right away, there is no longer a factor to hit LCP.
+
+[00:13:44]
+LCP is basically only constrained with how fast can we load this image and render it. The only factor really being considered because we've pushed everything off and said, hey, this is low priority, you don't need to worry about it.
+

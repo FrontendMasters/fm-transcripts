@@ -1,0 +1,138 @@
+[00:00:00]
+>> There's another important part of the performance API that we should talk about. And this is how we get the web vital information specifically. And that's called the performance observer. And so a way to observe different performance events that might not happen at known points in time. Like the purport like the navigation entry might a navigation entry, we always know that by the time the load event fires, we have all the information in that entry that we would ever need.
+
+[00:00:30]
+But different web vitals might not happen until the end. We might not know what our web vital score is, until 30 seconds into the page. And so we need a different paradigm to get that information. And that's where performance observer comes in. When we create a performance observer, we tell it to look for a specific thing.
+
+[00:00:52]
+Tell me about paint events, tell me about layout shift events. And whenever those sorts of events happen, we can capture that and get that information programmatically. Unfortunately, in somebody's infinite wisdom, these things are also called entries just like the other thing, but it's a different object entirely. They're not related at all, they're totally different shapes, just a different kind of entry.
+
+[00:01:20]
+So extra confusing for all of us. But something to keep in mind is that the performance timings is one kind of entry, and the performance observer is a different kind of entry. So, let's take a look at this. So we're gonna do two things. We're gonna run a lighthouse report on our site, so that we get a baseline of how does our site perform right now, according to lighthouse.
+
+[00:01:50]
+And then we're gonna walk through, I'm not gonna ask you to build it on your own. We're gonna walk through some code together and implemented on the site. To capture real field data from our site so that we can pull it together. So, we're gonna code together. So, if you're ready, open up your IDE of choice and have a look at some code.
+
+[00:02:19]
+So in the public folder under assets, j s utility, there's a couple of files in there that I brought in from other projects that we're going to use. The first is perf j s. Perf j s is our field data performance agent. This is the thing that's actually gonna capture field data from our webpage and bring it back.
+
+[00:02:48]
+And it's gonna do that by into by interacting with that performance API programmatically. So how does this work? At the top of it is an incantation that you might have seen before. This is document ready. We're gonna wait until everything is done and the document is ready before we do anything.
+
+[00:03:09]
+This is the equivalent of jQuery dot ready if you don't use jQuery. This is just raw JavaScript that just works in all browsers. And is free. And I copy and paste this around a lot. Once we're actually ready to do some stuff, we're gonna capture perf data. And so we create a payload of all the different things that we're gonna measure.
+
+[00:03:33]
+We wanna know what the URL of the pages because as the user navigates around, there might be the Index page or the pricing page or the features page or whatever. And I need to know what page are we capturing performance data from. And then I want to get a bunch of different metrics.
+
+[00:03:51]
+From the old world of performance. I want to capture DOM content loaded, of when did the initial document finish when was the load event? This information is still valuable and still relevant, just in a different way than the web vitals. And then I wanna capture each of the four web vitals that we've talked about.
+
+[00:04:14]
+First contentful paint, largest contentful paint, communitive layout shifts. And for simpler delay, and to do this, we're gonna need to create some performance observers to say I want to listen for certain kinds of events. And so the first one we're gonna create is the first contentful paint observer.
+
+[00:04:35]
+So we are gonna create a performance observer let's just collapse those and, we're gonna create a performance observer, that when, it goes off, it's gonna call our function. And it's gonna observe our document for paint events and pass in the buffered property or the buffered option. What buffered means is that, hey, because we're waiting for a document to be ready before we're creating any or any of our observers, some of these events might have already happened.
+
+[00:05:09]
+By saying buffered, it means I want them I'll give me the events even if they already happened. I can get historical events will be passed into me as well. And whenever that happens, I want you to call my function, my handle FCP function. There's a little bit of ceremony that seems to be necessary with this API, where the list of entries you get isn't actually the entries.
+
+[00:05:35]
+It's like an odd envelope for the entries. So you call entry list get entries, which sometimes doesn't return an array. So you have to like default it. In my opinion, this is a bunch of like ceremony that is totally unnecessary, but that's what the API demands. So for that, you'll get an array, an array of objects pate entries that have come in.
+
+[00:06:01]
+And for each page entry, we need to look at them because not all paint entries are the first contentful paint entry will get a paint entry for every time that there might be a paint of it. So we'll have to look to see hey, the entry that we get is it called first contentful paint which is specifically the metric we care about and if it is, we're just gonna capture the.
+
+[00:06:27]
+So what was the start time of the first contentful paint? And for our own ease of use, we'll write it out to the console as well, so that we can interact are other observers are gonna look a little bit similar. But each of the web vitals has its own quirks.
+
+[00:06:49]
+Of course, nothing is just, hey, here's an obvious API that does what you think it does. And you don't need to think about. Nope, they're all a little weird. So for example, we just went through the first contentful paint clearly largest contentful paint would be the same thing, just a slightly different thing, no.
+
+[00:07:09]
+No, it's a totally different event we're gonna listen to. We're not gonna listen to paint events, we're gonna listen specifically to a largest contentful paint event because it's different, but it is what it is. Inside the ceremony is exactly the same. We unwrap unwrap the envelope of entries loop over them.
+
+[00:07:30]
+And unfortunately this will go off multiple times every time there is a paint event and it is the been the largest one to date. Like so far in the process. The contentful paint event will go off again so, this is gonna go off again and again. And so, what we need to do is we need to measure, is the start time of the event that we just got bigger than what we've captured before?
+
+[00:07:57]
+And if it is as we update it, because the first contentful paint, by definition will also be the largest contentful paint when it happens, and then every subsequent paint will be measured if it is bigger than the one before. Can we also have layout shifts? Is not a paint event.
+
+[00:08:20]
+It's a little different. It is a layout shift, remember. This is when the page is pushing around. So any time elements are shifted on the page, we are gonna listen for a layout shift event. And it'll call our handler after unwrapping the same package, we have to look at a couple of things here.
+
+[00:08:42]
+First, we need to check to make sure that this wasn't expected. And what do I mean by expected? I mean, there's lots of patterns on the web where you might have a drop down menu and expander acts like maximize video. Thinks that the user just clicked a button and something got bigger and the elements around it shifted.
+
+[00:09:08]
+Well clearly that's expected, that's what we want. And we wouldn't want that to count against our score, so we're gonna get a layout shift event anytime it happens. But if there was a click event and the immediate event loop preceding this layout shift It'll be flagged and we don't want to capture that.
+
+[00:09:29]
+It's not part of our cumulative layout shift score. But aside from that we have to add this up ourselves. So every time there's a layout shift, we just add it to the previous add it to the pile. We're adding them all together and the total score will be the.
+
+[00:09:46]
+Now this can happen again through the entire lifetime of the document. So as a document changes, this is gonna keep going off and getting bigger and bigger. The last of the web vitals is first input delay, which will create yet another performance observer for this is gonna listen for the first input event.
+
+[00:10:09]
+And we're gonna unwrap the entry. Now, rather than just getting a single metric this time, we have to do a little bit of math ourselves. Because the data that it tells us is when did I start first calling events? Calling events in response to this click event versus when did the click event actually happen?
+
+[00:10:31]
+That's the delay between when the click event happened. And we're able to process our first event handler based on it. So we do that math and provide it. Now this is only gonna happen if there's a click if the user hits the page then leaves the page. There's no 1st input.
+
+[00:10:47]
+They never did anything. So with all 4 of these listeners going, we're gonna be capturing the data. How do we get it back to our server? Well, because these things can happen at any point during the lifecycle of the page. You don't necessarily know when you're done when you have the data that you need.
+
+[00:11:08]
+And so the only real way to get that data back to yourself reliably with the correct values is to wait for the page to be done, to be unloaded. The user is leaving so we can listen to the unload event. Now, if you've ever tried to listen to the unload event, you didn't know that it.
+
+[00:11:26]
+You can't do very much, you can't like fire off a fetch request there and have any reliability that you're gonna get it. But you can do other things. For example, you can send a beacon a begin is a very small payload that you can say after this page is done.
+
+[00:11:47]
+Post this after the API, I don't want to know anything about it. I can't really even configure it. I can't tell you it's Jason. I'm gonna fire the string up, report and pray that he lives in the right place so we're gonna fire off our payload to this beacon API.
+
+[00:12:05]
+There's a couple other bits of data that we hadn't captured yet that we can pull off the performance API. So we're gonna get a particular entry, the navigation entry. So the one that we looked at. Now we're gonna pull two particular values off of it, which is the DOM content loaded and the load event.
+
+[00:12:24]
+So we can get these historical bits of data. So this is a very simple performance agent. Now, some of you might be wondering, hey, why do I need to write all of this? Like this seems like a lot of really low level stuff. And it is, but you should know how it works.
+
+[00:12:42]
+There's a library that does most of this stuff, or yeah, most of it and in a little bit more bulletproof ways, and it's available from Google. It's called web vitals, you can pull it in. It's a little bit bigger than this, but it's more production ready. Alternatively, if you use a service for this, they'll provide you an agent that they would use for their data scheme as well, like request metrics as our own agent that does stuff very similar to this inside of our inside of our code.
+
+[00:13:08]
+But for the purpose of our workshop today, we have our own custom partisinal home grown agents. So we just need to add this to our page, and we should start capturing data. So pop open the index of our document, and we just need to load this script like any other.
+
+[00:13:29]
+So we're gonna scroll down until we start finding the other script tags on the page, scople here. And let's just add it. So I'm gonna copy this one and I'm gonna load it first, and it's in j s/util /perf. And I'm gonna save that. Now if I go back to our page here, and reload it you'll see in the console of dev tools, all of our data got fired off.
+
+[00:14:13]
+So it recorded the FCP as 713 and then recorded an LCP the largest contentful page has also 713, but then there was another paint that was bigger and so that recorded again at 925. That's why we need to continually rewrite this. Now you'll see a lot of CLS.
+
+[00:14:33]
+This has a lot of different layout shifts happening over time. And if we go to the page and scroll down, we might even see more CLS is fire as different parts of the page might render asynchronously. If we eventually click on the page. We'll see the first input delay, which by this time, everything should be done and there won't be any delay.
+
+[00:14:59]
+But at whatever point the user actually clicks on it, we will record this. Right now all of this data is still in our browser, we need to get it back to the server, which is happening as a beacon as part of unloading the page. So if we go back to request metrics and reload the page, that beacon should have gone off and fired to our server.
+
+[00:15:23]
+How do you know that that happens? If you go to the Network tab, and we look for slash API which is where it was firing it off, we don't see it in here. Like here's a couple of fonts that have API in them, but we don't see our actual beacon requests going off.
+
+[00:15:45]
+And that's because beacons are kind of tied in with the previous page. So it happened as part of closing the previous page and disappear there's some tricks in Chrome tools to like see them, but you never get all the information about them. So it's much easier to understand them from the server side.
+
+[00:16:06]
+If we take a look at your, your running server wherever you're running the console, you might see some new lines got printed. Our server will report every time it gets, a performance payload. It's just printing out, hey, here's all the values. And what we'll play with later is actually analyzing these values because they're being written into a directory called logs.
+
+[00:16:32]
+Perf dot log dot CSV. And so every time that beacon has gone off on your page, it's just writing a new row into this. Here's another piece of field data. And so here we are now starting to capture data from our site. There's one other thing we should do before we move back to our slides.
+
+[00:16:54]
+And that's, we should capture a bit of lab data so that we can start measuring the changes that we're gonna make to our site, and how it affects both lab data and field data. So going to our request metric sites, and opening up chrome tools, I just want you to go to lighthouse.
+
+[00:17:15]
+With clear storage, simulated throttling performance desktop and generate a report. It's really bad. Really really bad. It's not as bad as it could be. Because it's actually hard to make a site. Bad when it was once good, which we'll talk about a whole bunch more later. But we have a 1.3 second FCP, a 1.6 second LCP, 0.26 community with layout shift, and overall just really terrible.
+
+[00:17:47]
+And we're gonna spend some time improving these numbers here in a minute.
+

@@ -1,0 +1,78 @@
+[00:00:00]
+>> We're gonna talk about cumulative layout shift, which is one of the metrics or I'd say the metric that I see that people have the most trouble with actually. And as a reminder, the cumulative layout shift is about the movement, distance and impact of page elements during the lifetime of the document.
+
+[00:00:21]
+So as we load the page, sometimes things get pushed around as images pop in or iframes load. And we want to avoid moving things around we don't wanna change the map of the page the user is building as they see it load all right. Commutative layout shift is also adversely affected by the work that we've done to date.
+
+[00:00:48]
+There's this important interaction between the layout shifts, and deferring things to improve your largest contentful paint. The largest contentful paint if we look at a spectrum of the timeline of a page, LCP is this time where you're signaling to the user, hey, I'm ready. You can start carrying what's on the screen and start interacting and deciding what you wanna do.
+
+[00:01:12]
+And if you do stuff, before LCP like you have stuff popping in, that still affects your cumulative layout shift if you're loading stuff in different orders. But the user will kind of forgive you, they'll understand, they expect it. They're like yeah, it's the page loading, it's cool. So here's this really annoying gift of how, a gaming site or gaming news site used to load, that was like super annoying.
+
+[00:01:41]
+And I stopped going to it entirely because I couldn't stand it. If this happened before largest contentful paint, that'd be fine. But the fact that it happens after largest contentful paint, as you're scrolling through the page. Was infuriating. You never knew where in the document you were. You couldn't pick you couldn't just read it sequentially.
+
+[00:02:04]
+It was constantly injecting ads and images and sponsored content. And it was so incredibly frustrating to use. So how do we improve layout shifts. So here's the screenshot of the New York times from a couple of days ago. And, as we talked about before, there are a couple of things here, the pop in like the images, kind of push the page down and sometimes that mean image.
+
+[00:02:33]
+It doesn't seem to happen every time for me, but I've seen that a couple of times. The main image will like load in late and it might push things to the side. And we can prevent these shifts from happening by telling the browser what the layout is going to be.
+
+[00:02:49]
+We can give it hints and say, hey, here's a box that I'm gonna put an advertisement in later. And that box is gonna be this size. Keep this empty box there so that you can position all of the other content relative to how much space that's going to use.
+
+[00:03:06]
+Essentially, I have an advertisement box that I need to put at the top of the page and specify its height. It says we need to say this is 320 pixels tall. So that everything else that happens before that loads, knows where to go. And the image, we need to tell it, hey, I'm about 640 by 480.
+
+[00:03:27]
+We tell it like what, what size is it. Now, these sizes aren't necessarily fixed, right? Because as a page might. Might become responsive and scaled down. It's very common that the browser itself will have its own stylesheet that it's going to apply. And it'd be very common for you to have a rule that says like, the maximum image width is 100%, something like that.
+
+[00:03:55]
+It's in most base CSS framework. Reset functions. What that's gonna do is by saying this image is 640 by 480. browser remembers what that aspect ratio is, so it knows what the relative width and height is. So as the responsive as a page responsively collapses down, the width might become less than 640.
+
+[00:04:20]
+But it knows that it needs to reserve 640 by 480 for the image if it loads later, and so this won't necessarily break responsive pages. All right, let's take a look at the biggest offender of this. In our test page and that is positioning our banner. So if we go back to our, request metrics site here, when we load this, we have the super annoying privacy banner, like a lot of sites on the internet have.
+
+[00:04:58]
+And it is a legal thing for a lot of European countries that you have to say that you are using cookies even though every site everywhere has always used cookies and always will use cookies, but you have to like say that you do. Well, you need to show this, but you do not need to show it.
+
+[00:05:16]
+So intrusively, we don't need to say, hey, you have to be right there on the top of the page and push everything down. This could be your banner. It could be an advertisement. It could be it could be anything. What if we didn't put it there? What if instead of at the top of the page getting injected, what if we just had floating over the bottom of the page?
+
+[00:05:36]
+What other sites do that? Well, we can make a design choice and just change where this is positioned. So let's go into we go into public assets, CSS, there's a banner dot CSS file. Today, the consent banner is positioned relative top zero, which means when the banner loads, it gets stuck right into the top of the page and pushes down anything that might be up there, which is exactly what layout shift is.
+
+[00:06:13]
+We don't want that. Instead, what if we position it fixed, which is floating, right? It's going to float over the rest of the content, always in the same spot. And we want to put it at the bottom. We can put it at the top too, but fixed on the top is weird, weird choice.
+
+[00:06:33]
+So let's just put it there. So if we flip that around and reload this page. We haven't really changed anything. We just moved it from the top to the bottom. But this content isn't changing anymore. So let's go and run a Lighthouse and see what we did. So before, our CLS was quite bad at 2.93.
+
+[00:06:59]
+If we run this again, that's a lot better. It's that it's point 08. That was a big part of our layout ship problem was just that initial push down. It was a it was a huge negative influence on our page. Now, one things you might notice here is because we added a bunch of lazy loading things.
+
+[00:07:23]
+As we scroll down the page, a bunch of stuff gets injected into the page. And if you're quick, you see the layout shifting as these things load. Looks like I broke something in my code that's not important. You'll also see that as we scroll down the page, the cumulative layout shift kept increasing that lighthouse number isn't accurate.
+
+[00:07:46]
+That lighthouse number was just what your layout shift was at the beginning at the end of the load cycle, but not at the end of when the user experienced the page, or how Google search will actually rank you. The CLS increased every time something new came into the page.
+
+[00:08:04]
+Those new things are the images asynchronously loading. Because we've scrolled over them, how low can you get the CLS of this page? By decorating the various lazy loaded things that we put in with size attributes? Tell me how big this image should be. Tell me how big this iframe should be.
+
+[00:08:24]
+And can you get, the CLS. Or the community layout score to less than 0.01. Let's do the first one together just so you know what we're talking about. Okay, here we have this call out right here. If we load in asynchronously, this is 0 by 0, and all of the text around it moves.
+
+[00:08:48]
+So I want to describe what this is. So if we look at this image in our dev tools, so this image is at this resolution 666 by 500 pixels. And so I can solve the community layout shift of this particular image by finding that first call out right here and saying that this image, the width of this image is 6066 and the height is 500.
+
+[00:09:25]
+Which will instruct the browser to reserve that much space. Go ahead and apply similar rules to other things that you see shifting around on the page and see if you can get. The [INAUDIBLE] of layout score to less than 0.1, depending on the flakiness of your lighthouse and what screen size you're running, you may or may not be able to hit that 0.01.
+
+[00:09:49]
+When I did it just now, I hit 0.06 which was still a slight improvement, But at this screen size, there's still a little bit of layout shift. I don't know if I got all of them. This is something that you're probably never gonna get completely down to zero.
+
+[00:10:05]
+But if you can get reasonably close so that the user can't always notice it, that's going to give you your benefits.
+
