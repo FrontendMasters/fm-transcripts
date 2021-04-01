@@ -1,0 +1,84 @@
+[00:00:00]
+>> All right, so I think that sort of sums up this top area, which is like a pretty nice kind of high level view, what's going on? Are we having any issues? And we'll see in the exercise that the dev tools are really good when there are issues like when you're having page jank they just start highlighting stuff with red both up here and in the main section, which is really nice because you can just kind of open it up and see if there's problems.
+
+[00:00:25]
+So now moving into this section, this one used to be less complicated, but I think it's way better now. It used to just be a single column for all the different stuff going on, but now you can see that all of these little columns are titled by different things that are happening.
+
+[00:00:43]
+And so you can see like the network requests as like I request my fonts and things like that. And it has a lot of the data that we saw on the previous one like you can see the time it took and the priority it had which is really nice.
+
+[00:00:55]
+That was the exact same stuff we saw on the Network tab earlier. You can also see all the frames and we'll take a look specifically that when we start doing some real GPU heavy stuff. The timings one we had already seen, right? That if you do any performance marking measure, the stuff will show up here which can be really nice.
+
+[00:01:16]
+Actually don't know what the experience one does [LAUGH]. I've never used that one before. I think it's part of this. Yeah, I'm not sure. And then we can see the main thread here, right? So again, JavaScript being single threaded, this is where all the work will kick off.
+
+[00:01:28]
+So if we had like a big for loop or if we have, calculating something or you have react, parsing the JSX tree and generating stuff, see all that going on in here. We can check out all the rasterizing that happens on the site as it loads. We can see if any work that the GPU is doing, what work it's doing.
+
+[00:01:47]
+And then we've got a couple of other things here that I honestly I'm not sure exactly what they do, but this like child IO thread and the compositor. So for the most part we're just going to be we use timings when we do our own performance market measure.
+
+[00:02:00]
+The network, one is really helpful to associate. A big request came in and then I started getting page jank, but it's not as helpful when you wanna see what's what's really going on. But for the most part, we're going to just stick in this main thread. This is where we're going to be able to see a lot of stuff as it's happening.
+
+[00:02:20]
+So let me close this for a second. So as we kind of get into things, I think it's, it's important to look at specific examples, which we'll do and we'll kind of figure some stuff out but it's also important to know understand some high level concepts. And the high level concepts are both things that you can do to avoid page jank and performance problems.
+
+[00:02:41]
+But they're also they explain a lot about what frameworks do and like why these frameworks exist and how they work under the hood and things like that. And so the first thing that you can do is there's an API on the window object called requestAnimationFrame. This is really great.
+
+[00:02:56]
+And the basic idea is that instead of doing a thing, like changing the size of something right? By doing like dev.style.width equals 500 pixels, you can take that and you can pass it in as a callback to request animation frame, that same thing. And what that says is I do want you to do this, but you don't need to interrupt everything and do it.
+
+[00:03:18]
+Before you do the next window, repaint, please do a request animation, please do this piece of task. So like an idea of how things can go really awry is this code up here. So this looks like pretty normal where you're like, you grab a thing from the DOM, you grab its height, and then you change its height and then you grab another things height and you change its height, and you just kind of like doing your work, right.
+
+[00:03:39]
+You're just like grabbing three things and changing their heights or whatever, but the order that they happen in really matters because when you do read that it can cache that. So now anytime you refer to h1, it's got that value cached, right? So it doesn't need to hit the window again.
+
+[00:03:55]
+But then you do a right it invalidates the layout right now we have no idea how tall this thing actually is rendered to be. And so when we if we write vanilla code that interacts with the DOM, we can get into this bad habit of like doing reads and writes back and forth.
+
+[00:04:09]
+And we're never able to cache those values like we're always just wiping out the or invalidating the cache. And then rereading and rereading and rereading. So one approach that you could do is you could like pump all of these reads and writes into a request animation frame. So the kind of way I like to look through it is like let's say you have a site by yourself and you're aware of this.
+
+[00:04:31]
+So you write this code, you're like, This, this won't do. I kind of wanna do all my reads together and then all my rights that's like a that'll make things a little better. So you do that. But then you add a bunch of other people onto your team.
+
+[00:04:44]
+Now it's gonna get really annoying. It's like no, you can't just read the DOM, you got to go over here. And this is where we do our DOM reading. This is where we do our DOM writing, it gets really obnoxious. So what you could do is you could put all of those reads and writes into a request animation frame so that way, you're only invalidating the layout right before it gets repainted anyway for another frame.
+
+[00:05:04]
+But the important takeaway here is maybe not to use requestAnimationFrame all the time. But the important thing is, this is one of the really cool benefits that using a front end framework will do is all of these frameworks will do this stuff for you. So if you're like in react and you say, Set the height on something or rerender, a new component, it won't interrupt to do it.
+
+[00:05:22]
+It'll wait until the next animation frame fire, so I think the bigger takeaway here than using this API all the time is that this is one of the really cool benefits from using some open source front end framework is they'll do stuff like this for you. Another thing you can do web workers, so if we load a page and we see in kind of, this like center area here, if we see a bunch of big yellow JavaScript stuff like I had an example here of like, calculating Fibonacci or something like that, where it's like, it's really busy, the process is really busy.
+
+[00:05:56]
+You can offload that stuff to a web worker, which essentially gives JavaScript the main thread back to handle the actual website. There's a lot of cool talks on web workers and stuff like that I have a very basic example. So you can like grab two things like you can grab an input form and a feet on a div to display some stuff in If you can check if the window dot worker API exists, like if this browser supports it, and if it does, you can instantiate a new one.
+
+[00:06:23]
+And then you can basically send messages with a post message command and you can receive messages with an on message command. So for example, like a contrived example, if you have a bunch of cool animations on your screen, but you have to calculate a really big number If you don't use a web worker when the calculation's happening, those animations are going to just stop, right?
+
+[00:06:41]
+They're gonna freeze there because the main thread's being used to calculate the number. And as we mentioned a little bit ago, you could also get around this by moving all those animations into CSS, which would free you up there. But in lieu of that, you could take the big calculation, you could toss it to a web worker that'll split off another thread, do your calculation and then answer back.
+
+[00:06:59]
+Meanwhile, the animations go smoothly. Web Workers are a whole separate topic. They have restrictions like they can't mess with the DOM. But they're really great for kicking off any kind of big tasks like If you do any kind of Frontend processing for your ads or something like that, which ones got clicked on, which ones got seen and you have all this math to do.
+
+[00:07:17]
+That's a great example of when to use a web worker to free up the main thread. The next one use a framework. I meant to put an asterisk here, this is a warning. I'm not a gigantic framework proponent. I'm not like you should always use some framework for your apps.
+
+[00:07:32]
+Not at all. But I do think if you're getting into a problem where you're trying to do something like anything with animation heavy working on a game working on a really flashy website, and you start seeing these page jank problems, then using some kind of framework and doesn't have to be a react style.
+
+[00:07:49]
+It could be like a D3 style or something like that. One of the big benefits is they will batch up this work for you and do those things. And then the last thing is just like again, kind of back to the Network tab, the idea of reducing complexity.
+
+[00:08:03]
+So this is like, you can be amazed at all the things like even like a long, CSS selectors like, DIV UL Li span ,or something like that take more processing power than shorter UI like, selectors like a class name or something like that. Just like kinda a million things that ,you could do.
+
+[00:08:19]
+But I think the big ways to do it are,using web workers for expensive stuff and using requestAnimationFrame for batching up all of your writes and, reads and things like that. I know those are a little weird because they're covered but not covered in depth like this isn't going to be on web workers or RIF.
+
