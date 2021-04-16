@@ -1,0 +1,101 @@
+[00:00:00]
+>> That worked, but, let's write something a bit more complex. Because I want appreciate, I want us all to appreciate how useful the AssemblyScript loader is. Again, the loader is is a small utility function which provides a lot of glue code, which does a lot of the heavy lifting for us.
+
+[00:00:18]
+Let's see how well, let's see the benefits of using the loader and importing that in and using in our code and all the work that it does for us. So, we, I feel like we haven't done enough code today. So, real quick, pretend this is an interview. I want you to implement fizzbuzz.
+
+[00:00:37]
+But I want you to implement it in AssemblyScripts. Don't cheat if you don't have to, but this fizzbuzz is the world famous problem that apparently most developers can't solve when handed to them. Let's see if you can do it, but you're doing an assembly script this time. And a question that was asked was, where can we find the Opcodes, in a useful way, not in the official WebAssembly documents and the Opcodes are at pengoreGitHub.io/wazzleops.
+
+[00:01:18]
+I don't know why GitHub scrolling along to that. However, if you need a link, they are in the notes, under the stack and Opcode section. And if you click on here's an interactive table, you'll see all those Opcodes. All right, let's put my money where my mouth is and let's see if we can implement fizzbuzz.
+
+[00:01:47]
+Now, I'm gonna write it out because, again, I like to practice what I preach. So I'm gonna export function fizzbuzz and fizzbuzz is going to take one number and and it's a 32 bit integer. So i32 and we're going to return a string. The function is gonna return a string.
+
+[00:02:14]
+Or no, we use the pipe to say no, okay? And once you understand the logic transfer as well as it's pretty straightforward. I know, I've been trying not to say straightforward, much intact because like if someone doesn't get it feels like diminutive, but I do feel like fizzbuzz is fairly straightforward.
+
+[00:02:38]
+So all we're checking is if n is a, Why is that complaining, it's just early complaining. I was checking if and n mod 15 is 0, that means it's a, multiple of 15, so we can say return, fizzbuzz, And if n mod 3 equals 0, we're gonna return, fizz, In it n mode 5, there are many ways to write fizzbuzz.
+
+[00:03:29]
+This is just one, you might have written it a little bit different, that's okay. Buzz, otherwise we're going to return null. Now the liter stuff and planning cool. And as I like to do whenever I write a function, before I go wild about it, I like to run it through the compiler cuz it's going to check my types and make sure I didn't do anything wrong.
+
+[00:03:55]
+Compiles fine, awesome, okay, so now we're getting, into something a little bit trickier and we'll see why I saved this towards the end, why we didn't start messing with strings yet. But for now, let's update our index.html to call our fizzbuzz function and see let's see if it actually works.
+
+[00:04:17]
+So jumping back to our index.html going take out minus one and write fizzbuzz. And I'm just gonna fizzbuzz three, which theoretically should return. It should return fizz, right, all right, well, let's see. Let's see what happens, if returned 1104 that is not a string. Why is that, can anybody, can you think of why or what this is actually returning.
+
+[00:04:59]
+
+>> Some buffery, so it's four characters, I would say. And each letter is represented a character.
+>> That's a good guess, I liked what you're thinking and that's how I would interpret it as well. But actually what it's doing is it's returning a pointer, to the location in memory where the string is stored.
+
+[00:05:27]
+And because we like to go into a bit of detail here, let's check out what is actually happening, in the what file. So, if we scroll down to our fizzbuzz example, we see again, this gets more complicated as we saw in the previous example. And what it's doing is, it's getting the number it's comparing it against.
+
+[00:05:50]
+It's comparing against zero or 15, and if it equals that it's going to return. This function or it's gonna return 1056 for fizzbuzz, 1104 for fizz and 1136 for buzz. What these are, they are memory pointers to the location and memory. That AssemblyScript has saved our strings, because I can WebAssembly.
+
+[00:06:15]
+I'm gonna keep repeating this, but WebAssembly does not have the concept of strings. It only has the concept of numbers, strings, or should I say natively? Strings are just the concepts created for high level programming. At the core of everything, it's just a number. So we're still just dealing with numbers and in this case, we're dealing with memory locations.
+
+[00:06:36]
+So, what's really interesting is we can look here and we see a series of X representing the padding on the strings we're saving. But if we look down here, we should it's bigger. We see that the strings are are actually saved. So what AssemblyScript does is, it saves references to our strings, it puts them into data.
+
+[00:07:01]
+And data is just a way of saving things in directly in the memory and it saves them as these as X operators with the letters attached. So when we reach in, we can actually pull the strings backed out, using the loader, but naively and this is something it took me a while to grasp, was what that number meant.
+
+[00:07:25]
+Because it's in this case we said three, it's returning 1104. Why is it 1104, because if we look at the data for fizz, it's 1196. There is such thing as the header files on memory locations. So one of those header files starts with also step back. AssemblyScripts can only write to linear memory or WebAssembly only writes to linear memory.
+
+[00:07:52]
+That is, these chunks of memory, that are allocated for the process. So to save as something like a string in the memory, you have to give it a specific location and a specific size, so that later, when a web assembly is looking it up, it says, you want the string?
+
+[00:08:09]
+Which it doesn't have the concept of string, it has the concept of ones and zeros, but we know that it's stored at this particular memory location at this offset. With this header file, that's why these are numbers and that's why they jump up in size. Or should I say they, the pointers increase over time, but they're not necessarily correlated to the size of the string, because you have headers that go along with it that identify it as a string.
+
+[00:08:32]
+And actually, we're gonna jump in a little bit to this, I know this is like, what's going on, what does it even mean? But I think it's important to understand under the hood, what's happening and the fact that we get nothing for free. Like we do in JavaScript, we have to think about very carefully, all the code we're writing and how it's actually interacting with WebAssembly and then memory directly.
+
+[00:08:57]
+So that was a good rant, not one of my best said give me like a, three out of 10 on memory. But let's check out, actually let's, see if that works, we're still getting 1104. Okay, so what we need to do is, we need to tell AssemblyScript, this is actually a pointer to memory.
+
+[00:09:15]
+Want you to grab that memory and then compile that into a string, so that JavaScript knows what to do with it. Because JavaScript doesn't, It can't necessarily reach in to a memory location, say like that's a string. It can, there's an asterix on that, but we have to use we'd have to use the string decoder, API.
+
+[00:09:34]
+It's really cumbersome, it is not fun to work with at all. I don't want to do that to you, so we're not going to go down that path. We're going to get the WebAssembly loader to do all the work for us. Okay, so to use the loader, I, we have to import it.
+
+[00:09:51]
+So I, this part I'm just gonna copy paste because it's not worth copying out a URL, right now this is just one of the CD ends, it's the AssemblyScript loader. It's the same thing that we imported into our node modules earlier but, and we can serve it out ourselves, but I'm just going to be lazy and copy and paste this.
+
+[00:10:10]
+So let's go back to our index.HTML. And I'm gonna load, actually, I'm gonna load that in first. Okay, so now we have the loader on the global scope, so let's go back into our loader.js. And in case, my jumping around in my rants, we're here in the notes, we're still on AssemblyScript loader section.
+
+[00:10:39]
+Let's, we're gonna replace all the WebAssembly codes with the loader codes. So instead of using the native built in libraries, we're gonna use the loader, because the loader includes some useful utilities that will help us decode these strings and help us read the write from memory. In a, we'll say a more transparent way, rather than getting to the nuances of converting to a byte array and using a text encoder, API to iterate that byte array knowing the length, and it's a mess.
+
+[00:11:05]
+[LAUGH] But the loader makes it much simpler. So in our loader file, I'm gonna do it the fast way, because we have VS code. Gonna take all our WebAssembly references and I'm just gonna call, loader because loader is available on the window now. And so that was it, what I did in case I moved too fast, all of our instantiate streaming calls, that were WebAssembly dot, I just converted those to load or dot So now we're using the AssemblyScript loader.
+
+[00:11:42]
+And because we're using the loader, we need to include a certain amount of glue code. And the glue code represents utility files, that will help us decode strings, allocate memory, things like that. So in our package JSON, the way we include those extra utilities is, we're gonna say export runtime.
+
+[00:12:08]
+So I'm just modifying the scripts right now in the package JSON under scripts and for both optimized and untouched, I'm gonna say export and runtime. Okay, and, just before we do it, let's look at a nice, relatively clean, optimize that what file, and then let's rebuild and see what happens.
+
+[00:12:40]
+Whoa, that blew up very quickly, didn't it? So now, if somebody scripts including a lot of glue code and helper, that will help us fetch things from memory. Do type conversion or, yeah, type conversions work with arrays, work with things that, WebAssembly itself doesn't really make easy to do.
+
+[00:13:02]
+But using AssemblyScript, it provides us glue code. We didn't do it at start, because I wanted to keep the file as clean as possible, because now, it's a bit more difficult to read. But, yeah, if you're in a situation and you're trying to find the function, the WebAssembly function that you wrote, you can just command F.
+
+[00:13:20]
+And I'm going to say, where's that fizzbuzz function. There we go, it's still there, it's buried under a lot of other code. And, we will not get into what this code is doing. Even I don't know this is pretty low level by the library operators. But, I know that your function is still in there and it's still readable.
+
+[00:13:42]
+But generally I don't include the runtime unless I absolutely need to, because it makes things a bit more complicated to read anyways.
+
