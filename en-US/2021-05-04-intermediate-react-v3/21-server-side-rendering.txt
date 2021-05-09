@@ -1,0 +1,81 @@
+[00:00:00]
+>> Let's move on to Server Side Rendering, so we're gonna put our node js hats on here. And I'm gonna get another fresh copy of my repo here. So again, make sure you're starting with a fresh copy of the adopt me app. That's the one that's in 12-portals and refs.
+
+[00:00:21]
+The first part we just talked about was code splitting as a way of reducing your bundle size, and getting something that time to first visual, time to first paint, time to first meaningful paint, all that stuff down to the bare minimum as code splitting away is a good way of doing that.
+
+[00:00:34]
+The other way that's very useful for doing this is doing some server side rendering. So I react as the the fun ability that it can actually pre-render everything on the server and then send the user complete markup and then react can take over the existing markup on the page.
+
+[00:00:52]
+This is not again, not always the best thing because what what is happening here is you're adding more server time, right? Because now the server has to do more of like bringing in react, running react and then sending down the markup. And then you send down the JavaScript, it's still the same amount of JavaScript.
+
+[00:01:08]
+So now your HTML request is larger, JavaScript then has to bootstrap. Take over the page and keep rendering, that sounds complicated, because it is right, and it's not always helpful, I'll say that it's frequently helpful. But it's not always helpful so, it's one of the things that just like, make sure you're improving things right, measure it.
+
+[00:01:30]
+Make sure, that your service, especially code splitting and server side rendering, they're the double edged swords here and you can actually, worsen your performance here. You're trading off, like total kilobytes here for, hopefully time to first paint, that's what we're trying to optimize here for. Because with code splitting, you're downloading more code because that Glue Code is not free.
+
+[00:01:56]
+And server side rendering you're increasing server response time with the hopes of the server can do it faster than the client, which is not always true. But that being said, let's have some fun, let's do it. [LAUGH] So the first thing we have to do is we have to take all browser concerns, all of them, out of our application.
+
+[00:02:22]
+So if this is gonna be running in node, that means we can't refer to window anywhere. Right so for example, in our app.js were importing Browser Router. Browser Router definitely refers to the Window so you can't use Browser Router in Mode, so what do we do about that?
+
+[00:02:40]
+We're gonna create a new file here and we're gonna call it clientapp.js. And that's gonna go in the source directory, and everything that happens in client app. This is the stuff that we want to only happen in the browser. A good example this would be like Google Analytics, right or any of your analytics stuff.
+
+[00:02:58]
+You don't want that stuff to fire in Node, you only want that stuff to fire in browsers client side JavaScript. So here in client app js, we're going to import hydrate, which is going to be different than render from react router dom or sorry, from just react dom rather.
+
+[00:03:20]
+This is basically to say, hey, I'm expecting complete markup at this point, please take over this complete markup. We're going to import browser router, From react router dom. We're gonna import app from ./app, here we're gonna call hydrate, I'm gonna put browser router and inside of browser router we're gonna put app.
+
+[00:03:59]
+And then we're gonna say document, oops, that's should be a comma, document, get elementById route. And that's it. And then probably here I'll just put like a note for you, other stuff that should only happen in the browser, like analytics. So, this stuff won't get executed notes to go willy nilly referring to document, right, document doesn't exist a note it will exists in the client.
+
+[00:04:36]
+This is where you would do all of that, okay, let's go to app.js now. And now we're gonna get rid of browser router here because that's happening in hydrate, or sorry in the clients app. We're not gonna do render here so we can actually just remove this entire thing here, that's all happening now in client app.
+
+[00:05:03]
+We have to remove the router here, so I'm removed the router Okay, and let's just move strict mode, we're gonna move that in here to the app, so strict mode and strict mode. Okay, and then we can get rid of this render here all at the bottom and we're gonna say export default app.
+
+[00:05:39]
+Okay, and now this has been totally deep browser a FIDE right this is now node safe to run. If we had tried to do this in node it would have blown up, because browser router refers to window a bunch of times, and so does react router, sorry, react dom as well.
+
+[00:06:00]
+We're still not quite safe though, our modal refers to a window in the outside of its first execution, which is a problem as well. So let's go fix that, so open modal, we have to get a little clever about this. Because whenever this gets imported for the first time it's gonna try and reference documents, and so this is gonna crash.
+
+[00:06:25]
+So let's put let modal here, and then move this here. Then we're gonna say, if it exists, modal root Then just keep it the same thing, otherwise go fetch it from the dom. So this is a little awkward I know and then this will just be let muddle route here.
+
+[00:06:57]
+Now, why am I not just doing something like this, well this is the kind of an expensive call anytime that you're touching the dom. The dom is the slowest part of the browser, and so anytime that I do a document.getElementByid ID that's just a slow look up. So this is going to hang your render more than it should, in my MacBook 16 inch here, it's going to be fine.
+
+[00:07:23]
+But in someone's like really old Android device, it might slow down a render and make it look kind of janky. So that's why I do this, so the first time this will work, it'll basically go grab this. You might even be able to do this with the effect, but whatever the case this works fine.
+
+[00:07:44]
+Okay. Now we're gonna cut up a really quick quick node server. So if this is your first time running node, I'm gonna try and keep this as simple as possible. But before we do that one more thing to change, index.HTML we're gonna have the the entry point be not app.js but client app.js.
+
+[00:08:10]
+Cause this is now the entry point for the browser. Okay. Now, we're gonna have a problem here because I can't just import like app.js directly into my node code still because node doesn't speak jsx. So it has to import pre built code, so what I'm gonna have to do is, before I run my node server, I have to build my node server.
+
+[00:08:47]
+Which is kind of strange, but if you're doing server side rendering, it's just something you have to do. So let's go ahead and do this, open your package.JSON And we're gonna put a couple more scripts in here. The first one is gonna be build client. And we're gonna say parcel build -- public- url ./dist/ source/index.html.
+
+[00:09:19]
+Now what is this doing parcel builds, it's just getting a production build ready and you're just telling you that the the public url here is going to be coming from dist. Then we're gonna do a build server, And where your parcel build, the destination is gonna be dist slash server.
+
+[00:09:44]
+This is going to go to disk and that's fine, but we don't want our node server and our client stuff going to the same place. That's why we do the dash D there to tell it a different place. We're do --target node because we're letting it's like don't build for browsers.
+
+[00:10:00]
+Build for node js, and we're gonna say index.js, we're about to go build this. So that's where that's coming from, then we're gonna make just like an easy, do both. So I'm gonna do npm run build client and npm run build server, so, now I'm gonna say npm run build and it runs both of them.
+
+[00:10:34]
+Okay, last one here, I'm going to put start, this is how I'm gonna start my node server. npm-s which I think is silent, run build and node, dist server, so our build server/index.js. So we kind of had to like build a little bit of a house of cards here, build the client, build the server, and then start the node server.
+
+[00:11:05]
+That's basically what you and I did there together. But now nicely, we can even write jsx directly in our note code, and it's gonna be a little bit easier to read that way. Otherwise we'd have to go back to react.creed element calls, which is, once you write jsx you never wanna go back to doing that.
+
