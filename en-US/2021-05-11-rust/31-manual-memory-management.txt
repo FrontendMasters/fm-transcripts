@@ -1,0 +1,132 @@
+[00:00:00]
+>> Basically, when people talk about memory management in practice, what they tend to mean is this question of. When is it safe to mark something on the heap as no longer in use. Allocating stuff on the heap, It's definitely non trivial. There's a good bit of logic going on in there.
+
+[00:00:17]
+But it's not particularly tricky. Generally speaking. Figuring out when it's safe to free memory is a lot trickier. So, let's walk through an example of this. So, let's say I have a function called get final orders and returns in i64 and it makes this vec of orders. So 1, 2, 3, 4.
+
+[00:00:33]
+Let's say, these are counts of like different orders. Some sort of ordering system and we've got total order is 0. That's defined as mutable. Then we iterate through each of the orders and we say total orders plus equals orders. And then finally, we call some function called finish, which does some sort of finishing calculation on the total orders.
+
+[00:00:50]
+And then we finally return that. Okay. So, this is a function where almost everything that's happening here is happening on the stack. There's only one heap allocation we're doing which is this vec macro. Everything else is just basic arithmetic. We're iterating over that thing and we're calling finished passing an integer.
+
+[00:01:07]
+So lots of stack stuff, but only one particular heap interaction here. So this is our sort of one call to alloc in the whole thing. And the question is, where if anywhere do we want to that memory? Where is it safe for us to say, hey, bookkeeping system.
+
+[00:01:24]
+These four bytes, they are no longer in use, you can totally feel free to use them for whatever you want. Because, I'm not gonna use them anymore and you can release them back to the program. Now importantly, we do have the option of saying, hey, you know what, just never deallocate anything.
+
+[00:01:40]
+We're only gonna ever do alloc and we're just going to forget about the whole freeing up once we're done with that thing. Just alloc and that's all we're gonna have. You can do this but this creates what's known as a memory leak. where basically the longer your program runs, it keeps doing more and more allocations.
+
+[00:01:54]
+But it never actually freeze anything, even things that are no longer in use anymore. Which means that your programs memory usage goes up and up and then eventually, if you're unlucky, your program runs completely out of memory. Or, as is more common, you just noticed that your system starts getting really slow and you're like, what's what's using all my memory?
+
+[00:02:11]
+And you look in some program is using a huge amount of memory. Maybe it's because it actually needs all that memory but sometimes it could be because of a memory leak like this. Where you allocate something and don't deallocate it. So, we do want to deallocate things once we're done with them to prevent memory leaks because memory leaks are undesirable.
+
+[00:02:26]
+So, the question then becomes, when, when do we deallocate this vec. So, because it's not on the stack because it's on the heap deallocation is not going to happen automatically. We actually need to and by we, I mean rust, somebody needs to call a dealloc function at the appropriate time.
+
+[00:02:44]
+In the manual memory management world like this is basically what's done in C, you actually literally call this function yourself. In C the function is called malloc. Not alloc short for memory allocate. But basically in C, you actually literally do call malloc yourself and then you call a function called free which is like dealloc.
+
+[00:03:00]
+Which basically says, okay, I'm done with this memory, you can have it back now. And you actually have to decide on your own where to put those things. So, let's say that I was doing this in the C style. This is not how we do it in rust, but just for the sake of example, let's say that I decided to free those bytes right here.
+
+[00:03:15]
+So I said, okay. We allocated the orders up here and then I de-allocated them right here before returning final orders. That would work. Sure, no problem. Because at this point, I mean, we're done with the orders. We, in fact, the last time we used them was back up in here when we reiterated them, so, it's no problem if we deallocate them right here.
+
+[00:03:31]
+If this works like everything's good, we allocate it, we deallocate it. When this function returns, the heap is totally cleared out. All the new stuff we introduce has been marked as no longer in use, and everybody's happy. Great. Now, let's say that instead, I decided to deallocate it here.
+
+[00:03:50]
+That's the thing you could do and see. So, I'm running through my back here I allocated up here. And then I say, let my total reach 00 and I deallocate orders, and then I iterate through the orders. That doesn't sound good. It allocated it. So, what bad things could happen there?
+
+[00:04:06]
+Well, you remember back when we talked about our sort of mental map of memory. Now we have all the ones and zeros and some of them are sort of marked as in use and others are not. And we've seen both on the stack and on the heap that basically, the memory management system is or the bookkeeping system is just going to say, hey, this thing is available this thing is not.
+
+[00:04:24]
+So, if we've told it this thing is available. There could be code running in another thread. comes along and says, what? I just realized that this is available memory. Great. I wanna I want to put it back there. I'm gonna write the numbers 7259 and 1200 into that.
+
+[00:04:40]
+And then when I go through and iterate it instead of it being 1234 it's now like 5729. And you know, 2400 I'm like, What? What are these crazy numbers? I said 1234 and now I'm getting totally bananas like ridiculous numbers that had nothing to do with what I put in there.
+
+[00:04:55]
+Why is that happening? Well, what happened was that I deallocated it which told the bookkeeping system this was available. And some other part of my program that was running in parallel, wrote into that memory and now I'm in trouble. It's not even necessarily another part of my program.
+
+[00:05:12]
+If I have like another function call in here. That could also happen. So, this is what's called a use after free which basically means using memory after it's been marked as free in the bookkeeping system. That's to say available. And these are really nasty bugs. I remember a long time ago when I was writing an RPG and in C, I had this symptom where sometimes you would go into this one town in the game.
+
+[00:05:36]
+And instead of having a menu of items to be able to buy, the shopkeeper would just spewed gibberish at you just like random got like ASCII garbage. And I eventually figured out that what had happened was I've had to use after free somewhere. And so, contents of that store were getting overwritten by random memory garbage from somewhere else was really bad.
+
+[00:05:54]
+And they're really, really hard to track down. So, this is why people generally prefer not to do manual memory management like this. If you put the dealloc in the wrong place, it can cause a use after free which are really, really nasty bugs. Okay. So, this is a use after free bug.
+
+[00:06:10]
+We don't want one. This is a kind of illustration of what we just talked about. We allocate the thing and then somebody else writes into this memory that we had marked as unused. And now when we iterate through it, we're seeing the wrong stuff. So, however, if we deallocate down here, again, not a problem, because we're past the point where we're iterating over orders.
+
+[00:06:36]
+So, the fact that it's free now really has no downside. Now what if we did this? What if we said I'm gonna do it down here. And also I'm gonna do it up here as well. Why not just deallocate it more like let's, if one is good, two must be better.
+
+[00:06:52]
+Right? Well, this actually creates a different type of bug known as a double free and believe it or not double frees can be even worse than use after frees. So, here's what can happen in a double free. First I say, deallocate these orders. Now what that means in practice is what deallocate takes is it takes the particular memory index.
+
+[00:07:11]
+Like from that vec metadata struct of the first element of the the numbers that are in that vec. It says, yeah, make that memory address. Make that marked as free. Says, okay, no problem. And so, then it's going through and saying, all right, I've marked those as free.
+
+[00:07:28]
+Now let's go on let's keep running our program. And somewhere inside finish, let's say that this finished function call is asking for avec. And again, the bookkeeping system says, good news. We have this thing called orders. I found some some nice space for your vec. I'm gonna assign you to that indexing on the heap.
+
+[00:07:47]
+So it's great. So, then finish goes and populates that that vec that memory index. And then the next thing we do after this as we go and mark that same memory index, which now belongs to finish, as freed again. So now, we've created a use after free for someone else.
+
+[00:08:02]
+We've actually created accidentally created a use after free for whatever finish was doing. And so, this is basically not only is it a use after free but it's a use after free. That's even harder to diagnose than a regular use after free which are already really nasty. Because the culprit for the cause of use after free isn't actually even in the function that's allocating the thing in the first place.
+
+[00:08:23]
+So, double frees can be even worse even nastier to debug than use after free. And definitely they can cause those same kinds of symptoms where you just see random memory gibberish around. So, fortunately, rust does not ask us to do manual memory management. That would be pretty unpleasant.
+
+[00:08:39]
+Instead, rust is going to figure out where to insert the dealloc just in the right place. So, that there's no chance of a use after free and no chance of a double free. Really everything we've been building up to, to this point is kind of building up to how rust decides when to free memory.
+
+[00:08:59]
+That's sort of this crucial question that really separates a lot of different programming languages in terms of performance and in terms of reliability. Okay. So. Note, manual memory management like this is notorious for causing really serious not just bugs but also security problems. So ,in 2018, Microsoft ran a study of critical vulnerabilities and their causes over the past, like 12 years.
+
+[00:09:30]
+So, this is going back to 2006. So, the dark blue line, that is to say that most of this stuff that is about 70%, were caused by memory safety problems. Which is to say that things like use after free or double free or, in other cases buffer overruns.
+
+[00:09:45]
+But basically different problems related to manual memory management and dealing with memory manually like this. And everything else put together was around 30%. So, not all of these are used after frees. Not all these are double frees. But the point is that, manual memory management and dealing with that stuff manually, like like people have done for a very long time.
+
+[00:10:07]
+And see, it's not just a matter of performance and convenience. It's actually something that can really seriously cause security problems for your program. So, it's error prone, people make mistakes with it. And some of those errors cause security problems. So this is one of the things that rust advocates like to point to as a really big selling point of rust.
+
+[00:10:29]
+Is that, it's a way to get this same level of performance is CNC plus plus. Without nearly the risk of critical vulnerabilities. So, a lot of languages though, what they will do is they'll do what's called garbage collection. You've probably heard this term. So, garbage collection is absolutely a way of deciding when to free memory.
+
+[00:10:47]
+So, here's how this is working like a garbage collected language. So like, JavaScript is garbage collected, Python, Ruby, Java. Basically all of the like top 10 most popular languages, except for C and c++ are garbage collected languages. So, what they do is when they allocate, they actually go to the garbage collector which has its own bookkeeping system.
+
+[00:11:07]
+It has a little bit of extra overhead. So this is one of the downsides of garbage collection is that, the allocation system the bookkeeping system for garbage collectors tends to have more overhead per allocation. Then the type that C and c++ and rust use. They both do have some overhead though.
+
+[00:11:23]
+So, it says okay, hey, garbage collector, I wanna allocate this thing. And then basically, eventually you see this. A giant beach ball like your program grinds to a halt and what's happening there is what's known as a GC pause. Right, garbage collection pause. And what's happening is basically that at some point, the garbage collector runs and it says, I need to go and track down.
+
+[00:11:44]
+It's like it's been a while since we freed any memory. I need to go and track down all the things that we've allocated and see if any of them are still usable. Or if they've just become totally unreachable by all the stuff that's that's still usable. And this garbage collection sort of pass processes like a GC pass.
+
+[00:12:01]
+Is notorious for causing slowdowns and systems because it can have a lot of like it can take a lot of performance. And also it can potentially take a significant amount of extra memory, both in terms of the allocation overhead and then also in terms of like the GC pass running.
+
+[00:12:18]
+Depending on the garbage collection algorithm and how, like robust the the implementation is. Actually had a friend who was working at a company where they had a really big Java back end. And their garbage collection pauses were so bad that it would actually take down the whole system.
+
+[00:12:36]
+Because what would happen is, the services would get so clogged down. Waiting for the garbage collector to finish that the load balancer would conclude that they must be dead. They must have gone down because they was taking so long to respond to everything and it would kick them out of the load balancing pool.
+
+[00:12:51]
+And then, this would just happen. That would cause a cascading failure. The entire application would go down. So garbage collection, it is convenient in the sense that you basically only worried about allocations. And then you just let the garbage collector, take care of the deallocations. But, it does have this pretty serious downside of performance which can in some cases actually lead to failures.
+

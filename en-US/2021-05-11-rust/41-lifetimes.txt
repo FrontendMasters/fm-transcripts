@@ -1,0 +1,75 @@
+[00:00:00]
+>> That brings us to the final section, lifetimes. This is the end of our discussion of how rusts memory management system works. Cool, so in this section, we're talking about lifetimes, lifetime annotations, lifetime illusion, and finally, the static lifetime. So here we have a vector of years so we've got 1980 through 2010.
+
+[00:00:22]
+And let's say, we wanna take some slices of this. So we wanna say, eighties is the first two years in 1980-1985. And the nineties is the two years after that. So 1990 and another 1990 in there. And then we want to print, we have this many years in the nineties and say, nineties.len.
+
+[00:00:39]
+Very simple program not terribly useful, but we'll make it a little bit more interesting. Now let's say that I'm making a program that has something to do with when certain pieces of music were released in different years. So I want to make a struct and I want to have a struct that says, okay, I want to have a slice for all my years.
+
+[00:00:57]
+And I also want to have a slice of just the eighties. So part of our years back that we had sliced off in the previous example, and I also want to have a slice of nineties. And this is what I want to have in my releases struct. And then let's say I want to make a function that's just looking at jazz releases.
+
+[00:01:13]
+So it says, give me a list of the years and then I'm going to return a struct of releases for all the jazz releases that I know about in those years. So let's say again, I'm defining eighties and nineties, the same way we did on the previous slide, as the first two years and second, two years.
+
+[00:01:29]
+Ordinarily, a function like this would probably want to do some more sophisticated analysis. This will just hard code it for the sake of the example. And then I would return the struct saying releases with years is the years that were passed in the eighties and nineties. And that's it.
+
+[00:01:46]
+Okay, everything looks okay so far. Now, let's further say that I've got our jazz releases function. And then I'm over here in main and I say let releases equals, and then I open a curly brace because I want to make a little anonymous scope in here. And I'm like, let all years equals and then another back of years.
+
+[00:02:06]
+And I say I call jazz releases passing all years. So jazz releases is gonna take this. And it's going to go through and make these slices these things, put the slices into the releases, and then we're all good. And finally, let's say that after all this is done, after this scope has ended, I say let eighties = releases.eighties.
+
+[00:02:26]
+Bridget, there's kind of a lot of moving parts here. But believe it or not, at some point, if Rust were to do exactly what we've asked and not give us a compiler error, but of course it will give us a compile error. This would actually be a use after free and it might not look like it at first because we had to kind of jump through a number of hoops to get there.
+
+[00:02:47]
+So lifetimes solve a problem in Rust it has to do with this type of complicated situation. We've seen over the course of this workshop, we sort of built up more and more complicated examples of memory management. And seeing sort of the edge cases that we can get into when dealing with Rust.
+
+[00:03:02]
+Sort of form of automatic memory management that doesn't require a garbage collector. Then we saw how initially we talked about just ownership and when things go out of scope, we deallocate them. And where that model kind of breaks down and becomes kind of cumbersome, like in our exercise for Part 5.
+
+[00:03:15]
+When you start needing to like accidentally return more things or not accidentally but incidentally, return more things, just for the sake of avoiding a use after move. And we saw how borrowing solves that problem. It makes things a lot nicer by saying, I want to just temporarily give access to this thing to something else.
+
+[00:03:33]
+But now we're running into a scenario where when we're using ownership and borrowing together. We've actually ended up with a situation where by default, we would have a use after free if the Rust compiler wasn't gonna save us. And just looking at the code, it's not necessarily obvious why that would be.
+
+[00:03:49]
+So let's look at why it is a problem. And we can see how the concept of lifetimes can allow us to track when these things are happening. And sort of get a better understanding and build a better mental model in our code of what's actually happening behind the scenes of Rust's memory management model.
+
+[00:04:08]
+Okay, so why is this a use after free, so here's why. All years is allocated right here. This is our vec. And then, of course, when the vec goes out of scope, unless it's been moved to a different scope and ownership has been transferred, it's going to get de allocated as soon as it goes out of scope.
+
+[00:04:23]
+And it goes out of scope right here, so this is all years gets reallocated. Now we never do reference all years ever again, which of course we couldn't because it's out of scope, all right? The scope where it's alive is inside of here. But remember that what this jazz releases function does is we give it something that this references a heap allocation, in this case, a slice of years.
+
+[00:04:46]
+And inside that function, it's taking these slices of this thing, which are all references pointing to that same heap memory, as was originally allocated in this vec call. And then it's storing them in this releases struct, which we then reference later on. So after going through a series of hops, what we've ended up with this, we now have a reference that's pointing to heap memory that has been freed, which is to say I use after free.
+
+[00:05:12]
+So the problem here is that this slice of all years.releases is essentially going to cause this use after free problem. So fortunately, because this is Rust, we won't actually get to use that for free, we'll get a compiler error. But let's look at how Rust knows that it should give a compiler error using the concept of lifetimes.
+
+[00:05:35]
+So what we have highlighted on the screen here is the lifetime of this vec. In other words, this is the time between when the vec gets allocated and when it's going to get automatically deallocated, that is its lifetime. It's sort of its metaphorically, its life begins when it's allocated and ends when it's deallocated.
+
+[00:05:53]
+So this is what's highlighted here is sort of the lifetime of all years. And we can see that this right here refers to all years indirectly granted through these releases. After the lifetime of all years has ended, and that's why the use after free happens. So another way to think of this is that lifetimes are a way of tracking when a use after free might happen.
+
+[00:06:16]
+Which is to say, if we use something after its lifetime has ended, that'll be a use after free. Okay, so this is the lifetime of all years. This refers to all years after its lifetime has ended. That's a problem. What can we do about this and how can we track it?
+
+[00:06:33]
+So at this point, when we call jazz releases, this is still within its lifetime. Like when we call this function passing in all years, we're still in the highlighted area. Which is to say, this thing is still alive, it has not yet been deallocated. So there's no problem at this stage.
+
+[00:06:48]
+The problem seems to come somewhere after this stage, after we're passing this into this function. So let's take a look at that. In particular, let's take a look at how releases is sort of depending on years even though that dependency is not clear. Like when we return this releases value, we have some slices in here which actually referenced this years slice.
+
+[00:07:10]
+But that's not clear just from looking at this code. So let's try and make it a little bit more explicit. So here's our function, I shortened the name so it fit on the slide. So now we're just calling it jazz instead of jazz releases, but you can kind of get the idea.
+
+[00:07:23]
+So we're taking this slice. This slice as of when this function is called, it's still alive and then we return it. We're returning this releases struct which references things that are still inside of there.
+

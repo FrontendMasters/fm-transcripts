@@ -1,0 +1,1062 @@
+WEBVTT
+
+1
+00:00:00.220 --> 00:00:00.860
+So ownership.
+
+2
+00:00:02.120 --> 00:00:06.012
+Let's say I have this function called
+get_years, which returns a vec of i32 and
+
+3
+00:00:06.012 --> 00:00:07.691
+I instantiate the vec inside here.
+
+4
+00:00:07.691 --> 00:00:10.280
+So it doesn't take any arguments,
+it just makes a vec and returns it.
+
+5
+00:00:12.420 --> 00:00:15.240
+So far so good, this seems like
+a pretty straightforward function.
+
+6
+00:00:15.240 --> 00:00:16.747
+I then let's say main calls it.
+
+7
+00:00:16.747 --> 00:00:20.030
+Well, this is actually a little bit
+more complicated because of what we
+
+8
+00:00:20.030 --> 00:00:21.720
+just learned.
+
+9
+00:00:21.720 --> 00:00:25.035
+So we know that vec will cause
+an allocation to happen naturally.
+
+10
+00:00:25.035 --> 00:00:28.076
+And then we also know that years is
+gonna go out of scope right here.
+
+11
+00:00:28.076 --> 00:00:29.076
+Which means right here,
+
+12
+00:00:29.076 --> 00:00:32.580
+it's going to deallocate years
+before the function returns.
+
+13
+00:00:32.580 --> 00:00:33.815
+Well, now that's a bit of a problem.
+
+14
+00:00:33.815 --> 00:00:37.350
+[LAUGH] Because, yeah, I mean, I agree
+that years did go out of scope and,
+
+15
+00:00:37.350 --> 00:00:39.475
+of course, that triggers a deallocation.
+
+16
+00:00:39.475 --> 00:00:43.007
+But now we're gonna have a use-after-free
+and main as soon as we use this thing.
+
+17
+00:00:43.007 --> 00:00:45.765
+Because the thing has been
+de allocated and yet,
+
+18
+00:00:45.765 --> 00:00:47.790
+we still have a way to reference it.
+
+19
+00:00:49.280 --> 00:00:53.760
+So if Rust had only the heuristic of
+deallocate when everything goes out of
+
+20
+00:00:53.760 --> 00:00:55.791
+scope, this would be a problem.
+
+21
+00:00:55.791 --> 00:00:57.115
+It would lead to use-after-free bugs.
+
+22
+00:00:57.115 --> 00:01:00.075
+But, of course,
+we don't wanna have use-after-free bugs.
+
+23
+00:01:00.075 --> 00:01:02.615
+So fortunately,
+Rust has a way around this.
+
+24
+00:01:02.615 --> 00:01:05.330
+And this is the first of several edge
+cases that we're gonna talk about
+
+25
+00:01:05.330 --> 00:01:06.815
+in Rust's.
+
+26
+00:01:06.815 --> 00:01:11.245
+Otherwise, quite simple strategy for high
+performance automatic memory management.
+
+27
+00:01:12.420 --> 00:01:16.770
+Okay, so basically,
+whenever Rust does an allocation,
+
+28
+00:01:16.770 --> 00:01:20.696
+it assigns an owner to that
+particular allocation.
+
+29
+00:01:20.696 --> 00:01:24.430
+And the owner is basically the scope
+where the allocation was created.
+
+30
+00:01:24.430 --> 00:01:27.300
+So basically, when it does,
+its allocations says okay,
+
+31
+00:01:27.300 --> 00:01:30.760
+this current scope that we're in,
+it owns years.
+
+32
+00:01:30.760 --> 00:01:36.044
+And then when main calls this function,
+it basically says okay, I'm going
+
+33
+00:01:36.044 --> 00:01:42.100
+to transfer ownership from this scope
+to main scope, because we returned it.
+
+34
+00:01:42.100 --> 00:01:45.490
+So returning transfers ownership
+from one scope to another.
+
+35
+00:01:46.700 --> 00:01:50.528
+And ownership essentially refers to
+whose responsibility is it to deallocate
+
+36
+00:01:50.528 --> 00:01:51.167
+this thing?
+
+37
+00:01:51.167 --> 00:01:52.965
+Whenever the owner exits the scope,
+
+38
+00:01:52.965 --> 00:01:56.400
+either it needs to transfer that
+ownership to somebody else.
+
+39
+00:01:56.400 --> 00:02:01.250
+Or if there's nobody else to transfer to,
+then it will deallocate that memory.
+
+40
+00:02:01.250 --> 00:02:04.284
+So because we're returning this
+value here, it says, okay, got it,
+
+41
+00:02:04.284 --> 00:02:05.650
+you wanna return this thing.
+
+42
+00:02:05.650 --> 00:02:08.793
+I'm not gonna deallocate it because I'm
+gonna transfer ownership domain and
+
+43
+00:02:08.793 --> 00:02:10.945
+now it's main's responsibility
+to deallocate it.
+
+44
+00:02:10.945 --> 00:02:13.279
+Colloquially in Rust,
+this is referred to as moving.
+
+45
+00:02:13.279 --> 00:02:18.291
+A move in Rust refers to transferring
+ownership from one scope to another.
+
+46
+00:02:18.291 --> 00:02:22.260
+So here we would say, we're gonna
+move years from get_years to main.
+
+47
+00:02:22.260 --> 00:02:24.914
+And then here when main
+is calling this thing,
+
+48
+00:02:24.914 --> 00:02:27.716
+it's actually taking
+ownership of that value.
+
+49
+00:02:27.716 --> 00:02:30.875
+And then from now on, this years thing,
+whenever it goes out of scope,
+
+50
+00:02:30.875 --> 00:02:32.360
+we're gonna be in the same boat.
+
+51
+00:02:32.360 --> 00:02:35.519
+Either it needs to have its ownership
+transferred to a different scope or
+
+52
+00:02:35.519 --> 00:02:37.143
+else main is going to deallocate it.
+
+53
+00:02:37.143 --> 00:02:40.479
+And since main doesn't transfer it to
+anything else cuz main doesn't return,
+
+54
+00:02:40.479 --> 00:02:43.580
+it's going to deallocate it
+when main goes out of scope.
+
+55
+00:02:43.580 --> 00:02:45.400
+Great, this is exactly what we wanted.
+
+56
+00:02:45.400 --> 00:02:51.473
+Because now we have successfully
+allocated the memory,
+
+57
+00:02:51.473 --> 00:02:56.920
+it got D allocated automatically and
+we're good.
+
+58
+00:02:56.920 --> 00:03:00.255
+Okay, cool, so again, we still have
+a guarantee you no-use-after free and
+
+59
+00:03:00.255 --> 00:03:02.460
+no double free and no GC pause.
+
+60
+00:03:02.460 --> 00:03:05.582
+Okay, so
+now let's see we have a function called
+
+61
+00:03:05.582 --> 00:03:09.098
+print years which takes years
+which is a vec of i32s.
+
+62
+00:03:09.098 --> 00:03:12.210
+Iterates through them and prints all
+the years, very straightforward function.
+
+63
+00:03:14.340 --> 00:03:18.420
+This is going to take ownership
+of years from the caller.
+
+64
+00:03:18.420 --> 00:03:21.975
+So basically the caller is going to say,
+hey, I'm gonna give you years and
+
+65
+00:03:21.975 --> 00:03:24.810
+you're now responsible for
+cleaning up after this thing.
+
+66
+00:03:24.810 --> 00:03:27.049
+So when years goes out of scope
+at the end of this function,
+
+67
+00:03:27.049 --> 00:03:29.190
+we're not going to deallocate it.
+
+68
+00:03:29.190 --> 00:03:30.654
+So if I have my main function here,
+
+69
+00:03:30.654 --> 00:03:33.090
+I've got a years vec that
+I defined inside main.
+
+70
+00:03:33.090 --> 00:03:34.930
+I call print years, passing years.
+
+71
+00:03:34.930 --> 00:03:36.709
+So it's great that is a move,
+
+72
+00:03:36.709 --> 00:03:41.492
+I am now saying years had his ownership
+transferred into this print year scope.
+
+73
+00:03:41.492 --> 00:03:43.979
+And we get to the end of this function,
+we're gonna deallocate years,
+
+74
+00:03:43.979 --> 00:03:44.690
+that's all done.
+
+75
+00:03:44.690 --> 00:03:48.203
+So this is no longer main's responsibility
+to clean this up even though main is where
+
+76
+00:03:48.203 --> 00:03:49.000
+it was allocated.
+
+77
+00:03:50.030 --> 00:03:53.150
+But now let's say we
+call print years again.
+
+78
+00:03:53.150 --> 00:03:55.120
+Like I wanted to print the years and
+then that wasn't good enough.
+
+79
+00:03:55.120 --> 00:03:56.240
+I wanna print them a second time.
+
+80
+00:03:57.660 --> 00:03:59.520
+Well, now we have a bit of a problem.
+
+81
+00:03:59.520 --> 00:04:04.230
+Because after I called print years
+the first time, years got deallocated.
+
+82
+00:04:04.230 --> 00:04:07.550
+And then I called it again,
+and now, use-after-free bug.
+
+83
+00:04:07.550 --> 00:04:10.967
+When we come in here, I'm now using this
+memory that was deallocated the previous
+
+84
+00:04:10.967 --> 00:04:12.430
+time this is printed.
+
+85
+00:04:12.430 --> 00:04:14.230
+So this is a problem.
+
+86
+00:04:14.230 --> 00:04:16.550
+How does Rust prevent this
+use-after-free bug from happening?
+
+87
+00:04:18.180 --> 00:04:21.000
+Well, basically,
+Rust has a compiler error for this.
+
+88
+00:04:21.000 --> 00:04:23.010
+Like in other languages,
+this might happen in different things.
+
+89
+00:04:23.010 --> 00:04:26.910
+But the way that Rust does it is it says,
+hey, the way that you're dealing with this
+
+90
+00:04:26.910 --> 00:04:29.870
+memory management system,
+this is not allowed.
+
+91
+00:04:29.870 --> 00:04:34.060
+And the exact error that you'll see
+is they'll say use have moved value.
+
+92
+00:04:34.060 --> 00:04:37.000
+Namely years, and
+it'll say the value is moved here.
+
+93
+00:04:37.000 --> 00:04:38.670
+So on line 10, let's say this is line 10.
+
+94
+00:04:38.670 --> 00:04:42.320
+And value used here after
+move on the next line.
+
+95
+00:04:42.320 --> 00:04:45.002
+So we use after move is
+the first sort of borrow
+
+96
+00:04:45.002 --> 00:04:48.070
+checking error that we'll see from Rust.
+
+97
+00:04:48.070 --> 00:04:51.409
+Use-after-move is not a compiler error
+that you'll ever see in any other
+
+98
+00:04:51.409 --> 00:04:52.730
+language.
+
+99
+00:04:52.730 --> 00:04:56.637
+But this is why we've sort of been
+building up this mental model of how these
+
+100
+00:04:56.637 --> 00:04:57.760
+things work.
+
+101
+00:04:57.760 --> 00:04:59.110
+This is why Rust is doing it.
+
+102
+00:04:59.110 --> 00:05:02.520
+The reason that you will see a
+use-after-move value is that the compiler
+
+103
+00:05:02.520 --> 00:05:06.060
+is trying to prevent you from
+getting a use-after-free bug.
+
+104
+00:05:06.060 --> 00:05:09.697
+And the way that it's doing this is by
+telling you, hey, if I go and do my normal
+
+105
+00:05:09.697 --> 00:05:13.176
+thing with automatically delegating,
+when this thing goes out of scope,
+
+106
+00:05:13.176 --> 00:05:15.920
+you're going to get a use
+after free bug for sure.
+
+107
+00:05:15.920 --> 00:05:18.878
+And I don't want that to happen to you, so
+I don't know what you wanna do instead.
+
+108
+00:05:18.878 --> 00:05:20.618
+But I'm just gonna tell you,
+this is an error and
+
+109
+00:05:20.618 --> 00:05:22.970
+you got to figure out some
+other way to do that.
+
+110
+00:05:22.970 --> 00:05:25.200
+Okay, fair enough,
+thank you, Rust compiler.
+
+111
+00:05:25.200 --> 00:05:26.110
+I appreciate it.
+
+112
+00:05:26.110 --> 00:05:29.690
+So how can we actually deal with this and
+convince it not to free that memory when
+
+113
+00:05:29.690 --> 00:05:34.330
+it normally otherwise would, based on
+the simple rules we've learned so far?
+
+114
+00:05:34.330 --> 00:05:38.106
+Okay, well, we started the whole problem
+here was that at the end of print years,
+
+115
+00:05:38.106 --> 00:05:39.830
+it's deallocating years.
+
+116
+00:05:39.830 --> 00:05:40.920
+So why is it deallocating?
+
+117
+00:05:40.920 --> 00:05:42.620
+Well, because it went out of scope, right?
+
+118
+00:05:42.620 --> 00:05:45.010
+And we didn't move it somewhere else.
+
+119
+00:05:45.010 --> 00:05:47.340
+But we couldn't move it somewhere else.
+
+120
+00:05:47.340 --> 00:05:49.208
+We could just throw out
+a return value here and
+
+121
+00:05:49.208 --> 00:05:52.250
+say, hey, once I'm done with years,
+just return it.
+
+122
+00:05:52.250 --> 00:05:55.063
+As we saw in an earlier example,
+if you're returning something,
+
+123
+00:05:55.063 --> 00:05:58.550
+you actually transfer ownership
+of that thing back to the color.
+
+124
+00:05:58.550 --> 00:06:00.610
+So that would work,
+then it wouldn't deallocate anymore.
+
+125
+00:06:00.610 --> 00:06:02.340
+Instead, it would transfer
+ownership back to the color.
+
+126
+00:06:02.340 --> 00:06:03.478
+That would totally work so
+
+127
+00:06:03.478 --> 00:06:06.330
+that our main function would have
+to look a little bit different.
+
+128
+00:06:06.330 --> 00:06:07.785
+So we first define years,
+
+129
+00:06:07.785 --> 00:06:11.410
+then we'd say something like let
+years to equals print years.
+
+130
+00:06:11.410 --> 00:06:16.230
+So this would actually say, okay, I'm
+gonna transfer ownership into print years.
+
+131
+00:06:16.230 --> 00:06:18.235
+Then it's gonna do its thing,
+printing out all the years,
+
+132
+00:06:18.235 --> 00:06:19.530
+then it's gonna return it back to me.
+
+133
+00:06:19.530 --> 00:06:22.992
+Now I have this year as 2, which I
+can then pass to another print years,
+
+134
+00:06:22.992 --> 00:06:25.127
+which is going to then
+give me back years 3,
+
+135
+00:06:25.127 --> 00:06:27.520
+and then I can use that
+subsequently if I want to.
+
+136
+00:06:27.520 --> 00:06:31.510
+Now this might seem a little bit silly,
+but it does solve our problem.
+
+137
+00:06:31.510 --> 00:06:34.172
+Now granted the next section, we're gonna
+see a much more elegant way to do this.
+
+138
+00:06:34.172 --> 00:06:36.536
+But conceptually,
+based on what we've learned so far,
+
+139
+00:06:36.536 --> 00:06:39.400
+this is a perfectly reasonable workaround.
+
+140
+00:06:39.400 --> 00:06:40.733
+So this is a tool to have in your arsenal.
+
+141
+00:06:40.733 --> 00:06:44.680
+If you encounter a use-after-move compiler
+error, and you're looking at that saying,
+
+142
+00:06:44.680 --> 00:06:47.400
+use-after-move, okay, how do I fix that?
+
+143
+00:06:47.400 --> 00:06:48.960
+This is one way you can do that,
+
+144
+00:06:48.960 --> 00:06:52.620
+is you can do something that actually
+intentionally triggers a move like
+
+145
+00:06:52.620 --> 00:06:57.000
+returning the value from the function and
+we're gonna practice this in the exercise.
+
+146
+00:06:58.020 --> 00:07:02.048
+So you're actually intentionally
+transferring ownership back
+
+147
+00:07:02.048 --> 00:07:06.230
+into the caller's scope so
+the caller can access it again later on.
+
+148
+00:07:06.230 --> 00:07:09.410
+Let me pause here and
+ask questions about use after move.
+
+149
+00:07:09.410 --> 00:07:13.535
+&gt;&gt; Would it be possible to not bind
+the return value of print years and
+
+150
+00:07:13.535 --> 00:07:18.571
+just past years again and just use the
+return in the previous function as a hack?
+
+151
+00:07:18.571 --> 00:07:22.722
+But you don't really need years two years
+three because because you aren't mutating
+
+152
+00:07:22.722 --> 00:07:24.110
+years in the print.
+
+153
+00:07:24.110 --> 00:07:24.850
+&gt;&gt; That's a great question.
+
+154
+00:07:24.850 --> 00:07:26.261
+Yeah, so basically like, okay,
+
+155
+00:07:26.261 --> 00:07:28.555
+is it enough to just have
+the hack where we return years?
+
+156
+00:07:28.555 --> 00:07:30.366
+Do we actually need to say
+let years two equals or
+
+157
+00:07:30.366 --> 00:07:32.410
+could we just leave this part out?
+
+158
+00:07:32.410 --> 00:07:34.600
+Short answer is you do actually
+need to put it in here.
+
+159
+00:07:34.600 --> 00:07:38.092
+Basically, the reason for that is that
+this original years is sort of like you
+
+160
+00:07:38.092 --> 00:07:41.114
+can think of it as being consumed
+once you pass into this function.
+
+161
+00:07:41.114 --> 00:07:43.650
+Once you hand over ownership,
+that thing is gone.
+
+162
+00:07:43.650 --> 00:07:47.568
+And if you want to get back ownership
+of another one of those values,
+
+163
+00:07:47.568 --> 00:07:51.990
+you got to like assign this equal to and
+then this one has not been moved yet.
+
+164
+00:07:51.990 --> 00:07:55.540
+But, basically, if you don't do that,
+you'll still get the same error as before.
+
+165
+00:07:55.540 --> 00:08:00.839
+So you do actually need to bind
+this to give it a new name.
+
+166
+00:08:00.839 --> 00:08:03.764
+Or actually, you can use the same
+name again if you want but
+
+167
+00:08:03.764 --> 00:08:05.507
+that's intentional shadowing.
+
+168
+00:08:05.507 --> 00:08:09.910
+We'll go down that rabbit hole but, yeah,
+so you do need to actually rebind it.
+
+169
+00:08:09.910 --> 00:08:13.670
+In this final section,
+I like to call clone is your friend.
+
+170
+00:08:13.670 --> 00:08:15.170
+So here's what I mean by that.
+
+171
+00:08:15.170 --> 00:08:17.020
+There's another way we can deal with this.
+
+172
+00:08:17.020 --> 00:08:20.379
+So go back to our previous example of
+print years or we take years, iterate
+
+173
+00:08:20.379 --> 00:08:24.079
+through it, and then at the end it gets
+reallocated because it goes out of scope.
+
+174
+00:08:25.570 --> 00:08:28.073
+Rather than doing this
+whole return value dance,
+
+175
+00:08:28.073 --> 00:08:32.260
+another thing we could do is just this
+years.clone, taa-daa, problem solved.
+
+176
+00:08:33.310 --> 00:08:37.867
+So the .clone method basically says make a
+complete copy of this thing like duplicate
+
+177
+00:08:37.867 --> 00:08:40.840
+all of its contents like
+this is like a deep clone.
+
+178
+00:08:40.840 --> 00:08:44.010
+Just go through everything and
+just clone it all.
+
+179
+00:08:44.010 --> 00:08:46.307
+And basically,
+what it's saying is, okay, yeah,
+
+180
+00:08:46.307 --> 00:08:49.230
+print years is gonna deallocate
+whatever I give it, that's fine.
+
+181
+00:08:49.230 --> 00:08:50.691
+I'm gonna give it a clone,
+
+182
+00:08:50.691 --> 00:08:53.940
+which means that my original
+years is still in scope in main.
+
+183
+00:08:53.940 --> 00:08:56.731
+I'm just handing off this clone and
+I'm creating it on the fly and
+
+184
+00:08:56.731 --> 00:08:58.040
+handing it to print_years.
+
+185
+00:08:58.040 --> 00:08:59.716
+And then, yeah,
+when print_years gets to the end,
+
+186
+00:08:59.716 --> 00:09:01.700
+it's gonna deallocate the clone but
+I don't care about that.
+
+187
+00:09:01.700 --> 00:09:03.054
+I'm never gonna use it again.
+
+188
+00:09:03.054 --> 00:09:06.160
+And then I still have access to
+years which I can then use again.
+
+189
+00:09:06.160 --> 00:09:10.040
+Or if I wanted I could clone it again,
+then use years even further down in May.
+
+190
+00:09:11.250 --> 00:09:13.277
+So upside, very quick.
+
+191
+00:09:13.277 --> 00:09:16.323
+If you ever see a use after
+move nine times out of 10,
+
+192
+00:09:16.323 --> 00:09:19.970
+you can solve it by adding
+like a single.clone call.
+
+193
+00:09:19.970 --> 00:09:21.880
+Downside is pretty obvious.
+
+194
+00:09:21.880 --> 00:09:23.350
+There's a performance cost to using clone.
+
+195
+00:09:23.350 --> 00:09:24.443
+[LAUGH] And, of course,
+
+196
+00:09:24.443 --> 00:09:28.350
+the whole reason we're using Rust is
+we want to be able to go really fast.
+
+197
+00:09:28.350 --> 00:09:31.252
+The reason I say clone is your
+friend is when you're a beginner,
+
+198
+00:09:31.252 --> 00:09:34.050
+it's very common to encounter
+errors that you've just never
+
+199
+00:09:34.050 --> 00:09:36.970
+seen before in any other language and
+that can be frustrating.
+
+200
+00:09:36.970 --> 00:09:38.300
+You can get stuck.
+
+201
+00:09:38.300 --> 00:09:41.787
+This is a way to get you unstuck and
+I can say from experience and
+
+202
+00:09:41.787 --> 00:09:45.425
+not just personal experience but
+also talking to other people.
+
+203
+00:09:45.425 --> 00:09:48.466
+If you use clone as a way to get
+around use-after-move errors,
+
+204
+00:09:48.466 --> 00:09:50.227
+later on when you get better at Rust.
+
+205
+00:09:50.227 --> 00:09:53.878
+You've spent some more time with it and
+you start to learn the tips and tricks and
+
+206
+00:09:53.878 --> 00:09:54.707
+the techniques.
+
+207
+00:09:54.707 --> 00:09:56.840
+And these errors are no longer
+things you've never seen before,
+
+208
+00:09:56.840 --> 00:09:58.400
+but it's like, I've seen these before.
+
+209
+00:09:58.400 --> 00:10:01.010
+I actually have learned some
+ways to deal with them.
+
+210
+00:10:01.010 --> 00:10:02.649
+You can just go back and
+remove the clones and
+
+211
+00:10:02.649 --> 00:10:06.510
+use the techniques like the ones we're
+gonna talk about in the next section.
+
+212
+00:10:06.510 --> 00:10:08.160
+And just get rid of those clones.
+
+213
+00:10:08.160 --> 00:10:10.974
+So this is basically a way to say
+I'm gonna temporarily sacrifice some
+
+214
+00:10:10.974 --> 00:10:12.556
+performance because I'm a beginner.
+
+215
+00:10:12.556 --> 00:10:15.448
+I don't really know all the great
+techniques to do this in a high
+
+216
+00:10:15.448 --> 00:10:16.330
+performance way.
+
+217
+00:10:17.390 --> 00:10:21.063
+But later on, I'll always be able to come
+back and clean them up and remove them and
+
+218
+00:10:21.063 --> 00:10:22.620
+sort of restore the performance.
+
+219
+00:10:24.180 --> 00:10:27.890
+And still have no concern about use
+after freeze or double freeze or
+
+220
+00:10:27.890 --> 00:10:29.090
+anything like that.
+
+221
+00:10:30.090 --> 00:10:33.055
+So and the exercise are actually
+do the same thing both ways.
+
+222
+00:10:33.055 --> 00:10:34.727
+We're gonna do it with and
+without clone, so
+
+223
+00:10:34.727 --> 00:10:37.200
+you can see a way to do it using
+the workaround we just talked about.
+
+224
+00:10:37.200 --> 00:10:39.440
+And I'm gonna see a way
+to do it using clone.
+
+225
+00:10:39.440 --> 00:10:43.722
+And then also, in the next section, we're
+gonna learn another technique to do it
+
+226
+00:10:43.722 --> 00:10:45.970
+that's more elegant than either of them.
+

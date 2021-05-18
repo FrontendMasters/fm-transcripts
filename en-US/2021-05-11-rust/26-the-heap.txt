@@ -1,0 +1,87 @@
+[00:00:00]
+>> So we have this concept of the stack like we've been talking about before. And it's this series of bytes just like everything else. But there's the separate region of memory called the heap, which has its own sequence of bytes. And basically, they're just used for different purposes.
+
+[00:00:14]
+The stack is used for all the function calling things we've been talking about. Where we pass arguments around, and the stack gets bigger as you call more and more nested functions, and then it gets smaller as those functions return. The heap has nothing to do with function calling.
+
+[00:00:28]
+It's just as big bucket of space. And basically, it's used as sort of like a helper for the stack. So things that are running on the stack can use the heap for sort of like separate storage and use the fact that it doesn't play by the same rules as the stack to give a little bit more flexibility.
+
+[00:00:46]
+So this VecMetadata struct is gonna live on the stack, but first_elem_index is actually going to be index into the heap. So for example, let's say I said let nums equals vec [ 1, 2, 3 ]. So I'm making a vector of three numbers. Basically, this first elem index, this use size right here is going to refer to the first open slot.
+
+[00:01:11]
+The first open index that the russ like runtime system figured out is available to store this 1, 2, and 3. So let's say that this bookkeeping system when we run this vec macro, it says okay, I need to find enough room for three elements in this vec. These are gonna be u8s.
+
+[00:01:33]
+Does anyone have, anywhere in the heap can I find three places, three u8s in a row. And someplace to store them. And maybe the bookkeeping system comes back and says, I found that there's three available right here at slot 2. Maybe you could have said zero, could have said seven, but it happened to say, okay, I found enough space for them right here.
+
+[00:01:50]
+So that means that this two is gonna go into this VecMetadata struct saying this is where the elements begin. And then the length is going to refer to the length of the vector, so it's gonna say three. So that's gonna be, the first element is gonna be at index two.
+
+[00:02:03]
+And then because the length is three, we know it's gonna be these three elements, right here are the three elements that are representing the vec, those three are stored on the heap. And again, we'll get back to capacity later. So with these two combined, we can say, okay, great.
+
+[00:02:18]
+We know we have enough length for this, we've stored the length. This is what's gonna get returned when we call the length method. And then we also know where to put them. So we say great, put the one here, put the two there and put the three there.
+
+[00:02:28]
+Everything is good. So now we have successfully stored our data and we now have this thing that we can pass around on the stack. Which gives us a way to go look that data up on the heap. So how then say nums.push(85). Well, hopefully that's no problem, I can just say I'll just bump the length up from three to four.
+
+[00:02:45]
+First_elem_index doesn't change, that stays at 2, because that's still the index of our first element. All that happens is we go and write this 85 into that next piece of memory. No problem. But there's at least a potential problem that can happen here that can't really happen on the stack.
+
+[00:03:00]
+This gets into sort of the downside of the heap. We've got this bookkeeping system, and it told us that there were three slots available here. Now if we get lucky when we call push, there's a fourth slot available right here. If so, great, we can just write our 85 there, increase the length by 1, everything's fine.
+
+[00:03:18]
+But what happens if we then push another number like 29 and the bookkeeping system says actually, sorry, this is in use, like somebody else. Some other function was doing another vec somewhere, and I actually told it, it was okay to store a vec here so, this is in use.
+
+[00:03:33]
+And if you try to put your 29 there, it's gonna overwrite some other 4 vecs first element, that's no good. We don't want that to happen. So what do we do if this happens? If the bookkeeping system says, yeah, I'm sorry, you can't put something there because it's in use by somebody else, what do you do?
+
+[00:03:50]
+Well, unfortunately, in that case, basically what we need to do is we need to go back and redo it. We need to say, find a new spot, I now need to need when we went back earlier and said. Hey, bookkeeping system, can you find me three consecutive elements?
+
+[00:04:05]
+Now I can do that again, except this time we need to find five consecutive elements. We need to say yeah, can you find me five consecutive elements anywhere in the heap and I'm gonna go and copy every single one of my elements. I copy the one over into that, the two over into that, the three over that, 85 over that.
+
+[00:04:21]
+Update my first elem index. And then I can finally push the 29 in over there. Now of course, you can imagine what if we happen to find a slot that was exactly five elements long and then there happens to be something else right after that. We could get unlucky again, if we call push again, and it might need to do that whole copying dance all over again.
+
+[00:04:39]
+This can get really expensive and really performance intensive, which is why we have this capacity thing. So capacity is basically a way that lets us prevent this problem from happening or at least reduce the chances of it happening. So basically, instead of saying let nums = vec [ 1, 2, 3 ].
+
+[00:04:58]
+If we call it Vec : : with_capacity(5), what that saying is basically, I want you to give me back a new VecMetadata struct where the first elem index is pointing to something that has at least five slots open, like five elements open. Not even using them, yet necessarily I'm gonna go through and use push to populate it later.
+
+[00:05:18]
+But this I'm saying, I want upfront to say please make sure that I have enough room to store five elements inside this vec. And so you can use this as this is considered a good sort of a best practice. You can use this as a way to minimize the incidence of needing to do that really expensive copying over because after you did a bunch of pushes you ran out of space.
+
+[00:05:38]
+So if you anticipate wanting to call push on a vec a number of times. Try to call with capacity ahead of time to make sure that you have enough room. Okay, so revising our sort of previous mental model, we still have first element x being the same thing but the capacity, not the length is actually what determines how many total slots we're taking up.
+
+[00:06:01]
+Length is just how many slots we are currently taking up. But as far as memory goes, capacity is really what determines the total number of slots that we have available to push things into. So if our length is less than our capacity, like if we have a capacity of five, and we've only got three elements in there, that tells us okay, it's fine to just go ahead and push up to two more things in there before we might potentially need to find a new home for this thing and move it over.
+
+[00:06:27]
+Okay, now in contrast, remember we saw earlier, our example of an array with three elements, like it just [u8; 3]. I mean, how does this work? Well, just goes on the stack because we know how big it is than compile to nine. So, I know this is like kind of a long winded explanation here, but it really does illustrate, like just how vastly more complicated vec is than array.
+
+[00:06:52]
+Just because its sizes dynamic. There's just so much more going on that has to be taken into account. There's that whole bookkeeping system, which is not trivial. That's its own whole source of complexity. Also the bookkeeping system, depending on how long you're program has been running and what kind of data is been running through it.
+
+[00:07:08]
+It can actually take it potentially quite a long time to come back with an answer of like where it found space on the heap for doing things. So sort of the moral of the story is, yeah, the heap is more flexible. It does let you get this sort of dynamism.
+
+[00:07:18]
+It lets you have things that don't really necessarily work on the stack, like being able to return a vec that has sort of a dynamic length. But that comes at a serious cost of complexity, and especially a performance. And so when we talk about some of these rusts specific features like the bar checker and stuff like that, really all of those things turn out to be dealing with the heap and trying to efficiently manage all the complexity that comes with it without sacrificing performance.
+
+[00:07:49]
+Okay, so to sum up, we talked about vectors versus arrays. Arrays have this sort of hard coded size. And although that's inconvenient, it does mean that it's very straightforward to pass arrays around on the stack because they work just like tuples and structs. There's nothing complicated about them.
+
+[00:08:08]
+Vectors do let you have a variable lengths, you can push stuff onto them, you can pop them off. But that means that we can't actually store the entire veck on the stack because we don't know how much space to like pre allocate for return values and things like that.
+
+[00:08:23]
+So arrays can be stack allocated whereas vectors have to be heap allocated because they're dynamic length. And as previously mentioned, what we will see in future sections is that, this trade off sort of sets the stage for the number one biggest factor in programming language performance.
+
