@@ -1,0 +1,138 @@
+[00:00:00]
+>> Finally, the last sub part of mapped types that I'd like to talk about is, how do we filter properties out? So, we've already seen how we have some control over what is included via filtering the property key, right? So we used extract before, and we can actually, this is pretty cool.
+
+[00:00:26]
+We can use a template literal type, almost like a query tool here to say, show me those keys of document that begin with the word query. That's pretty cool, right? It's almost like a find the substring like a regular expression, right? Which of these keys begins with query because it's any string that begins with query.
+
+[00:00:56]
+That's what we're matching against. So we get all these QueryCommandEnabled, querySelector, querySelectorAll, etc. So those are the keys of interest and we can produce a filtered version of this document type. Meaning we only get those properties that are specified by the keys of our choosing, because that's what we're iterating over, right?
+
+[00:01:21]
+We're saying K is each of these 1, 2, 3, 4, 5, 6, 7 things, right, to each of these seven things. For each of them, we'll go look at the document, get the value type, and that's what we're gonna have there. So this is one mechanism of filtering, if the key is the determining factor, but what if we want to filter based on the value?
+
+[00:01:46]
+For example, what if we wanted the things on the document object that are functions who return either an element or an element list, right? And I'm kinda thinking about querySelector and querySelectorAll, just things that we use for retrieving or creating DOM nodes. Now, in advance, I couldn't tell you which keys, I mean, I can tell you querySelector, querySelectorAll, are gonna be included.
+
+[00:02:14]
+But I can't tell you which things those would be, right? So we're gonna need to think about how to approach this. And first, we're gonna go down the wrong road. So I wanna be very clear. I'm showing you something that doesn't work, but I think it's a useful midpoint as we approach a better solution.
+
+[00:02:37]
+So first we're going to use never, we're gonna use a flawed approach. Here's a disclaimer, don't copy and paste this code into your app, please. We're gonna use a flawed approach and use a conditional type with a mapped type, In order to do this filtering, so I'm gonna read this to you in pieces.
+
+[00:03:00]
+So we're iterating over all of the keys of document and we're performing a test. What's the test? What's our condition, is the value type for a given property key. It doesn't extend. Right, is it at least a function with an arbitrary number of arguments that returns either an element or an array of elements.
+
+[00:03:29]
+This condition is the right one for sure. This will be represented in our good solution in a moment. So we're comparing this to see if it matches what we're looking for. And if it does, we let it pass through Document [K], right? And if it doesn't, we say, never, hoping it will disappear.
+
+[00:03:53]
+But it doesn't, as you can see up here, we end up with every single property that is on document including 235 that have been suppressed. And although the things that match, I mean they're still usable, right? We don't say never hear. It's totally usable. Although that still works, it's not really gonna help us when it comes to autocompletes.
+
+[00:04:22]
+We're gonna go here and we'll say, okay, let's see what subset of things I have available. That's a never these are all nevers, it's just a bunch of noise, a bunch of garbage in here. AppendChild, is that one of them. So that one didn't get zeroed out. But these gotten zeroed out, it's just a bunch of junk in here.
+
+[00:04:42]
+It's not giving me good feedback as to what I can successfully use. So, hopefully we all agree, undesirable result. How can we make this better? A better approach is gonna involve filtering those keys first. And then once we have the set of keys that match our condition which is gonna be a value based condition.
+
+[00:05:12]
+Then we'll be in a position where we can get something that looks more cleaned up. And I first want you to witness that this works and we're gonna peel it all back, and build up to it slowly. So when I say that this works, first, there aren't over 200 things here and the things that are here, I can't spot any nevers on my screen.
+
+[00:05:40]
+So let's compare, there's seven more and up here there were 235 more. So it seems it's much more filtered down. And I'm gonna also sanity test and say, well, adopt node, create element, querySelector, do these things, do they feel like they're for DOM query, or DOM element creation?
+
+[00:06:02]
+Yes, just on a conceptual level these seem like what I was looking for. And then finally down here, this was one of the things I selected. So, I'm gonna kick out to the TypeScript Playground. And this is the kinda thing I would encourage you to pop this open on your own machines and follow along with me.
+
+[00:06:25]
+Because what you're about to see is somebody who's familiar with working with these kinda types, me. You're gonna see how I deal with this thing up here, which is nutty and complicated, and hard to debug. And you're going to see how I make progress towards getting it to work.
+
+[00:06:53]
+Because as, if you've been playing with this throughout the course, there's no debugger for types. This is not really code that runs, you're just defining constraints. So when things get complicated, and this is the equivalent of having many things on the same line of code, right? Where it's just doing a lot, one higher order function that does everything.
+
+[00:07:15]
+It's really challenging to troubleshoot. So you're gonna see how I peel this back and how I can start with breaking this up into simple small things. And layer my way up into the thing that eventually is going to work. Okay, so I'm gonna actually come and add our solution and create a copy of it.
+
+[00:07:40]
+So the approach that we wanna take here is, we want to select those keys, whose value type is what I'm looking for, right? So, we wanna go and find query selector and identify that is what we want. Because document.query selector is matching the condition that we're filtering for.
+
+[00:08:09]
+We're not just picking it because of its name we're picking it because it has a value. That is what we're looking for. And that value is this. And I'm actually gonna deviate from our written solution there for a second just to add some more verbose, a greater explicit set of information here.
+
+[00:08:33]
+So we'll just call this, ElementFunction, Element, and it's this, right? Just so we can refer to it by name and we get some of that punctuation out of our way. So we can take ElementFunction, we'll put it here, cuz that was working, cool. So FilteredKeys, I'm actually gonna get rid of this for now.
+
+[00:09:09]
+All right, so let's look at this here. So we're taking in a type, right? The fact that we see keyof T, here and T[P], this is gonna be the thing we're iterating over. So let's call it, We'll call it ToFilter, right? We're filtering this thing. And then you will call this, Condition, something like condition, right?
+
+[00:09:50]
+It's the type that represents what we're trying to match. So we're going to loop over all of the keys. And then this is our little i in our for loop, right? For each key, this is our parameter, see that parameter in the tooltip? P for parameter. We're gonna go and grab the value type out of whatever we're filtering from.
+
+[00:10:20]
+We're going to check it against the condition, right? Is the value type assignable to whatever we passed in? It's gonna be this, right? Is it a function that returns an element or an array of elements? And if so, this is weird, we've never seen this before. We saw a whole bunch of code that would do this, Right, we're like, did it match the condition?
+
+[00:10:47]
+Let it pass through. No, that's not what we're doing. If it works, if it passes the condition, we're sending the parameter through. This is the key, not the value, otherwise, never. So look at what we get out here. And let me make a smaller type so we can see this more easily.
+
+[00:11:10]
+So we've got this, and we'll call this RelevantColorKeys. And we're going to filter for, Actually those should be numbers, right? Just let's keep it consistent with way I've treated colors throughout the day. Look, green number, save, so FilteredKeys. So we've got this color, that's what we're filtering over.
+
+[00:11:43]
+And let's just make sure that everything passes straight through the way it should. I mean, I expect this to of course work, great. So everything passes through when I remove that condition. And then if this extends this condition, I should see P, what if we did this? You know what, I'm also gonna comment out.
+
+[00:12:15]
+No, I have no idea why this would interfere with anything. So, okay, so we're back on track here. Now I can explain what's going on here pretty easily now. So, we're iterating over all properties of Color, right? We're looking at red, we're looking at green, we're looking at blue, and we're comparing them against number.
+
+[00:12:41]
+We're comparing the value types against number, right? So this is number, this is gonna be here. This will be red, and then this here, it'll end up being a number. So if we were to do this, string, string for red, And then string for blue, now we can see that our RelevantColorKeys.
+
+[00:13:06]
+So green is gonna kind of pass through. And then look everything else turns to a never because they don't match. Now, what we want are the property keys. Right, so we're still getting this object type out, we want the property keys. Well, we can take advantage of the fact that an indexed access type, we can send, we can sort of project something through an index access type.
+
+[00:13:33]
+So I get this object type out. What if I did this? I just get green. So, it's almost like I'm starting with this and then I'm saying, okay, if I pass in the key of, right, it's just gonna be never, or green, or never. And remember, whenever we or with never, the never disappears.
+
+[00:14:14]
+Nevers disappear when you or with them. So if we just simply say keyof Color, we're basically saying, I'm gonna transform all of the keys of color, a union type of all of the keys of color. And I'm gonna project them through this. And I'll get a union type of all of the values, but not all the values of color, cuz we've sort of modified it a bit here.
+
+[00:14:40]
+We'll get all of the values of this, in a union type, never, or green, or never. And that's why we get just green. Now, we can actually move this up here and say keyof ToFilter, And it'll still be green. So now if we uncomment this and these, I think there may be one last thing we have to do, and there is.
+
+[00:15:15]
+So our last problem to solve here, we've hit this before when using index access types. And basically it's saying that, look, I see you have this thing here. It's all of these keys, but they've passed through a couple things by this point. How do I know they're still key of document?
+
+[00:15:36]
+If you're gonna reach into document and access, if you're gonna use this thing here, how do I know that that's gonna work out? Well, the way we handled that before, was we said, hey, look, if you don't trust me, I mean, I know if we look at the keys of document and we look at what I have, they overlap completely.
+
+[00:16:00]
+Meaning, Everything I have is included in the set of possible keys. So I'm happy to do this. I know it's a no up, but if it makes you comfortable, all the better. And now we are, I believe, should be where we need to be. Key of document, yep, and there it works.
+
+[00:16:23]
+There's our query selector, returns an HTML input element. And look at that, this is just what we wanted. It's like a subset of document that only relates to DOM manipulation. So imagine now if you have a React app and you've ever done server side rendering, you know that sometimes you have to do some node stuff maybe you register a service worker, or some code runs and it's like, you tried to reach into window and it's not there.
+
+[00:16:51]
+Well, this would let you kind of put some confines around that API that you're not supposed to be accessing if you're trying to serve or render your React app. Another example, here it is, so I built a Chrome extension recently. And when I'm defining the parts of the extension API that I wish to talk to, I make sure that, I don't want to reach in and touch too much.
+
+[00:17:22]
+Because although I can use a lot of things on the Chrome extension API, depending on what permissions my extension is asked for, things will error or they won't, right? Unless I have the user's permission to access their location data, I can't do that. This lets me put boundaries around what's gonna be presented to me in autocompletes, right?
+
+[00:17:48]
+Where I only want to see this stuff showing up to me. And if I need some other part of the API, well, I'd have to come back here and I'd have to add it. And that'll be the trigger for me to say, when I ask for permission from users, and in a Chrome extension that's gonna be here.
+
+[00:18:09]
+When I say, I need to be able to access the active tab and the tabs thing, right, all these permissions, that'll be my signal. I'm changing the boundaries, because I set up this nice sort of confinement around what I was building. And furthermore, I think here, so when I have to stub out parts of the Chrome API, I only have to deal with those pieces that I've said I'm going to access.
+
+[00:18:44]
+So when I'm stubbing things out, I know, look, I only need this ad listener thing. Here on this type I've said, look, I only have these properties on there. I plucked these things off and I only wanna see that subset of things showing up. Well, now I have this type safety that tells me whenever I go out of bounds, right?
+
+[00:19:05]
+I have this partial Chrome API instead of the full blown thing that will show me everything and who knows what you have to stub there? It kind of depends on where you're writing your code. So that's a practical use case. I'm going to write up the types for a little mini data layer using a variety of the concepts that we've seen so far.
+
+[00:19:35]
+But I do want you to celebrate one thing at this moment. And that is, that this type here, this FilteredKeys thing and the stuff you saw here, if we go back to the very beginning of the course, we had a slide on the beginning of the course where we set this out as our goal.
+
+[00:20:05]
+And we've now accomplished it. And the way we do it is just sort of piecing it together, chunk by chunk by chunk, and sort of expanding it out so that we're not maybe not trying to do so much on one line. But then when we get it right, we can put it all back together.
+
+[00:20:21]
+So hopefully we're feeling a little bit more comfortable at taking complicated things like this and sort of slicing them up a little bit.
+
