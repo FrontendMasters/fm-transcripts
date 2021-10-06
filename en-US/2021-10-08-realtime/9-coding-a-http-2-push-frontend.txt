@@ -1,0 +1,84 @@
+[00:00:00]
+>> So let's go write our code that's gonna connect to our client. So here's inside of frontend, we're gonna go into http2-chat.js. And this is a bit trickier. We're gonna have to write a decent amount more code to handle stuff coming over a long running connection as opposed to just a complete connection.
+
+[00:00:29]
+And again, this isn't necessarily what HTTP/2 push was built for. We're kind of abusing a little bit, which is fun. So we're gonna replace the code here in getNewMsgs. We're gonna say let reader. I'm gonna say const utf8Decoder = new TextDecoder("utf-8") is just how this works. It comes encoded, and we have to use this text decoder to decode it into something that we can use.
+
+[00:01:12]
+We're gonna say try here, and we're gonna say const res = await fetch("/msgs"). And then we're gonna say reader = res.body.getReader. So this was new to me. I've never used getReader before, but basically, what this is gonna turn reader into is a readable text stream, right? Which is basically saying, hey, I know there's gonna be a body there and I know it's incomplete.
+
+[00:01:46]
+So give me something that I can continually get stuff back from, and that's what reader is. Okay, we'll put our catch here, catch (e). And we're gonna say console.log("connection error", e). Okay, if we get to this point, then guess what? We have successfully connected to the server. So you wanna say presence, which you see up here I grabbed, which is just that present indicated with the red dot at the top right, presence.innerText.
+
+[00:02:29]
+You can see here very fancy front-end stuff going on here. And we're just gonna set that equal to green circle or whatever you wanna put there. On Mac, that's Ctrl+Cmd+Space, and that'll bring up this little emoji picker. I don't remember what it is on Windows. There is an emoji picker, I just can't remember what it is.
+
+[00:02:56]
+But, I'm sure you could just google green circle emoji and copy and paste it off of Google, too. Or you can just say connected, and that would work, too. Okay, so that'll let us know at the top right that we are connected. And down here again we're gonna say try reader, Where did I put that?
+
+[00:03:29]
+Okay, we're gonna say outside of here, Let readerResponse, like that. I'm gonna say readerResponse is assigned await reader.read. So basically, what this is gonna say is gonna say, hey, wait here until the API sends me something new back, right? And then we're gonna say const chunk = utf8Decoder.decode(readerResponse.value), and we're gonna say this is a stream.
+
+[00:04:25]
+So this is gonna pass us into our text decoder that we had up here, whatever it got back from the API. And we just need to let the UTF8 decoder let it know that this is not a complete thing, it's a stream. So expect that. And then here we'll just say console.log(chunk).
+
+[00:04:46]
+And then again, we'll say catch (e). We'll say console.error, reader fail. We'll say our presence indicator, we'll have to set that to read. And then we'll return after that. Cool, so what is this gonna do? We're gonna call getNewMsgs, we set up a decoder, we fetch from our API.
+
+[00:05:33]
+And then we say, cool, we know this is gonna be a stream of data coming in, not just one, right? That's why we can't use rest.json here. Rest.json's like, I'm going to wait for the entire thing to finish, which it never finishes, right? By design, our API is never going to finish.
+
+[00:05:49]
+So that's why we have to get this reader which is gonna be a stream of data coming in, right? We set our innerText to be green, we're connected. And then here, we're gonna read just the first response right now. So this is actually still not gonna handle all the requests coming in.
+
+[00:06:05]
+Right now we're just gonna read the first one, and that's it so far. After that, it's gonna finish. But yeah, we'll grab the chunk out of there and then we'll log it, and then we'll get to actually rendering that here in just a second. I'm not making you do the post again, by the way.
+
+[00:06:26]
+We did it for the polling section, and it's the same thing. So the thing to note about HTTP/2 is it's unidirectional, at least in the way that we're using it. That data is going to stream from the server to the client, but it doesn't go in the other way.
+
+[00:06:42]
+All right, so I can't push things on the same socket back to the server. That would be a WebSocket, which we're about to talk about. There is actually a proposal, or actually, I think it's called an extension of the spec that allows bidirectional communication. But it's not gonna work in this particular case.
+
+[00:07:07]
+Okay, so coming back here and refresh and we look at our console. You can see down here in the console, I am actually getting my message from the server, the first one, right? I don't think it's actually sending any more than one at the moment. So this would be it anyway.
+
+[00:07:26]
+But what's cool, if you refresh and look at this again. Look at that there's a 200 here, a 200 here, and there's no number here next to the msgs, messages endpoint. Why is that? Well, according to the browser, it's still an open connection, it still hasn't finished. So therefore, that's why we're not getting a status.
+
+[00:07:47]
+It could still 500 at some point, right? At which point it would show that, but yeah. The dev tools don't really know what to do with this because it's actually still a long running request. Like I told you, we're kind of abusing the system a little bit for fun and profit.
+
+[00:08:10]
+Okay, so this reads once. We want it to continue reading, right? We don't want it to just end. We want it to actually continue trying to read from the API as long as the API is still sending information. So let's do that. What we're gonna do here is we're actually gonna wrap this in a do loop.
+
+[00:08:33]
+We all love do loops, right? When is the last time you wrote a do loop? I don't know. I think, honestly, I think the last time I wrote a do loop I was teaching another Frontend Masters course. I almost never use them. You could totally do this with a while loop.
+
+[00:08:52]
+But any time that I see a place where a do loop fits in, I just get really excited. It's like I'm gonna do a do loop. So we're gonna say do while we're not done. We're gonna create a thing called done. And as long as it's not done, it's gonna just continue running this function over and over again.
+
+[00:09:09]
+In theory, this will actually never complete. So you actually really could put a while true loop here and it would be equally valid. And we're also gonna create a let done up here as well. Okay, so here we get the readerResponse. That's gonna come from the read. The catch, That's fine.
+
+[00:09:41]
+We're actually gonna move this stuff all outside of the try catch down here. You could leave it up there, it would probably be fine. But we'll stop logging. We don't need to do that. And we're gonna say done is assigned readerResponse.done. So I mean, the reason why I did it this way is eventually, in theory, that connection could be closed by the server, right?
+
+[00:10:05]
+In which case this done would come back as true. In which case we'd want to stop listening to the server. We're not gonna write any code that does that, but that's how you would handle, is like, okay, eventually, this will close, right? Yeah, we're not gonna care about that right now.
+
+[00:10:26]
+Okay, and then we're gonna say if (chunk), cuz sometimes you will get back empty frames of data. So you just wanna check to make sure that there's stuff in here. We're gonna say cons, or sorry, we're gonna do another try here. Lots of places to catch errors here.
+
+[00:10:46]
+This is probably more try catches than ever, right? But any time that you do JSON.parse, you just gotta try catch it, because if anything is out of whack at all, it's gonna throw an error. So const json = JSON.parse(chunk). And hopefully, this will be our messages back from our server.
+
+[00:11:10]
+Then we're gonna say allChat is assigned json.msg, and we'll call render. Otherwise, we'll just say down here we'll have a parser console.error("parse error", e). Okay, and then down here underneath the while done, we'll just copy and paste this one as well. If for some reason this while loop finished, right, then you would be disconnected as well.
+
+[00:11:52]
+So you'll put that innerText down there as well. Okay, So again, this do loop should go on forever, right? It should not finish as long as it's open and connected. So if we refresh the page, first thing I want you to notice is whenever you refresh the page, this will go from red to green immediately, which is kinda cool, right?
+
+[00:12:23]
+So now you know that you are definitely connected to the server. Where's my, down here, you can see here, the connecting and disconnecting whenever I refresh the page. Let's see if I can get it to reuse one. Yeah, so far it hasn't reused a number, but you will find that occasionally, it will, It'll reuse some of those stream IDs.
+

@@ -1,0 +1,129 @@
+[00:00:00]
+>> Hopefully by now you have cloned and you have this repo locally. I'm gonna put my VS code here. I put a couple of other files in here. There's a prettier file, just so you can form metric code the same way that I'm formatting it. If you're on VS code here, please install the prettier extension.
+
+[00:00:22]
+That'll help you a lot as well. And then you want to turn on format on Save as well. What else is in here? There is a gitignore file for you and an editor config. You have to install an editor config extension as well. And this will just set all of our vs codes to indent by two and use spaces and stuff like that.
+
+[00:00:52]
+Okay, so let's hop into this, we're gonna start by doing long polling. So go ahead and come into here we're going to exercise. And we're gonna be working with this project first. Not in HTTP two and pulling. Yeah, pulling exercise. That's where we are right now. Okay, so like I said, we are writing a chat app today, right?
+
+[00:01:26]
+So I'm a product manager now. So I think about everything in terms of product requirements and user demographics and like JIRA tickets unfortunately. Sorry to anyone that works at Atlassian. Let's think about the product requirements for someone that's going to actually be using a chat client. Like if I if I'm What kind of person is going to your website, what am I going to be able to expect to do?
+
+[00:01:50]
+I mean expect to be able to post new messages to see old messages right so when I first connect I can see like, I have some history of other messages. I need to be able to see my own messages right? If I post something I should be able to kind of meet see that reflected in the user interface.
+
+[00:02:06]
+And then as new messages roll in, I want to see those in a reasonable amount of time, right? Because if it's like a long delay, if I post a message, then it takes 30 seconds to show up. It's not really chat anymore, right? It's like a crappy email client.
+
+[00:02:19]
+[LAUGH] Like it's the worst middle ground between those two different products. So real time here is actually fairly important that we need to have some sort of tight feedback cycle for all of our users here. So it wouldn't be just enough to say on page load, load the history.
+
+[00:02:37]
+I'm done right? You need to have some sort of strategy of like, I'm gonna keep pulling messages out of the server, so that users can feel like they're actually engaged with whatever is going on. So, the first one we're gonna be talking about the first strategy for doing this.
+
+[00:02:53]
+And basically, everything that we're doing today is just a different strategy on what do we do with how do we make this real time. he first one we're gonna be doing is called long polling. And which is just a really fancy way of saying, make a whole lot of requests, right?
+
+[00:03:07]
+It's actually really not even more complicated than that. Really all you're gonna be doing is just make a request. See if something's new and then like. Three seconds later, five seconds later, 10 seconds later asked again. Okay, how about now, right? You just keep making requests over and over and over again.
+
+[00:03:26]
+So what's like some keys here? We're gonna make some sort of endpoints that we can call over and over again. So if you imagine that you have, 10,000 users, and they're all making a request every two seconds, that endpoint is going to see a whole lot of traffic, right?
+
+[00:03:43]
+So you need to get everything that's like hot out of that code path. So if you can't be writing to the database every single time that someone calls that pull endpoint. Or else we're gonna have a very, very overwhelmed database, right? So that's the big key here is you want to make sure that whatever you're pulling endpoint is it's very fast.
+
+[00:04:00]
+And it's not going to knock over your servers because essentially what you're going to do at the end of the day is your DDOS yourself if you're not careful, right? DDOS stands for Distributed Denial of Service, right? Which is basically like hackers way of bringing down services. They just make a tonne of requests, right?
+
+[00:04:17]
+You're basically writing that against yourself. The first thing that people always want to do is like, I know how to do this, I'm gonna use set interval, right? Which is actually the worst way that we could possibly do this, right? So set interval is a function in JavaScript that basically says, take this function and run it every x seconds.
+
+[00:04:37]
+So let's say I took my polling function, I said, Hey, call this polling function every three seconds. What happens if my API takes four seconds to respond? I'm going to start making requests before the other one has finished, right? Which is going to be a huge problem because now I'm going to have stale data rolling in.
+
+[00:04:56]
+And I'm also going to be making requests before they even come back in. So don't use set interval. I'm just saying that upfront because I know everyone's thinking that. And I just want to cut that off before we get anything out there. The first one we're gonna be doing is with set timeout.
+
+[00:05:11]
+But we'll get into that in just a second. So let's hop into pulling back end. Okay, so first thing here, we're gonna go into polling/exercise here. I've actually run npm install to make sure you're running npm install here. This will just go install the dependencies. You can see it's only 173.
+
+[00:05:40]
+Which given the context of node, it's not that many packages. The backend was under with express. That's fine. Again if you need some help with that, take Scott masters course. It's great. Yeah, looking here at the other dependencies, there's body parser actually don't think this is necessary anymore.
+
+[00:06:05]
+But this was I just installed this out of habit. Morgan is a logging framework so we can actually see all the requests coming in. And the nano buffer is basically a limited array. So, we make an array of length 50. And then when something newer comes in and it's at length 50, I'll just pop one off the end right?
+
+[00:06:24]
+So, at most we'll have 50 messages in our backlog. I could have written this myself, but I was way too lazy to do that, so that's how we brought in Nana buffer to do that. And then I'm always interested to ask people how do you pronounce that word?
+
+[00:06:40]
+And the correct pronunciation for it is there is no correct pronunciation. I found that out from the author. [LAUGH] So I would say no daman or you can say no demon if you'd like Pokemon I don't know I'm always torn of how to say that. But we'll go with no daman because that's just what comes to mind, okay?
+
+[00:07:00]
+So let's hop into the backend here. There's one server.js file here. And again, I wrote a lot of this for you. But let's just kind of take a tour around here. I am using ES modules, which is fairly new for node, but I was pretty excited to write this.
+
+[00:07:17]
+And I'm making you read it too. This is the future of how Node JS will continue to be written. So I would say get used to it. I think you have to actually set a flag in your life too many package that Jason's here, yeah, type module. It won't work unless you do that.
+
+[00:07:35]
+So we talked about nano buffer. This is like our limited array. And then I wrote a function here. To give it to you in the correct order, so you don't have to interact directly with MSG, you can just call get messages and it'll give you the last 50 order messages in reverse sort, right?
+
+[00:07:51]
+Because we want the newest messages first. And then I pushed a message in here for you. You can change this if you want, you can say Brian Is dumb or something like that? I don't know. I don't know why Brian would say that but I guess that's what he's gonna say now.
+
+[00:08:09]
+Here we're getting express ready to run. We use Morgan to our logging framework we use body parser you can see it's crossed out I think because it is deprecated. I don't remember how to do it off top my head so we're gonna leave this works, it's fine. And then we serve everything from front end statically which is just basically Serve the index HTML, serve the style.CSS, all that stuff.
+
+[00:08:37]
+That's what all that does, okay? We're gonna write some code here in app.getpoll. And we're gonna write some code here in app.postpoll. And then down here we're going to start the server/ We're gonna listen on port 3000. But this can be anything, right? I think other parts of the course have as 8080, it's up to you.
+
+[00:08:58]
+And then this part here the process that ended up port. I worked in cloud too long and I know all of them will insert the correct port to sort of put in there. So if you ever tried to deploy this, this is what your port would look like.
+
+[00:09:13]
+So I just do it, I have it now. Okay, I think that's a pretty good. That's the back end. Let's go look at the front end really quick. You can see I wrote some very wonderful CSS for you. It's gorgeous. And then some pretty basic HTML here which is just a form and that is it.
+
+[00:09:37]
+And it's using materialise for the font, okay? And then we have pulling chat here, that js. So we have two elements we're gonna grab here a chat and messages. We're gonna store all the messages that we've gotten from the server here in this All Chat variable. This is the interval that we're gonna pull out.
+
+[00:10:06]
+I just chose three seconds, feel free to change this. This is in milliseconds. Add an event listener to listen to form submits. We're going to write post new message and get new messages. This is my lovely render function that was telling you that is just high art, also known as terrible.
+
+[00:10:25]
+A template function and then this getting messages this will actually get things rolling down here. So that that's all the code that I wrote for you. And now we're just gonna kinda fill in some blanks to make this real time. So let's actually go get our project running, you should be able to just say NPM run Dev.
+
+[00:10:49]
+And it should just work, you should be able to open this now. And you can see this should come up, right? Someone can come in here but their username. We're not not doing off today, by the way, cuz I didn't want to spend literally two thirds of the course talking about auth.
+
+[00:11:05]
+So, roll your own auth in this case I'm just gonna say my name is Brian. And the server will believe me. And then you'll say something like that and click Submit. Obviously it's not doing anything right now because we'd haven't written all that code, but that's going to be the gist.
+
+[00:11:20]
+And then down here where the bar is, that's where all the messages will start showing up. Do you like my lovely design page as well? It's yeah, I just if I was going to describe this word, this course in one word, it'd be. Artistic, I think. I'm just getting this terrible, but I did it myself.
+
+[00:11:40]
+It's my pilot terrible, okay? So the fun thing about polling is that it's really straightforward. There's nothing really that special about it like. We invented all these words to describe what pulling is and reality. It's just like, it's just responding to an HTTP request a lot. So are getting new messages here is actually gonna be our, sorry, we're back here in server back here in server.
+
+[00:12:08]
+This get right here is gonna be super simple because all we're gonna do is just respond quickly to whatever they're asking for. So here we're just going to delete this. And we're just going to say rez as in response.JSON, which is gonna respond with you know, Jason headers and all the correct stuff with that thanks, express.
+
+[00:12:31]
+And you're just going to say MSG get messages. And that's it. Surprise, [LAUGH] So this part is not that complicated because again, we're just responding to a pretty normal request here. Same thing here with the post. We're gonna grab some stuff off of the request. So we'll say const user text.
+
+[00:13:06]
+There it is, equals req.body. So that's going to be whatever the user over here posted is so Brian and blah. All right, so Brian will be the user and the. Text will be lol right? That's gonna be in there. We're gonna say, we can ignore that part don't need to put that we're gonna say MSG.push.
+
+[00:13:31]
+And we're just gonna push a new message into our message queue here. So here, we're gonna say user text and time date.now, right? Cuz they just posted it so we're gonna store the timestamp that they posted to that. And then down here you can see rest.jason. Input whatever you want.
+
+[00:14:01]
+You can respond back with the messages again if you want to I just put status okay. And And that's it. So that's the wonderful thing here about long polling is the room, remarkably simple and the fact that they just don't deviate from normal API writing stuff, right? Both of these, you could have looked at these and said I don't even know that these are long polling endpoints, right?
+
+[00:14:32]
+These could just be normal endpoints. And you can use them as normal endpoints, right? Like I could imagine later that you write like an IOS app. And you just call this and you don't pull it you just call it once to get the latest messages and then you're done, right?
+
+[00:14:45]
+So it can it can do some double duty for that.
+

@@ -1,0 +1,91 @@
+[00:00:00]
+>> Let's hop into HTTP/2 push. I have the hardest time saying the words HTTP/2 out loud, the syllables there just don't mesh in my mouth, so I'm gonna mess it up a bunch of times. I might just call it H2 because I hear a bunch of people call it that, I won't cuz I'll forget but I would like to.
+
+[00:00:24]
+Okay. So let's talk about HTTP/2 push. So let's think of a normal, TCP IP HTTP requests, right? I make a request to example.com, I send a bunch of headers, they sent a bunch of stuff back. And it just goes back and forth like it's that kind of normal exchange of information.
+
+[00:00:51]
+I write a single request and to that request, I get a single response, it's a one-to-one relationship that I requested something and I got it back. What if we could make an HTTP request instead of getting just one request back, we could get, or sorry, one response back, we can get many responses back?
+
+[00:01:11]
+And that's what we're actually gonna do with this thing called HTTP/2 push, right? We're just gonna open a connection but after we're done getting information for the first chunk of data that we're gonna get, we're just not gonna close the connection, right? We're just gonna leave that connection open and just say, cool, if you got more stuff, send it my way.
+
+[00:01:32]
+That's what HTTP/2 push is. So the first thing I was describing to you, which is one request, one response, that is the old spec, which has been around since like 96, or 97. And that's HTTP/1.1, it's been around forever, it still serves us well. I was actually just going through some websites, a bunch of websites still actually do 100% of all their requests over 1.1, and that is actually mostly totally fine.
+
+[00:02:00]
+HTTP 2 came out in 2015, and ever since then we've been kind of adapting to that. It started out as a library from Google called SPDY, S-P-D-Y, I don't know what this stands for or if it stands for anything. But basically after a couple years of pushing, I remember them pushing it at conferences in 2011, 2012.
+
+[00:02:22]
+Firefox adopted it, Safari adopted it. Eventually people are like, okay, this thing makes sense and they just kind of modified and they built on top of HTTP/1.1. And made it a little bit better and added some better features to it. Just some highlights of things that they added, you can now multiplex requests which that was extremely helpful.
+
+[00:02:43]
+So let's say I'm connecting to netflix.com, rather than connect to netflix.com, read the HTML, figure out that I need this CSS file and this image file and this JavaScript file. And opening new requests to the server and having individual handshakes and headers and stuff like that. You can actually just open one big pipe connection and it all goes over the same connection so you don't have to make multiple handshakes basically.
+
+[00:03:12]
+Huge performance win, really cool. There's better compression strategies to HTTP/2, it allows a lower level access to the binary frames, which sounds smart and I actually don't totally get it. But suffice to say it allows finer grit access to the underlying frames which are actually sending the data back and forth so they can compress them better.
+
+[00:03:39]
+And it also added request prioritization, so you can say, hey, this CSS file is a higher priority than this image file, so you can actually send them things in different orders and that can be negotiated over the protocol. There's other things, those are just the things that stood out to me.
+
+[00:03:55]
+The thing that I actually wanna talk about is long running requests, which is a feature of HTTP/2. So a long running request is basically the idea that I'm going to connect to the server and it's not going to immediately give me everything back, right? So where this is actually super, super useful, imagine that you're building an index.html file and the body takes a long time to render.
+
+[00:04:23]
+Maybe it's all of their user details and you have to request from the database, request that from the cache and a bunch of stuff like that. And it takes a while to call that stuff to come back. If you're doing 1.1, you have to wait for all of that to be finished before you can send them anything, right?
+
+[00:04:40]
+You can't just send them a piece or a chunk of it, you have to send them the entire thing back. The reason why this is a damn shame is that there's CSS files that they need to download, there's images that they need to download. There's fonts, there's scripts, there's a bunch of stuff that the browser could be working on but is not allowed to because they don't know about it yet.
+
+[00:05:00]
+Now enter HTTP/2, what we can do is we can say, my user connects and then I immediately push to them the entire head, right? So they can see all the fonts, they can see all the CSS, they could probably even load a little loading script tag where they could put up a nice loading module or something like that.
+
+[00:05:19]
+But I can immediately flush that information to them, and then in the background run all that other rendering that I have to do and querying databases. And then in a second chunk, push them the rendered information and then maybe in a third chunk, you send them the footer, right?
+
+[00:05:35]
+But suffice to say that something that had to come all at once can now come in multiple pieces, that is what we're about to abuse is supposed to do. What we're gonna do is we're gonna make an API request and then just not finish the request. And then we're just gonna send multiple things down on the same API request.
+
+[00:05:57]
+I don't think it was designed for that, maybe it was and I just think I'm more clever than I am, so, true, I do think I'm more clever than I am. But basically we're gonna take that same strategy of being able to flush out multiple pieces of an index.html and we're gonna do that with API requests.
+
+[00:06:18]
+Cool, yeah suffice to say, we're gonna open a connection and then we're gonna send little JSON chunks down to the client. Man, I have chunks written everywhere in my notes and it's just a weird word to say out loud, right? I don't know, probably should have chosen a different word.
+
+[00:06:35]
+Yeah, Mark.
+>> Are there any advancements planned for HTTP/3 that will improve upon HTTP/2 push?
+>> Good question, the answer is no. What's interesting about HTTP/1 versus 2 versus 3 is 1 to 2 changed a lot of the interop and the kind of the protocols and the handshakes and all that kind of stuff.
+
+[00:07:00]
+The stuff that actually profoundly affects you and me as web developers, that was a big revolution for that. HTTP/3, which is often called QUIC, Q-U-I-C, I think it's another Google project if I'm not mistaken, actually messes with the transport layer and not necessarily with the protocol layer. Which I know I'm just throwing out weird words here, but what it's actually doing is it's actually messing with how the individual packets are sliced up and sent over.
+
+[00:07:33]
+HTTP/1.1 and 2 both use what's called TCP/IP, which is probably a term that you've heard before, right? Whereas HTTP/3 uses something called UDP, which if you've ever done any sort of networking, should make total sense to you, it makes a little sense to me. The thing that HTTP/3 is going to revolutionize us as web developers is that it's way more fault-tolerant than 2 and 1.1.
+
+[00:08:02]
+So the thing about TCP/IP is you get a, I think it's called head-of-line blocking. And the idea is basically, let's say I'm sending 100 packets to you and you drop the third packet, you have to wait for that third packet to come. It must come in the correct order and so you have to wait until you have to send back to the server, hey, I missed the third packet and then the server's like, okay, here's the third packet again, right?
+
+[00:08:30]
+And then you can continue loading all of your stuff, that's TCP/IP and that's just how it's designed. UDP, which I forgot what it stands for, but basically UDP says, we're just gonna send you all the packets, it doesn't matter what order they come in. You can drop packets and you can probably reconstruct stuff from other packets, right, it's much more meant to be fault-tolerant.
+
+[00:08:50]
+And so you lose this problem with dropping packets. That's the biggest change from 2 to 3 is this ability to be much more fault-tolerant. So if you're in rural Montana and you're on a cell phone, this is gonna be a revolution for your speeds because you don't have this head-of-line blocking problem for you anymore, right?
+
+[00:09:12]
+If you're on gigabits, probably not gonna make a terrible difference to you, but for people that have harder networking problems, it's gonna make a big difference. Yeah, question.
+>> So this is based on an assumption that I had, my assumption was TCP/IP was for areas where accuracy is more important over speed.
+
+[00:09:32]
+And UDP was used for video chat applications, perhaps, so how does that kind of fit with HTTP/3? Is HTTP/3 meant for things like those?
+>> So the question is, is HTTP/2, or sorry, just TCP/IP in general, has generally, the mantra of is that you use that when accuracy, everything has to be constructed correctly.
+
+[00:09:56]
+Whereas UDP sacrifices some of that accuracy for speed and fault tolerance. You're basically scratching the end of my knowledge of networking. My understanding of QUIC which is based upon UDP, so it's on top of UDP, is that they've accounted for that because accuracy is still just as important, right?
+
+[00:10:22]
+That whatever they built into 3 which I'm not terribly familiar with, QUIC is just now rolling out. I don't think that every browser supports it yet, I think Chrome does support it today. I know CloudFlare for example, one of their things is they do support QUIC. But they basically took the best of both of them and married them together to make it fault-tolerant and accurate.
+
+[00:10:44]
+That's as good as you're gonna get out of me because that's all I know.
+

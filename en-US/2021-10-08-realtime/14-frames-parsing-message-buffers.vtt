@@ -1,0 +1,779 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:01.169
+Open this back up.
+
+2
+00:00:01.169 --> 00:00:02.368
+So now we're running on 8080.
+
+3
+00:00:02.368 --> 00:00:07.088
+Again, come over here
+write our names as Brian.
+
+4
+00:00:10.604 --> 00:00:13.569
+I hit submit obviously it's not gonna
+I'm not doing anything with it yet.
+
+5
+00:00:13.569 --> 00:00:18.148
+But if you come over here, look at what
+you're getting back here from the server.
+
+6
+00:00:18.148 --> 00:00:20.948
+Something, right?
+
+7
+00:00:20.948 --> 00:00:24.232
+It's an encrypted buffer, right?
+
+8
+00:00:24.232 --> 00:00:25.937
+So we actually have to go and
+
+9
+00:00:25.937 --> 00:00:30.387
+we have to decode everything that
+we're getting back from the client,
+
+10
+00:00:30.387 --> 00:00:35.521
+because it's being sent in this particular
+binary format that's been encoded.
+
+11
+00:00:40.069 --> 00:00:41.979
+Yeah, so these are called frames, right?
+
+12
+00:00:41.979 --> 00:00:43.859
+And if it's a like a really large output,
+
+13
+00:00:43.859 --> 00:00:47.474
+it'll actually it will definitely break
+these over multiple frames, right?
+
+14
+00:00:47.474 --> 00:00:51.980
+So if you send it back, 100 pages of
+JSON I'm going to break that over multiple
+
+15
+00:00:51.980 --> 00:00:55.119
+frames as well so
+that it can send those packets faster.
+
+16
+00:00:55.119 --> 00:00:57.948
+It makes the implementation
+harder to deal with but
+
+17
+00:00:57.948 --> 00:01:01.171
+it makes it a very flexible way
+of communicating because we
+
+18
+00:01:01.171 --> 00:01:04.748
+can send videos over WebSocket for
+example, right that can be.
+
+19
+00:01:04.748 --> 00:01:08.549
+Can you broken down, written two frames
+and then sent over across a WebSocket
+
+20
+00:01:08.549 --> 00:01:11.429
+connection, it makes it really good for
+stuff like that.
+
+21
+00:01:11.429 --> 00:01:14.828
+So let's go dissect a frame for
+just a second.
+
+22
+00:01:14.828 --> 00:01:21.763
+Let's scroll down here and
+you'll see this.
+
+23
+00:01:21.763 --> 00:01:28.195
+This diagram that I took from
+think this might be this spec.
+
+24
+00:01:28.195 --> 00:01:30.039
+I don't remember.
+
+25
+00:01:30.039 --> 00:01:32.738
+Yeah, this is actually
+from the protocol spec.
+
+26
+00:01:32.738 --> 00:01:35.605
+So if you got way too much
+time in your hands and
+
+27
+00:01:35.605 --> 00:01:40.299
+you're super bored and you want to be
+more bored, go ahead and read this.
+
+28
+00:01:40.299 --> 00:01:41.678
+I did read part of it.
+
+29
+00:01:41.678 --> 00:01:43.061
+Some of the stuff in here.
+
+30
+00:01:43.061 --> 00:01:46.148
+Yeah for example, this is
+the string I was telling you about.
+
+31
+00:01:46.148 --> 00:01:47.448
+It's just right there.
+
+32
+00:01:47.448 --> 00:01:48.438
+Someone's like, okay cool.
+
+33
+00:01:48.438 --> 00:01:49.578
+This seems like a good idea.
+
+34
+00:01:49.578 --> 00:01:51.278
+We're just putting this
+magic string in here.
+
+35
+00:01:53.038 --> 00:01:55.733
+Someone's gonna like tweet at me and say
+like, this is why this was a good idea,
+
+36
+00:01:55.733 --> 00:01:57.320
+Brian, I'll be like, okay, that's fine.
+
+37
+00:01:57.320 --> 00:02:00.939
+I believe you cheap jokes.
+
+38
+00:02:00.939 --> 00:02:05.009
+Okay, so this is like what
+a frame ends up looking like.
+
+39
+00:02:05.009 --> 00:02:09.866
+So these are individual bytes in here,
+bytes bits.
+
+40
+00:02:15.138 --> 00:02:20.598
+But the important parts here
+is one we have an opcode here.
+
+41
+00:02:20.598 --> 00:02:24.846
+So there's different kinds of frames that
+you can send there's like an opening frame
+
+42
+00:02:24.846 --> 00:02:27.738
+there's a data frame or
+I think it's called a text frame.
+
+43
+00:02:27.738 --> 00:02:31.489
+There's a closing frame when you're done
+and you're closing it to like significant
+
+44
+00:02:31.489 --> 00:02:35.358
+the fate of the server or the client, hey,
+I've decided that I'm done talking to you.
+
+45
+00:02:35.358 --> 00:02:36.898
+Here's a closing frame.
+
+46
+00:02:36.898 --> 00:02:40.818
+All that stuff is stored
+here in the opcode.
+
+47
+00:02:40.818 --> 00:02:43.675
+Here we're giving it a payload length
+of how long of how much data to
+
+48
+00:02:43.675 --> 00:02:44.398
+expect from it.
+
+49
+00:02:47.058 --> 00:02:50.454
+If you need more than you can actually
+extend here into this extended
+
+50
+00:02:50.454 --> 00:02:51.358
+payload length.
+
+51
+00:02:51.358 --> 00:02:53.658
+You have to give it a masking key.
+
+52
+00:02:53.658 --> 00:02:57.877
+So note, WebSockets themselves
+do not require masking which
+
+53
+00:02:57.877 --> 00:03:01.538
+is basically you use like
+this masking key to encode.
+
+54
+00:03:01.538 --> 00:03:06.658
+What you're sending over, however,
+the browser always masks it.
+
+55
+00:03:06.658 --> 00:03:07.661
+So we actually,
+
+56
+00:03:07.661 --> 00:03:12.548
+we're gonna assume this is always set to
+one in our particular implementation.
+
+57
+00:03:12.548 --> 00:03:14.228
+That's the masking key here.
+
+58
+00:03:14.228 --> 00:03:17.628
+And then here, everything after
+this is just payload data, right?
+
+59
+00:03:17.628 --> 00:03:19.508
+Stuff that we're sending to the client.
+
+60
+00:03:19.508 --> 00:03:21.438
+Not super important that
+you understand this.
+
+61
+00:03:21.438 --> 00:03:24.630
+I'm just Just kinda of letting
+the concepts that I'm about to show
+
+62
+00:03:24.630 --> 00:03:25.658
+you in code, right?
+
+63
+00:03:25.658 --> 00:03:31.218
+This is, the raw information that's
+being pushed over your socket.
+
+64
+00:03:36.288 --> 00:03:40.753
+Okay, so the only opcodes of your
+care about one which is n and
+
+65
+00:03:40.753 --> 00:03:43.828
+we care about eight is the closing frame.
+
+66
+00:03:43.828 --> 00:03:46.713
+We're just gonna ignore a lot of this,
+to be honest with you.
+
+67
+00:03:46.713 --> 00:03:49.579
+We're just gonna implement that what
+we need to make our app work and
+
+68
+00:03:49.579 --> 00:03:51.098
+we're gonna ignore the rest of it.
+
+69
+00:03:51.098 --> 00:03:54.228
+But something like socket, io will
+handle all of this stuff for you, right?
+
+70
+00:03:54.228 --> 00:04:01.508
+They've actually gone through and thought
+through all of these permutations, okay?
+
+71
+00:04:01.508 --> 00:04:07.118
+So let's hop back over to our code and
+we're gonna go look at parse message.
+
+72
+00:04:07.118 --> 00:04:09.138
+This is the most complicated part of this.
+
+73
+00:04:14.998 --> 00:04:16.468
+So we're gonna give it a buffer.
+
+74
+00:04:16.468 --> 00:04:19.348
+So basically what we wanna do
+at this point if we look here.
+
+75
+00:04:19.348 --> 00:04:24.038
+We wanna take this, and
+we wanna translate this back into text.
+
+76
+00:04:24.038 --> 00:04:27.920
+That's the goal of taking a buffer,
+and making it back into text.
+
+77
+00:04:27.920 --> 00:04:32.016
+Just like we did with the object to
+response where we made it a buffer, and
+
+78
+00:04:32.016 --> 00:04:33.638
+sent that over the network.
+
+79
+00:04:33.638 --> 00:04:35.378
+We're now going the opposite direction.
+
+80
+00:04:38.558 --> 00:04:42.124
+Okay, so the first thing is
+we're gonna read the first byte,
+
+81
+00:04:42.124 --> 00:04:44.468
+and this is gonna be the opcode, right?
+
+82
+00:04:44.468 --> 00:04:48.164
+So you're gonna notice here we're gonna
+see a lot of individual hands and
+
+83
+00:04:48.164 --> 00:04:50.140
+we're gonna see a lot of these things.
+
+84
+00:04:50.140 --> 00:04:56.629
+So the and
+this is a logical end bitwise operator.
+
+85
+00:04:56.629 --> 00:05:01.182
+And what a bitwise
+operator do if I have like
+
+86
+00:05:01.182 --> 00:05:05.869
+a full byte 0b10010011, right?
+
+87
+00:05:05.869 --> 00:05:12.925
+And I say and 0b00010010,
+
+88
+00:05:12.925 --> 00:05:17.248
+this does a logical and
+
+89
+00:05:17.248 --> 00:05:23.627
+between the two of these things.
+
+90
+00:05:23.627 --> 00:05:27.284
+And what that actually does is this is
+really easy to see basically look like
+
+91
+00:05:27.284 --> 00:05:29.797
+where does it have both one
+in one of these, right?
+
+92
+00:05:29.797 --> 00:05:36.617
+So here, the product of logical and
+here would be 00010010.
+
+93
+00:05:36.617 --> 00:05:39.317
+Because you can see it's
+where these two matchup.
+
+94
+00:05:43.457 --> 00:05:45.043
+You'll sometimes see or
+
+95
+00:05:45.043 --> 00:05:49.127
+you'll sometimes see other ones
+like I'm trying to remember.
+
+96
+00:05:49.127 --> 00:05:53.744
+I don't do a lot of it was operating
+like I always have to look these up
+
+97
+00:05:53.744 --> 00:05:58.688
+whenever I'm teaching these, but
+you'll see these down here in here.
+
+98
+00:05:58.688 --> 00:06:03.837
+These are shifting operations we
+actually just moving things over.
+
+99
+00:06:03.837 --> 00:06:08.720
+And then he had we're doing
+a bitwise between the first byte
+
+100
+00:06:08.720 --> 00:06:12.432
+that we're getting back from the frame,
+and
+
+101
+00:06:12.432 --> 00:06:17.022
+then hexadecimal 16 which I
+think you can represent as
+
+102
+00:06:17.022 --> 00:06:21.632
+it's just representing that as this two,
+four eight.
+
+103
+00:06:21.632 --> 00:06:25.541
+Anyway, whatever I'm not gonna
+translate into binary but
+
+104
+00:06:25.541 --> 00:06:28.679
+suffice to say this ends up being 16,
+right?
+
+105
+00:06:28.679 --> 00:06:33.519
+Hexadecimal, O x f This is
+ends up being the number 16.
+
+106
+00:06:33.519 --> 00:06:37.020
+They're just different base numbers right?
+
+107
+00:06:37.020 --> 00:06:39.439
+Binary is base two hexadecimals base 16.
+
+108
+00:06:39.439 --> 00:06:46.109
+And you and I are most used to writing
+hexadecimal or so just decimal base ten.
+
+109
+00:06:46.109 --> 00:06:47.261
+Not a class in binary but
+
+110
+00:06:47.261 --> 00:06:50.729
+I just wanted to let you know the stuff
+that's that's going into here.
+
+111
+00:06:50.729 --> 00:06:55.119
+So opcode, we're looking here for
+opcode eight, right?
+
+112
+00:06:55.119 --> 00:06:58.379
+This means that connection this close so
+we return null and we're just saying cool.
+
+113
+00:06:58.379 --> 00:07:00.519
+We're all done here, wrap it up.
+
+114
+00:07:00.519 --> 00:07:04.100
+The connection is now over.
+
+115
+00:07:04.100 --> 00:07:08.663
+If we see any other opcode besides one,
+we're just gonna return because we don't
+
+116
+00:07:08.663 --> 00:07:12.119
+know what to do with that,
+aka we're not gonna implement it.
+
+117
+00:07:12.119 --> 00:07:17.579
+So we're only care about text
+frames here which is opCode 1.
+
+118
+00:07:17.579 --> 00:07:20.320
+Okay, we read the second byte here.
+
+119
+00:07:20.320 --> 00:07:27.209
+And this is basically saying we're looking
+for is is this a mast number, right?
+
+120
+00:07:27.209 --> 00:07:30.355
+A non mass number you would just be
+able to read the numbers directly out of
+
+121
+00:07:30.355 --> 00:07:30.929
+their mask.
+
+122
+00:07:30.929 --> 00:07:35.929
+You'll see down here that we have to use a
+mass to convert from one thing to another.
+
+123
+00:07:35.929 --> 00:07:40.560
+So we're looking for is it masked,
+if it's not masked, then we're gonna say,
+
+124
+00:07:40.560 --> 00:07:45.069
+well, you're obviously not a browser,
+so I'm just not gonna deal with you.
+
+125
+00:07:45.069 --> 00:07:48.829
+So this is where we're saying here we only
+care about masked frames from the browser.
+
+126
+00:07:48.829 --> 00:07:54.109
+Here where to get the maskingKey.
+
+127
+00:07:54.109 --> 00:07:57.558
+And then down here, we're checking
+the length of how long it is and
+
+128
+00:07:57.558 --> 00:08:01.017
+we're saying We don't care about
+anything that's big, right?
+
+129
+00:08:01.017 --> 00:08:03.698
+So we're just doing small frames here, but
+
+130
+00:08:03.698 --> 00:08:07.906
+this is where you would handle long
+frames if that's what happened.
+
+131
+00:08:07.906 --> 00:08:12.699
+Okay, and then at this point we're
+just gonna start reading stuff out of
+
+132
+00:08:12.699 --> 00:08:17.346
+the buffer and piece by piece convert
+adding it to an unmasked number.
+
+133
+00:08:17.346 --> 00:08:20.266
+This is the mask here.
+
+134
+00:08:20.266 --> 00:08:25.647
+The mask down here,
+which we're using a masking key.
+
+135
+00:08:25.647 --> 00:08:29.437
+Suffice to say, we have like a four
+number mask and we're just looping over
+
+136
+00:08:29.437 --> 00:08:32.819
+the position because you have to
+kind of loop over it continually.
+
+137
+00:08:32.819 --> 00:08:37.702
+And we use that to convert
+that from a buffered mask
+
+138
+00:08:37.702 --> 00:08:41.550
+stream into just a normal buffer here.
+
+139
+00:08:41.550 --> 00:08:49.009
+And then at the end here after our for
+loop is done.
+
+140
+00:08:49.009 --> 00:08:53.309
+This is another bitwise operator there,
+this is another shifting operator here.
+
+141
+00:08:53.309 --> 00:08:59.233
+Same thing shifting operator here and
+a logical and there.
+
+142
+00:08:59.233 --> 00:09:03.331
+Between doing all that you end up with at
+the end like a byte that can be written
+
+143
+00:09:03.331 --> 00:09:04.109
+out as UTF8.
+
+144
+00:09:07.009 --> 00:09:09.629
+Yeah, that's what we're doing
+here with the response.
+
+145
+00:09:09.629 --> 00:09:12.509
+Yeah, or you went to a truther there.
+
+146
+00:09:12.509 --> 00:09:15.281
+And we're writing that to our sponsor,
+and eventually we're gonna
+
+147
+00:09:15.281 --> 00:09:17.979
+end up with a string of something
+that we can actually understand.
+
+148
+00:09:17.979 --> 00:09:22.768
+So we take that buffered binary string and
+we say to string UTF8,
+
+149
+00:09:22.768 --> 00:09:28.439
+which will end up being a JSON string,
+which we then do JSON.parse, right?
+
+150
+00:09:28.439 --> 00:09:30.977
+And at the end of this
+entire parse message thing,
+
+151
+00:09:30.977 --> 00:09:34.129
+we'll end up with an object of
+what we got from the WebSocket.
+
+152
+00:09:37.569 --> 00:09:41.984
+So, how much of that do you need to
+understand like, just zero, right?
+
+153
+00:09:41.984 --> 00:09:45.388
+It doesn't nothing there's actually
+really critical to understanding here.
+
+154
+00:09:45.388 --> 00:09:50.250
+One, I just think it's super interesting
+and two, I think it's cool for
+
+155
+00:09:50.250 --> 00:09:54.579
+you to understand what's actually
+going on over the wire there.
+
+156
+00:09:54.579 --> 00:09:58.743
+And to me, it's interesting If
+you're doing like socket.io, or
+
+157
+00:09:58.743 --> 00:10:03.799
+anything like that, somewhere in
+JavaScript code, this is happening, right?
+
+158
+00:10:03.799 --> 00:10:08.023
+So this is something that I had assumed
+forever that was just being handled by
+
+159
+00:10:08.023 --> 00:10:11.399
+the c++ layer or
+some part of the the node engine natively.
+
+160
+00:10:11.399 --> 00:10:16.659
+It's not, some jerk just like me wrote
+this in an open source library and
+
+161
+00:10:16.659 --> 00:10:18.569
+released it, all right?
+
+162
+00:10:18.569 --> 00:10:23.329
+I think it's cool, okay?
+
+163
+00:10:23.329 --> 00:10:26.209
+Does anyone have any questions about this?
+
+164
+00:10:26.209 --> 00:10:29.016
+I will say that I don't really understand
+it a whole lot more than I'm what I
+
+165
+00:10:29.016 --> 00:10:29.609
+just told you.
+
+166
+00:10:29.609 --> 00:10:33.480
+I dug a lot into this but it's just,
+there's an infinite depth here.
+

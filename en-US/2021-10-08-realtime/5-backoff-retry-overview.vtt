@@ -1,0 +1,706 @@
+WEBVTT
+
+1
+00:00:00.300 --> 00:00:05.021
+So now we're gonna do backoff-and-retry.
+
+2
+00:00:05.021 --> 00:00:10.330
+This is a favorite question of Facebook
+interviews and Google interviews.
+
+3
+00:00:10.330 --> 00:00:12.696
+So if that's something
+that you're interested in,
+
+4
+00:00:12.696 --> 00:00:15.020
+this will actually be a very
+useful section for you.
+
+5
+00:00:17.400 --> 00:00:22.161
+So let's take the DDoS kinda idea
+that I was talking about earlier and
+
+6
+00:00:22.161 --> 00:00:23.486
+expand upon that.
+
+7
+00:00:23.486 --> 00:00:29.380
+What happens if your request fails?
+
+8
+00:00:31.780 --> 00:00:34.540
+I'm actually not sure what would
+happen here at the moment.
+
+9
+00:00:37.070 --> 00:00:43.358
+But let's try, let's just say
+that here and get new messages.
+
+10
+00:00:43.358 --> 00:00:45.250
+You don't have to do this.
+
+11
+00:00:45.250 --> 00:00:48.211
+We're just gonna have some fun here for
+just a second.
+
+12
+00:00:48.211 --> 00:00:55.128
+We're gonna say res.status 500 and
+
+13
+00:00:55.128 --> 00:00:59.201
+just comment that out.
+
+14
+00:00:59.201 --> 00:01:04.156
+So this will make our request
+actually fail or at least it should
+
+15
+00:01:08.220 --> 00:01:10.209
+And a network here,
+
+16
+00:01:18.496 --> 00:01:20.110
+I think this actually just ends.
+
+17
+00:01:21.460 --> 00:01:25.307
+Yeah, so it's probably not even scheduling
+stuff to happen in the future, so
+
+18
+00:01:25.307 --> 00:01:27.244
+it depends on how your code is written.
+
+19
+00:01:27.244 --> 00:01:29.855
+You can see here that if
+we have one failed request,
+
+20
+00:01:29.855 --> 00:01:32.980
+our entire thing just comes
+to a grinding to a halt.
+
+21
+00:01:32.980 --> 00:01:34.425
+That's not ideal, right?
+
+22
+00:01:34.425 --> 00:01:38.601
+If you're writing this chat app, and
+if there's just one blip, right?
+
+23
+00:01:38.601 --> 00:01:41.470
+Let's say that they move
+from one Wi-Fi to another,
+
+24
+00:01:41.470 --> 00:01:46.040
+frequently you'll drop a lot of requests
+when you change networks, right?
+
+25
+00:01:46.040 --> 00:01:50.101
+You don't want your entire app to crash
+just cuz they changed Wi-Fi networks on
+
+26
+00:01:50.101 --> 00:01:50.723
+accident.
+
+27
+00:01:50.723 --> 00:01:53.408
+Or the connection between the L3 and
+
+28
+00:01:53.408 --> 00:01:58.862
+Verizon interconnects happens to have
+a blip and that causes it to go down,
+
+29
+00:01:58.862 --> 00:02:02.514
+or you fail over from one
+region of AWS to another.
+
+30
+00:02:02.514 --> 00:02:06.402
+These are tons of reasons where it's not
+really your app's fault that you failed
+
+31
+00:02:06.402 --> 00:02:07.900
+but you got a 500 requests.
+
+32
+00:02:10.240 --> 00:02:11.790
+What do you do then?
+
+33
+00:02:11.790 --> 00:02:14.010
+Well, there's quite a few strategies.
+
+34
+00:02:14.010 --> 00:02:17.340
+This one's bad which is just quit,
+[LAUGH] Don't do that.
+
+35
+00:02:17.340 --> 00:02:23.580
+The another strategy could
+be immediately try again.
+
+36
+00:02:23.580 --> 00:02:27.786
+And that's one thing you'll see
+frequently is, okay, my request failed,
+
+37
+00:02:27.786 --> 00:02:30.510
+I'm gonna just try again immediately.
+
+38
+00:02:30.510 --> 00:02:32.645
+The problem with that is what happens,
+
+39
+00:02:32.645 --> 00:02:35.500
+if your server has actually
+just gone down, right?
+
+40
+00:02:36.950 --> 00:02:41.271
+This was the problem like we had the Obama
+AMA, when I was working at Reddit is we
+
+41
+00:02:41.271 --> 00:02:45.530
+just had so many people requesting
+stuff that we basically DDoS ourself.
+
+42
+00:02:45.530 --> 00:02:47.790
+And so
+our server actually went down during that.
+
+43
+00:02:49.610 --> 00:02:52.533
+If you immediately start requesting again,
+and then it fails,
+
+44
+00:02:52.533 --> 00:02:54.318
+then the request again and then again,
+
+45
+00:02:54.318 --> 00:02:58.122
+basically you're gonna have all of your
+users making 1000 requests a second.
+
+46
+00:02:58.122 --> 00:03:00.621
+And you're definitely gonna
+crash your servers, right?
+
+47
+00:03:00.621 --> 00:03:02.340
+So that strategy is not great.
+
+48
+00:03:03.750 --> 00:03:05.380
+So we're gonna talk about two things here.
+
+49
+00:03:05.380 --> 00:03:07.052
+One is called backoff and
+one's called retry.
+
+50
+00:03:07.052 --> 00:03:09.251
+We just talked about retry
+which is try again, right?
+
+51
+00:03:09.251 --> 00:03:11.223
+Which is more we're not doing here.
+
+52
+00:03:11.223 --> 00:03:17.830
+All right, so I have a 500 request,
+I'm gonna retry again.
+
+53
+00:03:17.830 --> 00:03:20.946
+Let's say that one 500 as well and
+then I'm gonna try again, but
+
+54
+00:03:20.946 --> 00:03:23.360
+I'm gonna try again at twice the interval,
+right?
+
+55
+00:03:23.360 --> 00:03:26.222
+So if it was zero seconds and
+I'll try again at three seconds,
+
+56
+00:03:26.222 --> 00:03:30.094
+and then I'll try again six seconds after
+that, and then 12 seconds after that.
+
+57
+00:03:30.094 --> 00:03:31.717
+Then 24 seconds after that, right?
+
+58
+00:03:31.717 --> 00:03:38.021
+And then you, you keep backing off until
+eventually you're making it requests like
+
+59
+00:03:38.021 --> 00:03:43.550
+every two minutes or something like
+that or until the service comes back.
+
+60
+00:03:44.570 --> 00:03:47.080
+So I don't know,
+if you all use Gmail, right?
+
+61
+00:03:47.080 --> 00:03:51.180
+But if you look at Gmail and
+it'll say like, hey, you're offline.
+
+62
+00:03:51.180 --> 00:03:54.051
+I'm gonna try again in 25 seconds, and
+then it'll be like two minutes, and
+
+63
+00:03:54.051 --> 00:03:56.160
+there'll be like five minutes.
+
+64
+00:03:56.160 --> 00:03:57.981
+That's exactly what's happening there.
+
+65
+00:03:57.981 --> 00:04:02.034
+They're trying not to overwhelm their
+servers, and they're just making it so
+
+66
+00:04:02.034 --> 00:04:05.797
+that you retry like every 30 seconds
+to a minute or something like that.
+
+67
+00:04:05.797 --> 00:04:08.163
+So that's called backoff,
+and in particular,
+
+68
+00:04:08.163 --> 00:04:10.945
+what I was talking about is
+called exponential backoff.
+
+69
+00:04:10.945 --> 00:04:14.829
+And it's just designed with
+the idea in mind is like all right,
+
+70
+00:04:14.829 --> 00:04:19.019
+we're gonna try again immediately
+because maybe there was a blip.
+
+71
+00:04:19.019 --> 00:04:22.860
+Then we gonna try again in three seconds
+cuz maybe, we're able to recover quickly.
+
+72
+00:04:22.860 --> 00:04:24.990
+And then eventually it's like okay,
+something is definitely wrong.
+
+73
+00:04:24.990 --> 00:04:29.080
+If I make three requests in a row and
+they all 500 something is probably wrong.
+
+74
+00:04:29.080 --> 00:04:33.100
+So I'm gonna start taking longer and
+longer in between my re-request to give my
+
+75
+00:04:33.100 --> 00:04:36.340
+server just an opportunity to,
+maybe they need to come back up,
+
+76
+00:04:36.340 --> 00:04:39.220
+maybe they need to shed some load,
+something like that.
+
+77
+00:04:40.330 --> 00:04:42.476
+And that's what the backoff strategy is.
+
+78
+00:04:44.765 --> 00:04:46.982
+Specifically the exponential backoff.
+
+79
+00:04:46.982 --> 00:04:51.715
+You can also do linear backoff, which is
+like add 10 seconds every single time, so
+
+80
+00:04:51.715 --> 00:04:57.199
+you try 10 seconds, then 20 seconds, then
+30, then 40, then 50, so on and so forth.
+
+81
+00:05:02.439 --> 00:05:07.287
+So and the strategy that you're gonna
+choose is just gonna be based on
+
+82
+00:05:07.287 --> 00:05:08.549
+what your app is.
+
+83
+00:05:10.060 --> 00:05:13.995
+If our chat app goes down and they're not
+able to reconnect within 30 to 45 seconds,
+
+84
+00:05:13.995 --> 00:05:16.188
+they're probably just gonna abandon,
+right?
+
+85
+00:05:16.188 --> 00:05:19.791
+And that's probably not a bad choice for
+them either.
+
+86
+00:05:19.791 --> 00:05:23.610
+We don't want them to sit there waiting
+for an app just getting mad at our page.
+
+87
+00:05:24.730 --> 00:05:27.655
+So with something like that, you probably
+want to make a bunch of requests,
+
+88
+00:05:27.655 --> 00:05:30.570
+all upfront, so like two seconds,
+four seconds, eight seconds.
+
+89
+00:05:30.570 --> 00:05:32.600
+And then after that you just say,
+all right,
+
+90
+00:05:32.600 --> 00:05:35.172
+it's you probably should
+just come back later, right?
+
+91
+00:05:35.172 --> 00:05:37.322
+As opposed to something like,
+
+92
+00:05:37.322 --> 00:05:42.048
+maybe you're writing like a script
+to try and get concert tickets.
+
+93
+00:05:42.048 --> 00:05:46.332
+That, when you probably wanna try a bunch
+all at front because maybe you'll have
+
+94
+00:05:46.332 --> 00:05:48.860
+your opportunity to get
+some concert tickets.
+
+95
+00:05:51.000 --> 00:05:54.808
+Or maybe it's something like I don't know,
+a spreadsheet that they're trying to look
+
+96
+00:05:54.808 --> 00:05:57.741
+at that even if it takes them two
+minutes to get to that spreadsheet,
+
+97
+00:05:57.741 --> 00:06:00.586
+they're still gonna wait for
+that because they need it, right?
+
+98
+00:06:00.586 --> 00:06:04.174
+In which case you probably wanna have a
+pretty generous backoff because the people
+
+99
+00:06:04.174 --> 00:06:07.554
+will wait and they'll be fine, I don't
+know if they'll be fine with it, but
+
+100
+00:06:07.554 --> 00:06:08.720
+they will wait.
+
+101
+00:06:08.720 --> 00:06:13.420
+&gt;&gt; Is there an upper limit to how much
+the longest backoff time should be?
+
+102
+00:06:13.420 --> 00:06:16.340
+&gt;&gt; Certainly nothing written in stone in
+
+103
+00:06:16.340 --> 00:06:19.997
+terms of a longest time
+that a user should wait.
+
+104
+00:06:19.997 --> 00:06:23.312
+It's just gonna basically
+conform to your product strategy
+
+105
+00:06:23.312 --> 00:06:25.849
+which is kinda what I
+was talking about there.
+
+106
+00:06:25.849 --> 00:06:31.964
+Do you anticipate users waiting for your
+service to come back like Gmail, right?
+
+107
+00:06:31.964 --> 00:06:34.486
+When my Gmail is down,
+I probably will sit there and
+
+108
+00:06:34.486 --> 00:06:37.070
+wait until my Gmail comes back, right?
+
+109
+00:06:37.070 --> 00:06:40.238
+So maybe at that point, maybe that's like
+two minutes, like try every two minutes or
+
+110
+00:06:40.238 --> 00:06:42.278
+something like that,
+which is probably long enough.
+
+111
+00:06:42.278 --> 00:06:47.075
+One request of 120 seconds, it's probably
+not gonna bring your server down.
+
+112
+00:06:47.075 --> 00:06:50.580
+So, that would kinda be my upper
+limit of expecting my user to wait.
+
+113
+00:06:52.050 --> 00:06:55.600
+If I don't expect them to wait like a chat
+service, I'd probably say no, right?
+
+114
+00:06:55.600 --> 00:06:58.274
+It's fine,
+make a request every 10 minutes,
+
+115
+00:06:58.274 --> 00:07:01.412
+that's fine because they're
+probably not gonna wait.
+
+116
+00:07:04.324 --> 00:07:09.370
+So, anyway, it's a product question, it's
+not a technical question, which is fine.
+
+117
+00:07:09.370 --> 00:07:10.399
+It's a good question.
+
+118
+00:07:10.399 --> 00:07:11.260
+Do you have another question?
+
+119
+00:07:13.140 --> 00:07:13.755
+&gt;&gt; Yeah,
+
+120
+00:07:13.755 --> 00:07:17.668
+it's like the Gmail button has a retry,
+&gt;&gt; Yep.
+
+121
+00:07:17.668 --> 00:07:21.855
+&gt;&gt; To manually request,
+do you recommend that?
+
+122
+00:07:21.855 --> 00:07:26.587
+&gt;&gt; Sure, so the question is like,
+let's say I went down here and
+
+123
+00:07:26.587 --> 00:07:31.229
+should I pop up like a Retry
+button right there in the middle?
+
+124
+00:07:31.229 --> 00:07:33.984
+Again, that's gonna be a product question,
+so
+
+125
+00:07:33.984 --> 00:07:37.481
+that button if you clicked on
+it rather than wait two minutes,
+
+126
+00:07:37.481 --> 00:07:42.209
+it would allow the user to say, okay, let
+me try again right now I think it's back.
+
+127
+00:07:42.209 --> 00:07:45.582
+Here's the danger is that when
+your user clicks a button and
+
+128
+00:07:45.582 --> 00:07:49.567
+it doesn't do anything,
+they're gonna click it again, and again.
+
+129
+00:07:49.567 --> 00:07:53.405
+And you're gonna allow the user
+to literally manually DDoS here.
+
+130
+00:07:55.933 --> 00:07:59.781
+So in some cases, it's probably okay.
+
+131
+00:07:59.781 --> 00:08:03.308
+If you're trying to recover and
+all your users are spamming you,
+
+132
+00:08:03.308 --> 00:08:04.730
+you didn't win, right?
+
+133
+00:08:04.730 --> 00:08:07.100
+You lost that interaction.
+
+134
+00:08:07.100 --> 00:08:10.414
+So if I was gonna do that and I felt
+like that was a good product choice,
+
+135
+00:08:10.414 --> 00:08:11.729
+I would have them click it,
+
+136
+00:08:11.729 --> 00:08:15.610
+and then I would probably have
+a backoff clicking it as well, right?
+
+137
+00:08:15.610 --> 00:08:16.901
+So if they clicked and it didn't work,
+
+138
+00:08:16.901 --> 00:08:19.144
+I'd make them wait two seconds before
+I would show it to them again.
+
+139
+00:08:19.144 --> 00:08:21.409
+And then four seconds before I
+showed it to them again, right?
+
+140
+00:08:21.409 --> 00:08:26.155
+Or something like that, just so the user
+is not able to spam you as well, right?
+
+141
+00:08:26.155 --> 00:08:27.058
+Because they will.
+
+142
+00:08:27.058 --> 00:08:28.524
+And it's not a mean thing, right?
+
+143
+00:08:28.524 --> 00:08:31.752
+We're just wired on the Internet
+to expect everything instantly.
+
+144
+00:08:34.142 --> 00:08:36.003
+I hate waiting for Gmail to come back, and
+
+145
+00:08:36.003 --> 00:08:39.475
+I definitely spam that button despite
+the fact I know precisely what it does.
+
+146
+00:08:39.475 --> 00:08:40.836
+I also don't care.
+
+147
+00:08:40.836 --> 00:08:42.342
+It's Google's problem, not mine.
+
+148
+00:08:46.121 --> 00:08:48.606
+But that's something you could do here.
+
+149
+00:08:48.606 --> 00:08:52.719
+You could totally go make a retry button.
+
+150
+00:08:52.719 --> 00:08:54.630
+That'd be a good exercise
+to do after this.
+

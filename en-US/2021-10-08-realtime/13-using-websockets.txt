@@ -1,0 +1,74 @@
+[00:00:00]
+>> So now we have these two connections. Here on the server side, I got socket. And I can just say socket.write all day every day, and everything's just gonna start sending all that to the client. And here on the client, I got my WS here, right? Which now I hear I can start accepting messages from the server, right?
+
+[00:00:22]
+So I actually have an active connection. So this WS here. I can start saying here ws.send, right? Yeah, this. So ws.send, now this is like how you post back to the server. So it's a two-direction socket between the two. So let's go ahead and send something. Head back to here where we said under this socket.write right here, we're gonna say, socket.write.
+
+[00:00:59]
+And then we'll just say, (objToResponse). We'll look at this here in just a second. And we're gonna send this (msg: getMsgs() }));. And we're gonna send our messages down to the client. So that mean, this looks a lot like HTTP/2, right? Where we're just kind of writing to their open connection, right?
+
+[00:01:19]
+All right, let's go just peek beneath the covers of this, just the depths of oddity that's happening here in this object response.js file. We actually have to go in here, and we have to directly manipulate the binary that's being sent to the client. Or elsewhere it's not gonna be sent in the correct sort of fashion here.
+
+[00:01:43]
+So the first thing that this object to response does, is it takes the object that we got, and it makes it a big whole string, right? So this could work with anything, but we're making it particularly work for JSON, okay? So we have a string here. The first thing we're gonna do, is how many bytes is this string?
+
+[00:01:59]
+So then we got how many string bytes this is? This is gonna be some number of how long it is? Rather not how long, but how many bytes that is to send us? Here, we're gonna count how many, like the length of the byte count is. And then we have to encode that into the first part of the frame.
+
+[00:02:17]
+And so when I say frame, what I mean is one packet of data that's being sent and received from the browser is called a frame, okay? Here I'm gonna make a buffer that's precisely that long, select some area in memory where I can start writing this two. And then I'm just gonna start writing the payload length.
+
+[00:02:38]
+This is kind of like a base starting value here. If you've never seen 0b before, this just means in JavaScript binary. This is a binary number, right? It's not something you probably have to interact with so much. If you ever seen 0xx0 or something like this, the x means that this is hexadecimal, right?
+
+[00:02:57]
+This is an ES5 thing. So it's been around since 2015. Anyway, that's it. That's what that means. So we write that, this is the buffer. We write how long our buffer is gonna be. And then here we actually go through. And we write all of our information to this buffer in binary.
+
+[00:03:15]
+And then at the end we end up with this buffer, which is the encoded message. So I didn't make you write this, because it's relatively, it's stuff that I had to look up. It's not stuff that I ever figured out, right? So I didn't want you to worry too much about it.
+
+[00:03:30]
+But I also want you to be curious and aware this is actually sent over this kind of is not encrypted, but it's encoded messaging, right? And if you use something, like WS or Socket.io, this is what it's actually doing for you in the library. Makes sense so far?
+
+[00:03:52]
+Cool. Are you happy that I didn't make you write this? I'm happy I didn't make you write it, okay? [COUGH] So now we have a valid message being written to the client. So we can head back over here to raw.chat.js. Again, the magic of this WebSocket object is just doing all this for you.
+
+[00:04:13]
+So all of this decoding and encoding on the browser side, we don't have to write anything for it, right? The browser's just like, cool, I got this for you and it just does it all for you really quick. So under ws.addEventListener, we're gonna add a (message). So whenever we get a message back from the server, it's gonna come back in as an event And we're gonna say, const data = JSON.parse(event.data);.
+
+[00:04:50]
+And we're just gonna say, allChat = data.msg;. And render = ():. That's it. It's all you gotta do here. Accept the message, parse it, grab the information that you want, call render. So from a client side perspective, it's just incredibly easy to work with. So I think we come back over here.
+
+[00:05:21]
+Yeah, now we're actually getting real messages back from the server. The client has everything to do with it and we're rendering back out exactly what we need to the client.
+>> I noticed that you put return on a new line. So this is on the upgrade. We could have just returned socket.end, right, or is that not gonna work?
+
+[00:05:39]
+
+>> Yeah. So the question here is on line 27. Why did I put return on a new end or a new line? I don't know what this actually returns. So this is technically a sort of like a WebSocket interface, there is, okay. It's a socket is a WebSocket, which means that this, No, maybe not that.
+
+[00:06:11]
+Maybe it's a stream of some variety. Anyway, suffice to say, I don't know what socket.end returns, which means that I don't actually care about what it returns. So, here I'm just returning, because I want this to end, right? I don't want it to go do the rest of this stuff, if we hit this body here.
+
+[00:06:29]
+But I didn't wanna return whatever mystery that socket.end was returning. Maybe it's some control object or something like that. I didn't want the consumer of this to be able to mess with it. You probably would be fine. To be honest with you, if you just said return this, it just wouldn't matter.
+
+[00:06:46]
+That's just a habit I have. In general from writing way too much TypeScript, I try not to return anything that I don't either use it, or know what it is, right? Yeah, that's actually really what it's, that is definitely a TypeScript habit that I have. Let's go listen to messages now from the client.
+
+[00:07:10]
+This is where things get a little weird, so bear with me. If it wasn't already weird, it's probably already weird. It gets weirder. We'll go with that. So we're doing this all on server.on(upgrade", down here underneath your console.log, save some space there. Now we're gonna say, hey, socket.on "data".
+
+[00:07:37]
+We need something back from the user. Just gonna log it out really quick. So now we can do socket.on "data". This is gonna let us receive information back from the client, right? So instead of doing a post request to some endpoint, we're just gonna use that socket and receive information back from the client.
+
+[00:08:01]
+Let's go write the raw chat post here. So head back over to raw chat. And we're gonna write this postNewMsg, it's gonna be real simple here. So const data = {user, text}. And then we're just gonna say, ws.send (JSON.stringify(data));. And that is it for what you need to do here from the post, right?
+
+[00:08:29]
+You just put it together an object and send the string of five version back to the server. And again, just wanna shout out to the browser for doing all the encoding here for us with this WebSocket object. Cuz it is getting encoding, it's doing a bunch of heavy lifting for you under the scenes.
+
+[00:08:47]
+It's just the browser already handling it for you.
+

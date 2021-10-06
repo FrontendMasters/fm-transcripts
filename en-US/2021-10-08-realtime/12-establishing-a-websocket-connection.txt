@@ -1,0 +1,78 @@
+[00:00:00]
+>> So coming here to server.js, you can see here I have quite a few more things in here. And there's just stuff I didn't want you to write. We could spend here actually going through binary piece by piece and bitwise operators. I don't think you wanna do that.
+
+[00:00:15]
+I don't wanna do it. So I kinda wrote some of these things, we''ll go through the code so you can understand what's happening. But for the most part we're just gonna handle the upgraded experience. So here in server.js, a lot of this stuff looks familiar, nanobuffer, serve-handler, http, all that stuff.
+
+[00:00:35]
+We could do this over http too, by the way, we just chose not to, we're just making it as simple as possible here, but there's no reason that couldn't be done that way. Connections, we'll do the same thing, keep tracking connections, get messages. All this stuff is the same.
+
+[00:00:49]
+This is serving static assets. This is all fine here. And then our code is gonna go here. All right, so we're gonna say server.on, we're gonna say whenever someone asks for an upgrade, this is the function that you're gonna run. So this function is gonna take in a req and a socket.
+
+[00:01:18]
+Or we can make this an arrow function since that's what I've been doing, so an arrow function. Either way, it doesn't matter. So, I guess there are other things that can be upgraded. I don't really know what they are, to be honest with you, but we're just gonna make sure that it's a websocket upgrade.
+
+[00:01:36]
+So if (req.headers ['upgrade'] is not equal to 'websocket'), just give up on it, basically is what we're gonna do. I'm gonna say socket.end("HTTP/1.1 400 Bad Request"). So we're just gonna say send back some, yeah, we don't speak anything but websocket basically, and then return. And then just to show, you're gonna see a console.log here of upgrade requested.
+
+[00:02:23]
+Okay, so we're just gonna look now to see what happens when a browser reaches out and request upgrade. So go ahead and stop your last server here, I'm gonna go into websockets/exercise-raw. And we're gonna say npm install if you haven't already. And then npm run dev, npm install, which I think I've done.
+
+[00:02:52]
+You can see here, 183 packages. And then I'm gonna say npm run start. So notice again, we're going back to http not https, right? So make sure that s is gone. Click that open here. I'm just gonna open this. All right, so, Now if we go back in over here you can see we're getting upgrade requests over here, right?
+
+[00:03:22]
+That's coming from that websocket saying hey, I would like to do this upgrade thing. And right now, all were saying is we're just logging out, and we're not actually honoring that upgrade experience. So you can see here, the red doesn't even get open here, right? And you can see here Firefox eventually gives up, is like yeah, I tried to upgrade and the server just never really acknowledged me, right?
+
+[00:03:47]
+So, that's what's happening so far, this is still right up here. So we have to go now do something on the server to deal with that. So, this one's kind of interesting, open the parse-message.js, not parse-message we want, not that one. We want generate-accept-value, this one here. So, the way that we're gonna do this is we send back a header and we kind of sign it with the sha1 hash.
+
+[00:04:29]
+And then we take the key that the browser sends to us, we add this magic key here. And believe me, I didn't make this up. It actually literally has to be this exact string that you add to it. And then you put it back into base64 and send it back.
+
+[00:04:45]
+That's like the magic handshake of okay, take my key then send it back to me with this particular magic key. And that's how we both know we're both definitely speaking websocket to each other. I thought this was hilarious when I found it on the Internet. I was like, why this string?
+
+[00:05:04]
+And I actually did try to track down a reason of why the hell did they choose this thing, and it's just a randomly generated string that someone found. Seems like a really strange way for people to kind of do this but this is literally how it works. You have to generate this header and send it back, otherwise it will not work.
+
+[00:05:24]
+Yeah, it's literally hard coded in the websocket spec, I actually went and found the spec, read through and found it was like, it must have this special key. It's true, it doesn't work without it. So that's what this generateAcceptValue does is it takes an acceptKey from the browser, mixes this stuff all together, it makes the key to send back, so the browser is like okay, we're speaking the same language.
+
+[00:05:49]
+So let's go ahead and go do that. Let's actually go finish making that connection. Underneath here we're gonna say const acceptKey = req.headers and the header needs to be called sec-websocket-key. By the way, this is definitely not a security thing, that was kind of the first thing that occurred to me as well.
+
+[00:06:24]
+I was like, we are doing all these things for security purposes and in reality, there's nothing secure about this, right? It's actually just making sure that both parties understand that they're speaking the same protocol. Const acceptValue = generateAcceptValue, which I've already imported for you at the top here.
+
+[00:06:52]
+And then we're just gonna pass in that acceptKey, and now this acceptValue is gonna be the correct key that we have to send back to the client so that the browser can acknowledge, cool, we're on the same page. So now we're gonna generate some headers to send back to the client.
+
+[00:07:09]
+So const headers =, and it's just gonna be an array of headers to send back. So the first thing we're gonna send back is "HTTP1/1.1 101 Web Socket Protocol Handshake". That's the first header, the second one's gonna be "Upgrade: WebSocket". Then we're gonna send back "Connection: Upgrade". And then here I'm gonna use a backtick.
+
+[00:07:50]
+Notice instead of here I'm using double quotes, here I'm gonna use a backtick, which is on the tail, the next to the 1 on your keyboard. We're gonna say 'Seq-WebSocket-Accept:, and then we're gonna feed in that acceptValue, Like that. And then here we're gonna say "Seq-WebSocket-Protocol". So notice that we're just ignoring what the browser sent to us.
+
+[00:08:23]
+It's like, you remember that list of things, here's is what you would choose. We're gonna speak this to each other. Whether or not they send me anything that I care about, I'm just always gonna send them back JSON here. You would typically wanna say are they offering to speak the same text kind of protocol and try and choose the correct one?
+
+[00:08:42]
+Here we're just gonna hardcode in, I don't care what you think, we're speaking JSON, right? Okay, and then down here we're gonna add an extra "\r\n", so some whitespace to say, browser, this is the end of headers, everything after this is now data. So that's what this last line here means.
+
+[00:09:07]
+Okay, and then down here we're gonna say socket.write. We're gonna say headers.join, \r\n. So with quotes around it. So this is just like an array join, right, so it's coming out as one large string. And all of these are separated by a little bit of whitespace. And then when you put two of these \r\n's together, that signifies to the browser, I'm done sending you headers now.
+
+[00:09:51]
+So this is the magic sacrificial ritual that one must perform for the browser and the server to say, cool, we've both sacrificed the right goats, now we can speak our secret arcane language of websockets to each other, right? And now in theory, we should be able to refresh the page here.
+
+[00:10:13]
+No, I gotta restart my server, right? Yeah, I did start, so npm run dev rather. So don't be like me, don't say run start, say run dev so that you get the nice dev server experience here. Run dev, refresh that here. And now notice up here, this is green, right?
+
+[00:10:31]
+So now we are definitely connected between server and client. You can see down here that I got a connected logged out to my console. Pretty cool so far, right? It's like one of those things where you did some weird thing, you had to go walk backwards through something and it worked.
+
+[00:10:49]
+And so, now you get to feel proud of yourself even though it's kinda strange we had to do it in the first place. But we did it.
+

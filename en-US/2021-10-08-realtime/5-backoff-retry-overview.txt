@@ -1,0 +1,87 @@
+[00:00:00]
+>> So now we're gonna do backoff-and-retry. This is a favorite question of Facebook interviews and Google interviews. So if that's something that you're interested in, this will actually be a very useful section for you. So let's take the DDoS kinda idea that I was talking about earlier and expand upon that.
+
+[00:00:23]
+What happens if your request fails? I'm actually not sure what would happen here at the moment. But let's try, let's just say that here and get new messages. You don't have to do this. We're just gonna have some fun here for just a second. We're gonna say res.status 500 and just comment that out.
+
+[00:00:59]
+So this will make our request actually fail or at least it should And a network here, I think this actually just ends. Yeah, so it's probably not even scheduling stuff to happen in the future, so it depends on how your code is written. You can see here that if we have one failed request, our entire thing just comes to a grinding to a halt.
+
+[00:01:32]
+That's not ideal, right? If you're writing this chat app, and if there's just one blip, right? Let's say that they move from one Wi-Fi to another, frequently you'll drop a lot of requests when you change networks, right? You don't want your entire app to crash just cuz they changed Wi-Fi networks on accident.
+
+[00:01:50]
+Or the connection between the L3 and Verizon interconnects happens to have a blip and that causes it to go down, or you fail over from one region of AWS to another. These are tons of reasons where it's not really your app's fault that you failed but you got a 500 requests.
+
+[00:02:10]
+What do you do then? Well, there's quite a few strategies. This one's bad which is just quit, [LAUGH] Don't do that. The another strategy could be immediately try again. And that's one thing you'll see frequently is, okay, my request failed, I'm gonna just try again immediately. The problem with that is what happens, if your server has actually just gone down, right?
+
+[00:02:36]
+This was the problem like we had the Obama AMA, when I was working at Reddit is we just had so many people requesting stuff that we basically DDoS ourself. And so our server actually went down during that. If you immediately start requesting again, and then it fails, then the request again and then again, basically you're gonna have all of your users making 1000 requests a second.
+
+[00:02:58]
+And you're definitely gonna crash your servers, right? So that strategy is not great. So we're gonna talk about two things here. One is called backoff and one's called retry. We just talked about retry which is try again, right? Which is more we're not doing here. All right, so I have a 500 request, I'm gonna retry again.
+
+[00:03:17]
+Let's say that one 500 as well and then I'm gonna try again, but I'm gonna try again at twice the interval, right? So if it was zero seconds and I'll try again at three seconds, and then I'll try again six seconds after that, and then 12 seconds after that.
+
+[00:03:30]
+Then 24 seconds after that, right? And then you, you keep backing off until eventually you're making it requests like every two minutes or something like that or until the service comes back. So I don't know, if you all use Gmail, right? But if you look at Gmail and it'll say like, hey, you're offline.
+
+[00:03:51]
+I'm gonna try again in 25 seconds, and then it'll be like two minutes, and there'll be like five minutes. That's exactly what's happening there. They're trying not to overwhelm their servers, and they're just making it so that you retry like every 30 seconds to a minute or something like that.
+
+[00:04:05]
+So that's called backoff, and in particular, what I was talking about is called exponential backoff. And it's just designed with the idea in mind is like all right, we're gonna try again immediately because maybe there was a blip. Then we gonna try again in three seconds cuz maybe, we're able to recover quickly.
+
+[00:04:22]
+And then eventually it's like okay, something is definitely wrong. If I make three requests in a row and they all 500 something is probably wrong. So I'm gonna start taking longer and longer in between my re-request to give my server just an opportunity to, maybe they need to come back up, maybe they need to shed some load, something like that.
+
+[00:04:40]
+And that's what the backoff strategy is. Specifically the exponential backoff. You can also do linear backoff, which is like add 10 seconds every single time, so you try 10 seconds, then 20 seconds, then 30, then 40, then 50, so on and so forth. So and the strategy that you're gonna choose is just gonna be based on what your app is.
+
+[00:05:10]
+If our chat app goes down and they're not able to reconnect within 30 to 45 seconds, they're probably just gonna abandon, right? And that's probably not a bad choice for them either. We don't want them to sit there waiting for an app just getting mad at our page.
+
+[00:05:24]
+So with something like that, you probably want to make a bunch of requests, all upfront, so like two seconds, four seconds, eight seconds. And then after that you just say, all right, it's you probably should just come back later, right? As opposed to something like, maybe you're writing like a script to try and get concert tickets.
+
+[00:05:42]
+That, when you probably wanna try a bunch all at front because maybe you'll have your opportunity to get some concert tickets. Or maybe it's something like I don't know, a spreadsheet that they're trying to look at that even if it takes them two minutes to get to that spreadsheet, they're still gonna wait for that because they need it, right?
+
+[00:06:00]
+In which case you probably wanna have a pretty generous backoff because the people will wait and they'll be fine, I don't know if they'll be fine with it, but they will wait.
+>> Is there an upper limit to how much the longest backoff time should be?
+>> Certainly nothing written in stone in terms of a longest time that a user should wait.
+
+[00:06:19]
+It's just gonna basically conform to your product strategy which is kinda what I was talking about there. Do you anticipate users waiting for your service to come back like Gmail, right? When my Gmail is down, I probably will sit there and wait until my Gmail comes back, right?
+
+[00:06:37]
+So maybe at that point, maybe that's like two minutes, like try every two minutes or something like that, which is probably long enough. One request of 120 seconds, it's probably not gonna bring your server down. So, that would kinda be my upper limit of expecting my user to wait.
+
+[00:06:52]
+If I don't expect them to wait like a chat service, I'd probably say no, right? It's fine, make a request every 10 minutes, that's fine because they're probably not gonna wait. So, anyway, it's a product question, it's not a technical question, which is fine. It's a good question.
+
+[00:07:10]
+Do you have another question?
+>> Yeah, it's like the Gmail button has a retry,
+>> Yep.
+>> To manually request, do you recommend that?
+>> Sure, so the question is like, let's say I went down here and should I pop up like a Retry button right there in the middle?
+
+[00:07:31]
+Again, that's gonna be a product question, so that button if you clicked on it rather than wait two minutes, it would allow the user to say, okay, let me try again right now I think it's back. Here's the danger is that when your user clicks a button and it doesn't do anything, they're gonna click it again, and again.
+
+[00:07:49]
+And you're gonna allow the user to literally manually DDoS here. So in some cases, it's probably okay. If you're trying to recover and all your users are spamming you, you didn't win, right? You lost that interaction. So if I was gonna do that and I felt like that was a good product choice, I would have them click it, and then I would probably have a backoff clicking it as well, right?
+
+[00:08:15]
+So if they clicked and it didn't work, I'd make them wait two seconds before I would show it to them again. And then four seconds before I showed it to them again, right? Or something like that, just so the user is not able to spam you as well, right?
+
+[00:08:26]
+Because they will. And it's not a mean thing, right? We're just wired on the Internet to expect everything instantly. I hate waiting for Gmail to come back, and I definitely spam that button despite the fact I know precisely what it does. I also don't care. It's Google's problem, not mine.
+
+[00:08:46]
+But that's something you could do here. You could totally go make a retry button. That'd be a good exercise to do after this.
+
