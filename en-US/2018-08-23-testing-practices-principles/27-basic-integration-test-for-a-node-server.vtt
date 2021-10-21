@@ -1,0 +1,1614 @@
+WEBVTT
+
+1
+00:00:02.880 --> 00:00:07.118
+&gt;&gt; Kent C. Dodds: Alrighty, so
+with that let's go ahead and
+
+2
+00:00:07.118 --> 00:00:10.188
+move on to integration tests.
+
+3
+00:00:10.188 --> 00:00:15.397
+So like I was saying before,
+the distinction between integration and
+
+4
+00:00:15.397 --> 00:00:18.141
+unit tests can be a little bit fuzzy.
+
+5
+00:00:18.141 --> 00:00:23.873
+If you wanna be totally purist unit
+tester than a unit, like if you consider
+
+6
+00:00:23.873 --> 00:00:29.607
+a unit to be a module, it will mock
+every single one of it's dependencies.
+
+7
+00:00:29.607 --> 00:00:32.334
+And that is your unit that you're testing,
+
+8
+00:00:32.334 --> 00:00:35.655
+whereas an integration test
+will not mock anything.
+
+9
+00:00:35.655 --> 00:00:38.382
+I'm kind of loosey-goosey in the middle.
+
+10
+00:00:38.382 --> 00:00:41.780
+I pretty much I just care
+about getting confidence, but
+
+11
+00:00:41.780 --> 00:00:46.789
+there is a certain point where I say, yes
+this is absolutely an integration test.
+
+12
+00:00:46.789 --> 00:00:50.198
+And from a client side
+application perspective,
+
+13
+00:00:50.198 --> 00:00:53.939
+that's like let's take this page and
+test this page.
+
+14
+00:00:53.939 --> 00:00:58.566
+Maybe that's still happening in Node,
+you're not pulling it up in a browser or
+
+15
+00:00:58.566 --> 00:01:01.893
+anything necessarily when
+you're using jsdom in Node.
+
+16
+00:01:01.893 --> 00:01:06.394
+So rendering a component that's higher
+level would kind of be an integration test
+
+17
+00:01:06.394 --> 00:01:07.056
+in my mind.
+
+18
+00:01:07.056 --> 00:01:10.905
+On the server side,
+that would be starting up the server and
+
+19
+00:01:10.905 --> 00:01:12.686
+hitting it with requests.
+
+20
+00:01:12.686 --> 00:01:16.024
+So that's what our tests are going to do.
+
+21
+00:01:16.024 --> 00:01:20.764
+And in an express server you have
+your routes that you define.
+
+22
+00:01:20.764 --> 00:01:25.212
+So that's where our integration
+tests are going to live.
+
+23
+00:01:25.212 --> 00:01:29.834
+If we're talking about colocating tests,
+that just makes the most sense to me for
+
+24
+00:01:29.834 --> 00:01:33.791
+these kinds of integration tests is
+to put it right next to the routes.
+
+25
+00:01:33.791 --> 00:01:38.924
+So if we look at our index,
+we have our router that we're
+
+26
+00:01:38.924 --> 00:01:44.627
+adding different endpoints to,
+or different subroutes to.
+
+27
+00:01:44.627 --> 00:01:48.212
+And so we have the setupRoutes, we have
+the setupAuthRoutes, userRoutes, and
+
+28
+00:01:48.212 --> 00:01:48.857
+postRoutes.
+
+29
+00:01:48.857 --> 00:01:51.749
+And these files are responsible for
+
+30
+00:01:51.749 --> 00:01:56.379
+setting up those routes on
+each of these subrouters, and
+
+31
+00:01:56.379 --> 00:02:01.411
+then we mount those onto different
+parts of our application.
+
+32
+00:02:01.411 --> 00:02:04.313
+So for us, we have the user routes and
+
+33
+00:02:04.313 --> 00:02:08.537
+on the root of the user route,
+we'll have getUsers.
+
+34
+00:02:08.537 --> 00:02:13.091
+Then you have this authMiddleware for
+
+35
+00:02:13.091 --> 00:02:18.368
+when you're trying to get a specific user.
+
+36
+00:02:18.368 --> 00:02:23.397
+And if you're authorized, then you'll
+get more information about this user.
+
+37
+00:02:23.397 --> 00:02:26.714
+And then you can put,
+if you're authorized,
+
+38
+00:02:26.714 --> 00:02:29.953
+then you can update a user,
+and then delete.
+
+39
+00:02:29.953 --> 00:02:32.701
+If you're authorized,
+you can delete a user.
+
+40
+00:02:32.701 --> 00:02:39.505
+Okay, so this is actually what we're
+going to be testing is this flow.
+
+41
+00:02:39.505 --> 00:02:42.686
+I want to be able to register an account,
+and
+
+42
+00:02:42.686 --> 00:02:47.250
+I want to get the user that I just
+created and log in as that user.
+
+43
+00:02:47.250 --> 00:02:50.583
+And I want to update that user and
+then I want to delete that user.
+
+44
+00:02:50.583 --> 00:02:55.069
+And we could do this in
+a bunch of different tests.
+
+45
+00:02:55.069 --> 00:02:59.875
+And in some scenarios,
+that might make more sense,
+
+46
+00:02:59.875 --> 00:03:04.570
+but if we can do it in a single
+test that will actually
+
+47
+00:03:04.570 --> 00:03:08.845
+save us a fair amount of
+extra setup with test.
+
+48
+00:03:08.845 --> 00:03:11.467
+And so
+that's what we're going to be doing,
+
+49
+00:03:11.467 --> 00:03:13.614
+is doing all of this in a single test.
+
+50
+00:03:13.614 --> 00:03:18.523
+But the first thing we need
+to do when testing a server,
+
+51
+00:03:18.523 --> 00:03:23.882
+as an integration test,
+is we need to start up that server.
+
+52
+00:03:23.882 --> 00:03:31.840
+And sometimes starting up your server
+could require a fair amount of time.
+
+53
+00:03:31.840 --> 00:03:35.587
+It takes a while to boot up your server.
+
+54
+00:03:35.587 --> 00:03:40.184
+And so you might do that in a separate
+process before you start your tests on
+
+55
+00:03:40.184 --> 00:03:41.085
+that server.
+
+56
+00:03:41.085 --> 00:03:43.540
+But if you can get away with it,
+
+57
+00:03:43.540 --> 00:03:49.314
+try to have the same process that's
+running your test start the server.
+
+58
+00:03:49.314 --> 00:03:53.864
+In a Node context, we can start
+the Node server with Node APIs.
+
+59
+00:03:53.864 --> 00:03:58.093
+The reason that I say that is because
+then, can instrument all of that code for
+
+60
+00:03:58.093 --> 00:03:58.700
+coverage.
+
+61
+00:03:58.700 --> 00:04:02.963
+And now you can have code coverage
+on your integration tests for
+
+62
+00:04:02.963 --> 00:04:05.386
+your server which is really handy.
+
+63
+00:04:05.386 --> 00:04:08.628
+In addition,
+you'll get better error messages.
+
+64
+00:04:08.628 --> 00:04:10.460
+If the server throws an error,
+
+65
+00:04:10.460 --> 00:04:15.179
+you'll be able to see that better if the
+same process that's running the test is
+
+66
+00:04:15.179 --> 00:04:18.362
+the one that started the server
+up in the first place.
+
+67
+00:04:18.362 --> 00:04:22.403
+And so to do that, here we have our index.
+
+68
+00:04:22.403 --> 00:04:24.787
+This is the entry for our server.
+
+69
+00:04:24.787 --> 00:04:27.507
+It's not doing a whole
+lot because most of our
+
+70
+00:04:27.507 --> 00:04:30.095
+modules in this project are pure modules.
+
+71
+00:04:30.095 --> 00:04:32.619
+And so it's just getting things started.
+
+72
+00:04:32.619 --> 00:04:36.321
+It starts out, our server, isProduction
+then we're gonna use the port.
+
+73
+00:04:36.321 --> 00:04:39.300
+Otherwise we'll specify
+the port is undefined and
+
+74
+00:04:39.300 --> 00:04:42.423
+then it will actually default
+to a random port for us.
+
+75
+00:04:42.423 --> 00:04:47.274
+So if we look at that startServer.
+
+76
+00:04:47.274 --> 00:04:51.613
+We'll detect the port,
+we'll figure out a good port for us.
+
+77
+00:04:51.613 --> 00:04:54.760
+It sets a whole bunch of stuff up,
+sets up the routes and
+
+78
+00:04:54.760 --> 00:04:59.148
+then it does a whole bunch of weird stuff
+to make Express work with Promises.
+
+79
+00:04:59.148 --> 00:05:00.130
+Thanks a lot Express.
+
+80
+00:05:02.596 --> 00:05:03.398
+&gt;&gt; Kent C. Dodds: So anyway,
+
+81
+00:05:03.398 --> 00:05:07.889
+this is actually the function that
+we are going to call in our test.
+
+82
+00:05:07.889 --> 00:05:12.523
+We'll call this function
+to start our server up and
+
+83
+00:05:12.523 --> 00:05:18.146
+then we'll have that server to
+make these requests against.
+
+84
+00:05:18.146 --> 00:05:22.504
+Okay, so let's go ahead and
+
+85
+00:05:22.504 --> 00:05:25.962
+start with that test.
+
+86
+00:05:25.962 --> 00:05:28.649
+So yeah, we already saw this.
+
+87
+00:05:28.649 --> 00:05:32.465
+We're initializing our API
+a little bit differently, but
+
+88
+00:05:32.465 --> 00:05:34.534
+the same thing kind of applies.
+
+89
+00:05:34.534 --> 00:05:38.868
+This is actually a little bit better
+because this port actually can be dynamic,
+
+90
+00:05:38.868 --> 00:05:43.026
+and so we're getting whatever the server's
+port actually ended up being.
+
+91
+00:05:43.026 --> 00:05:44.395
+We're still closing.
+
+92
+00:05:44.395 --> 00:05:48.986
+In this case we are initializing
+the database before every single one
+
+93
+00:05:48.986 --> 00:05:53.200
+because we have this extra test
+that wants to get all the users.
+
+94
+00:05:53.200 --> 00:05:59.424
+But yeah, so we are going to create some
+registration data with the login form.
+
+95
+00:05:59.424 --> 00:06:03.017
+We pass that data to
+the auth register endpoint.
+
+96
+00:06:03.017 --> 00:06:09.506
+And then map that the user
+property of the response data.
+
+97
+00:06:09.506 --> 00:06:11.196
+So that gets us our testUser and
+
+98
+00:06:11.196 --> 00:06:15.357
+we want to make sure that our testUser's
+user name, the user we get back from
+
+99
+00:06:15.357 --> 00:06:18.890
+the registration is the same as
+the one that we registered with.
+
+100
+00:06:18.890 --> 00:06:22.526
+We can't do anymore verification
+than that because I wouldn't
+
+101
+00:06:22.526 --> 00:06:26.514
+want them to send me back my password,
+that would be pretty annoying.
+
+102
+00:06:26.514 --> 00:06:33.022
+So then we have this read where
+it's an unauthenticated read for
+
+103
+00:06:33.022 --> 00:06:36.166
+the user that we just created.
+
+104
+00:06:36.166 --> 00:06:39.779
+We want to make sure that
+because it's unauthenticated,
+
+105
+00:06:39.779 --> 00:06:44.359
+that we get back this test user, but
+that test user doesn't have a token.
+
+106
+00:06:44.359 --> 00:06:49.133
+Because I wouldn't want people who
+make unauthenticated requests to my
+
+107
+00:06:49.133 --> 00:06:50.548
+user to get my token.
+
+108
+00:06:50.548 --> 00:06:55.765
+And so then we are going to
+create a new instance of axios
+
+109
+00:06:55.765 --> 00:07:00.428
+that is authenticated and
+this is how we do that.
+
+110
+00:07:00.428 --> 00:07:05.420
+Your mileage may vary,
+however you do authentication,
+
+111
+00:07:05.420 --> 00:07:10.411
+but the general idea is let's
+create a mechanism by which
+
+112
+00:07:10.411 --> 00:07:13.740
+we can make authenticated requests.
+
+113
+00:07:13.740 --> 00:07:18.346
+And now that's interesting,
+that should be authAPI.
+
+114
+00:07:18.346 --> 00:07:21.905
+The reason that actually worked
+is cuz there's a bug in axios,
+
+115
+00:07:21.905 --> 00:07:23.256
+that shouldn't work.
+
+116
+00:07:23.256 --> 00:07:28.067
+And I'm pretty sure that there may be a
+new version where that bug has been fixed.
+
+117
+00:07:28.067 --> 00:07:33.545
+Yeah, so then we're gonna make an
+authenticated request to the user's API,
+
+118
+00:07:33.545 --> 00:07:39.032
+map that to the user so this is actually
+the user object from the response data.
+
+119
+00:07:39.032 --> 00:07:42.923
+And make sure that when I make
+an authenticator request,
+
+120
+00:07:42.923 --> 00:07:48.292
+I get the same response that I got when I
+registered the user in the first place.
+
+121
+00:07:48.292 --> 00:07:52.111
+And then we can update, so
+we'll make this updates object.
+
+122
+00:07:52.111 --> 00:07:57.252
+We'll put to that endpoint
+with the authorized API.
+
+123
+00:07:57.252 --> 00:08:01.940
+And then we'll map that to user to
+get the user and we want it to match.
+
+124
+00:08:01.940 --> 00:08:05.276
+So yeah, we want the updated
+test user to match the updates.
+
+125
+00:08:05.276 --> 00:08:09.110
+So it's gonna have the same user name.
+
+126
+00:08:09.110 --> 00:08:12.746
+&gt;&gt; Kent C. Dodds: Okay, and then we
+can delete with the auth API and make.
+
+127
+00:08:12.746 --> 00:08:13.964
+And in this case,
+
+128
+00:08:13.964 --> 00:08:19.256
+an actual implementation the delete
+will send back the user that we deleted.
+
+129
+00:08:19.256 --> 00:08:23.395
+So we can verify the deleted users
+the same as the one we just updated.
+
+130
+00:08:23.395 --> 00:08:26.460
+So our most fresh version of that user.
+
+131
+00:08:26.460 --> 00:08:28.233
+And then we can verify that.
+
+132
+00:08:28.233 --> 00:08:32.464
+If we try to read again,
+it's gonna give us a 404.
+
+133
+00:08:32.464 --> 00:08:37.156
+So there are a couple of things
+to kind of pull out from
+
+134
+00:08:37.156 --> 00:08:41.224
+this demonstration of an integration test.
+
+135
+00:08:41.224 --> 00:08:45.289
+First of all,
+all of this is happening in a single test.
+
+136
+00:08:45.289 --> 00:08:48.906
+And before our let's say for
+example, here,
+
+137
+00:08:48.906 --> 00:08:52.892
+before we had the tools that
+we do today this might be
+
+138
+00:08:52.892 --> 00:08:57.830
+kind of a bad idea because all you
+would see is user cred failed.
+
+139
+00:08:57.830 --> 00:08:59.493
+That won't be super helpful.
+
+140
+00:08:59.493 --> 00:09:04.421
+But with the error messages that we
+have now we can see exactly which
+
+141
+00:09:04.421 --> 00:09:06.896
+one of these assertions failed.
+
+142
+00:09:06.896 --> 00:09:12.812
+We can go to line 33 that's the one that
+failed, its error message is much better.
+
+143
+00:09:12.812 --> 00:09:17.181
+And so the ergonomics of that are just so
+much better because the alternative would
+
+144
+00:09:17.181 --> 00:09:19.730
+be, like,
+we have a whole bunch of logic in it.
+
+145
+00:09:19.730 --> 00:09:24.430
+Before each test we're going to create
+a new user and do all this extra stuff.
+
+146
+00:09:24.430 --> 00:09:26.390
+Instead we can just do it all at once.
+
+147
+00:09:26.390 --> 00:09:27.906
+Actually in this way,
+
+148
+00:09:27.906 --> 00:09:32.866
+you can kind of think of it as somebody
+who is using the software to test it.
+
+149
+00:09:32.866 --> 00:09:35.669
+No user is gonna go in and register and
+
+150
+00:09:35.669 --> 00:09:39.751
+then delete their account
+immediately thereafter.
+
+151
+00:09:39.751 --> 00:09:42.087
+Update and then delete it.
+
+152
+00:09:42.087 --> 00:09:47.325
+But if you are a tester testing some
+software, you might go register and
+
+153
+00:09:47.325 --> 00:09:51.968
+then try to get that user and
+then log in and update then delete.
+
+154
+00:09:51.968 --> 00:09:54.388
+So we can do all that in a single test.
+
+155
+00:09:54.388 --> 00:09:59.983
+Another thing to note is that we're
+pretty much doing the happy path here.
+
+156
+00:09:59.983 --> 00:10:02.237
+We have one set half
+right here at the end.
+
+157
+00:10:02.237 --> 00:10:06.450
+I don't even know if sat path
+is something people say, but
+
+158
+00:10:06.450 --> 00:10:09.120
+I like to say it cuz we got happy path.
+
+159
+00:10:09.120 --> 00:10:12.176
+So we have this one kind
+of educause situation here.
+
+160
+00:10:12.176 --> 00:10:16.383
+We're not doing a whole lot
+of educause testing in here.
+
+161
+00:10:16.383 --> 00:10:17.252
+We could but
+
+162
+00:10:17.252 --> 00:10:23.343
+I don't think that would give me any more
+confidence than to do those as unit tests.
+
+163
+00:10:23.343 --> 00:10:23.960
+And so for
+
+164
+00:10:23.960 --> 00:10:28.681
+most of the time my educases are going
+to be covered by lower level tests.
+
+165
+00:10:28.681 --> 00:10:33.661
+Whereas the the happier
+situation are gonna be covered
+
+166
+00:10:33.661 --> 00:10:36.375
+by these higher level tests.
+
+167
+00:10:36.375 --> 00:10:41.428
+Because there is a significant
+difference with regard to how
+
+168
+00:10:41.428 --> 00:10:47.781
+how complicated these things are to set
+up and run and to write and maintain.
+
+169
+00:10:47.781 --> 00:10:51.445
+Versus a unit test of a smaller component.
+
+170
+00:10:51.445 --> 00:10:53.794
+Those are normally easier to maintain.
+
+171
+00:10:53.794 --> 00:10:59.181
+And so spending a lot of time dealing
+with edge cases at the integration
+
+172
+00:10:59.181 --> 00:11:04.384
+test level when you could just as
+easily do it at the unit test level,
+
+173
+00:11:04.384 --> 00:11:06.691
+doesn't make a lot of sense.
+
+174
+00:11:06.691 --> 00:11:13.515
+So I generally do most of my
+edge case testing lower level.
+
+175
+00:11:13.515 --> 00:11:19.682
+And yeah, so that's pretty much it for
+the integration test.
+
+176
+00:11:19.682 --> 00:11:24.955
+Does anybody have any
+questions about that?
+
+177
+00:11:24.955 --> 00:11:27.029
+Yeah?
+&gt;&gt; Speaker 2: Yeah, so when I'm doing,
+
+178
+00:11:27.029 --> 00:11:31.014
+integration testing,
+one of the first things I do is I
+
+179
+00:11:31.014 --> 00:11:34.277
+figure out what are all the different-
+&gt;&gt; Kent C. Dodds: Help you
+
+180
+00:11:34.277 --> 00:11:34.984
+paths and paths.
+
+181
+00:11:34.984 --> 00:11:35.514
+Yeah.
+&gt;&gt; Speaker 2: Yeah,
+
+182
+00:11:35.514 --> 00:11:40.393
+the most extremes in each possible
+direction based on what the data might
+
+183
+00:11:40.393 --> 00:11:41.197
+look like.
+
+184
+00:11:41.197 --> 00:11:45.697
+And I'll run it through all of those
+possible scenarios because that's the edge
+
+185
+00:11:45.697 --> 00:11:46.235
+of work.
+
+186
+00:11:46.235 --> 00:11:48.680
+&gt;&gt; Kent C. Dodds: Yeah,
+yeah, that's a fair point.
+
+187
+00:11:48.680 --> 00:11:52.464
+Because generally your happy
+path is gonna stay happy,
+
+188
+00:11:52.464 --> 00:11:57.949
+because that's what developers are using
+as they're going through and stuff.
+
+189
+00:11:57.949 --> 00:11:59.940
+But if you take a step back and
+
+190
+00:11:59.940 --> 00:12:04.109
+think, what do I really wanna
+make sure never ever breaks?
+
+191
+00:12:04.109 --> 00:12:08.745
+It's normally the happy path,
+I don't want that to break.
+
+192
+00:12:08.745 --> 00:12:12.942
+I wanna make sure that a user can
+go through the the register and
+
+193
+00:12:12.942 --> 00:12:17.891
+they can add an item to their cart,
+and they can check out with that item.
+
+194
+00:12:17.891 --> 00:12:21.689
+That's a happy path that I
+never want to break, and so
+
+195
+00:12:21.689 --> 00:12:24.484
+I will definitely have a test for that.
+
+196
+00:12:24.484 --> 00:12:29.976
+Like if the process of, like I add
+something to my cart, and then I go back.
+
+197
+00:12:29.976 --> 00:12:34.535
+I make a change and that's no longer,
+like we're out of the quantity, or
+
+198
+00:12:34.535 --> 00:12:37.185
+whatever of that and
+then I try to check out.
+
+199
+00:12:37.185 --> 00:12:41.091
+And something with that breaks you don't
+want that to break either, for sure.
+
+200
+00:12:41.091 --> 00:12:43.947
+And those are the kinds
+of things that often do.
+
+201
+00:12:43.947 --> 00:12:47.435
+But if that part breaks you're going to
+affect a fraction of the users than if
+
+202
+00:12:47.435 --> 00:12:48.593
+your happy path breaks.
+
+203
+00:12:48.593 --> 00:12:50.648
+So if you're trying to decide to do one or
+
+204
+00:12:50.648 --> 00:12:52.831
+the other I would always
+do the happy path.
+
+205
+00:12:52.831 --> 00:12:55.798
+But normally you can do both.
+
+206
+00:12:55.798 --> 00:13:00.124
+And I would like you said,
+I would suggest people do both.
+
+207
+00:13:00.124 --> 00:13:07.488
+But whether the sad path is covered by
+an integration test or a unit test.
+
+208
+00:13:07.488 --> 00:13:14.277
+Or whether these edge tests are covered
+by integration unit It kind of depends.
+
+209
+00:13:14.277 --> 00:13:22.479
+Can you reasonably accomplish recovering
+the SAD path with a lower level test?
+
+210
+00:13:22.479 --> 00:13:25.122
+If you can, I would put that there.
+
+211
+00:13:25.122 --> 00:13:27.223
+&gt;&gt; Speaker 2: So let me clarify.
+
+212
+00:13:27.223 --> 00:13:33.379
+What I guess I am thinking of is same
+path, different data to, in part, validate
+
+213
+00:13:33.379 --> 00:13:39.648
+that the contract with the server is being
+honored the way that it was documented.
+
+214
+00:13:39.648 --> 00:13:40.186
+&gt;&gt; Kent C. Dodds: Hm.
+Yeah.
+
+215
+00:13:40.186 --> 00:13:43.736
+So yeah,
+I'd be totally cool with that, too.
+
+216
+00:13:43.736 --> 00:13:49.166
+So like if you're saying that like all
+the tests will look pretty much the same,
+
+217
+00:13:49.166 --> 00:13:51.611
+except the data will be different?
+
+218
+00:13:51.611 --> 00:13:53.910
+Is that what you were suggesting?
+
+219
+00:13:53.910 --> 00:13:54.896
+Yeah.
+&gt;&gt; Speaker 2: Absolutely.
+
+220
+00:13:54.896 --> 00:13:57.443
+&gt;&gt; Kent C. Dodds: Yep.
+So what I would do in that situation, and
+
+221
+00:13:57.443 --> 00:14:02.070
+that also makes sense, is I would
+probably use that just in case thing, and
+
+222
+00:14:02.070 --> 00:14:03.775
+just have a bunch of cases.
+
+223
+00:14:03.775 --> 00:14:06.655
+All of these should work
+with the happy path.
+
+224
+00:14:06.655 --> 00:14:10.098
+You get, with integration tests,
+often, they're more expensive.
+
+225
+00:14:10.098 --> 00:14:14.653
+We've got, like, a JavaScript
+module that is, like, our database,
+
+226
+00:14:14.653 --> 00:14:19.077
+like, it doesn't take any time to
+start up the database and all that.
+
+227
+00:14:19.077 --> 00:14:21.839
+And so we could add millions of tests and
+
+228
+00:14:21.839 --> 00:14:24.868
+I mean millions of tests
+that take a while.
+
+229
+00:14:24.868 --> 00:14:28.532
+But you'd add like dozens and
+dozens of tests, it wouldn't take long.
+
+230
+00:14:28.532 --> 00:14:29.983
+You got a bunch of those and
+
+231
+00:14:29.983 --> 00:14:33.416
+you're starting to get into
+situations where you're like,
+
+232
+00:14:33.416 --> 00:14:37.445
+well do we really need to run all these
+tests on CI, and maybe you don't.
+
+233
+00:14:37.445 --> 00:14:39.949
+Maybe you just run those nightly or
+something like that.
+
+234
+00:14:39.949 --> 00:14:41.141
+But I totally agree,
+
+235
+00:14:41.141 --> 00:14:45.582
+I don't see any reason why you couldn't
+just add additional tests just to say,
+
+236
+00:14:45.582 --> 00:14:48.910
+we these subtle changes it's
+should still actually work.
+
+237
+00:14:48.910 --> 00:14:51.076
+I'm glad you mentioned that.
+
+238
+00:14:51.076 --> 00:14:52.687
+Anyone else?
+
+239
+00:14:52.687 --> 00:14:53.588
+Yeah, Peter.
+
+240
+00:14:53.588 --> 00:14:58.244
+&gt;&gt; Speaker 3: Can you talk a little
+bit about how a test like this,
+
+241
+00:14:58.244 --> 00:15:03.225
+I'm curious how a test like
+this that like range across
+
+242
+00:15:03.225 --> 00:15:07.405
+your code base impact your code coverage.
+
+243
+00:15:07.405 --> 00:15:10.898
+&gt;&gt; Kent C. Dodds: Yeah, if I understand
+you correctly, that's a good question.
+
+244
+00:15:10.898 --> 00:15:14.896
+Even if I don't,
+it's probably a good question too.
+
+245
+00:15:14.896 --> 00:15:19.580
+Yeah, with integration tests you most
+definitely are covering a lot more of
+
+246
+00:15:19.580 --> 00:15:20.322
+your code.
+
+247
+00:15:20.322 --> 00:15:24.615
+Because we are starting out
+the server within this process,
+
+248
+00:15:24.615 --> 00:15:28.500
+Jess can actually instrument that code for
+coverage.
+
+249
+00:15:28.500 --> 00:15:32.662
+Lots of times I've seen integration tests
+where you start at the server here and
+
+250
+00:15:32.662 --> 00:15:36.774
+you start up your test and you hit that
+server, and you can't cover your code.
+
+251
+00:15:36.774 --> 00:15:41.160
+Well, there are tools, but it's pretty
+hard to set up those tools to cover a code
+
+252
+00:15:41.160 --> 00:15:44.081
+for a server that you start
+up in a different process.
+
+253
+00:15:44.081 --> 00:15:48.477
+But I only care a little bit
+about the code coverage report.
+
+254
+00:15:48.477 --> 00:15:52.116
+It's a helpful metric, but
+it's not like an end-all be-all.
+
+255
+00:15:52.116 --> 00:15:56.269
+So I'm not gonna make critical
+decisions based off it.
+
+256
+00:15:56.269 --> 00:15:57.001
+But yeah, so
+
+257
+00:15:57.001 --> 00:16:01.626
+in general, your integration test,
+you're gonna get a lot more code coverage.
+
+258
+00:16:01.626 --> 00:16:06.569
+But as I was saying before,
+I don't normally use integration tests
+
+259
+00:16:06.569 --> 00:16:11.652
+to test Like these edge cases, because you
+can cover those with lower level tests.
+
+260
+00:16:11.652 --> 00:16:14.785
+So with the integration test,
+you'll get a lot of code coverage.
+
+261
+00:16:14.785 --> 00:16:17.664
+But you'll miss out on
+some of these edge cases,
+
+262
+00:16:17.664 --> 00:16:22.033
+like if random edge case then do this,
+you'll miss code coverage there.
+
+263
+00:16:22.033 --> 00:16:24.514
+But then you can easily pick
+that up with the unit test.
+
+264
+00:16:24.514 --> 00:16:28.227
+&gt;&gt; Speaker 3: Sure, and I guess that gives
+you a way to see what you're not covering
+
+265
+00:16:28.227 --> 00:16:29.773
+with you integration test.
+
+266
+00:16:29.773 --> 00:16:32.276
+&gt;&gt; Kent C. Dodds: Yep, exactly.
+
+267
+00:16:32.276 --> 00:16:34.315
+&gt;&gt; Speaker 3: So
+I guess I'm kinda of missing.
+
+268
+00:16:34.315 --> 00:16:36.405
+&gt;&gt; Kent C. Dodds: Yep, go ahead.
+
+269
+00:16:36.405 --> 00:16:41.965
+&gt;&gt; Speaker 3: If you're coverage
+report has all this green
+
+270
+00:16:41.965 --> 00:16:47.532
+because of your integration tasks, right?
+
+271
+00:16:47.532 --> 00:16:52.069
+Is that gonna give you a false
+sense of confidence that hey,
+
+272
+00:16:52.069 --> 00:16:54.077
+all this code is covered?
+
+273
+00:16:54.077 --> 00:16:59.587
+How do you know what then you need to
+go back and add some unit tests for?
+
+274
+00:16:59.587 --> 00:17:00.825
+&gt;&gt; Kent C. Dodds: Yeah,
+that's a good question.
+
+275
+00:17:00.825 --> 00:17:04.573
+The question generally is about,
+well, okay, so
+
+276
+00:17:04.573 --> 00:17:09.730
+it sounds like my integration test and
+my unit test have some overlap.
+
+277
+00:17:09.730 --> 00:17:13.860
+What's the point in unit testing if
+my integration test can actually
+
+278
+00:17:13.860 --> 00:17:15.220
+cover all that stuff?
+
+279
+00:17:15.220 --> 00:17:16.760
+Is that what you're kind of asking about?
+
+280
+00:17:16.760 --> 00:17:21.519
+&gt;&gt; Speaker 3: No,
+if you're using code coverage as kind of
+
+281
+00:17:21.519 --> 00:17:26.529
+like a sense of, okay,
+what needs attention,
+
+282
+00:17:26.529 --> 00:17:30.805
+where do I need to write some more tests?
+
+283
+00:17:30.805 --> 00:17:36.418
+I fear that kind of sweeping integration
+
+284
+00:17:36.418 --> 00:17:41.533
+tests might just make you blind to all
+
+285
+00:17:41.533 --> 00:17:47.159
+of the kind of open untested edge cases.
+
+286
+00:17:47.159 --> 00:17:50.427
+&gt;&gt; Kent C. Dodds: Yeah,
+I'm glad that you brought this up.
+
+287
+00:17:50.427 --> 00:17:55.475
+Actually, it reveals to you the fact
+that that actually is tested.
+
+288
+00:17:55.475 --> 00:17:59.736
+Because if it is green then it is tested,
+it's covered by the integration test.
+
+289
+00:17:59.736 --> 00:18:03.839
+And so if you're using the coverage
+report as a mechanism for
+
+290
+00:18:03.839 --> 00:18:09.082
+you to know what you are not testing,
+if it's green then your are testing it.
+
+291
+00:18:09.082 --> 00:18:10.957
+The integration, and
+that's one of the nice things about-
+
+292
+00:18:10.957 --> 00:18:11.929
+&gt;&gt; Speaker 3: [CROSSTALK] testing
+
+293
+00:18:11.929 --> 00:18:12.782
+the happy path.
+
+294
+00:18:12.782 --> 00:18:17.169
+&gt;&gt; Kent C. Dodds: That's true, and so
+if there are edge cases then those will
+
+295
+00:18:17.169 --> 00:18:23.165
+normally live in something like if edge
+case then do this, and that will be read.
+
+296
+00:18:23.165 --> 00:18:28.287
+And so then in your unit when you're like,
+okay, I wanna make sure
+
+297
+00:18:28.287 --> 00:18:33.600
+I cover those not happy paths,
+then you can add that in as a unit test.
+
+298
+00:18:33.600 --> 00:18:38.523
+I should also add that it's not a bad
+thing to test edge cases with integration
+
+299
+00:18:38.523 --> 00:18:39.062
+tests.
+
+300
+00:18:39.062 --> 00:18:46.467
+Sometimes the edge case is best tested
+as like a process of several steps.
+
+301
+00:18:46.467 --> 00:18:51.036
+And so that could make sense as
+an integration test as well.
+
+302
+00:18:51.036 --> 00:18:55.101
+But yeah, in general, if it's green
+because of your integration test,
+
+303
+00:18:55.101 --> 00:18:59.036
+then adding a unit test is not gonna
+give you any more confidence because
+
+304
+00:18:59.036 --> 00:19:00.104
+you already know.
+
+305
+00:19:00.104 --> 00:19:03.041
+Your integration test would
+fail if this code broke, and so
+
+306
+00:19:03.041 --> 00:19:05.987
+there's no reason to add a unit
+test cuz it'll also break.
+
+307
+00:19:05.987 --> 00:19:07.176
+Yeah, just extra noise.
+
+308
+00:19:07.176 --> 00:19:08.996
+I also wanna clarify
+something that I said.
+
+309
+00:19:08.996 --> 00:19:12.224
+So if your integration test
+is covering some code,
+
+310
+00:19:12.224 --> 00:19:16.066
+it's not always a bad thing to
+also unit test that same code.
+
+311
+00:19:16.066 --> 00:19:22.445
+Because the integration test, we can say
+this is user create, read, update, delete.
+
+312
+00:19:22.445 --> 00:19:26.696
+But there could be something
+that's broken in this process.
+
+313
+00:19:26.696 --> 00:19:30.636
+And all that it can tell us is,
+I can't read a user, but
+
+314
+00:19:30.636 --> 00:19:35.202
+a unit test could tell us that
+a specific part of that is broken.
+
+315
+00:19:35.202 --> 00:19:39.030
+And so even though you're
+covering the same stuff,
+
+316
+00:19:39.030 --> 00:19:43.033
+sometimes it can actually be
+useful to do that anyway.
+
+317
+00:19:43.033 --> 00:19:48.262
+I would actually, generally,
+be happy to over-cover certain areas
+
+318
+00:19:48.262 --> 00:19:53.859
+of my app that are really, really
+critical to my application's success.
+
+319
+00:19:53.859 --> 00:20:01.204
+And it just helps you come up with
+what the problem is more quickly.
+
+320
+00:20:01.204 --> 00:20:05.280
+The one trade-off with that is when
+something breaks, everything breaks and
+
+321
+00:20:05.280 --> 00:20:06.649
+it's a total nightmare.
+
+322
+00:20:06.649 --> 00:20:09.341
+And that's one of the things people
+don't like about integration and
+
+323
+00:20:09.341 --> 00:20:10.030
+end to end tests.
+
+324
+00:20:10.030 --> 00:20:14.177
+They're so easy to break because
+they cover so much stuff.
+
+325
+00:20:14.177 --> 00:20:18.966
+But they cover so much stuff, and
+so there are trade-offs there.
+
+326
+00:20:18.966 --> 00:20:19.522
+Yeah?
+&gt;&gt; Speaker 4: So
+
+327
+00:20:19.522 --> 00:20:24.756
+I think you made a good point earlier,
+right, about how integration tests or
+
+328
+00:20:24.756 --> 00:20:29.598
+tests of compositions of modules,
+right, or compositions of units.
+
+329
+00:20:29.598 --> 00:20:36.273
+And so to that end, right, unit testing
+those individual units is additive, right?
+
+330
+00:20:36.273 --> 00:20:40.308
+Cuz the point is the integration tests
+should actually let you combine those
+
+331
+00:20:40.308 --> 00:20:43.410
+modules in multiple ways and
+not break your test, right?
+
+332
+00:20:43.410 --> 00:20:47.584
+Nonetheless, inside each unit there are,
+right, possibly also implementation
+
+333
+00:20:47.584 --> 00:20:50.445
+details that shouldn't break
+unit tests at that level or
+
+334
+00:20:50.445 --> 00:20:52.251
+at the integration level, right?
+
+335
+00:20:52.251 --> 00:20:56.297
+But if you're refactoring at
+the individual unit level, you still need
+
+336
+00:20:56.297 --> 00:21:00.157
+that around the unit testing to
+tell you that's what broke, right?
+
+337
+00:21:00.157 --> 00:21:03.948
+So I think when you put it that way
+earlier, it kind of makes sense to me in
+
+338
+00:21:03.948 --> 00:21:07.934
+the context of what you're describing
+there, like why the two coexist and
+
+339
+00:21:07.934 --> 00:21:11.351
+it's not duplicative cuz even
+though they cover the same code,
+
+340
+00:21:11.351 --> 00:21:13.782
+they cover it from different perspectives.
+
+341
+00:21:13.782 --> 00:21:16.899
+&gt;&gt; Kent C. Dodds: Mm-hm, yeah,
+you're thinking more about use cases and
+
+342
+00:21:16.899 --> 00:21:18.496
+that kinda thing, exactly.
+

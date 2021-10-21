@@ -1,0 +1,707 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:03.762
+[MUSIC]
+
+2
+00:00:03.762 --> 00:00:08.803
+&gt;&gt; Mike North: Loading and error substates
+have to do with what's happening as you
+
+3
+00:00:08.803 --> 00:00:13.756
+transition from one route to another
+route and in your model hook or
+
+4
+00:00:13.756 --> 00:00:19.950
+your before model hook or your after
+model hook you've returned a promise.
+
+5
+00:00:19.950 --> 00:00:22.570
+So what's happening while we're waiting?
+
+6
+00:00:22.570 --> 00:00:26.770
+So what ends up happening is
+you're in this intermediate state.
+
+7
+00:00:26.770 --> 00:00:32.610
+You're in this loading state that
+is part of the state machine but
+
+8
+00:00:32.610 --> 00:00:35.530
+it does not correspond to a url.
+
+9
+00:00:36.710 --> 00:00:42.180
+It is sort of a waiting state that you're
+in until that promise resolves and
+
+10
+00:00:42.180 --> 00:00:43.100
+then you pop out of it.
+
+11
+00:00:46.080 --> 00:00:54.210
+So similarly there is an error sub
+state and the idea here is that if you
+
+12
+00:00:56.590 --> 00:01:00.990
+requested something and your promise
+rejected instead of resolving.
+
+13
+00:01:02.220 --> 00:01:07.994
+You'd end up in an error.
+&gt;&gt; Mike North: Make sense so far?
+
+14
+00:01:07.994 --> 00:01:13.340
+So in addition,
+
+15
+00:01:13.340 --> 00:01:19.680
+when you error, when you reach this error
+state, it is usually the result of either
+
+16
+00:01:19.680 --> 00:01:26.410
+firing the error action explicitly or
+a promise in your model hook rejecting.
+
+17
+00:01:28.040 --> 00:01:32.350
+This error action on the route in question
+where the error happened will fire.
+
+18
+00:01:33.610 --> 00:01:39.310
+And you usually will want to handle
+something specific like maybe
+
+19
+00:01:39.310 --> 00:01:43.950
+a 404, in a way that informs the user that
+they've typed something in that's wrong or
+
+20
+00:01:43.950 --> 00:01:47.900
+they're lost and click here to search and
+find whatever you really need
+
+21
+00:01:47.900 --> 00:01:52.835
+versus like a 500 which is sort
+of a catchall server blew up.
+
+22
+00:01:55.120 --> 00:01:57.950
+And those you would sort of let fall
+through to a generic error page
+
+23
+00:01:57.950 --> 00:01:58.510
+of some sort.
+
+24
+00:01:59.820 --> 00:02:03.485
+So I'm gonna show you how to set
+up loading in error substates,
+
+25
+00:02:03.485 --> 00:02:08.343
+and then we're gonna really quickly add it
+to this app that we've been working on.
+
+26
+00:02:18.578 --> 00:02:23.860
+&gt;&gt; Mike North: So this is quiet easy.
+
+27
+00:02:23.860 --> 00:02:29.639
+All you have to do,
+&gt;&gt; Mike North: Is add a template
+
+28
+00:02:29.639 --> 00:02:36.852
+called loading.hbs.
+&gt;&gt; Mike North: And
+
+29
+00:02:36.852 --> 00:02:40.310
+this will give you some style for
+your loading substate.
+
+30
+00:02:40.310 --> 00:02:46.680
+So if we go loading dot dot dot dot dot
+and we don't really even see anything.
+
+31
+00:02:48.120 --> 00:02:51.512
+And the reason is there's no waiting yet,
+it's fast and
+
+32
+00:02:51.512 --> 00:02:55.764
+especially on this page we're
+literally returning an array literal.
+
+33
+00:02:59.003 --> 00:03:01.038
+&gt;&gt; Mike North: But if we go in here and
+
+34
+00:03:01.038 --> 00:03:07.952
+for no good reason at all add a promise
+that resolves in a couple seconds.
+
+35
+00:03:38.052 --> 00:03:38.750
+&gt;&gt; Mike North: All right, and
+
+36
+00:03:38.750 --> 00:03:41.230
+I will explain what all this is doing.
+
+37
+00:03:41.230 --> 00:03:46.070
+It's not incredibly important but
+essentially, one thing I forgot.
+
+38
+00:03:47.640 --> 00:03:52.030
+So ember run later, there's this
+concept of a run loop in ember and
+
+39
+00:03:52.030 --> 00:03:56.840
+it's a prioritized work queue and
+
+40
+00:03:56.840 --> 00:04:01.700
+it is sort of the magic behind
+efficient DOM updates, where if you set
+
+41
+00:04:01.700 --> 00:04:07.510
+17 properties in an action and
+it will result in 17 DOM changes,
+
+42
+00:04:07.510 --> 00:04:10.260
+potentially things changing back and
+forth and back and forth.
+
+43
+00:04:10.260 --> 00:04:16.010
+Ultimately, all of that is
+sort of lumped together and
+
+44
+00:04:16.010 --> 00:04:21.970
+only the ultimate changed state will
+be what drives an update to the DOM.
+
+45
+00:04:21.970 --> 00:04:24.390
+And so, what we're doing here is
+instead of using set time out,
+
+46
+00:04:24.390 --> 00:04:28.150
+which will just happen at an arbitrary
+time, we're scheduling a task to be put
+
+47
+00:04:28.150 --> 00:04:33.130
+into this work queue no earlier
+than 3,000 milliseconds from now.
+
+48
+00:04:34.300 --> 00:04:39.315
+And here we're creating our own
+promise and we're resolving
+
+49
+00:04:39.315 --> 00:04:44.715
+with the same array literal but
+we're gonna resolve three seconds
+
+50
+00:04:44.715 --> 00:04:50.838
+later.
+&gt;&gt; Mike North: There you go.
+
+51
+00:04:50.838 --> 00:04:55.210
+That's it, loading.hbs is all you need.
+
+52
+00:04:55.210 --> 00:04:58.098
+All the rest of this was just
+to make it so you could see it.
+
+53
+00:04:58.098 --> 00:05:01.420
+But loading.hbs.
+
+54
+00:05:01.420 --> 00:05:05.020
+Now we know that these
+routes load in a hierarchy.
+
+55
+00:05:06.100 --> 00:05:09.860
+So I'm gonna add some more delay.
+
+56
+00:05:11.670 --> 00:05:12.750
+That was a real wait by the way.
+
+57
+00:05:14.550 --> 00:05:15.430
+Let's see.
+
+58
+00:05:15.430 --> 00:05:16.952
+Wow, that's getting frustratingly long.
+
+59
+00:05:16.952 --> 00:05:19.266
+[LAUGH] We're gonna go back to,
+
+60
+00:05:19.266 --> 00:05:24.316
+one second.
+&gt;&gt; Mike North: So
+
+61
+00:05:24.316 --> 00:05:28.490
+here, this is actually the API
+request just for a moment.
+
+62
+00:05:28.490 --> 00:05:29.080
+Taking a second.
+
+63
+00:05:30.780 --> 00:05:36.200
+So we can put another
+loading.hbs inside a route.
+
+64
+00:05:37.660 --> 00:05:42.210
+So you remember when I was looking at
+the ember inspector earlier and we
+
+65
+00:05:43.330 --> 00:05:50.300
+peeked through and saw that there were a
+ton of routes that we hadn't talked about?
+
+66
+00:05:50.300 --> 00:05:55.160
+Right, so we've go the application
+loading, which we've actually
+
+67
+00:05:55.160 --> 00:05:59.660
+supplied a template for, but we've got
+orgs loading and we've got org error.
+
+68
+00:05:59.660 --> 00:06:04.300
+So error and loading substates can
+exist at many different levels.
+
+69
+00:06:04.300 --> 00:06:08.470
+So if you wanted to have a different
+spinner or something, while you're looking
+
+70
+00:06:08.470 --> 00:06:14.300
+for an org or more than likely an error
+page that says, this org was not found.
+
+71
+00:06:17.600 --> 00:06:24.190
+That can be sort of a localized specific
+thing that pertains only to that,
+
+72
+00:06:24.190 --> 00:06:28.972
+only to pivots that are on
+that particular node in this
+
+73
+00:06:28.972 --> 00:06:34.530
+hierarchy of routes
+&gt;&gt; Mike North: So
+
+74
+00:06:34.530 --> 00:06:38.240
+let me see if I can illustrate
+that with an example.
+
+75
+00:06:38.240 --> 00:06:44.241
+So if we make loading.hbs, and
+
+76
+00:06:44.241 --> 00:06:49.837
+there it is.
+&gt;&gt; Mike North: There it is.
+
+77
+00:06:55.737 --> 00:06:58.272
+&gt;&gt; Mike North: Okay I gotta slow that down
+
+78
+00:06:58.272 --> 00:07:03.110
+but [LAUGH] it's unfortunate
+that GitHub's API is
+
+79
+00:07:03.110 --> 00:07:07.270
+sub performing it's screwing my demo up.
+
+80
+00:07:21.057 --> 00:07:26.811
+&gt;&gt; Mike North: Promise, resolve, reject,
+
+81
+00:07:26.811 --> 00:07:33.436
+arrow.
+&gt;&gt; Mike North: Then.
+
+82
+00:07:49.954 --> 00:07:50.750
+&gt;&gt; Mike North: All right so
+
+83
+00:07:50.750 --> 00:07:52.663
+there's our initial load.
+
+84
+00:07:52.663 --> 00:08:02.455
+What's going on here.
+&gt;&gt; Mike North: org.js.
+
+85
+00:08:09.900 --> 00:08:11.165
+&gt;&gt; Mike North: I'm going to remove this at
+
+86
+00:08:11.165 --> 00:08:12.460
+our loading state.
+
+87
+00:08:12.460 --> 00:08:15.569
+I'm not sure what all is going on there.
+
+88
+00:08:28.638 --> 00:08:29.554
+&gt;&gt; Mike North: I have to admit,
+
+89
+00:08:29.554 --> 00:08:31.524
+this is not working how I expected.
+
+90
+00:08:42.414 --> 00:08:43.788
+&gt;&gt; Mike North: You know what,
+
+91
+00:08:43.788 --> 00:08:46.329
+I'm just going to try this.
+
+92
+00:08:46.329 --> 00:08:51.374
+We'll just go with the initial thing.
+
+93
+00:08:54.899 --> 00:08:57.660
+&gt;&gt; Mike North: So it's very hard to see.
+
+94
+00:08:57.660 --> 00:08:58.800
+I know what I can do.
+
+95
+00:08:58.800 --> 00:09:00.180
+Chrome to the rescue.
+
+96
+00:09:00.180 --> 00:09:01.880
+I'm gonna throttle my
+network speed way down.
+
+97
+00:09:03.160 --> 00:09:06.070
+So we're gonna simulate Edge network.
+
+98
+00:09:06.070 --> 00:09:08.485
+GPRS, the good stuff.
+
+99
+00:09:31.454 --> 00:09:33.480
+&gt;&gt; Mike North: Maybe we'll
+recap this tomorrow.
+
+100
+00:09:33.480 --> 00:09:37.407
+I have to investigate what's
+going wrong here but for
+
+101
+00:09:37.407 --> 00:09:42.380
+those of you who can see the live view,
+we were seeing a loading state
+
+102
+00:09:42.380 --> 00:09:47.308
+blink briefly
+&gt;&gt; Mike North: When that
+
+103
+00:09:47.308 --> 00:09:48.680
+API call is being made.
+
+104
+00:09:52.250 --> 00:09:53.352
+Maybe if we delete this.
+
+105
+00:10:04.448 --> 00:10:12.284
+&gt;&gt; Mike North: Come on.
+&gt;&gt; Mike North: Yeah,
+
+106
+00:10:12.284 --> 00:10:16.733
+I think I'll demo this tomorrow,
+after I figure out what's going on here
+
+107
+00:10:16.733 --> 00:10:19.894
+since we're at the end of the day here.
+&gt;&gt; Speaker 2: There were couple of
+
+108
+00:10:19.894 --> 00:10:20.908
+questions.
+&gt;&gt; Mike North: Yep.
+
+109
+00:10:20.908 --> 00:10:21.717
+&gt;&gt; Speaker 2: Do you mind answering them?
+
+110
+00:10:21.717 --> 00:10:23.790
+One of them was that kind
+of what you're doing.
+
+111
+00:10:23.790 --> 00:10:28.040
+If a child route is loading and
+it doesn't have a loading.hbs.
+
+112
+00:10:28.040 --> 00:10:32.840
+Does it default to
+the parents loading template?
+
+113
+00:10:34.840 --> 00:10:35.950
+&gt;&gt; Mike North: Yes, it should.
+
+114
+00:10:35.950 --> 00:10:39.372
+But it will bubble up until it finds
+
+115
+00:10:39.372 --> 00:10:42.880
+a defined loading substate.
+&gt;&gt; Speaker 2: Okay.
+
+116
+00:10:42.880 --> 00:10:43.590
+&gt;&gt; Mike North: So it will not
+
+117
+00:10:43.590 --> 00:10:46.680
+go all the way up to, like if
+the parent doesn't have one either,
+
+118
+00:10:46.680 --> 00:10:50.580
+it will basically keep traversing upward.
+&gt;&gt; Speaker 2: The other question was
+
+119
+00:10:50.580 --> 00:10:52.170
+the model four.
+
+120
+00:10:52.170 --> 00:10:55.538
+Is this a desired way to
+share data between routes or
+
+121
+00:10:55.538 --> 00:10:58.890
+are services preferred?
+&gt;&gt; Mike North: So,
+
+122
+00:10:59.920 --> 00:11:05.230
+our use of a service, so if the data
+that you're sharing between routes is
+
+123
+00:11:05.230 --> 00:11:09.918
+resolved models from routes,
+you should be using model four.
+
+124
+00:11:09.918 --> 00:11:15.030
+If you're sharing application state or
+
+125
+00:11:15.030 --> 00:11:18.940
+a singular piece of data that is
+needed throughout the application like
+
+126
+00:11:20.360 --> 00:11:23.270
+the currently logged in user,
+that's what a service is for.
+
+127
+00:11:23.270 --> 00:11:28.160
+And it's worth noting that you don't
+have access to model four in things like
+
+128
+00:11:28.160 --> 00:11:34.050
+a component, whereas you can totally use
+a service to share data with a component.
+
+129
+00:11:35.130 --> 00:11:38.688
+So in the context of routes,
+it seems like we could do both, but
+
+130
+00:11:38.688 --> 00:11:41.996
+one is extremely general and
+the other is route specific.
+
+131
+00:11:44.483 --> 00:11:52.340
+&gt;&gt; Speaker 3: [INAUDIBLE]
+
+132
+00:11:52.340 --> 00:11:54.722
+&gt;&gt; Mike North: You're asking me to
+
+133
+00:11:54.722 --> 00:11:59.769
+speculate on something that's currently
+
+134
+00:11:59.769 --> 00:12:05.807
+in a polar class and
+like it could turn out that way.
+
+135
+00:12:05.807 --> 00:12:10.137
+Controllers right now have
+direct access to the store.
+
+136
+00:12:10.137 --> 00:12:15.490
+And I think the paradigm is going to be,
+provide a mechanism for
+
+137
+00:12:15.490 --> 00:12:20.480
+injecting behavior onto
+components that might need it.
+
+138
+00:12:20.480 --> 00:12:23.690
+Like inject the store as
+a service onto component.
+
+139
+00:12:23.690 --> 00:12:28.291
+Rather than just a blanket access because
+many components don't need any knowledge
+
+140
+00:12:28.291 --> 00:12:28.808
+of that,
+
+141
+00:12:28.808 --> 00:12:32.638
+only the top level routed components.
+&gt;&gt; Speaker 3: So when you're talking
+
+142
+00:12:32.638 --> 00:12:36.324
+about the store that's the [INAUDIBLE]
+&gt;&gt; Mike North: The store?
+
+143
+00:12:36.324 --> 00:12:39.295
+&gt;&gt; Speaker 3: It's however data is
+
+144
+00:12:39.295 --> 00:12:45.417
+exposed, is it gets injected [INAUDIBLE]
+&gt;&gt; Mike North: Actually
+
+145
+00:12:45.417 --> 00:12:48.560
+all of the frameworks use the same thing.
+
+146
+00:12:48.560 --> 00:12:51.010
+In Flux you have a store.
+
+147
+00:12:52.710 --> 00:12:54.900
+In Ember data you have a store.
+
+148
+00:12:54.900 --> 00:12:56.640
+In Angular data you have a store.
+
+149
+00:12:56.640 --> 00:13:01.130
+And the idea is, especially if you
+have some sort of caching solution,
+
+150
+00:13:01.130 --> 00:13:04.430
+you want a central place to
+be able to request records
+
+151
+00:13:04.430 --> 00:13:08.180
+of a given type to create new records
+that originate on the client.
+
+152
+00:13:08.180 --> 00:13:12.610
+We'll get into all of that tomorrow
+when we dive into Ember data.
+

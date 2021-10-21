@@ -1,0 +1,965 @@
+WEBVTT
+
+1
+00:00:00.008 --> 00:00:04.140
+I just wanna talk about what kinds of
+things make sense to store in LevelDB, and
+
+2
+00:00:04.140 --> 00:00:05.350
+what kinds of things don't.
+
+3
+00:00:05.350 --> 00:00:07.404
+And we'll whip up a fun demo.
+
+4
+00:00:07.404 --> 00:00:11.182
+I think we'll do image hosting service or
+something,
+
+5
+00:00:11.182 --> 00:00:16.356
+cuz that's a good example to kinda
+demonstrate the basic pattern of having
+
+6
+00:00:16.356 --> 00:00:22.120
+Blob Storage separate from your local DB
+that can do things like storing metadata.
+
+7
+00:00:24.720 --> 00:00:30.290
+So if you have things like images or
+media files, or big arrays,
+
+8
+00:00:30.290 --> 00:00:35.440
+or whatever, things that
+are kind of static in character,
+
+9
+00:00:35.440 --> 00:00:37.630
+it's usually best not to
+put those in LevelDB.
+
+10
+00:00:37.630 --> 00:00:41.060
+It's good to stick them in another
+kind of secondary storage.
+
+11
+00:00:41.060 --> 00:00:43.250
+They might be backed by the same things,
+like in the browser.
+
+12
+00:00:43.250 --> 00:00:45.250
+Of course,
+all you have to work with this IndexedDB.
+
+13
+00:00:45.250 --> 00:00:47.070
+But there's wrappers.
+
+14
+00:00:47.070 --> 00:00:50.351
+There's a package called
+idb-content-addressable-blob-store, for
+
+15
+00:00:50.351 --> 00:00:51.565
+example, that you can use.
+
+16
+00:00:51.565 --> 00:00:53.805
+Or if you're node,
+you can use this package,
+
+17
+00:00:53.805 --> 00:00:57.885
+whichever they like called
+content-addressable-blob-store.
+
+18
+00:00:57.885 --> 00:01:01.834
+Which, you just write data to it,
+you call createReadStream, or
+
+19
+00:01:01.834 --> 00:01:04.015
+createReadStream function.
+
+20
+00:01:04.015 --> 00:01:08.115
+You pump a bunch of data into it,
+which is gonna live on the file system.
+
+21
+00:01:08.115 --> 00:01:12.205
+And it gives you back a hash of
+the content, and you can use that hash to,
+
+22
+00:01:16.690 --> 00:01:21.328
+To store a reference to that
+document in your LevelDB data,
+
+23
+00:01:21.328 --> 00:01:24.650
+which is gonna be a lot smaller.
+
+24
+00:01:24.650 --> 00:01:27.776
+There's also some other fun blobstore
+modules like torrent-blob-store.
+
+25
+00:01:27.776 --> 00:01:32.480
+So you can put files onto BitTorrent
+with a really tiny node package.
+
+26
+00:01:32.480 --> 00:01:35.940
+That's all pure JavaScript that
+speaks the BitTorrent protocol.
+
+27
+00:01:37.040 --> 00:01:38.033
+And it's pretty good.
+
+28
+00:01:38.033 --> 00:01:40.540
+I recommend if you wanna
+swap out any of the content.
+
+29
+00:01:40.540 --> 00:01:42.746
+I'm gonna be using
+a content-addressable-blob-store for
+
+30
+00:01:42.746 --> 00:01:43.290
+the next demo.
+
+31
+00:01:43.290 --> 00:01:47.640
+But if you want to have a project, you
+can swap that out with the torrent store,
+
+32
+00:01:47.640 --> 00:01:48.769
+and then it will live on BitTorrent.
+
+33
+00:01:50.120 --> 00:01:54.949
+There's also packages like hypercore,
+which is part of the DOT project, and
+
+34
+00:01:54.949 --> 00:01:57.740
+hypercore is actually
+also a log structure.
+
+35
+00:01:57.740 --> 00:02:00.440
+It has kind of a basic cap
+architecture behind the scenes.
+
+36
+00:02:00.440 --> 00:02:02.340
+We'll look maybe a little
+more at that later.
+
+37
+00:02:02.340 --> 00:02:07.040
+But okay, so let's make another demo.
+
+38
+00:02:07.040 --> 00:02:07.950
+I'll call this blob.
+
+39
+00:02:10.450 --> 00:02:14.396
+Maybe we'll write a little
+commandline program to populate
+
+40
+00:02:14.396 --> 00:02:16.183
+a database with some data.
+
+41
+00:02:16.183 --> 00:02:20.800
+And then maybe we'll write a little server
+that will just display some of this data.
+
+42
+00:02:20.800 --> 00:02:26.140
+Okay, so the first thing that we can
+do is make a little program that
+
+43
+00:02:26.140 --> 00:02:32.190
+can add records to our database.
+
+44
+00:02:32.190 --> 00:02:36.890
+So we could also do something with
+batching up secondary indexes and
+
+45
+00:02:36.890 --> 00:02:39.740
+stuff, but
+I'm just gonna skip that kind of features.
+
+46
+00:02:39.740 --> 00:02:41.930
+This is gonna be pretty simple.
+
+47
+00:02:41.930 --> 00:02:44.880
+And we'll also use the
+package-content-addressable-blob-store to
+
+48
+00:02:44.880 --> 00:02:45.710
+put the data in there.
+
+49
+00:02:45.710 --> 00:02:51.560
+So call this one addimg.js,
+
+50
+00:02:51.560 --> 00:02:55.760
+and it'll take an image file as input,
+
+51
+00:02:55.760 --> 00:03:00.370
+maybe on standard in, or maybe on, yeah,
+standard in is good place to put that.
+
+52
+00:03:00.370 --> 00:03:04.582
+So what we're gonna do is we're
+gonna load this package-content
+
+53
+00:03:04.582 --> 00:03:06.546
+addressable-blob-store.
+
+54
+00:03:06.546 --> 00:03:09.809
+We're also gonna load LevelDB,
+like normal.
+
+55
+00:03:12.209 --> 00:03:17.846
+And we're gonna instantiate
+our call it img.db, whatever.
+
+56
+00:03:20.041 --> 00:03:21.780
+And valueEncoding: json.
+
+57
+00:03:25.270 --> 00:03:29.555
+Okay, so If we look at the readme for
+
+58
+00:03:29.555 --> 00:03:34.260
+content-addressable-blob-store, you
+can see that
+
+59
+00:03:34.260 --> 00:03:38.600
+all that you need to do is you require it,
+and then you give it a place to live.
+
+60
+00:03:38.600 --> 00:03:42.690
+So it's a similar kind of
+API to LevelDB itself.
+
+61
+00:03:42.690 --> 00:03:44.740
+Then you can call
+a createWriteStream method,
+
+62
+00:03:44.740 --> 00:03:48.000
+and you get a key that you can use.
+
+63
+00:03:48.000 --> 00:03:51.460
+So what we're gonna do,
+I'll just test out.
+
+64
+00:03:52.750 --> 00:03:57.286
+First, we need to give it,
+call it img.blob.
+
+65
+00:03:57.286 --> 00:04:01.767
+So there's gonna be img.db, that's gonna
+be our LevelDB storage in this directory.
+
+66
+00:04:01.767 --> 00:04:05.610
+And img.blob, that's gonna be
+the location of our image data.
+
+67
+00:04:07.140 --> 00:04:12.340
+Okay, so we're gonna have an image
+coming in on process.stdin.
+
+68
+00:04:12.340 --> 00:04:18.315
+We can pipe it to
+a blob.store.createWriteStream.
+
+69
+00:04:21.710 --> 00:04:25.894
+I believe you can give it a callback, and
+
+70
+00:04:25.894 --> 00:04:29.719
+we've gotta save that to variable.
+
+71
+00:04:32.310 --> 00:04:35.583
+So we can either listen for
+a finished event, which is
+
+72
+00:04:35.583 --> 00:04:41.350
+a property on all writable streams, or
+we can I think passing a callback here.
+
+73
+00:04:41.350 --> 00:04:43.940
+So I'll try it with a callback.
+
+74
+00:04:43.940 --> 00:04:47.804
+And so if there's an error,
+we wanna know about it.
+
+75
+00:04:47.804 --> 00:04:54.351
+Otherwise, we wanna, for now,
+I'll just print out the key.
+
+76
+00:04:54.351 --> 00:04:56.535
+So we can make sure that this part works,
+
+77
+00:04:56.535 --> 00:04:59.210
+before we add in the part
+that writes to LevelDB.
+
+78
+00:04:59.210 --> 00:05:01.370
+So I could do console.log.w.key.
+
+79
+00:05:02.810 --> 00:05:08.870
+Okay, and then not an image, but I'll just
+add in this file, just to make sure, yeah.
+
+80
+00:05:08.870 --> 00:05:13.680
+And then I think whatever
+kinda SHA that is, 256 maybe.
+
+81
+00:05:16.390 --> 00:05:21.840
+Yeah, so this is just SHA-256
+of that file is the address.
+
+82
+00:05:21.840 --> 00:05:26.079
+So we're gonna put this
+hash into our database.
+
+83
+00:05:27.430 --> 00:05:32.400
+And then if we provide the hash as
+input to a createReadStream function,
+
+84
+00:05:32.400 --> 00:05:33.840
+we can get that data back out again.
+
+85
+00:05:34.910 --> 00:05:37.366
+Although, now we've got
+some garbage in there.
+
+86
+00:05:37.366 --> 00:05:40.570
+Cuz we're gonna wanna
+store images in here,
+
+87
+00:05:40.570 --> 00:05:45.430
+not just like any old file, gonna delete
+those, and we can get back to our program.
+
+88
+00:05:47.000 --> 00:05:49.910
+So what we wanna do is every
+time we have a new image,
+
+89
+00:05:49.910 --> 00:05:54.050
+we're gonna wanna call db.put
+with a key and a value.
+
+90
+00:05:54.050 --> 00:05:58.424
+So our key is gonna be something there,
+and
+
+91
+00:05:58.424 --> 00:06:01.712
+our value, there's an error.
+
+92
+00:06:01.712 --> 00:06:02.740
+We wanna know about it.
+
+93
+00:06:07.740 --> 00:06:10.123
+Well, I have a thing called that.
+
+94
+00:06:10.123 --> 00:06:15.100
+And we can use the w.key, which is
+a hex string to reference the data.
+
+95
+00:06:15.100 --> 00:06:20.912
+And maybe we wanna store some other
+kinds of documents, like the timestamp.
+
+96
+00:06:20.912 --> 00:06:24.762
+So date that now is a handy thing to do,
+to put that in a value.
+
+97
+00:06:24.762 --> 00:06:28.931
+If you want some ideas for
+how you might extend this example,
+
+98
+00:06:28.931 --> 00:06:33.180
+we could do the same thing that
+we did in the user post example,
+
+99
+00:06:33.180 --> 00:06:37.640
+where we have a secondary index for
+the timestamps or whatever.
+
+100
+00:06:37.640 --> 00:06:38.720
+Whatever, I think this is fine.
+
+101
+00:06:40.690 --> 00:06:45.080
+Okay, so now we've got our db.put, so
+
+102
+00:06:45.080 --> 00:06:49.470
+I ought to be able to add a file
+from my Photos directory.
+
+103
+00:06:49.470 --> 00:06:53.530
+I think I've got a photo of my cat,
+put it in there.
+
+104
+00:06:55.100 --> 00:06:59.540
+So now there should be some data
+in our database to play with.
+
+105
+00:06:59.540 --> 00:07:03.970
+So if we look in the blob directory,
+we can see that this is a similar trick
+
+106
+00:07:03.970 --> 00:07:07.488
+to what get uses if you've ever
+poked around in the bowels of .git.
+
+107
+00:07:07.488 --> 00:07:13.370
+I think in Objects, right?
+
+108
+00:07:13.370 --> 00:07:20.450
+So this is just a way of taking
+the first two digits in hexadecimal.
+
+109
+00:07:20.450 --> 00:07:23.860
+And using that to prefix,
+because of how file systems work,
+
+110
+00:07:23.860 --> 00:07:27.070
+it's actually really slow to have
+way too many files in a directory.
+
+111
+00:07:27.070 --> 00:07:32.000
+So this is a way of expanding
+the branch size to be 256 or something.
+
+112
+00:07:33.702 --> 00:07:38.694
+All right, anyways, so
+we can take our img.js script,
+
+113
+00:07:38.694 --> 00:07:42.854
+and we can modify it to
+maybe just print out all of
+
+114
+00:07:42.854 --> 00:07:47.853
+the hashes from our database now,
+so list-files.js.
+
+115
+00:07:49.660 --> 00:07:52.670
+Okay, so all of this can be the same.
+
+116
+00:07:52.670 --> 00:07:54.010
+It's just our setup.
+
+117
+00:07:54.010 --> 00:08:00.066
+But now we need to do
+store.createReadStream with that hash,
+
+118
+00:08:00.066 --> 00:08:04.775
+which we can get on as
+a commandline argument.
+
+119
+00:08:04.775 --> 00:08:09.230
+Sorry, that would be the reader function.
+
+120
+00:08:09.230 --> 00:08:14.520
+What we wanna do is db.createReadStream,
+
+121
+00:08:14.520 --> 00:08:18.150
+and then we can consume that stream,
+which is an object stream.
+
+122
+00:08:18.150 --> 00:08:19.258
+So do to.obj.
+
+123
+00:08:22.294 --> 00:08:27.630
+And then we're gonna get every record
+in the database, and just print it.
+
+124
+00:08:33.514 --> 00:08:37.990
+So here we see the key that we
+put in with the hex string.
+
+125
+00:08:37.990 --> 00:08:41.790
+And the timestamp could format
+it more pretty if we wanna,
+
+126
+00:08:41.790 --> 00:08:44.070
+but we don't have to do that.
+
+127
+00:08:44.070 --> 00:08:47.429
+Well, actually,
+I'm gonna just take the key and slice it.
+
+128
+00:08:49.200 --> 00:08:53.871
+Get a slice off the first bit, so
+that we just see the hex part.
+
+129
+00:08:57.383 --> 00:08:58.758
+Now, you can just be the same.
+
+130
+00:09:02.349 --> 00:09:03.160
+All right, there we go.
+
+131
+00:09:03.160 --> 00:09:04.690
+So we've got this hex string.
+
+132
+00:09:04.690 --> 00:09:09.669
+Now, it'd be pretty nice if we could
+also print out the contents for this.
+
+133
+00:09:09.669 --> 00:09:12.934
+So there's a method in
+content-addressable-blob-store
+
+134
+00:09:12.934 --> 00:09:15.390
+called createReadStream we can use for
+that.
+
+135
+00:09:15.390 --> 00:09:23.580
+So I'll say read file.js.
+
+136
+00:09:23.580 --> 00:09:26.505
+Now we can do store.createReadStream.
+
+137
+00:09:27.770 --> 00:09:31.146
+We don't actually have to do any
+LevelDB in this particular file,
+
+138
+00:09:31.146 --> 00:09:32.910
+because we can just take the hash.
+
+139
+00:09:38.146 --> 00:09:45.510
+Yeah, not require process.argv, and
+just type that to standard out.
+
+140
+00:09:49.940 --> 00:09:54.820
+So if we run that program with this hash,
+and then write it to a file,
+
+141
+00:09:57.840 --> 00:10:00.340
+if I open that file, there we go.
+
+142
+00:10:00.340 --> 00:10:00.920
+It's a cat.
+
+143
+00:10:00.920 --> 00:10:03.010
+That's pretty cool.
+
+144
+00:10:03.010 --> 00:10:07.010
+So let's turn this into a little
+web service, that'll be fun.
+
+145
+00:10:08.490 --> 00:10:12.800
+Okay, so we can take one of our
+existing files, maybe our list files,
+
+146
+00:10:12.800 --> 00:10:15.918
+because our server's also gonna have
+to have a list of the files and
+
+147
+00:10:15.918 --> 00:10:20.720
+call the server.js.
+
+148
+00:10:20.720 --> 00:10:25.394
+We need to load the HTTP module,
+in addition to all of
+
+149
+00:10:25.394 --> 00:10:31.364
+this other stuff,
+aAnd we can do http.createserver.
+
+150
+00:10:31.364 --> 00:10:32.741
+We get a request and response.
+
+151
+00:10:34.832 --> 00:10:40.643
+And then inside of our server,
+after we listen on a port,
+
+152
+00:10:40.643 --> 00:10:43.910
+we can maybe, on the main page,
+
+153
+00:10:43.910 --> 00:10:49.859
+we'll just have a really bare
+bones HTML output for this.
+
+154
+00:10:51.160 --> 00:10:55.690
+This data, otherwise,
+we can just say not found.
+
+155
+00:10:55.690 --> 00:10:57.082
+We won't even set the correct header.
+
+156
+00:10:57.082 --> 00:10:59.050
+I don't care that much.
+
+157
+00:10:59.050 --> 00:11:05.741
+Okay, so can we have our createReadStream,
+instead of two I can use through.
+
+158
+00:11:05.741 --> 00:11:10.720
+And we're gonna quickly pipe
+that out to the response.
+
+159
+00:11:10.720 --> 00:11:11.910
+&gt;&gt; Yeah, but that's [INAUDIBLE].
+
+160
+00:11:14.050 --> 00:11:14.550
+&gt;&gt; Which?
+
+161
+00:11:15.560 --> 00:11:16.624
+There's a two at the end of there.
+
+162
+00:11:16.624 --> 00:11:17.583
+&gt;&gt; Yeah.
+
+163
+00:11:17.583 --> 00:11:18.453
+&gt;&gt; Yeah, it's supposed to be like that.
+
+164
+00:11:18.453 --> 00:11:19.293
+&gt;&gt; Okay.
+
+165
+00:11:19.293 --> 00:11:23.196
+&gt;&gt; All right, so now,
+instead of doing console.log,
+
+166
+00:11:23.196 --> 00:11:27.877
+what we need to do is we can call
+our next function with a little bit
+
+167
+00:11:27.877 --> 00:11:31.110
+of HTML that we wanna send for
+every piece.
+
+168
+00:11:31.110 --> 00:11:37.060
+So you can use template strings,
+and node is a nice way to do that.
+
+169
+00:11:37.060 --> 00:11:38.490
+So we can have multiline output.
+
+170
+00:11:41.000 --> 00:11:46.487
+And then what we're gonna do is
+we're gonna use the same values.
+
+171
+00:11:46.487 --> 00:11:51.962
+But I guess we can have like an h1 tag,
+I don't know, I like h1 tags.
+
+172
+00:11:51.962 --> 00:11:53.930
+We can have the hash,
+that'll be the heading.
+
+173
+00:11:55.110 --> 00:12:00.440
+And then we can have an img tag
+
+174
+00:12:00.440 --> 00:12:07.070
+that will refer to another URL that we
+can specify that will load the data.
+
+175
+00:12:07.070 --> 00:12:11.666
+So image/, and then the hash,
+
+176
+00:12:11.666 --> 00:12:15.591
+which is gonna be this bit.
+
+177
+00:12:17.789 --> 00:12:25.880
+Actually, we're already doing the hash
+of the content in the image src.
+
+178
+00:12:25.880 --> 00:12:28.309
+So why don't I put
+the timestamp in the h1?
+
+179
+00:12:31.141 --> 00:12:34.622
+Beautifully formatted as a number [LAUGH].
+
+180
+00:12:34.622 --> 00:12:38.890
+All right, so
+that looks like in order to work.
+
+181
+00:12:40.900 --> 00:12:42.378
+We're gonna just be able to run this.
+
+182
+00:12:42.378 --> 00:12:43.600
+It's gonna show us a broken image,
+
+183
+00:12:43.600 --> 00:12:45.493
+because we haven't implemented
+the image right yet.
+
+184
+00:12:45.493 --> 00:12:50.260
+But we can do that really quick,
+and then it'd be a fun little demo.
+
+185
+00:12:50.260 --> 00:12:55.470
+So if everything's working, you should
+be able to go to localhost 5000.
+
+186
+00:12:55.470 --> 00:12:58.940
+And indeed, there is a timestamp and
+a broken image.
+
+187
+00:12:58.940 --> 00:13:04.110
+So let's go ahead and implement that
+route that image are to live on.
+
+188
+00:13:04.110 --> 00:13:10.290
+And then we'll have a nifty little example
+using LevelDB in a blob storage module.
+
+189
+00:13:12.120 --> 00:13:19.860
+So I'm just gonna reuse regex really fast
+to test if the URL starts with image.
+
+190
+00:13:19.860 --> 00:13:25.830
+So it's gonna be /image/ test(req.url).
+
+191
+00:13:25.830 --> 00:13:28.670
+If you wanna use a router,
+I like to use the package called routes.
+
+192
+00:13:28.670 --> 00:13:31.370
+A lot more in this stuff tomorrow,
+but for the time being.
+
+193
+00:13:32.950 --> 00:13:37.630
+So if we have a request for
+image, we need to call store.
+
+194
+00:13:38.790 --> 00:13:42.550
+createReadStream with that hash.
+
+195
+00:13:42.550 --> 00:13:47.780
+So we need to cut off the first
+part to get the hash,
+
+196
+00:13:47.780 --> 00:13:49.870
+which we can do with another regex.
+
+197
+00:13:49.870 --> 00:13:53.790
+So reg.url.replace,
+whatever that is with nothing.
+
+198
+00:13:55.688 --> 00:13:57.550
+And then createReadStream for hash, and
+
+199
+00:13:57.550 --> 00:14:02.230
+just pipe it into the response
+after we set a content type header.
+
+200
+00:14:05.620 --> 00:14:07.080
+I'll just always say it's a JPEG,
+
+201
+00:14:07.080 --> 00:14:09.701
+even though it's probably
+not always gonna be one.
+
+202
+00:14:10.770 --> 00:14:15.340
+Once we do that, there we go.
+
+203
+00:14:15.340 --> 00:14:19.350
+It's really big, but
+that's a picture of a cat.
+
+204
+00:14:19.350 --> 00:14:22.920
+And can add more images
+using the image script, or
+
+205
+00:14:22.920 --> 00:14:26.180
+we could implement a put request,
+or whatever.
+
+206
+00:14:26.180 --> 00:14:30.212
+But I think you get the basic idea of how
+you can string some stuff together with
+
+207
+00:14:30.212 --> 00:14:35.790
+LevelDB, and
+different kinds of binary storage modules.
+

@@ -1,0 +1,857 @@
+WEBVTT
+
+1
+00:00:00.030 --> 00:00:03.120
+&gt;&gt; Kyle Simpson: There's another
+nuance to this life cycle.
+
+2
+00:00:03.120 --> 00:00:06.080
+And if you're starting to get a little bit
+
+3
+00:00:06.080 --> 00:00:10.520
+overwhelmed by all these life cycle
+nuances, you're in good company.
+
+4
+00:00:10.520 --> 00:00:13.790
+It's a lot more complex than it was
+with just a regular web worker.
+
+5
+00:00:13.790 --> 00:00:17.650
+The web workers there and then the web
+worker's dead and then it's back and
+
+6
+00:00:17.650 --> 00:00:18.670
+then it's dead.
+
+7
+00:00:18.670 --> 00:00:22.680
+There's a lot of complexity here, and
+it's because of all the things that we're
+
+8
+00:00:22.680 --> 00:00:26.670
+potentially breaking about web experience
+by installing a service worker.
+
+9
+00:00:26.670 --> 00:00:30.530
+We have to be able to allow the author
+of the service worker to handle
+
+10
+00:00:30.530 --> 00:00:35.000
+all the different cases, and
+that's the reason for this complexity.
+
+11
+00:00:35.000 --> 00:00:41.660
+But your service worker being
+activated does not mean that,
+
+12
+00:00:43.240 --> 00:00:48.620
+like when we did the self.skip waiting, it
+doesn't mean that a page that was talking
+
+13
+00:00:48.620 --> 00:00:52.990
+to the old service worker immediately
+knows about the new service worker.
+
+14
+00:00:53.990 --> 00:00:55.800
+So you may have a page instance for
+example,
+
+15
+00:00:55.800 --> 00:00:59.310
+imagine you had three tabs open and
+you've loaded up a new tab and
+
+16
+00:00:59.310 --> 00:01:01.560
+we've said skip waiting,
+I've got this new service worker.
+
+17
+00:01:01.560 --> 00:01:05.920
+But what about those other two tabs that
+are still thinking they're talking to and
+
+18
+00:01:05.920 --> 00:01:09.020
+controlled by that old service worker,
+which is now gone.
+
+19
+00:01:09.020 --> 00:01:13.110
+So one of the complexities that we need
+to handle is we essentially need to tell
+
+20
+00:01:13.110 --> 00:01:15.170
+the page, hey, I'm controlling you now.
+
+21
+00:01:15.170 --> 00:01:18.420
+And this is what actually fires
+that controller change event that
+
+22
+00:01:18.420 --> 00:01:19.820
+we've talked about.
+
+23
+00:01:19.820 --> 00:01:25.360
+And the way we do that
+is called clients.claim.
+
+24
+00:01:25.360 --> 00:01:29.490
+Clients is plural because it's basically
+saying go find all my clients.
+
+25
+00:01:29.490 --> 00:01:34.000
+This is actually an API that
+you could cycle through all of
+
+26
+00:01:34.000 --> 00:01:38.730
+the connected clients and do this for
+only some of them if you really cared.
+
+27
+00:01:38.730 --> 00:01:41.670
+I can't imagine any use case why
+you wouldn't wanna claim all
+
+28
+00:01:41.670 --> 00:01:44.860
+of the open clients, but
+maybe there's some things there.
+
+29
+00:01:44.860 --> 00:01:46.360
+Just for the consistency of it,
+
+30
+00:01:46.360 --> 00:01:51.270
+since this has not activated until
+after we have claimed all of these,
+
+31
+00:01:51.270 --> 00:01:56.330
+and that is an asynchronous event,
+we're gonna await the clients.claim,
+
+32
+00:01:56.330 --> 00:01:59.230
+and then that's when we're gonna print
+the service worker is activated.
+
+33
+00:02:00.730 --> 00:02:04.120
+This one doesn't need to be
+in a sync function anymore.
+
+34
+00:02:04.120 --> 00:02:07.150
+You can leave it as one if you
+like the consistency of it.
+
+35
+00:02:07.150 --> 00:02:12.580
+But the reason and this is a little
+nuance of the way promises work.
+
+36
+00:02:12.580 --> 00:02:17.810
+But the reason that we need this is that
+we need a promise to pass to this thing.
+
+37
+00:02:17.810 --> 00:02:22.540
+And we can't really construct unless
+you did it the manual way like making,
+
+38
+00:02:22.540 --> 00:02:26.570
+like doing a new promise that's passed
+in and then doing the work inside of it.
+
+39
+00:02:26.570 --> 00:02:29.680
+We can't really have this thing
+being an async function and
+
+40
+00:02:29.680 --> 00:02:32.960
+say event that wait until myself.
+
+41
+00:02:32.960 --> 00:02:36.620
+So that's why I have it in a separate
+function called handleActivation
+
+42
+00:02:36.620 --> 00:02:38.990
+that can do all of my asynchronous stuff.
+
+43
+00:02:38.990 --> 00:02:42.570
+And I get one promise that rolls up all
+that behavior and says that's all done.
+
+44
+00:02:42.570 --> 00:02:45.170
+So that's the reason for
+splitting this out.
+
+45
+00:02:45.170 --> 00:02:49.320
+I've heard other people say that they like
+to do inline async function expressions
+
+46
+00:02:49.320 --> 00:02:51.220
+here, like an async iffy.
+
+47
+00:02:52.360 --> 00:02:56.860
+I just like to have stand alone function
+declaration, which is why I did it here.
+
+48
+00:02:56.860 --> 00:03:01.790
+But you could either do that or
+just do an inline async if that's
+
+49
+00:03:01.790 --> 00:03:06.040
+more of your style.
+
+50
+00:03:06.040 --> 00:03:09.590
+Okay, well I think that's it for
+setting up our service worker.
+
+51
+00:03:09.590 --> 00:03:16.990
+So let's actually try it, let's check and
+see if we can make this work.
+
+52
+00:03:19.170 --> 00:03:20.810
+Make sure your files are saved.
+
+53
+00:03:21.860 --> 00:03:26.260
+Come over here to the browser and
+before you actually refresh the page,
+
+54
+00:03:26.260 --> 00:03:31.120
+I wanna direct you to the application
+tab in your developer tools.
+
+55
+00:03:31.120 --> 00:03:33.870
+This is where you're going
+to spend a lot of time when
+
+56
+00:03:33.870 --> 00:03:35.310
+you're working on service workers.
+
+57
+00:03:35.310 --> 00:03:37.220
+And there's a couple of
+things to point out.
+
+58
+00:03:37.220 --> 00:03:39.671
+There's a service workers item here and
+
+59
+00:03:39.671 --> 00:03:42.704
+you'll notice that there's
+three check marks.
+
+60
+00:03:42.704 --> 00:03:47.220
+These are ones that you can control
+the service worker behavior for.
+
+61
+00:03:48.920 --> 00:03:50.870
+We're not going to get too much into them.
+
+62
+00:03:50.870 --> 00:03:53.370
+There's a lot of Chrome documentation
+
+63
+00:03:53.370 --> 00:03:56.540
+in some of those links that I
+pointed you to and the readme.
+
+64
+00:03:56.540 --> 00:04:00.700
+There's a lot of documentation
+about the implications of this.
+
+65
+00:04:00.700 --> 00:04:03.770
+The reason I don't use this one very much
+
+66
+00:04:05.180 --> 00:04:07.750
+is because it's really
+easy to leave that on.
+
+67
+00:04:07.750 --> 00:04:10.200
+And then you're trying to do something
+with your service worker and
+
+68
+00:04:10.200 --> 00:04:13.950
+nothing's happening and
+you forgot this check mark was on.
+
+69
+00:04:13.950 --> 00:04:18.950
+I literally wasted like three days one
+time on a project where I was like,
+
+70
+00:04:18.950 --> 00:04:22.550
+why is this stuff not,
+I'm updating my service worker.
+
+71
+00:04:22.550 --> 00:04:24.400
+I can see the new service worker.
+
+72
+00:04:24.400 --> 00:04:27.170
+Why isn't it doing what
+I want with this item?
+
+73
+00:04:27.170 --> 00:04:29.790
+And then it was because I
+had this check mark on and
+
+74
+00:04:29.790 --> 00:04:31.370
+the browser was just bypassing it.
+
+75
+00:04:31.370 --> 00:04:33.090
+So use it with caution and
+
+76
+00:04:33.090 --> 00:04:37.280
+make sure to remember you turn
+on something like that mode.
+
+77
+00:04:38.750 --> 00:04:43.290
+This one I'm pretty sure is
+now a defunct option because
+
+78
+00:04:43.290 --> 00:04:47.710
+I believe that is the default now,
+that it always updates service worker.
+
+79
+00:04:47.710 --> 00:04:50.220
+It used to be that it
+used the browser cache,
+
+80
+00:04:50.220 --> 00:04:51.730
+now I'm pretty sure it
+does it all the time.
+
+81
+00:04:51.730 --> 00:04:54.070
+So, I don't even think we
+need that check mark anymore.
+
+82
+00:04:54.070 --> 00:04:59.058
+And this one is not one I've ever
+used because I use the network tab
+
+83
+00:04:59.058 --> 00:05:04.150
+to force offline, but this can force just
+your service worker into an offline mode.
+
+84
+00:05:04.150 --> 00:05:08.900
+I've never needed my service worker
+offline, but my browser online.
+
+85
+00:05:08.900 --> 00:05:14.270
+But that may be an use
+case you might need.
+
+86
+00:05:14.270 --> 00:05:16.750
+When your service worker
+has installed itself,
+
+87
+00:05:16.750 --> 00:05:19.730
+there's gonna be a bunch of stuff
+that we see here that we don't see.
+
+88
+00:05:19.730 --> 00:05:23.560
+And when we start adding items to our
+cache, it's gonna be listed here and
+
+89
+00:05:23.560 --> 00:05:26.740
+there's a few of these other ones
+that we'll end up looking at later.
+
+90
+00:05:26.740 --> 00:05:27.900
+By the way, if you never knew,
+
+91
+00:05:27.900 --> 00:05:31.620
+this is where you can inspect any
+items in local storage on a page.
+
+92
+00:05:31.620 --> 00:05:35.980
+So, application tab is actually
+a pretty important tab to check out.
+
+93
+00:05:35.980 --> 00:05:39.490
+Anyway, let's go back to our console.
+
+94
+00:05:39.490 --> 00:05:41.230
+Well actually,
+
+95
+00:05:41.230 --> 00:05:45.370
+let's stay on the application tab and
+let's go load our page.
+
+96
+00:05:47.670 --> 00:05:56.070
+Let's do a refresh and now, we see that
+we have a service worker installed.
+
+97
+00:05:56.070 --> 00:06:01.390
+It's given a unique ID, which if you
+are doing a lot of rapid updates you might
+
+98
+00:06:01.390 --> 00:06:04.090
+pay attention to that changing,
+and if you don't see that
+
+99
+00:06:04.090 --> 00:06:07.240
+number changing it's because your
+service worker isn't getting installed.
+
+100
+00:06:08.260 --> 00:06:11.538
+One thing to know is if you have
+an error in a service worker,
+
+101
+00:06:11.538 --> 00:06:16.390
+you definitely will get
+a message in your console.
+
+102
+00:06:16.390 --> 00:06:20.660
+But it's real easy, if you've got a bunch
+of console messages, to miss that stuff.
+
+103
+00:06:20.660 --> 00:06:24.150
+So one thing you wanna have like
+an eagle eye attention to is,
+
+104
+00:06:24.150 --> 00:06:26.260
+if you're trying to make a change
+to your service worker and
+
+105
+00:06:26.260 --> 00:06:30.300
+it doesn't seem to be taking, it might
+be because it's not loading at all.
+
+106
+00:06:30.300 --> 00:06:34.070
+The protocol for service workers is
+if there's any error on installation,
+
+107
+00:06:34.070 --> 00:06:37.220
+it throws that service worker away and
+keeps the old one.
+
+108
+00:06:37.220 --> 00:06:41.470
+So I've had this happen where I've been
+trying to make a change and I didn't
+
+109
+00:06:41.470 --> 00:06:45.610
+realize there was some syntax error that
+was causing it to never get installed.
+
+110
+00:06:45.610 --> 00:06:47.900
+So, just be aware of that.
+
+111
+00:06:47.900 --> 00:06:52.050
+Remember, I said the idea that we can
+mess around with our service workers.
+
+112
+00:06:52.050 --> 00:06:56.680
+One of the things that we can do is
+start and stop our service workers.
+
+113
+00:06:56.680 --> 00:06:59.970
+Before you click that though,
+let's go to our console.
+
+114
+00:06:59.970 --> 00:07:06.360
+And see that we saw service worker version
+1 is starting, installed, and activating.
+
+115
+00:07:06.360 --> 00:07:10.520
+But now, let's come back to our
+Application tab and click Stop.
+
+116
+00:07:10.520 --> 00:07:13.670
+That's mimicking what might have
+happened if the browser decided,
+
+117
+00:07:13.670 --> 00:07:15.740
+I don't need the service worker anymore.
+
+118
+00:07:15.740 --> 00:07:21.010
+And then if we click Start again,
+it's like then coming back to a page or
+
+119
+00:07:21.010 --> 00:07:23.710
+reviving a page that was already open.
+
+120
+00:07:23.710 --> 00:07:26.160
+And you'll notice that when
+we go back to the console,
+
+121
+00:07:26.160 --> 00:07:29.980
+we got another indication of
+that service worker is starting.
+
+122
+00:07:29.980 --> 00:07:32.600
+So we didn't really go through
+the installation and activation but
+
+123
+00:07:32.600 --> 00:07:36.209
+we did redo any of our
+starting initialization stuff.
+
+124
+00:07:37.460 --> 00:07:40.370
+So beware of what that means for
+the status of things.
+
+125
+00:07:40.370 --> 00:07:44.200
+If you have something that you
+need to persist across those,
+
+126
+00:07:44.200 --> 00:07:48.880
+you're gonna have to store it somewhere,
+like for example in index db.
+
+127
+00:07:48.880 --> 00:07:51.080
+This is a little bit strange,
+I don't know why, but
+
+128
+00:07:51.080 --> 00:07:54.390
+service workers don't have
+access to local storage.
+
+129
+00:07:54.390 --> 00:07:56.530
+So you can't store stuff in local storage,
+
+130
+00:07:56.530 --> 00:08:01.200
+but they do have index db and
+you can store stuff in index db, okay?
+
+131
+00:08:01.200 --> 00:08:04.410
+So if you do have a piece of state that
+you need to store across indications of
+
+132
+00:08:04.410 --> 00:08:06.820
+your service worker, remember that.
+
+133
+00:08:06.820 --> 00:08:10.435
+But if you start doing persistent storage
+remember that you need to be cleaning up
+
+134
+00:08:10.435 --> 00:08:13.622
+after yourself for you to eventually
+run the browser out of its quota and
+
+135
+00:08:13.622 --> 00:08:15.553
+then you won't be able to store anything.
+
+136
+00:08:19.503 --> 00:08:23.910
+&gt;&gt; Kyle Simpson: Okay, so now we have
+our first service worker written.
+
+137
+00:08:23.910 --> 00:08:26.120
+It's not doing anything
+particularly interesting yet,
+
+138
+00:08:26.120 --> 00:08:28.570
+but give yourselves a pat on the back.
+
+139
+00:08:28.570 --> 00:08:30.980
+You've now written your
+first service worker.
+
+140
+00:08:30.980 --> 00:08:33.000
+Any questions before we move on?
+
+141
+00:08:34.190 --> 00:08:37.190
+&gt;&gt; Speaker 2: I noticed you don't tend to
+use arrow functions very often or at all.
+
+142
+00:08:37.190 --> 00:08:38.700
+Is there a reason for that?
+
+143
+00:08:38.700 --> 00:08:41.660
+Does it cause a lot of issues or
+is it not compliant or?
+
+144
+00:08:41.660 --> 00:08:44.290
+&gt;&gt; Kyle Simpson: I glad you said that
+at all because I don't use arrow
+
+145
+00:08:44.290 --> 00:08:45.560
+functions at all.
+
+146
+00:08:45.560 --> 00:08:47.070
+&gt;&gt; Speaker 2: Okay, [LAUGH]
+&gt;&gt; Kyle Simpson: Yeah,
+
+147
+00:08:47.070 --> 00:08:49.230
+I'm very much not a fan
+of arrow functions.
+
+148
+00:08:49.230 --> 00:08:50.070
+&gt;&gt; Speaker 2: Okay.
+&gt;&gt; Kyle Simpson: And the reasons for
+
+149
+00:08:50.070 --> 00:08:52.270
+that are outside of our
+discussion scope here,
+
+150
+00:08:52.270 --> 00:08:54.370
+but it's essentially a readability thing.
+
+151
+00:08:54.370 --> 00:08:56.160
+It's an anonymous function expression and
+
+152
+00:08:56.160 --> 00:08:59.990
+I think it communicates less
+than when a named function.
+
+153
+00:08:59.990 --> 00:09:02.000
+When I have a function with a name.
+
+154
+00:09:02.000 --> 00:09:06.550
+So this could have been like an anonymous
+arrow expression iffy thing.
+
+155
+00:09:06.550 --> 00:09:10.250
+But the fact that I want to tell
+you that it's handling activation
+
+156
+00:09:10.250 --> 00:09:12.630
+I think that name makes
+my code more readable.
+
+157
+00:09:12.630 --> 00:09:16.220
+So I'll use function declarations when
+they're gonna be multiple lines and
+
+158
+00:09:16.220 --> 00:09:17.320
+this one is.
+
+159
+00:09:17.320 --> 00:09:21.470
+Or if it's just gonna be a one liner I'll
+do an in line function expression but
+
+160
+00:09:21.470 --> 00:09:22.470
+I still give it a name.
+
+161
+00:09:22.470 --> 00:09:23.500
+&gt;&gt; Speaker 2: Got you.
+
+162
+00:09:23.500 --> 00:09:25.720
+&gt;&gt; Kyle Simpson: Because in my mind,
+every function,
+
+163
+00:09:25.720 --> 00:09:28.010
+if it exists in your
+program it has a purpose.
+
+164
+00:09:28.010 --> 00:09:32.050
+And if it has a purpose it has a name, and
+the user shouldn't have to read the code
+
+165
+00:09:32.050 --> 00:09:34.220
+in the function to
+figure out it's purpose.
+
+166
+00:09:34.220 --> 00:09:35.740
+You should just tell
+them what the purpose is.
+
+167
+00:09:35.740 --> 00:09:37.940
+&gt;&gt; Speaker 2: So it's a readability
+constraint, not a technical constraint.
+
+168
+00:09:37.940 --> 00:09:38.440
+&gt;&gt; Kyle Simpson: It is, yeah.
+&gt;&gt; Speaker 2: Okay.
+
+169
+00:09:38.440 --> 00:09:39.250
+&gt;&gt; Kyle Simpson: Well there are technical
+
+170
+00:09:39.250 --> 00:09:42.370
+reasons why arrow functions may or
+may not be what you want.
+
+171
+00:09:42.370 --> 00:09:43.310
+&gt;&gt; Speaker 2: Okay.
+&gt;&gt; Kyle Simpson: There are technical
+
+172
+00:09:43.310 --> 00:09:46.870
+behaviors like with this keyword,
+but my primary reason for
+
+173
+00:09:46.870 --> 00:09:51.900
+generally avoiding them is I don't
+like to have poor readability.
+
+174
+00:09:51.900 --> 00:09:52.400
+&gt;&gt; Speaker 2: Okay.
+
+175
+00:09:54.670 --> 00:09:58.560
+In blog JS, the IT Service Worker function
+
+176
+00:09:58.560 --> 00:10:01.379
+that needs to be asynchronous
+because the register method?
+
+177
+00:10:02.390 --> 00:10:04.750
+&gt;&gt; Kyle Simpson: Because we're
+doing an await right here.
+
+178
+00:10:04.750 --> 00:10:05.993
+&gt;&gt; Speaker 2: Okay, and that-
+&gt;&gt; Kyle Simpson: The register method
+
+179
+00:10:05.993 --> 00:10:08.489
+is asynchronous, and
+we wanna wait on that before moving on.
+

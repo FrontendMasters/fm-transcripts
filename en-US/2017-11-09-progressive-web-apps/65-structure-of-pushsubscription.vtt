@@ -1,0 +1,343 @@
+WEBVTT
+
+1
+00:00:00.520 --> 00:00:02.370
+&gt;&gt; Mike North: Here's what
+a PushSubscription looks like.
+
+2
+00:00:02.370 --> 00:00:04.700
+It's got an endpoint and some keys.
+
+3
+00:00:04.700 --> 00:00:10.450
+The end point as you might suspect tells
+us that this is probably from Chrome or
+
+4
+00:00:10.450 --> 00:00:13.270
+from an Android device maybe, right?
+
+5
+00:00:13.270 --> 00:00:15.790
+Because that's telling us
+where to send this thing,
+
+6
+00:00:15.790 --> 00:00:18.090
+it's sort of part of the routing.
+
+7
+00:00:18.090 --> 00:00:24.150
+The key section here helps to push server
+
+8
+00:00:24.150 --> 00:00:29.970
+understand that we do have permission
+to send this user a notification.
+
+9
+00:00:29.970 --> 00:00:33.430
+So you're gonna need to send both
+of those along for the ride.
+
+10
+00:00:33.430 --> 00:00:35.920
+Now, this is all done for
+you behind the scenes.
+
+11
+00:00:35.920 --> 00:00:38.906
+The server side is not something
+we're going to tackle today.
+
+12
+00:00:38.906 --> 00:00:44.210
+But we're gonna deal with kind of the
+typical front end responsibility, which is
+
+13
+00:00:44.210 --> 00:00:49.020
+asking for permission, getting that
+PushSubscription, sending it to an API so
+
+14
+00:00:49.020 --> 00:00:52.620
+it's stored, and then the API is
+gonna send notifications for you.
+
+15
+00:00:52.620 --> 00:00:55.588
+It's actually attempting to
+send notifications all along,
+
+16
+00:00:55.588 --> 00:00:57.651
+we're just not setup to receive them yet.
+
+17
+00:00:59.889 --> 00:01:04.766
+&gt;&gt; Mike North: So, keep in mind that users
+may have more than one push subscription
+
+18
+00:01:04.766 --> 00:01:06.340
+per browser.
+
+19
+00:01:06.340 --> 00:01:09.250
+You might see that you have
+duplicate messages coming in,
+
+20
+00:01:09.250 --> 00:01:11.380
+and we'll talk about different
+ways of combating that.
+
+21
+00:01:12.790 --> 00:01:16.920
+That's like for now just know
+that you could always blow away
+
+22
+00:01:16.920 --> 00:01:21.040
+your development database and start
+over and like you will be clean again.
+
+23
+00:01:21.040 --> 00:01:26.160
+And that development database
+is in db/development.sqlite.
+
+24
+00:01:26.160 --> 00:01:28.943
+When you start your server again
+a new one will be created for
+
+25
+00:01:28.943 --> 00:01:30.568
+you presided with all of the data.
+
+26
+00:01:34.684 --> 00:01:40.560
+&gt;&gt; Mike North: So you do not want to
+do the server-side work yourself.
+
+27
+00:01:40.560 --> 00:01:45.426
+The reason is that if you've ever built
+something like this where you're either
+
+28
+00:01:45.426 --> 00:01:50.090
+doing native push notifications or
+sometimes if you've ever tried to
+
+29
+00:01:50.090 --> 00:01:55.270
+integrate with something like Intercom,
+while Intercom is an excellent product.
+
+30
+00:01:55.270 --> 00:02:00.600
+It's inherently hard when you're
+passing stuff off to another service,
+
+31
+00:02:00.600 --> 00:02:04.670
+something may go wrong inside that service
+and you're not watching their logs,
+
+32
+00:02:04.670 --> 00:02:06.500
+you can't see what's going on.
+
+33
+00:02:06.500 --> 00:02:10.670
+You kind of throw stuff
+off into a black hole and
+
+34
+00:02:10.670 --> 00:02:15.490
+hope that something happens on
+the other end as a result of that.
+
+35
+00:02:15.490 --> 00:02:18.420
+This is why you want to use a library for
+this,
+
+36
+00:02:18.420 --> 00:02:20.730
+they can validate stuff
+before it's sent out.
+
+37
+00:02:20.730 --> 00:02:24.562
+You don't wanna be just
+manually crafting HTTP
+
+38
+00:02:24.562 --> 00:02:28.306
+requests to talk to
+the push server directly.
+
+39
+00:02:28.306 --> 00:02:32.908
+&gt;&gt; Speaker 2: So,
+&gt;&gt; Speaker 2: Could you talk about
+
+40
+00:02:32.908 --> 00:02:33.790
+the flow a little bit?
+
+41
+00:02:33.790 --> 00:02:39.060
+Are we talking about this back-end
+API actually talking to the,
+
+42
+00:02:39.060 --> 00:02:46.922
+let's assume that there's a Mozilla or
+the Google's PushService.
+
+43
+00:02:46.922 --> 00:02:52.940
+And then that service is actually pushing
+that subscription over to the browser,
+
+44
+00:02:52.940 --> 00:02:56.091
+and the service worker is listening to it?
+
+45
+00:02:56.091 --> 00:02:56.850
+&gt;&gt; Mike North: Exactly.
+
+46
+00:02:56.850 --> 00:02:59.015
+&gt;&gt; Speaker 2: Is that what you meant?
+&gt;&gt; Mike North: So here's the flow again,
+
+47
+00:02:59.015 --> 00:03:02.760
+and it's good to make sure
+we make this point clearly.
+
+48
+00:03:02.760 --> 00:03:06.228
+The first part of the flow
+is we request permission,
+
+49
+00:03:06.228 --> 00:03:14.190
+we basically ask for a subscription,
+for this push subscription object.
+
+50
+00:03:14.190 --> 00:03:18.620
+On the critical path to that promise
+resolving is the user must click, yes,
+
+51
+00:03:18.620 --> 00:03:22.450
+I wish to allow like the site
+to send me stuff, right?
+
+52
+00:03:22.450 --> 00:03:23.710
+It reject if they say no.
+
+53
+00:03:24.750 --> 00:03:27.370
+So once we have those
+subscription objects,
+
+54
+00:03:27.370 --> 00:03:30.710
+just those JSON objects with
+the keys in the endpoint.
+
+55
+00:03:30.710 --> 00:03:36.586
+We use those as a mechanism to
+send data to this PushService.
+
+56
+00:03:36.586 --> 00:03:41.240
+And the PushService sends it to
+the appropriate browser to the appropriate
+
+57
+00:03:41.240 --> 00:03:45.420
+service worker and an event will
+be fired on that service worker.
+
+58
+00:03:45.420 --> 00:03:50.120
+Similar to the fetch event that we've been
+working with, but it's just a push event.
+
+59
+00:03:51.240 --> 00:03:54.890
+So you get it there, you get a push event,
+does that make sense?
+
+60
+00:03:56.340 --> 00:03:59.085
+All right, let me go forward.
+
+61
+00:04:00.730 --> 00:04:06.250
+&gt;&gt; Mike North: Great, so use a library,
+here's how we receive the message.
+
+62
+00:04:07.860 --> 00:04:13.090
+Looks a lot like fetch AddEventListener,
+push and there's the event.
+
+63
+00:04:15.320 --> 00:04:18.370
+And this push event has
+a property on it called data and
+
+64
+00:04:18.370 --> 00:04:20.820
+that's where you'll find
+your push message data.
+
+65
+00:04:20.820 --> 00:04:23.630
+You'll note that I can
+call data.text on it,
+
+66
+00:04:23.630 --> 00:04:29.086
+it looks a lot like the way we
+process response objects, right?
+
+67
+00:04:29.086 --> 00:04:34.710
+.text, .json, the difference
+is this is not promise based,
+
+68
+00:04:34.710 --> 00:04:39.310
+it's synchronous and there is no
+restriction on using it more than once.
+
+69
+00:04:39.310 --> 00:04:43.590
+These aren't like, you don't have to
+do all of this chaining together.
+
+70
+00:04:43.590 --> 00:04:47.150
+But a similar set of
+methods are available, so
+
+71
+00:04:47.150 --> 00:04:48.810
+you can decode it into JSON if you wish.
+

@@ -1,0 +1,944 @@
+WEBVTT
+
+1
+00:00:00.240 --> 00:00:02.860
+&gt;&gt; Jem Young: So
+now let's get into Nginx tuning.
+
+2
+00:00:02.860 --> 00:00:05.257
+It seems boring, but
+this is probably, as web developers,
+
+3
+00:00:05.257 --> 00:00:07.327
+probably something you'll
+be very interested in.
+
+4
+00:00:07.327 --> 00:00:13.430
+I can make our site perform way
+faster just by tuning our Nginx.
+
+5
+00:00:13.430 --> 00:00:14.979
+So I added in some slow sites.
+
+6
+00:00:14.979 --> 00:00:19.946
+So if I say jem.party,
+or whatever your URL is,
+
+7
+00:00:19.946 --> 00:00:24.564
+if I say slow file,
+we watch our network tab.
+
+8
+00:00:24.564 --> 00:00:29.817
+Man, this is taking a long time,
+why is that?
+
+9
+00:00:29.817 --> 00:00:33.366
+Because I added in a timeout just to
+simulate what a slow connection would
+
+10
+00:00:33.366 --> 00:00:33.954
+look like.
+
+11
+00:00:33.954 --> 00:00:36.714
+Lets say it's doing
+a complex database query,
+
+12
+00:00:36.714 --> 00:00:39.390
+let's say it had to
+parse a bunch of things.
+
+13
+00:00:39.390 --> 00:00:42.900
+I added a slow file in there so
+we can learn how to speed this up.
+
+14
+00:00:42.900 --> 00:00:47.720
+And if you want an even slower file,
+jem.party, if you go to cats,
+
+15
+00:00:47.720 --> 00:00:52.390
+it's gonna download a bunch
+of very large cat pictures.
+
+16
+00:00:52.390 --> 00:00:55.685
+So large that you can't even see them,
+but they're there.
+
+17
+00:00:55.685 --> 00:01:01.295
+That's great.
+&gt;&gt; Jem Young: And
+
+18
+00:01:01.295 --> 00:01:02.702
+all these are on the GitHub repo.
+
+19
+00:01:02.702 --> 00:01:04.742
+If you look at the source code for
+that Node app,
+
+20
+00:01:04.742 --> 00:01:06.910
+which we'll take a look at in a second.
+
+21
+00:01:06.910 --> 00:01:10.811
+You'll see just these routes in there
+that I added just for convenience sake,
+
+22
+00:01:10.811 --> 00:01:14.197
+to understand how to make our
+connections faster just using Nginx.
+
+23
+00:01:14.197 --> 00:01:17.835
+[LAUGH] Cats, that's great.
+
+24
+00:01:17.835 --> 00:01:22.220
+So to start with, let's start with gzip.
+
+25
+00:01:22.220 --> 00:01:26.410
+We touched on it a bit in the last class,
+but can anybody tell me what gzip is?
+
+26
+00:01:26.410 --> 00:01:27.365
+You've probably heard of it.
+
+27
+00:01:27.365 --> 00:01:29.732
+Hazard a guess?
+&gt;&gt; Speaker 2: To compress the file.
+
+28
+00:01:29.732 --> 00:01:34.120
+&gt;&gt; Jem Young: Yes, it compress files.
+
+29
+00:01:34.120 --> 00:01:38.255
+So we know zipping is an algorithm that
+runs through and compresses files.
+
+30
+00:01:38.255 --> 00:01:40.384
+How does a zipping algorithm work,
+in general?
+
+31
+00:01:40.384 --> 00:01:45.504
+Like high-level, super high-level,
+how would you imagine you compress a file?
+
+32
+00:01:45.504 --> 00:01:48.096
+&gt;&gt; Speaker 2: Finds repeated strings and
+
+33
+00:01:48.096 --> 00:01:52.544
+then matches them to a smaller string?
+&gt;&gt; Jem Young: That's exactly
+
+34
+00:01:52.544 --> 00:01:53.375
+right, perfect.
+
+35
+00:01:53.375 --> 00:01:56.625
+So all compression algorithms
+work essentially the same.
+
+36
+00:01:56.625 --> 00:02:01.217
+It looks for repeated patterns,
+it takes those and says,
+
+37
+00:02:01.217 --> 00:02:05.164
+instead of 00000000, I just say x50.
+
+38
+00:02:05.164 --> 00:02:08.159
+It just means I'm just gonna repeat
+this over and over again, and
+
+39
+00:02:08.159 --> 00:02:11.814
+it's just a shortened syntax for repeating
+bits and bytes over and over again.
+
+40
+00:02:11.814 --> 00:02:15.933
+And it's actually, it's brilliant once
+your understand that, cuz you understand
+
+41
+00:02:15.933 --> 00:02:19.423
+compression, you understand how
+every compression works in general,
+
+42
+00:02:19.423 --> 00:02:22.140
+how we make things smaller,
+so great answer.
+
+43
+00:02:22.140 --> 00:02:26.740
+Gzip is the public version of,
+well, it's not the public,
+
+44
+00:02:26.740 --> 00:02:31.490
+it's the widely adopted version of how
+to compress files on the Internet.
+
+45
+00:02:31.490 --> 00:02:35.570
+Fortunately, most browsers, almost all
+browsers support gzip to some degree, and
+
+46
+00:02:35.570 --> 00:02:37.640
+Apache and Nginx support gzipping content.
+
+47
+00:02:37.640 --> 00:02:40.220
+So what it does is,
+all those cat pictures,
+
+48
+00:02:40.220 --> 00:02:42.530
+it's gonna compress those
+down as best we can.
+
+49
+00:02:42.530 --> 00:02:44.980
+Pictures are very good
+at being compressed.
+
+50
+00:02:44.980 --> 00:02:47.100
+And then it's gonna send down
+those down to the server, or
+
+51
+00:02:47.100 --> 00:02:48.790
+send those down to the browser.
+
+52
+00:02:48.790 --> 00:02:52.530
+The browser's gonna unpack those using
+an unzipper, and it shows it to you.
+
+53
+00:02:52.530 --> 00:02:56.849
+And because it's very well known, it's
+very fast at doing this over and over and
+
+54
+00:02:56.849 --> 00:02:57.558
+over again.
+
+55
+00:02:57.558 --> 00:02:59.980
+So gzip is just a well known format for
+doing that.
+
+56
+00:03:01.170 --> 00:03:02.440
+And you're thinking right now,
+
+57
+00:03:02.440 --> 00:03:05.570
+why are pictures particulary
+good at being compressed?
+
+58
+00:03:05.570 --> 00:03:07.000
+Knowing what you know now about zipping,
+
+59
+00:03:07.000 --> 00:03:10.730
+what would you think?
+&gt;&gt; Speaker 3: Similar colors?
+
+60
+00:03:10.730 --> 00:03:11.230
+&gt;&gt; Jem Young: Yes,
+
+61
+00:03:11.230 --> 00:03:13.590
+exactly right, cuz what is an image?
+
+62
+00:03:13.590 --> 00:03:17.425
+It's just the bitmap of hex colors or
+what have you, just bits and bytes, and
+
+63
+00:03:17.425 --> 00:03:20.000
+generally they're repeated over and
+over again.
+
+64
+00:03:20.000 --> 00:03:23.886
+So if we look at our, sorry, I'm just
+nerding out a bit, cuz I think it's
+
+65
+00:03:23.886 --> 00:03:27.736
+interesting, if we look at our cat
+picture, all this is the same color.
+
+66
+00:03:27.736 --> 00:03:31.186
+It can compress really well, cuz it's
+just gonna say, the next million pixels,
+
+67
+00:03:31.186 --> 00:03:34.836
+it's just this color blue, rather than
+this being blue, blue, blue, blue, blue,
+
+68
+00:03:34.836 --> 00:03:36.139
+it just compresses that down.
+
+69
+00:03:36.139 --> 00:03:38.518
+That's why images compress
+particularly well.
+
+70
+00:03:38.518 --> 00:03:44.070
+Now, if you had complex data, say like a
+JSON payload, it doesn't compress as well,
+
+71
+00:03:44.070 --> 00:03:48.039
+because there's not a lot of
+patterns in there, not as much.
+
+72
+00:03:48.039 --> 00:03:51.278
+Yes, we're learning all about compression,
+who knew,
+
+73
+00:03:51.278 --> 00:03:57.653
+full stack?
+&gt;&gt; Jem Young: So if we wanna look at gzip,
+
+74
+00:03:57.653 --> 00:04:02.900
+let's look at our response headers, and
+we'll see what Nginx is doing for us.
+
+75
+00:04:02.900 --> 00:04:06.788
+So in Chrome, or any browser you want,
+let's open up your dev tools, and
+
+76
+00:04:06.788 --> 00:04:15.945
+let's look at the response headers.
+&gt;&gt; Jem Young: It's not gzipping currently,
+
+77
+00:04:15.945 --> 00:04:20.951
+we'll fix that.
+&gt;&gt; Jem Young: Maybe it's not doing.
+
+78
+00:04:20.951 --> 00:04:24.507
+It's probably not doing images.
+&gt;&gt; Jem Young: So
+
+79
+00:04:24.507 --> 00:04:27.261
+we have two things we send
+out with every request,
+
+80
+00:04:27.261 --> 00:04:31.534
+they're called the header files,
+they go along with the packet we send out.
+
+81
+00:04:31.534 --> 00:04:35.731
+It's just saying, as a browser,
+here is all the things that I accept.
+
+82
+00:04:35.731 --> 00:04:39.770
+I understand gzip, so I can accept gzips.
+
+83
+00:04:39.770 --> 00:04:44.551
+Don't worry about connection, do not track
+the host, don't worry about the other
+
+84
+00:04:44.551 --> 00:04:48.811
+stuff, but these are the headers that
+go out to the client or to the server.
+
+85
+00:04:48.811 --> 00:04:51.775
+The server reads these and
+may or may not act on them.
+
+86
+00:04:51.775 --> 00:04:54.512
+The response headers is
+what Nginx is sending back.
+
+87
+00:04:54.512 --> 00:04:58.276
+It's saying, okay,
+here's a cache connection,
+
+88
+00:04:58.276 --> 00:05:01.448
+it's gzip encoded, etc., etc., etc.
+
+89
+00:05:01.448 --> 00:05:03.607
+Questions on headers?
+
+90
+00:05:03.607 --> 00:05:08.763
+I could do a whole course on different
+headers because they're kind of what,
+
+91
+00:05:08.763 --> 00:05:13.385
+they're the instructions that make
+your requests go out properly.
+
+92
+00:05:13.385 --> 00:05:17.051
+Any questions on headers, any at all?
+&gt;&gt; Speaker 4: Can you think of
+
+93
+00:05:17.051 --> 00:05:20.075
+a reason why I would not have BR on mine,
+and
+
+94
+00:05:20.075 --> 00:05:24.160
+accepting coding?
+&gt;&gt; Jem Young: No,
+
+95
+00:05:24.160 --> 00:05:27.440
+maybe you're just using
+different version of Chrome.
+
+96
+00:05:27.440 --> 00:05:31.940
+Yeah, as long as it takes gzip,
+you're okay.
+
+97
+00:05:31.940 --> 00:05:34.530
+And even accepting coding,
+it's kinda of an optional header cuz
+
+98
+00:05:34.530 --> 00:05:38.564
+almost all modern browsers
+will take gzip now.
+
+99
+00:05:38.564 --> 00:05:41.410
+All right, no questions on headers.
+
+100
+00:05:41.410 --> 00:05:45.930
+Let's modify some headers then,
+because again,
+
+101
+00:05:45.930 --> 00:05:52.669
+these are the instructions on telling
+us how we should handle this request.
+
+102
+00:05:52.669 --> 00:05:56.309
+So in /var/etc/nginx/nginx.conf, no,
+
+103
+00:05:56.309 --> 00:06:02.590
+we're not in Nginx sites available
+default, we're in nginx.conf.
+
+104
+00:06:02.590 --> 00:06:06.833
+nginx.conf applies to all the servers
+you have running on your machine,
+
+105
+00:06:06.833 --> 00:06:08.750
+rather than if I go into default,
+
+106
+00:06:08.750 --> 00:06:13.210
+I'm editing specific server blocks
+that just represent specific domains.
+
+107
+00:06:14.600 --> 00:06:18.310
+It's a bit more advanced cuz we haven't
+covered how to run multiple domains on one
+
+108
+00:06:18.310 --> 00:06:21.776
+server, but it's just adding another
+block to your Nginx configuration.
+
+109
+00:06:21.776 --> 00:06:26.651
+It's actually pretty easy, but so
+let's take a look at our gzip settings,
+
+110
+00:06:26.651 --> 00:06:30.704
+because in general,
+we want all of our requests to be gzipped.
+
+111
+00:06:30.704 --> 00:06:33.037
+So sudo vi
+
+112
+00:06:33.037 --> 00:06:41.345
+/etc/nginx/nginx.conf.
+&gt;&gt; Speaker 5: Have
+
+113
+00:06:41.345 --> 00:06:47.124
+a question in chat.
+&gt;&gt; Jem Young: What is X-Requested-With?
+
+114
+00:06:47.124 --> 00:06:52.260
+Yeah, all right, Alex is asking,
+what is X-requested-With, that header?
+
+115
+00:06:53.600 --> 00:06:55.250
+That is a great question.
+
+116
+00:06:55.250 --> 00:07:00.080
+X-Requested-With just means,
+who made the request?
+
+117
+00:07:00.080 --> 00:07:05.342
+So any X dash prefix is something that's
+not specifically used by any server.
+
+118
+00:07:05.342 --> 00:07:07.129
+It's just more of an information,
+
+119
+00:07:07.129 --> 00:07:10.586
+just like X-Powered-With,
+not used by me, not terribly useful,
+
+120
+00:07:10.586 --> 00:07:14.237
+but it's just saying Express is
+the server that's running on the node.
+
+121
+00:07:14.237 --> 00:07:17.916
+We can make it not do that,
+we can make X say anything.
+
+122
+00:07:17.916 --> 00:07:22.413
+But in general if you say, I want to pass
+some information back to the client, but
+
+123
+00:07:22.413 --> 00:07:25.721
+I don't want Nginx to try to parse it or
+anything like that,
+
+124
+00:07:25.721 --> 00:07:29.300
+just use an X dash whatever,
+and you'll be safe.
+
+125
+00:07:29.300 --> 00:07:32.463
+But great question, if you ever see X,
+it's usually just information, and
+
+126
+00:07:32.463 --> 00:07:35.673
+we're gonna add in an X header ourselves
+to let us know about cache status, but
+
+127
+00:07:35.673 --> 00:07:37.890
+we'll get to that in a minute.
+
+128
+00:07:37.890 --> 00:07:42.643
+Great question though.
+&gt;&gt; Jem Young: All right, so
+
+129
+00:07:42.643 --> 00:07:48.164
+we're in /etc/nginx/nginx conf.
+&gt;&gt; Speaker 3: I
+
+130
+00:07:48.164 --> 00:07:51.882
+don't have etc folder in my-
+&gt;&gt; Jem Young: I put that wrong.
+
+131
+00:07:51.882 --> 00:07:56.427
+You don't have, there we go, sorry,
+apologies, I typed that incorrectly.
+
+132
+00:07:56.427 --> 00:08:01.129
+So it's /etc/nginx/nginx.conf.
+
+133
+00:08:07.770 --> 00:08:08.387
+&gt;&gt; Jem Young: So again,
+
+134
+00:08:08.387 --> 00:08:10.510
+these are the settings that apply for
+
+135
+00:08:10.510 --> 00:08:15.497
+every connection running through Nginx.
+&gt;&gt; Jem Young: And
+
+136
+00:08:15.497 --> 00:08:20.259
+in general, this is where we do
+the fine-tuning, if we wanted to, but for
+
+137
+00:08:20.259 --> 00:08:22.459
+now, we're just gonna do a gzip.
+
+138
+00:08:22.459 --> 00:08:27.618
+So I'm gonna search gzip at the bottom,
+
+139
+00:08:27.618 --> 00:08:33.401
+and gzip is on right now.
+&gt;&gt; Jem Young: But
+
+140
+00:08:33.401 --> 00:08:38.121
+if I say, I want the default level, cuz
+there's different levels you can compress
+
+141
+00:08:38.121 --> 00:08:42.990
+things with, different strengths you want
+that algorithm to run against your file.
+
+142
+00:08:42.990 --> 00:08:44.664
+You can turn that all the way up to nine.
+
+143
+00:08:44.664 --> 00:08:49.551
+Not generally recommended, because again,
+there's diminishing returns on,
+
+144
+00:08:49.551 --> 00:08:52.663
+yeah, your files may be
+a couple of bytes smaller but
+
+145
+00:08:52.663 --> 00:08:55.310
+it cost you 20 extra
+CPU cycles to do that.
+
+146
+00:08:55.310 --> 00:08:57.981
+It's probably not worth it,
+you're not really saving any time.
+
+147
+00:08:57.981 --> 00:09:01.206
+Whereas rookie Jim would have said,
+yeah, let's turn it up to nine,
+
+148
+00:09:01.206 --> 00:09:02.584
+why don't we always do that?
+
+149
+00:09:02.584 --> 00:09:05.569
+But when you're dealing with
+hundreds of thousands of request,
+
+150
+00:09:05.569 --> 00:09:07.809
+you have to be more careful
+with your CPU cycles.
+
+151
+00:09:07.809 --> 00:09:11.016
+So we're gonna leave it on 6,
+actually turn it down to 5,
+
+152
+00:09:11.016 --> 00:09:20.694
+you can turn it on whatever you'd like.
+&gt;&gt; Jem Young: And that's about it,
+
+153
+00:09:20.694 --> 00:09:27.523
+all we can do for gzip, it's already on.
+&gt;&gt; Jem Young: But while
+
+154
+00:09:27.523 --> 00:09:31.730
+we're in this file, let's talk a little
+bit more about Nginx configurations.
+
+155
+00:09:31.730 --> 00:09:34.645
+This is where all the things
+that the logging,
+
+156
+00:09:34.645 --> 00:09:39.598
+how we work our processes, this is where
+this happening in this nginx.conf.
+
+157
+00:09:39.598 --> 00:09:44.278
+We're not gonna touch that for now because
+there's better observations we can make,
+
+158
+00:09:44.278 --> 00:09:48.267
+but let's say if we wanna change where
+the logs are, we change it in here.
+
+159
+00:09:48.267 --> 00:09:51.435
+An interesting optimization we can do is,
+
+160
+00:09:51.435 --> 00:09:56.011
+instead of worker_processes auto,
+I can change that to 2.
+
+161
+00:09:56.011 --> 00:09:59.645
+So what Nginx does, which makes it great,
+is it auto scales for you.
+
+162
+00:09:59.645 --> 00:10:03.037
+So if you're getting a lot of
+connections and it's just slow,
+
+163
+00:10:03.037 --> 00:10:07.517
+slow, slow, it'll spin up another process
+on your computer on another core, and
+
+164
+00:10:07.517 --> 00:10:10.794
+just start handling traffic,
+and it scales out all the way.
+
+165
+00:10:10.794 --> 00:10:12.037
+It scales out as much as you want.
+
+166
+00:10:12.037 --> 00:10:18.318
+Why wouldn't you want that though?
+&gt;&gt; Speaker 5: A DDoS?
+
+167
+00:10:18.318 --> 00:10:20.408
+&gt;&gt; Jem Young: Yes, yes, DDoS,
+
+168
+00:10:20.408 --> 00:10:22.503
+things like that.
+
+169
+00:10:22.503 --> 00:10:26.069
+But mainly, if you're just running a web
+server that's also running a database
+
+170
+00:10:26.069 --> 00:10:29.741
+server that's also running a node server,
+you don't necessarily want Nginx to be
+
+171
+00:10:29.741 --> 00:10:33.427
+able to take over your whole machine if
+someone's sending you a bunch of requests.
+
+172
+00:10:33.427 --> 00:10:36.949
+So if you cap it at, say, one,
+you're saying no matter what,
+
+173
+00:10:36.949 --> 00:10:39.152
+Nginx is only gonna run at one process.
+
+174
+00:10:39.152 --> 00:10:42.601
+It could get slow if you're getting
+hammered with a lot of requests, so
+
+175
+00:10:42.601 --> 00:10:44.324
+I'm just gonna leave it for auto for
+
+176
+00:10:44.324 --> 00:10:48.400
+now, but in the future, you should know
+that Nginx will auto scale for you.
+
+177
+00:10:48.400 --> 00:10:49.350
+It's kind of something,
+
+178
+00:10:49.350 --> 00:10:52.770
+if you notice Nginx running seven
+processes, something is probably wrong.
+
+179
+00:10:55.150 --> 00:11:03.307
+All right, any questions about this?
+&gt;&gt; Jem Young: Awesome,
+
+180
+00:11:03.307 --> 00:11:05.838
+and here is where the rest
+of the config files get put,
+
+181
+00:11:05.838 --> 00:11:09.661
+which is why sites enabled default, sites
+enabled whatever you want to call it,
+
+182
+00:11:09.661 --> 00:11:11.820
+they all get put into
+this block eventually.
+
+183
+00:11:11.820 --> 00:11:16.540
+And it's just included in your
+virtual hosts, that's by default.
+
+184
+00:11:18.230 --> 00:11:20.610
+Awesome so, I'm gonna restart Nginx.
+
+185
+00:11:20.610 --> 00:11:25.152
+So first let me make sure I didn't
+make any errors, sudo ngimx -t.
+
+186
+00:11:25.152 --> 00:11:28.819
+Looking good,
+
+187
+00:11:28.819 --> 00:11:33.332
+sudo service nginx
+
+188
+00:11:33.332 --> 00:11:38.140
+reload, awesome.
+
+189
+00:11:38.140 --> 00:11:41.035
+And we're all gzipped,
+why is it trying to print?
+
+190
+00:11:41.035 --> 00:11:44.337
+Don't know.
+&gt;&gt; Jem Young: And
+
+191
+00:11:44.337 --> 00:11:45.533
+we can increase our compression level.
+
+192
+00:11:45.533 --> 00:11:49.142
+At the bottom, I include a link
+to the gzip module for Nginx.
+
+193
+00:11:49.142 --> 00:11:52.067
+If you wanna just dive
+into all the settings and
+
+194
+00:11:52.067 --> 00:11:55.226
+tweak to your heart's content,
+you can do that.
+
+195
+00:11:55.226 --> 00:11:57.444
+If you mess with gzip,
+you probably not gonna break anything.
+
+196
+00:11:57.444 --> 00:12:01.763
+So you're pretty safe on the crap scale,
+don't wanna touch it.
+
+197
+00:12:01.763 --> 00:12:05.135
+Feel free to play around with it,
+try to tune as much as you can, but
+
+198
+00:12:05.135 --> 00:12:09.384
+there are more efficient things we can do
+rather than trying to tweak gzip too much.
+

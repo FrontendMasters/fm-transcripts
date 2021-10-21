@@ -1,0 +1,1222 @@
+WEBVTT
+
+1
+00:00:00.040 --> 00:00:02.980
+&gt;&gt; Steve Kinney: So the first thing
+I wanna talk about is fixing that
+
+2
+00:00:02.980 --> 00:00:05.368
+routing issue that we've been having.
+
+3
+00:00:05.368 --> 00:00:10.090
+First, we just blew up the page on
+a client-side route we didn't recognize.
+
+4
+00:00:10.090 --> 00:00:10.800
+That wasn't great.
+
+5
+00:00:12.090 --> 00:00:14.425
+Then, we set it so that, yeah,
+
+6
+00:00:14.425 --> 00:00:19.624
+even if you get back a client-side
+route and it works, it's a 404.
+
+7
+00:00:20.630 --> 00:00:22.290
+That wasn't great.
+
+8
+00:00:22.290 --> 00:00:24.580
+Then, we set it so, you know what?
+
+9
+00:00:24.580 --> 00:00:26.610
+Everything's a 200.
+
+10
+00:00:26.610 --> 00:00:29.950
+Also not great, right?
+
+11
+00:00:29.950 --> 00:00:33.300
+All of these are varying degrees of sad.
+
+12
+00:00:33.300 --> 00:00:34.911
+So, a lot of what we're gonna do,
+
+13
+00:00:34.911 --> 00:00:37.369
+I haven't actually seen
+done a whole lot of places.
+
+14
+00:00:37.369 --> 00:00:40.497
+And this,
+like most great technological decisions,
+
+15
+00:00:40.497 --> 00:00:44.010
+this came out of me fighting
+with one of the architects.
+
+16
+00:00:44.010 --> 00:00:49.335
+Which is basically, he wanted us to use
+those, basically every client-side route
+
+17
+00:00:49.335 --> 00:00:54.518
+starting with a hash, like hashbang,
+like Twitter did in 2012, 2014.
+
+18
+00:00:54.518 --> 00:00:56.610
+Everybody's looking at me like,
+what are you talking about?
+
+19
+00:00:56.610 --> 00:00:59.890
+Exactly, [LAUGH] nobody does that in 2018.
+
+20
+00:00:59.890 --> 00:01:01.480
+We don't, we don't do that anymore.
+
+21
+00:01:01.480 --> 00:01:03.310
+We have regular-looking routes and
+it's fine.
+
+22
+00:01:03.310 --> 00:01:07.050
+And he's like, well, those will
+technically be 200s from CloudFront and
+
+23
+00:01:07.050 --> 00:01:08.820
+that means you're breaking the web.
+
+24
+00:01:08.820 --> 00:01:12.430
+And I was not going to
+use hash-based routes.
+
+25
+00:01:12.430 --> 00:01:13.810
+That was just not happening.
+
+26
+00:01:13.810 --> 00:01:17.927
+So, a lot of this comes from
+basically me trying to figure out how
+
+27
+00:01:17.927 --> 00:01:20.913
+not to have ugly URLs,
+while also appeasing.
+
+28
+00:01:20.913 --> 00:01:23.720
+As a front engineer I care very
+much about not breaking the web.
+
+29
+00:01:23.720 --> 00:01:26.820
+And I had quietly just been breaking
+the web for the last year, and
+
+30
+00:01:26.820 --> 00:01:28.200
+not talking about it.
+
+31
+00:01:28.200 --> 00:01:33.750
+So, what we're going to do, is we're
+going to make a Lambda@Edge function.
+
+32
+00:01:33.750 --> 00:01:37.201
+What this function's gonna do is,
+
+33
+00:01:37.201 --> 00:01:43.640
+if it sees that it is a known
+good client-side route, right?
+
+34
+00:01:43.640 --> 00:01:49.153
+Then what we'll do, is we'll actually tell
+it to go get the index.html out of S3.
+
+35
+00:01:49.153 --> 00:01:53.260
+So we will kind of white list
+URL's that we know are good.
+
+36
+00:01:53.260 --> 00:01:56.669
+Now this is very easy to do
+with a simple application.
+
+37
+00:01:56.669 --> 00:02:00.839
+It is a lot trickier
+to do when many URL's.
+
+38
+00:02:00.839 --> 00:02:06.276
+You do need some kind of
+manifest of declared good routes.
+
+39
+00:02:06.276 --> 00:02:09.050
+Which is a little bit trickier but
+not un-doable.
+
+40
+00:02:09.050 --> 00:02:12.980
+So we're gonna say hey, if you're looking
+for a known, good client-side route,
+
+41
+00:02:12.980 --> 00:02:18.370
+we're gonna actually tell S3 to go get
+the index.html out of there instead.
+
+42
+00:02:20.040 --> 00:02:22.933
+And then, we'll go back to
+treating actual 404s like 404s.
+
+43
+00:02:22.933 --> 00:02:27.888
+We'll still send them the index.html
+because we know react router is going to
+
+44
+00:02:27.888 --> 00:02:31.881
+give them the correct,
+it's gonna give them a not found page.
+
+45
+00:02:31.881 --> 00:02:33.810
+But at least it'll come back
+from the server as a 404.
+
+46
+00:02:33.810 --> 00:02:38.040
+That way if the Google bot is crawling
+some bogus URL, it'll actually register as
+
+47
+00:02:38.040 --> 00:02:44.020
+a 404, rather than a 200 that just
+happens to say not found on it, right?
+
+48
+00:02:44.020 --> 00:02:48.040
+This is probably an easy way to kind
+of get some SEO juice without having to
+
+49
+00:02:48.040 --> 00:02:50.220
+do server side routing as well.
+
+50
+00:02:50.220 --> 00:02:52.250
+I say that as somebody who does
+not know that much about SEO,
+
+51
+00:02:52.250 --> 00:02:56.260
+because I work on an application that's
+not crawlable on the Internet, so
+
+52
+00:02:56.260 --> 00:02:59.630
+don't take my word for that one.
+
+53
+00:02:59.630 --> 00:03:04.730
+All right, so, I mentioned before and I'll
+kinda just say it again, anything that
+
+54
+00:03:04.730 --> 00:03:10.110
+is global for AWS is in us-east-1.
+
+55
+00:03:10.110 --> 00:03:13.785
+So if you try to do what I'm about
+to do in a different region,
+
+56
+00:03:13.785 --> 00:03:18.689
+we're gonna get to the point where it's
+like, and now we added Cloudfront, and
+
+57
+00:03:18.689 --> 00:03:21.087
+you just won't see Cloudfront there.
+
+58
+00:03:21.087 --> 00:03:25.513
+So we do wanna make sure that we
+are doing this all on us-east-1.
+
+59
+00:03:26.782 --> 00:03:28.654
+&gt;&gt; Steve Kinney: Let's see,
+I got, let's go to this one, and
+
+60
+00:03:28.654 --> 00:03:29.759
+we're gonna go to Lambda.
+
+61
+00:03:37.516 --> 00:03:39.750
+&gt;&gt; Steve Kinney: Cool, we'll go ahead and
+create our first function.
+
+62
+00:03:40.750 --> 00:03:42.390
+We're gonna author from scratch.
+
+63
+00:03:42.390 --> 00:03:46.480
+There's a bunch of blueprints here,
+I don't want to use any of them.
+
+64
+00:03:46.480 --> 00:03:54.661
+We'll call this one
+&gt;&gt; Steve Kinney: RedirectClientRoutes,
+
+65
+00:03:54.661 --> 00:03:57.662
+obviously whatever you call
+it doesn't really matter.
+
+66
+00:03:57.662 --> 00:04:01.034
+You can choose any of
+these languages you want.
+
+67
+00:04:01.034 --> 00:04:03.600
+I'm gonna stick with
+the default which is Node 6.
+
+68
+00:04:03.600 --> 00:04:06.300
+You can treat yourself
+to Node 8 if you want,
+
+69
+00:04:06.300 --> 00:04:08.910
+but I don't know these other
+programming languages.
+
+70
+00:04:08.910 --> 00:04:11.530
+So that's, [LAUGH],
+my choices are relatively limited.
+
+71
+00:04:11.530 --> 00:04:15.570
+We've talked a little bit
+about policies before.
+
+72
+00:04:15.570 --> 00:04:18.790
+A role, again,
+is a set of policies that can be shared.
+
+73
+00:04:18.790 --> 00:04:22.791
+So, we can call this one EdgeLambda.
+
+74
+00:04:25.679 --> 00:04:30.232
+&gt;&gt; Steve Kinney: And there are some policy
+templates, depending on what you're doing.
+
+75
+00:04:30.232 --> 00:04:32.480
+You might need to add more of these.
+
+76
+00:04:32.480 --> 00:04:34.070
+If you need to read from an S3 bucket,
+
+77
+00:04:34.070 --> 00:04:36.640
+you're gonna need to
+give it read permissions.
+
+78
+00:04:36.640 --> 00:04:40.280
+If you intend on hooking
+it up to an AWS IoT button,
+
+79
+00:04:40.280 --> 00:04:41.970
+you have to give it those permissions.
+
+80
+00:04:41.970 --> 00:04:45.563
+I am just going to use basic
+Lambda@Edge for a CloudFront trigger,
+
+81
+00:04:45.563 --> 00:04:48.156
+cuz that is literally
+what I'm doing right now.
+
+82
+00:04:49.673 --> 00:04:52.516
+&gt;&gt; Steve Kinney: All right, so we'll
+go ahead and we'll hit Create Function
+
+83
+00:04:57.644 --> 00:04:59.240
+&gt;&gt; Steve Kinney: Let it cook for
+
+84
+00:04:59.240 --> 00:05:01.102
+a second there.
+
+85
+00:05:01.102 --> 00:05:03.298
+The other kind of tasting note is,
+
+86
+00:05:03.298 --> 00:05:08.069
+that when you have a regular Lambda you
+are able to have this idea of latest,
+
+87
+00:05:08.069 --> 00:05:12.253
+which will just be whatever the latest
+code is to hit that Lambda.
+
+88
+00:05:12.253 --> 00:05:16.240
+With the CloudFront ones, you have
+to publish an actual version of it.
+
+89
+00:05:16.240 --> 00:05:20.050
+Cuz again, it's not one Lambda
+sitting in one data center,
+
+90
+00:05:20.050 --> 00:05:24.210
+it is one Lambda, distributed, right?
+
+91
+00:05:24.210 --> 00:05:27.750
+So it can't really do latest,
+that's not really a thing.
+
+92
+00:05:27.750 --> 00:05:30.029
+Because again,
+distributed systems are hard.
+
+93
+00:05:31.030 --> 00:05:35.370
+Cool, so we have our Lambda function, and
+
+94
+00:05:35.370 --> 00:05:38.440
+this is kind of what's
+in there by default.
+
+95
+00:05:38.440 --> 00:05:39.860
+That's not gonna really work for us.
+
+96
+00:05:41.130 --> 00:05:45.470
+So what we wanna do is say, hey,
+we can now look at the requests,
+
+97
+00:05:45.470 --> 00:05:47.470
+we can even modify the request object.
+
+98
+00:05:47.470 --> 00:05:51.330
+We can also look at and
+modify the response, but
+
+99
+00:05:51.330 --> 00:05:54.500
+only once we're in the response phase.
+
+100
+00:05:54.500 --> 00:05:56.861
+This is actually, we're gonna get
+it before it gets to CloudFront and
+
+101
+00:05:56.861 --> 00:05:57.950
+change what it's looking for.
+
+102
+00:05:59.460 --> 00:06:03.830
+So in those cases, this is gonna
+be a viewer request function, so
+
+103
+00:06:03.830 --> 00:06:07.820
+we can't modify the response here,
+cuz there is no response yet.
+
+104
+00:06:07.820 --> 00:06:10.840
+We can make one, but
+we'll get to that in a little bit.
+
+105
+00:06:10.840 --> 00:06:13.340
+Cool, all right, so,
+
+106
+00:06:13.340 --> 00:06:16.450
+the first thing I wanna do is I
+wanna get the request object.
+
+107
+00:06:16.450 --> 00:06:22.480
+And this is a little squirrely,
+so we're gonna say is,
+
+108
+00:06:22.480 --> 00:06:29.450
+we know that notes/a number, or
+/notes/a number, is a valid route.
+
+109
+00:06:29.450 --> 00:06:34.263
+So we´ll say cool, if.
+
+110
+00:06:38.615 --> 00:06:43.202
+&gt;&gt; Steve Kinney: I'm gonna live code
+Regex, what could possibly go wrong here?
+
+111
+00:06:49.230 --> 00:06:52.233
+&gt;&gt; Steve Kinney: This is also,
+if you don't want to type this,
+
+112
+00:06:52.233 --> 00:06:54.900
+this is also in the setup guide.
+
+113
+00:06:54.900 --> 00:06:58.764
+Which, it was probably smarter
+than me trying to live code.
+
+114
+00:07:07.796 --> 00:07:09.575
+&gt;&gt; Steve Kinney: So notes/a number.
+
+115
+00:07:11.895 --> 00:07:13.810
+&gt;&gt; Steve Kinney: Cool,
+that should do the trick.
+
+116
+00:07:16.290 --> 00:07:19.670
+We take that Regex, and we'll test it.
+
+117
+00:07:22.107 --> 00:07:25.907
+&gt;&gt; Steve Kinney: Against the request URI.
+
+118
+00:07:25.907 --> 00:07:29.140
+So, and that's test, not text.
+
+119
+00:07:30.996 --> 00:07:35.696
+So, taking a Regex has a test method,
+which then takes a string and say,
+
+120
+00:07:35.696 --> 00:07:40.642
+hey, does this string, which will be
+your request URI, match this Regex?
+
+121
+00:07:43.164 --> 00:07:48.567
+&gt;&gt; Steve Kinney: If so,
+let's change it to actually
+
+122
+00:07:48.567 --> 00:07:54.160
+just look for index.html, right?
+
+123
+00:07:54.160 --> 00:07:59.317
+Which is definitely not, since we're
+changing all of these client-side routes,
+
+124
+00:07:59.317 --> 00:08:01.212
+they're gonna be cache hits.
+
+125
+00:08:01.212 --> 00:08:06.443
+Cuz it's like, yeah, I know index.html,
+which means it'll be a legit 200.
+
+126
+00:08:06.443 --> 00:08:10.875
+Which means that after we're done with
+this, we should be able to turn back on
+
+127
+00:08:10.875 --> 00:08:15.717
+404s as 404s, and our known client-side
+routes, assuming I didn't mess up
+
+128
+00:08:15.717 --> 00:08:20.239
+this Regex, which is totally on the table
+as something that's gonna happen.
+
+129
+00:08:20.239 --> 00:08:25.070
+That those known client-side
+routes will get turned into index,
+
+130
+00:08:25.070 --> 00:08:28.614
+which is totally valid,
+which will be a 200.
+
+131
+00:08:28.614 --> 00:08:33.728
+And unknown garbage will be a S3 miss and
+will count as a real 404.
+
+132
+00:08:33.728 --> 00:08:36.636
+So we can basically program
+our CDN to be smarter so
+
+133
+00:08:36.636 --> 00:08:40.670
+that we don't have to do weird
+hacks to get stuff to work.
+
+134
+00:08:40.670 --> 00:08:44.550
+Cool, I'm gonna do a little
+console logging, like I said,
+
+135
+00:08:44.550 --> 00:08:46.650
+in the event that I mess up.
+
+136
+00:08:46.650 --> 00:08:53.960
+So I'll say before, and
+I'll log the request.uri.
+
+137
+00:08:53.960 --> 00:08:54.810
+And I'll do a.
+
+138
+00:09:01.854 --> 00:09:05.030
+Do after.
+
+139
+00:09:05.030 --> 00:09:08.380
+And then,
+do you see that last option is callback?
+
+140
+00:09:08.380 --> 00:09:13.880
+This does a very like Node style
+callback pattern, which is the error,
+
+141
+00:09:13.880 --> 00:09:17.870
+which is null in this case,
+and then the request object.
+
+142
+00:09:19.480 --> 00:09:23.630
+You can also, if you want to actually move
+to sending a response back, you could
+
+143
+00:09:23.630 --> 00:09:27.210
+actually pass in a response object as well
+here, and we will do that in a little bit.
+
+144
+00:09:27.210 --> 00:09:29.399
+But right now we're just
+modifying requests.
+
+145
+00:09:31.650 --> 00:09:35.330
+&gt;&gt; Speaker 2: Do you think that
+bottom one should be request.uri?
+
+146
+00:09:35.330 --> 00:09:37.860
+&gt;&gt; Steve Kinney: Yep, good catch.
+
+147
+00:09:37.860 --> 00:09:40.090
+That was the other thing I was
+going to warn you about is that,
+
+148
+00:09:40.090 --> 00:09:43.710
+having practiced this a bunch of times,
+I know that I will type request.url.
+
+149
+00:09:43.710 --> 00:09:45.050
+That will not be the last time.
+
+150
+00:09:45.050 --> 00:09:46.420
+This is a test, I'm testing all of you.
+
+151
+00:09:50.120 --> 00:09:51.680
+Cool, we'll go ahead and we'll save that.
+
+152
+00:09:52.780 --> 00:09:55.929
+And then once it's saved,
+we actually have to go to Actions, and
+
+153
+00:09:55.929 --> 00:09:57.200
+hit Publish new version.
+
+154
+00:09:58.220 --> 00:09:59.770
+And you could give
+a description if you want.
+
+155
+00:10:01.770 --> 00:10:04.610
+You can see how much confidence
+I have in my live Regex.
+
+156
+00:10:04.610 --> 00:10:05.610
+Call it initial attempt.
+
+157
+00:10:07.000 --> 00:10:09.320
+So now we're in version one.
+
+158
+00:10:09.320 --> 00:10:11.210
+You can see that I can add triggers.
+
+159
+00:10:11.210 --> 00:10:13.770
+Again, if you don't see CloudFront,
+it's because you're not on us-east-1.
+
+160
+00:10:13.770 --> 00:10:18.280
+We go down to CloudFront, and
+it'll say configuration required.
+
+161
+00:10:18.280 --> 00:10:19.680
+And then if I click,
+
+162
+00:10:19.680 --> 00:10:24.970
+it'll just give me those little arrows
+that showed up there for a second.
+
+163
+00:10:24.970 --> 00:10:30.740
+Cool, you'll put in the CloudFront
+distribution you want to attach it to.
+
+164
+00:10:30.740 --> 00:10:34.800
+If you have a lot of these, you should go
+back to the CloudFront distribution and
+
+165
+00:10:34.800 --> 00:10:36.600
+look at the one that you actually mean,
+right?
+
+166
+00:10:36.600 --> 00:10:42.520
+Cuz trying to remember based on these
+very descriptive titles, not fun.
+
+167
+00:10:42.520 --> 00:10:43.082
+Cool, and
+
+168
+00:10:43.082 --> 00:10:47.281
+so we're gonna do this on Viewer request,
+and then we'll probably turn it on.
+
+169
+00:10:51.028 --> 00:10:53.014
+&gt;&gt; Steve Kinney: And we'll hit Save.
+
+170
+00:10:54.438 --> 00:10:59.300
+&gt;&gt; Steve Kinney: So now we have this
+new client-side route viewer request.
+
+171
+00:10:59.300 --> 00:11:01.447
+So we'll now change it as it comes in.
+
+172
+00:11:04.837 --> 00:11:06.965
+&gt;&gt; Steve Kinney: Let's go
+to Chrome where I've got
+
+173
+00:11:16.626 --> 00:11:17.208
+&gt;&gt; Steve Kinney: We'll open up
+
+174
+00:11:17.208 --> 00:11:18.760
+the dev tools, we'll go to network.
+
+175
+00:11:22.960 --> 00:11:25.920
+All right, we've made an error.
+
+176
+00:11:25.920 --> 00:11:27.540
+Now we'll play the game.
+
+177
+00:11:27.540 --> 00:11:31.100
+Of hunt down the logs,
+figure out what the issue was.
+
+178
+00:11:32.990 --> 00:11:39.925
+Now, my lucky guess is that
+they will be in us-east-2.
+
+179
+00:11:51.791 --> 00:11:53.795
+&gt;&gt; Steve Kinney: So
+we can go here to Logs.
+
+180
+00:11:53.795 --> 00:11:55.655
+And right now I'm in North Virginia,
+so you know I can't,
+
+181
+00:11:55.655 --> 00:11:57.515
+there is nothing in this one,
+let's go to Ohio.
+
+182
+00:12:00.325 --> 00:12:01.155
+Hey, there they are.
+
+183
+00:12:02.420 --> 00:12:03.339
+There's my Lambda function.
+
+184
+00:12:08.364 --> 00:12:10.490
+&gt;&gt; Steve Kinney: You can see
+it's getting the bundle.
+
+185
+00:12:21.280 --> 00:12:22.800
+&gt;&gt; Steve Kinney: There's the before and
+after.
+
+186
+00:12:31.934 --> 00:12:32.702
+&gt;&gt; Steve Kinney: For those two, but
+
+187
+00:12:32.702 --> 00:12:34.630
+I don't really have anything just yet
+in here.
+
+188
+00:12:35.730 --> 00:12:36.767
+So that's not super helpful.
+
+189
+00:13:00.132 --> 00:13:01.950
+&gt;&gt; Steve Kinney: Let's look at qualifiers,
+we'll go to Version,
+
+190
+00:13:01.950 --> 00:13:02.850
+and then we'll go to 1.
+
+191
+00:13:02.850 --> 00:13:06.084
+I'm gonna take a look at the code
+real quick, see if I can see it.
+
+192
+00:13:13.643 --> 00:13:17.335
+&gt;&gt; Steve Kinney: So one of the things we
+can do, if we're trying to debug this,
+
+193
+00:13:17.335 --> 00:13:18.540
+is we can test it.
+
+194
+00:13:18.540 --> 00:13:20.230
+Now, we hit this Test button.
+
+195
+00:13:20.230 --> 00:13:26.320
+It's a little tricky because
+that's not my object.
+
+196
+00:13:26.320 --> 00:13:31.663
+If we go to the,
+one of the things that Amazon has done for
+
+197
+00:13:31.663 --> 00:13:37.031
+us though, is they have
+a Lambda Edge event structure.
+
+198
+00:13:37.031 --> 00:13:40.740
+And so this is roughly what
+a request object looks like.
+
+199
+00:13:40.740 --> 00:13:45.720
+And this is roughly, there's a response
+object, I believe down below.
+
+200
+00:13:45.720 --> 00:13:48.450
+Right, what a response object looks like,
+and all the things in it.
+
+201
+00:13:48.450 --> 00:13:50.860
+The thing is,
+you get a lot of information out of this.
+
+202
+00:13:50.860 --> 00:13:53.982
+So what I'm gonna do real quick,
+is I'm gonna grab the request object.
+
+203
+00:14:02.645 --> 00:14:05.777
+&gt;&gt; Steve Kinney: And now there are things
+about this I'll need to change,
+
+204
+00:14:05.777 --> 00:14:09.440
+like the URI, for instance,
+will not be what I initially wanted.
+
+205
+00:14:09.440 --> 00:14:12.522
+But let's go ahead and give it a shot.
+
+206
+00:14:24.913 --> 00:14:26.778
+&gt;&gt; Steve Kinney: So under the.
+
+207
+00:14:29.647 --> 00:14:31.416
+&gt;&gt; Steve Kinney: Let's change this to.
+
+208
+00:14:46.880 --> 00:14:54.642
+&gt;&gt; Steve Kinney: It looks
+like it is working.
+
+209
+00:14:57.326 --> 00:14:58.430
+&gt;&gt; Steve Kinney: I think
+I see the problem.
+
+210
+00:14:59.580 --> 00:15:01.920
+That needs to be /index.html.
+
+211
+00:15:04.693 --> 00:15:07.700
+&gt;&gt; Steve Kinney: So,
+what I'm gonna do is, in version 1,
+
+212
+00:15:07.700 --> 00:15:10.550
+I'm gonna take this one off and save it.
+
+213
+00:15:10.550 --> 00:15:12.940
+Let me, zoom in's all weird.
+
+214
+00:15:14.455 --> 00:15:19.330
+&gt;&gt; Steve Kinney: And so the issue was
+I forgot a prefixed slash, right?
+
+215
+00:15:19.330 --> 00:15:22.130
+So it's just going to index.html,
+when it is /index.html.
+
+216
+00:15:22.130 --> 00:15:24.750
+So we'll go ahead and we'll change that.
+
+217
+00:15:24.750 --> 00:15:26.440
+We'll go to Latest,
+you can only edit Latest.
+
+218
+00:15:26.440 --> 00:15:28.220
+So it's a little tricky.
+
+219
+00:15:28.220 --> 00:15:31.380
+With a regular Lambda1, you can edit
+it and the events will flow through.
+
+220
+00:15:31.380 --> 00:15:35.840
+Because these are distributed,
+you can only deploy a published version,
+
+221
+00:15:35.840 --> 00:15:37.627
+and you can only edit Latest.
+
+222
+00:15:37.627 --> 00:15:45.020
+So there is my amazing change.
+
+223
+00:15:45.020 --> 00:15:47.510
+And what I'll do is,
+I will publish a new version.
+
+224
+00:15:50.598 --> 00:15:54.544
+&gt;&gt; Steve Kinney: We'll go to version 2.
+
+225
+00:15:54.544 --> 00:15:56.241
+We'll set up CloudFront.
+
+226
+00:15:59.048 --> 00:16:02.333
+&gt;&gt; Steve Kinney: We'll set
+it on the Viewer request.
+
+227
+00:16:04.757 --> 00:16:06.686
+&gt;&gt; Steve Kinney: Enable it.
+
+228
+00:16:08.756 --> 00:16:10.190
+&gt;&gt; Steve Kinney: And save it.
+
+229
+00:16:10.190 --> 00:16:14.976
+Now, CloudFront and Lambda@Edge will only
+let you have one viewer request function.
+
+230
+00:16:14.976 --> 00:16:17.056
+So if you have another one somewhere,
+
+231
+00:16:17.056 --> 00:16:20.702
+you basically need to have one
+Lambda that will handle all of them.
+
+232
+00:16:20.702 --> 00:16:22.430
+But we only have one so far.
+
+233
+00:16:28.350 --> 00:16:34.750
+Cool, and so you can see that our
+website is back, and we got a 200.
+
+234
+00:16:34.750 --> 00:16:41.564
+Now if we add a whole bunch of 0s here,
+or zeroes in this case.
+
+235
+00:16:41.564 --> 00:16:42.988
+It might take a while to distribute.
+
+236
+00:16:56.193 --> 00:16:58.490
+&gt;&gt; Steve Kinney: We actually,
+we missed a step.
+
+237
+00:16:58.490 --> 00:17:03.066
+We had, the two things that we had
+to do if we go back to the slides,
+
+238
+00:17:03.066 --> 00:17:07.080
+is do our awesome change, and
+then put CloudFront back.
+
+239
+00:17:07.080 --> 00:17:09.810
+So if you don't do one of
+the two steps it doesn't work.
+
+240
+00:17:11.440 --> 00:17:12.690
+Unless.
+
+241
+00:17:15.951 --> 00:17:23.390
+&gt;&gt; Steve Kinney: Cool, we'll go here,
+change our Error Pages.
+
+242
+00:17:26.150 --> 00:17:29.280
+We'll edit it back to 404s.
+
+243
+00:17:32.508 --> 00:17:34.858
+&gt;&gt; Steve Kinney: Sweet.
+
+244
+00:17:34.858 --> 00:17:36.634
+&gt;&gt; Steve Kinney: I'm gonna
+fix this one as well.
+
+245
+00:17:41.305 --> 00:17:46.032
+&gt;&gt; Steve Kinney: All right that will
+put my CloudFront distributions back
+
+246
+00:17:46.032 --> 00:17:47.613
+into In progress.
+
+247
+00:17:47.613 --> 00:17:49.345
+But we're gonna take it for
+a spin regardless,
+
+248
+00:17:49.345 --> 00:17:52.190
+and if we need to give it a second or
+two then we'll do that.
+
+249
+00:17:52.190 --> 00:17:53.098
+But before we.
+
+250
+00:17:56.743 --> 00:17:57.915
+&gt;&gt; Steve Kinney: That was
+pretty quick actually.
+
+251
+00:17:57.915 --> 00:18:02.763
+Notes, or notes,
+like that melodramatic Darth Vader at
+
+252
+00:18:02.763 --> 00:18:05.895
+the end of Episode III, is a 404.
+
+253
+00:18:05.895 --> 00:18:07.191
+Someone got that.
+
+254
+00:18:08.794 --> 00:18:10.125
+&gt;&gt; Steve Kinney: Well, notes.
+
+255
+00:18:15.714 --> 00:18:17.110
+&gt;&gt; Steve Kinney: Is a 200.
+
+256
+00:18:17.110 --> 00:18:22.832
+So we have fixed
+the client-side routing problem.
+
+257
+00:18:22.832 --> 00:18:26.388
+That most people that have client-side
+apps that don't have server
+
+258
+00:18:26.388 --> 00:18:28.880
+site rendering, just get hand wavy about.
+
+259
+00:18:28.880 --> 00:18:32.130
+Either you had to treat
+valid URLs as 404s,
+
+260
+00:18:32.130 --> 00:18:35.080
+or you had to treat invalid URLs as 200s.
+
+261
+00:18:35.080 --> 00:18:36.870
+And we've just been living like this.
+
+262
+00:18:36.870 --> 00:18:38.932
+Like animals, honestly, for
+
+263
+00:18:38.932 --> 00:18:43.307
+however many years that we've
+had fancy client-side routers.
+
+264
+00:18:43.307 --> 00:18:44.495
+I mean, who amongst us hasn't?
+

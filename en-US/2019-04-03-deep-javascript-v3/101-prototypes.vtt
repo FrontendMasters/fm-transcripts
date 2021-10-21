@@ -1,0 +1,683 @@
+WEBVTT
+
+1
+00:00:00.100 --> 00:00:03.936
+&gt;&gt; Kyle Simpson: So now you understand
+what the syntactic sugar layer looks like,
+
+2
+00:00:03.936 --> 00:00:07.214
+but let's peel back the covers,
+look underneath, and
+
+3
+00:00:07.214 --> 00:00:11.839
+find out how the prototype system that
+it's layered on top of actually works.
+
+4
+00:00:11.839 --> 00:00:15.841
+Exactly the same as everything else I've
+taught you, it's better to understand
+
+5
+00:00:15.841 --> 00:00:20.089
+these systems than to just have, well, I
+don't know how it works, it's a black box.
+
+6
+00:00:20.089 --> 00:00:23.650
+Or worse,
+have a totally wrong mental model for it.
+
+7
+00:00:23.650 --> 00:00:27.341
+So we wanna look at how
+the prototype system works, and
+
+8
+00:00:27.341 --> 00:00:32.090
+specifically how its used to implement
+class systems in JavaScript.
+
+9
+00:00:32.090 --> 00:00:36.296
+First observation I would make is that
+objects that exist in our programs that we
+
+10
+00:00:36.296 --> 00:00:38.993
+can see and that we create or
+that we interact with,
+
+11
+00:00:38.993 --> 00:00:42.542
+they're always created by these
+so-called constructor calls.
+
+12
+00:00:42.542 --> 00:00:47.409
+You might remember in our discussion
+of this keyword that I said that new in
+
+13
+00:00:47.409 --> 00:00:50.560
+front of a function call
+is a constructor call.
+
+14
+00:00:50.560 --> 00:00:54.674
+That is not the same thing as
+saying there's a constructor,
+
+15
+00:00:54.674 --> 00:00:57.658
+it is to simply say that
+that is basically for
+
+16
+00:00:57.658 --> 00:01:02.255
+lack of a better term when you use
+new in front of a function call it's
+
+17
+00:01:02.255 --> 00:01:07.279
+constructing an object to be used for
+this binding of that function call.
+
+18
+00:01:07.279 --> 00:01:08.559
+So that's where objects come from.
+
+19
+00:01:08.559 --> 00:01:11.731
+They come via new from
+these constructor calls.
+
+20
+00:01:11.731 --> 00:01:16.511
+And it is often said that in that process
+of constructing these new objects
+
+21
+00:01:16.511 --> 00:01:21.150
+that it's making that object based
+on the constructor's prototype.
+
+22
+00:01:23.909 --> 00:01:27.160
+&gt;&gt; Kyle Simpson: That phrase based on
+is what I have to take issue with.
+
+23
+00:01:27.160 --> 00:01:30.316
+So I'm gonna just for
+a moment diverge from or
+
+24
+00:01:30.316 --> 00:01:33.150
+go down from talking about JavaScript.
+
+25
+00:01:33.150 --> 00:01:36.291
+I'll take off the JavaScript hat for
+a moment, and
+
+26
+00:01:36.291 --> 00:01:39.810
+I wanna talk more about
+the foundations of class theory.
+
+27
+00:01:39.810 --> 00:01:45.523
+As if you were in CS101 and they were
+gonna teach you all about classes,
+
+28
+00:01:45.523 --> 00:01:49.129
+what would they explain
+to you about classes?
+
+29
+00:01:49.129 --> 00:01:54.397
+Well, number one, the most common metaphor
+to describe the difference between
+
+30
+00:01:54.397 --> 00:01:59.209
+a class and an instance is that a class
+is the abstract pattern for a thing.
+
+31
+00:01:59.209 --> 00:02:02.270
+It's like a blueprint.
+
+32
+00:02:02.270 --> 00:02:07.820
+And the instance is like when an architect
+takes the blueprint and builds the thing.
+
+33
+00:02:07.820 --> 00:02:10.880
+It's the literal concrete thing.
+
+34
+00:02:10.880 --> 00:02:14.759
+So we have blueprint, abstract,
+plan, that's the class.
+
+35
+00:02:14.759 --> 00:02:18.119
+We have physical, concrete,
+object, that's the instance.
+
+36
+00:02:18.119 --> 00:02:21.100
+That's the most common of those metaphors.
+
+37
+00:02:21.100 --> 00:02:25.000
+Now in that metaphor,
+whether you realize it or not,
+
+38
+00:02:25.000 --> 00:02:28.129
+there's something being implied to you.
+
+39
+00:02:28.129 --> 00:02:30.742
+And you're picking up on and
+you're internalizing,
+
+40
+00:02:30.742 --> 00:02:34.169
+just like anybody else that's ever
+done class-oriented coding has.
+
+41
+00:02:34.169 --> 00:02:42.580
+And it is that class-oriented coding
+is fundamentally a copy operation.
+
+42
+00:02:42.580 --> 00:02:46.292
+And I get push back on this a lot, when I
+say this, people that like classes will
+
+43
+00:02:46.292 --> 00:02:49.458
+push back and they say, no,
+no, no, but, but, but, but.
+
+44
+00:02:49.458 --> 00:02:53.097
+And they'll point to lots of other
+examples of languages where it's
+
+45
+00:02:53.097 --> 00:02:54.109
+not exactly that.
+
+46
+00:02:54.109 --> 00:02:58.076
+The truth is that there is
+no one specific standard for
+
+47
+00:02:58.076 --> 00:03:01.169
+what the class design pattern really is.
+
+48
+00:03:01.169 --> 00:03:02.931
+There's a lots of different ones.
+
+49
+00:03:02.931 --> 00:03:08.972
+But it is also true that the majority of
+people that write JavaScript, the first
+
+50
+00:03:08.972 --> 00:03:14.849
+time they ever saw something like a class
+was in a language like Java or C++.
+
+51
+00:03:14.849 --> 00:03:21.490
+So Java and C++'s flavor of classes is
+heavily influential in the mind and
+
+52
+00:03:21.490 --> 00:03:25.550
+mental model that people
+have about classes.
+
+53
+00:03:25.550 --> 00:03:29.526
+Certainly my CS program did all Java and
+all C++, that's the only
+
+54
+00:03:29.526 --> 00:03:33.879
+class learning they did for the entire
+however many years I was in school.
+
+55
+00:03:33.879 --> 00:03:38.793
+And I think I'm definitely not the only
+one who comes to JavaScript by way of
+
+56
+00:03:38.793 --> 00:03:43.090
+what I would call more traditional
+class-oriented languages.
+
+57
+00:03:43.090 --> 00:03:47.999
+And when we say this idea of copying,
+and when we teach it in a CS program
+
+58
+00:03:47.999 --> 00:03:51.930
+as if there's a copy behavior,
+that means something.
+
+59
+00:03:51.930 --> 00:03:54.716
+It means something about our expectations,
+
+60
+00:03:54.716 --> 00:03:59.270
+our even subconscious expectations
+about what we think the code will do.
+
+61
+00:03:59.270 --> 00:04:03.745
+So here's why that metaphor implies
+that copy relationship without you
+
+62
+00:04:03.745 --> 00:04:05.660
+potentially even knowing it.
+
+63
+00:04:05.660 --> 00:04:08.579
+Let's imagine that you draw up
+the blueprints for a building and
+
+64
+00:04:08.579 --> 00:04:10.047
+then you go build the building.
+
+65
+00:04:10.047 --> 00:04:13.359
+The architect builds, he designs it and
+then somebody goes and builds it.
+
+66
+00:04:13.359 --> 00:04:19.140
+Now, what would happen if you came back
+to the blueprints and you erased a wall?
+
+67
+00:04:19.140 --> 00:04:22.331
+Is that wall gonna disappear
+from the building?
+
+68
+00:04:22.331 --> 00:04:25.370
+No, that would be crazy, right?
+
+69
+00:04:25.370 --> 00:04:28.520
+That would be really weird.
+
+70
+00:04:28.520 --> 00:04:30.737
+What happens if you went
+to the building and
+
+71
+00:04:30.737 --> 00:04:34.009
+you installed a new window that
+wasn't in the original plans?
+
+72
+00:04:34.009 --> 00:04:37.435
+Does it magically show
+up on the blueprint?
+
+73
+00:04:37.435 --> 00:04:42.332
+The reason is because the relationship
+that existed between the blueprint and
+
+74
+00:04:42.332 --> 00:04:45.891
+the building existed for
+the split second, if you will,
+
+75
+00:04:45.891 --> 00:04:48.765
+that it was being instantiated.
+
+76
+00:04:48.765 --> 00:04:53.229
+The characteristics from
+the blueprint were copied into
+
+77
+00:04:53.229 --> 00:04:58.070
+the real building and
+then the relationship ceased to exist.
+
+78
+00:04:58.070 --> 00:04:59.579
+You follow me?
+
+79
+00:04:59.579 --> 00:05:01.369
+So that metaphor in and of itself and
+
+80
+00:05:01.369 --> 00:05:04.839
+the way we think about what we're
+doing when we're instantiating.
+
+81
+00:05:04.839 --> 00:05:07.122
+When you make an instance of a class,
+
+82
+00:05:07.122 --> 00:05:12.439
+the mental model that you're getting is my
+instance is a copy of all those behaviors.
+
+83
+00:05:12.439 --> 00:05:16.779
+They're inherited, and that's copying.
+
+84
+00:05:16.779 --> 00:05:18.127
+Speaking of inherited,
+
+85
+00:05:18.127 --> 00:05:22.682
+when you start talking about classes you
+immediately start talking about parent and
+
+86
+00:05:22.682 --> 00:05:25.520
+child classes, and
+all what inheritance is about.
+
+87
+00:05:25.520 --> 00:05:30.610
+An inheritance is also
+fundamentally a copy operation.
+
+88
+00:05:30.610 --> 00:05:34.470
+The metaphor that's most often used to
+describe inheritance is the genetic
+
+89
+00:05:34.470 --> 00:05:35.080
+metaphor.
+
+90
+00:05:35.080 --> 00:05:39.886
+Now I have a son, he's eight years old and
+when he was created,
+
+91
+00:05:39.886 --> 00:05:41.620
+he got a copy of my DNA.
+
+92
+00:05:43.310 --> 00:05:47.720
+&gt;&gt; Kyle Simpson: He now exist as
+an entirely independent person.
+
+93
+00:05:47.720 --> 00:05:52.694
+If he breaks his leg in his baseball game
+tonight, my leg is not gonna get broken.
+
+94
+00:05:52.694 --> 00:05:56.489
+And if I lose my hair someday,
+hopefully he does lose his hair.
+
+95
+00:05:56.489 --> 00:05:58.512
+We are distinct people, but
+
+96
+00:05:58.512 --> 00:06:04.005
+we had a relationship at the moment of
+creation that was a copy relationship.
+
+97
+00:06:06.630 --> 00:06:10.393
+&gt;&gt; Kyle Simpson: As a matter of fact,
+even when you think about many languages,
+
+98
+00:06:10.393 --> 00:06:13.730
+interpreters, compilers,
+will implement classes,
+
+99
+00:06:13.730 --> 00:06:17.280
+they will actually flatten them for
+performance reasons.
+
+100
+00:06:17.280 --> 00:06:21.407
+They will literally copy down into
+the instance, cuz it's much faster for
+
+101
+00:06:21.407 --> 00:06:25.797
+the instance to have a reference to the
+function instead of having to look up some
+
+102
+00:06:25.797 --> 00:06:27.650
+dynamic class hierarchy chain.
+
+103
+00:06:27.650 --> 00:06:31.609
+They only maintain the class hierarchy
+chain when there's relative polymorphism.
+
+104
+00:06:31.609 --> 00:06:33.772
+It's called a virtual table.
+
+105
+00:06:33.772 --> 00:06:36.329
+That's from C++, okay?
+
+106
+00:06:36.329 --> 00:06:39.458
+So in all possible ways
+that you slice this,
+
+107
+00:06:39.458 --> 00:06:44.380
+the relationship that is implied
+by classes is a copy relationship.
+
+108
+00:06:44.380 --> 00:06:48.058
+And so we pop the stack of
+our conversation back to
+
+109
+00:06:48.058 --> 00:06:52.289
+this statement on the slide,
+and that phrase based on.
+
+110
+00:06:52.289 --> 00:06:58.148
+When we say a constructor call is making
+the object based on its prototype,
+
+111
+00:06:58.148 --> 00:07:02.612
+we're saying in our mental
+model that the constructor is
+
+112
+00:07:02.612 --> 00:07:06.340
+making a copy of the prototype
+in the instance.
+
+113
+00:07:06.340 --> 00:07:09.633
+Except there's a little tiny detail,
+
+114
+00:07:09.633 --> 00:07:14.039
+which is JavaScript doesn't
+do any copying at all.
+
+115
+00:07:14.039 --> 00:07:18.293
+As a matter of fact, to properly describe
+what is happening when a constructor call
+
+116
+00:07:18.293 --> 00:07:22.329
+makes an object, it doesn't make it
+based on the constructor's prototype.
+
+117
+00:07:22.329 --> 00:07:25.069
+It makes it linked to the prototype.
+
+118
+00:07:28.170 --> 00:07:31.770
+&gt;&gt; Kyle Simpson: Now there are many
+that have argued with me and
+
+119
+00:07:31.770 --> 00:07:34.612
+said, it have disagreed with me and
+
+120
+00:07:34.612 --> 00:07:40.065
+said copying versus linking is
+a distinction without difference.
+
+121
+00:07:40.065 --> 00:07:44.625
+There's no difference there, it doesn't
+matter, there are just two different sides
+
+122
+00:07:44.625 --> 00:07:47.780
+of the same thing,
+linking is just the dynamic form of copy.
+
+123
+00:07:47.780 --> 00:07:49.500
+And I couldn't disagree more.
+
+124
+00:07:51.120 --> 00:07:55.762
+Linking and copying are not just two
+different sides of the same coin,
+
+125
+00:07:55.762 --> 00:08:01.280
+they are completely and fundamentally and
+diametrically opposite to each other.
+
+126
+00:08:01.280 --> 00:08:04.891
+And they completely change what your
+expectation of a system is based on
+
+127
+00:08:04.891 --> 00:08:07.479
+whether your mental model
+is all about copying, or
+
+128
+00:08:07.479 --> 00:08:09.540
+your mental model is all about linking.
+
+129
+00:08:12.310 --> 00:08:15.360
+&gt;&gt; Kyle Simpson: It matters what
+mental model you're using for
+
+130
+00:08:15.360 --> 00:08:19.669
+expectation because when the program
+breaks, why did it break?
+
+131
+00:08:19.669 --> 00:08:23.240
+It broke because you had a divergence
+between what you were thinking,
+
+132
+00:08:23.240 --> 00:08:26.610
+your mental model, and
+what the system was actually doing.
+
+133
+00:08:26.610 --> 00:08:31.000
+If you're thinking copying and it's doing
+linking, guess what is going to occur.
+
+134
+00:08:31.000 --> 00:08:35.020
+Not maybe, will occur, bugs.
+
+135
+00:08:35.020 --> 00:08:37.484
+Cuz your mental model diverges
+from the way it works.
+
+136
+00:08:39.553 --> 00:08:43.081
+&gt;&gt; Kyle Simpson: So I have a problem
+with this whole notion of trying to take
+
+137
+00:08:43.081 --> 00:08:47.420
+a class system, which is fundamentally
+copy, the design pattern's
+
+138
+00:08:47.420 --> 00:08:52.223
+fundamentally copy, and put it on top
+of a language that doesn't do copies.
+
+139
+00:08:54.019 --> 00:08:56.010
+&gt;&gt; Kyle Simpson: It doesn't fit.
+
+140
+00:08:56.010 --> 00:09:00.683
+And it shouldn't be surprising that
+we've had so much trouble making
+
+141
+00:09:00.683 --> 00:09:05.369
+JavaScript look and feel and
+behave like a class-related language.
+
+142
+00:09:05.369 --> 00:09:08.539
+They're just not designed to fit together.
+
+143
+00:09:08.539 --> 00:09:14.023
+At least in the mental model you
+get from say a Java or a C++.
+
