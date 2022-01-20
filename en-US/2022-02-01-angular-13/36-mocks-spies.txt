@@ -1,0 +1,84 @@
+[00:00:00]
+>> So now that we have covered the very basics of testing a component, the last thing that I want to leave you with is how do you handle a component that has a dependency. Thankfully, Angular works on a concept of dependency injection. And so hopefully at this point, this is nothing new.
+
+[00:00:30]
+But I have a component that has a dependency that calls a service, that calls a server that mutates a database or something. You typically do not want to use real services in your component tests. It's really, really important that when you're writing a test, you are only testing the thing that is under test.
+
+[00:00:53]
+So meaning if I am testing this app component and I look at this, I see that I also have the authService that's being injected in. And right now it's currently not doing anything and our tests are not forcing this authService to do anything, but let's say we were testing logout and it actually hit a real database.
+
+[00:01:20]
+Well, that would be bad. And more importantly is that if it returned some kind of a result, we won't want to test the correctness of that result inside of the component test. When we look at a method like this, the question is, what does logout do? Well, when you call logout, it calls logout on the authService.
+
+[00:01:49]
+That's what you need to be able to test. You do not need to be able to test. For instance the temptation might be that if I click on the authService, here you'll notice that when somebody calls logout that it sets a property locally on this class to false.
+
+[00:02:13]
+And so we're keeping track of within the stream is this authenticated? Well, it would be a misstep that when we call this within our app components spec to test the properties on the authService, like we expect that authService dot is authenticated to be false. The reason being is because that test or that assertion belongs in the authService test.
+
+[00:02:42]
+And so what we need is the ability to segment and isolate our component and provide something that looks and feels like a real dependency, but in fact, is not. And so this is where we can leverage the dependency injection system to use mocks, and by extension, spies. So what I want to do is I want to override the authService and use something else in its place.
+
+[00:03:18]
+So not too hard, the first thing that I recommend when starting out on this is this right here. I would just simply create a mock object. So in this case, we're gonna call it mockAuthService. And what I'm gonna do here is I know we are calling it logout and I'm going to give it a property of noop or no op.
+
+[00:03:50]
+And I'll define this up here. And this is just something that I've picked up from doing just this over and over and over is a lot of times I will create an empty function. It's called noop or no operation. It doesn't do anything. I just need an empty function to exist in its place.
+
+[00:04:13]
+So now, what I can do is take this mockAuthService and I can use this in place of the real service. So what I need to do as well is create a reference to the authService, and then within the, TestBed configuration, I am going to update this to have a providers array, and I'm going to add in a new object.
+
+[00:04:53]
+And so from here, we're going to provide AuthService and instead of using the AuthService we're going to go useValue. And we're going to go mockAuthService. So what we're saying is I wanna provide the AuthService, but in its place, I want to use value. You can use a couple different things here, use class, I think you can even use object.
+
+[00:05:21]
+There's a few ways to do this, but typically I just will use an object and therefore, I can use value. So now we have essentially overridden the AuthService with our mockAuthService. Now what I wanna do is I want to get a reference to this. So service = TestBed.inject(AuthService).
+
+[00:05:52]
+The particular semantics around this is a little funny to me because I feel like you would be injecting something into the TestBed. But what this does is actually return whatever instance of the AuthService that it has. Which, in this case, will be our mockAutService. So semantics or the API, the way that they define that seems a little funny to me.
+
+[00:06:23]
+But, nonetheless, it is what it is. And so from here, we are going to write one more test to illustrate how to take our mock service, and then we're going to spy on it. So from here, it should properly delegate logout responsibility. And so when we do this, what we want is not to test that we were even logged out, we just want to test or verify that the component itself has properly delegated.
+
+[00:07:10]
+So we're going to use spyOn and this is a created Jasmine spy. And we're gonna spy on the service and we're going to specifically spy on the logout method. And from here, we're going to go and. And you'll notice you have a number of options here callFake, callThrough, returnValue, there's a lot of things we can do here.
+
+[00:07:42]
+In this case, I am just going to callThrough. There we go. And so you can create a spy, and if you need or if the component or whatever you're testing needs for this to complete, or there's some kind of expected flow and you don't allow the spy to callThrough.
+
+[00:08:05]
+Once it hits this, it will stop. And so by doing spyOn and callThrough is it spies on that method but then it allows it to execute normally. And then from here, so real quick, Arrange. Let's go ahead and act. So what we wanna do is we wanna call component.logout, and then we're going to assert.
+
+[00:08:35]
+So from here, we would expect that services or service rather logout. What do we expect? Well, that it should have been called, all right? We'll save this and let's hop into our test here and let's see what else happened. Apparently, it's looking for something and it doesn't exist.
+
+[00:09:17]
+So the reason why I allowed this to happen is because I wanted to highlight what a typical kind of workflow is, at least for me. You will spend probably 80% of your time satisfying dependencies within an application. And so in this case, it's looking for, Pipe. Well, pipe on what?
+
+[00:09:43]
+Well, let's go into our code and let's check this out. So if we go into our app component. That's right. I thought we were only using authService.logout, but we're also referencing isAuthenticated, which is an observable string. So I've mocked out the authService, but I haven't done it enough, I missed a piece.
+
+[00:10:12]
+And so this is where for me typically what I'll do is I'll mock out the bare minimum and then I'll just add in the pieces that I need. So you only have to mock out the pieces that your component under test is using. So in this case, if I go back to my spec, I need to update my mockAuthService to have an isAuthenticated.
+
+[00:10:43]
+We spelled that right. Property, that is going to have an observable string. Well, how you can handle that is by using the of operator from RxJS, and I'm just going to send in true. We'll save this. And let's go back into our code. And you can see here that it did indeed pass.
+
+[00:11:12]
+So just to review, we have created an object that represents just the pieces of the AuthService that we're using inside of our app component. This is what we happen to be testing. And so we have a logout property, that's a noop. We have isAuthenticated, which is just an observable string of true.
+
+[00:11:37]
+And then from here, we are overriding the provider by saying provide : AuthService, UseValue : mockAuthService. And then using TestBed.inject, we're able to get a reference to the AuthService, which in this case is actually the underlying is the mockAuthService, that's the actual instance itself. And then from here, we are calling spyOn and we're spying on the logout service.
+
+[00:12:08]
+And when we call component.logout, what we want to assert is that we have called or that service.logout has been called. And so this is really important that when you're testing a method that calls another method, using spies, that it's really, really easy to verify the delegation. So if I were going to even test a, let's say, a HTTP service.
+
+[00:12:41]
+So I'll pull this up real quick, just as a parting thought exercise, and if we look in shared and I go to my courses.service. The question here is, how would we test this? Well, if I called createCourse, two things are happening. It's calling the notificationService and it's calling http.post.
+
+[00:13:14]
+And so what I would do is I'd verify that notificationService.notify was called. And in this case, I could verify that http.post was called with a mock course. And so I'm not validating any of the results, but what I am doing is using spies, I am validating that it was properly delegated.
+
+[00:13:42]
+And so this is how you can use or test a component with dependencies. And then from there, spy on that mocked out dependency to make sure that it has done exactly what it advertised to do, that delegation was handled properly.
+

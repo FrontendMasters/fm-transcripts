@@ -1,0 +1,615 @@
+WEBVTT
+
+1
+00:00:00.170 --> 00:00:04.560
+A common technique for optimizing a heavy
+
+2
+00:00:04.560 --> 00:00:10.080
+application is to break it
+up into smaller modules or
+
+3
+00:00:10.080 --> 00:00:16.310
+pieces that get loaded lazily or
+when the user requests.
+
+4
+00:00:16.310 --> 00:00:21.849
+So, imagine you have an application
+that has let's say 20 features.
+
+5
+00:00:21.849 --> 00:00:27.087
+And your entire payload is massive
+that I've seen applications
+
+6
+00:00:27.087 --> 00:00:31.460
+sometimes being 20 megabytes large,
+very large.
+
+7
+00:00:31.460 --> 00:00:37.376
+And unfortunately the first time
+you go to an application like this,
+
+8
+00:00:37.376 --> 00:00:42.377
+you have to download the entire
+payload to make that work.
+
+9
+00:00:42.377 --> 00:00:47.330
+And so somebody is waiting a very
+long time for the application to
+
+10
+00:00:47.330 --> 00:00:52.990
+just even do its first meaningful
+content paint in for to render.
+
+11
+00:00:52.990 --> 00:00:57.662
+And so the idea is,
+what if we only loaded the pieces
+
+12
+00:00:57.662 --> 00:01:01.470
+that we needed when we needed them?
+
+13
+00:01:01.470 --> 00:01:06.642
+And so, a strategy for this or
+how you approach this is going
+
+14
+00:01:06.642 --> 00:01:14.180
+to depend on your circumstances and
+more importantly on your users behavior.
+
+15
+00:01:14.180 --> 00:01:20.271
+So for instance, if you have
+an application that has five features,
+
+16
+00:01:20.271 --> 00:01:26.151
+and your users spend 90% of their
+time in two of those features,
+
+17
+00:01:26.151 --> 00:01:31.630
+I would recommend loading
+those in the initial bundle.
+
+18
+00:01:31.630 --> 00:01:36.600
+But if the other 10% of
+their time is spent randomly
+
+19
+00:01:36.600 --> 00:01:41.681
+accessing the other three features,
+then you could,
+
+20
+00:01:41.681 --> 00:01:48.550
+one break those three up into a second
+module or into individual modules.
+
+21
+00:01:48.550 --> 00:01:52.710
+So then you have your initial module and
+maybe three other smaller modules.
+
+22
+00:01:52.710 --> 00:01:59.125
+And so this really is going to depend on
+how your users use your application and
+
+23
+00:01:59.125 --> 00:02:05.060
+where kind of the behavior is
+distributed across your entire feature.
+
+24
+00:02:05.060 --> 00:02:11.490
+So you could split it up in half,
+you could do a lazy module for each.
+
+25
+00:02:11.490 --> 00:02:15.772
+The one thing that I do wanna point
+out that most people will say,
+
+26
+00:02:15.772 --> 00:02:20.708
+like well the more modules the better,
+that just makes sense, right?
+
+27
+00:02:20.708 --> 00:02:27.598
+Well, especially in countries that
+have an underdeveloped infrastructure,
+
+28
+00:02:27.598 --> 00:02:33.164
+like third world countries or
+even drought in like a rural area.
+
+29
+00:02:33.164 --> 00:02:39.720
+And you are on a like a 3G network or
+something equivalent.
+
+30
+00:02:39.720 --> 00:02:44.518
+The most expensive operation
+you can do on that device
+
+31
+00:02:44.518 --> 00:02:48.149
+is to make an XHR callback to the server.
+
+32
+00:02:48.149 --> 00:02:51.951
+The reason being is
+that unlike a computer,
+
+33
+00:02:51.951 --> 00:02:56.061
+a phone has to activate
+hardware pin the tower,
+
+34
+00:02:56.061 --> 00:03:01.580
+do a handshake, then get the thing and
+then complete it.
+
+35
+00:03:01.580 --> 00:03:05.241
+And so,
+in some cases it is a lot better for
+
+36
+00:03:05.241 --> 00:03:11.220
+the user to have a larger payload but
+reduce the calls over the wire.
+
+37
+00:03:11.220 --> 00:03:15.492
+So, I just want to put that out
+there that this is a balance
+
+38
+00:03:15.492 --> 00:03:19.408
+that making XHR calls to
+a server is also expensive,
+
+39
+00:03:19.408 --> 00:03:23.960
+and if you're on a handheld device,
+it's very expensive.
+
+40
+00:03:23.960 --> 00:03:29.930
+So, depending on your user base,
+you may want to factor that in.
+
+41
+00:03:29.930 --> 00:03:36.750
+So, with that said, let's talk about
+how to implement a lazy module.
+
+42
+00:03:36.750 --> 00:03:40.770
+And so, I'm going to go into the code and
+
+43
+00:03:40.770 --> 00:03:48.225
+I'm going to walk through some code
+that I have preemptively generated and
+
+44
+00:03:48.225 --> 00:03:52.550
+just show you what we are starting with.
+
+45
+00:03:52.550 --> 00:03:59.527
+So, when you are lazy loading a module,
+naturally you need a module,
+
+46
+00:03:59.527 --> 00:04:06.401
+and so this looks exactly like any
+other module that we would create.
+
+47
+00:04:06.401 --> 00:04:10.557
+So, very similar to our app module, and
+
+48
+00:04:10.557 --> 00:04:15.570
+you'll notice here that
+we have our component,
+
+49
+00:04:15.570 --> 00:04:19.491
+we also have our lazy routing module.
+
+50
+00:04:19.491 --> 00:04:24.413
+And if we step into this,
+then what you're gonna
+
+51
+00:04:24.413 --> 00:04:28.375
+see is that we have a route defined for or
+
+52
+00:04:28.375 --> 00:04:33.299
+think of this as a top level
+component that we have
+
+53
+00:04:33.299 --> 00:04:38.009
+a top level route for
+this particular module.
+
+54
+00:04:38.009 --> 00:04:41.613
+As well as we're doing router module for
+
+55
+00:04:41.613 --> 00:04:47.020
+child because this is going to be
+added in as a child module and
+
+56
+00:04:47.020 --> 00:04:51.340
+we're not loading this into the route.
+
+57
+00:04:51.340 --> 00:04:56.706
+And so, this is very similar in
+structure philosophically to the app
+
+58
+00:04:56.706 --> 00:05:02.710
+module over here and its relationship
+to the app routing module.
+
+59
+00:05:02.710 --> 00:05:08.823
+And so in order for this to work,
+we are going to create a route for
+
+60
+00:05:08.823 --> 00:05:17.110
+this that's going to be a little different
+than anything we've seen up to this point.
+
+61
+00:05:19.230 --> 00:05:25.500
+So, we're going to create a path and
+it's going to be lazy.
+
+62
+00:05:25.500 --> 00:05:31.080
+And then from here,
+we are going to instead
+
+63
+00:05:31.080 --> 00:05:38.367
+of calling component because
+there is not a component,
+
+64
+00:05:38.367 --> 00:05:44.117
+we are going to instead
+call load children.
+
+65
+00:05:44.117 --> 00:05:48.583
+And this is going to store a function,
+and so
+
+66
+00:05:48.583 --> 00:05:53.776
+load children is essentially
+when we go to this that
+
+67
+00:05:53.776 --> 00:05:59.111
+angle under the hood is
+going to call load children.
+
+68
+00:05:59.111 --> 00:06:04.970
+And then execute the logic that we
+put in to this particular function.
+
+69
+00:06:04.970 --> 00:06:10.768
+And so from here, what we're going
+to do is we're going to import or
+
+70
+00:06:10.768 --> 00:06:13.007
+call the import method and
+
+71
+00:06:13.007 --> 00:06:18.730
+we're going to give it a path to
+the module that we want to load.
+
+72
+00:06:18.730 --> 00:06:27.070
+So in this case, it's
+examples/lazy-module/lazy-module,module.
+
+73
+00:06:27.070 --> 00:06:32.267
+So, I feel like this is either
+a vocal warm up, a tongue twister or
+
+74
+00:06:32.267 --> 00:06:36.910
+a funny joke, and
+at this point I'm trolling everybody.
+
+75
+00:06:36.910 --> 00:06:40.651
+And then from here we are going to,
+
+76
+00:06:40.651 --> 00:06:45.295
+because this is going to return a promise,
+
+77
+00:06:45.295 --> 00:06:50.206
+we are going to resolve
+this using that then.
+
+78
+00:06:50.206 --> 00:06:51.167
+And this is something I don't understand
+why this, they did it like this.
+
+79
+00:06:51.167 --> 00:06:55.552
+Well, I believe the reason why it is
+a promise, once I think about it for
+
+80
+00:06:55.552 --> 00:06:59.512
+like two seconds is that this is
+only ever going to resolve once.
+
+81
+00:06:59.512 --> 00:07:03.789
+And so a promise in this case,
+I believe would make sense.
+
+82
+00:07:03.789 --> 00:07:09.767
+And so from here, this is going to take
+in a single parameter which is m for
+
+83
+00:07:09.767 --> 00:07:14.865
+module, just as c is for cookie,
+that's good enough for me.
+
+84
+00:07:14.865 --> 00:07:20.243
+And then we're going to define
+the module that we want to load,
+
+85
+00:07:20.243 --> 00:07:24.005
+so in this case it's
+pulling in the module.
+
+86
+00:07:24.005 --> 00:07:27.317
+And then because within this module here,
+
+87
+00:07:27.317 --> 00:07:31.549
+this is called LazyModule,
+then it's going ahead and
+
+88
+00:07:31.549 --> 00:07:37.167
+then essentially bootstrapping that
+module into the angular runtime.
+
+89
+00:07:37.167 --> 00:07:41.829
+And so, just to recap before
+we check this out, same path,
+
+90
+00:07:41.829 --> 00:07:46.494
+the difference is that we're
+giving it a function that when
+
+91
+00:07:46.494 --> 00:07:49.967
+we call this it's gonna say loadChildren.
+
+92
+00:07:49.967 --> 00:07:53.413
+And it's going to import the module and
+
+93
+00:07:53.413 --> 00:07:58.741
+from here then it's just going
+to return the module itself,
+
+94
+00:07:58.741 --> 00:08:04.176
+the angular module that we want
+to essentially instantiate or
+
+95
+00:08:04.176 --> 00:08:08.061
+initialize or bootstrap into the runtime.
+
+96
+00:08:08.061 --> 00:08:11.637
+So now if I go here and
+I go to lazy module,
+
+97
+00:08:11.637 --> 00:08:16.090
+you'll see here that
+this is a lazy module.
+
+98
+00:08:16.090 --> 00:08:20.676
+Now, one thing I do wanna
+do is let me go ahead and
+
+99
+00:08:20.676 --> 00:08:25.050
+I'm gonna just clear my cache, Clear data.
+
+100
+00:08:26.590 --> 00:08:33.360
+If we come back here, and we go to
+the Network tab, I'm going to refresh.
+
+101
+00:08:35.160 --> 00:08:40.267
+And, you'll notice here that this,
+one of the things
+
+102
+00:08:40.267 --> 00:08:47.810
+that was loaded after it loaded everything
+else, is this particular module.
+
+103
+00:08:47.810 --> 00:08:53.238
+And, so I think I can zoom this
+up just a bit without loosing it,
+
+104
+00:08:53.238 --> 00:08:56.938
+is that this is pulling
+this over the wire.
+
+105
+00:08:56.938 --> 00:09:01.706
+So, it's wrapping up this module,
+the lazy module,
+
+106
+00:09:01.706 --> 00:09:05.654
+into a kind of a standalone
+separate module.
+
+107
+00:09:05.654 --> 00:09:08.486
+And then when we request it,
+
+108
+00:09:08.486 --> 00:09:14.032
+then it's pulling in the entire
+module over the wire and
+
+109
+00:09:14.032 --> 00:09:17.929
+then loading it into the application.
+
+110
+00:09:17.929 --> 00:09:24.434
+And so this is where if we built another
+one or we had a number of lazy modules.
+
+111
+00:09:24.434 --> 00:09:27.554
+Every time you navigated
+to that lazy module,
+
+112
+00:09:27.554 --> 00:09:32.602
+what you would see would be the bundle for
+that module coming over the wire.
+
+113
+00:09:32.602 --> 00:09:37.854
+And so, executing lazy modules or
+implementing them is fairly
+
+114
+00:09:37.854 --> 00:09:43.908
+straightforward, you simply treat
+the piece that you want to isolate.
+
+115
+00:09:43.908 --> 00:09:48.279
+So, a lot of times this might
+be a standalone feature set or
+
+116
+00:09:48.279 --> 00:09:53.741
+even a bit of functionality that is or
+a couple pieces of functionality.
+
+117
+00:09:53.741 --> 00:09:55.613
+But these go into a module and
+
+118
+00:09:55.613 --> 00:10:00.390
+in a way you have to treat that like
+almost like a separate application.
+
+119
+00:10:00.390 --> 00:10:06.715
+So a lot of times you'll have separate
+routes for it, for routing table.
+
+120
+00:10:06.715 --> 00:10:11.630
+As well as one thing that you
+can run into problems is that
+
+121
+00:10:11.630 --> 00:10:15.815
+within the module,
+if you have dependencies,
+
+122
+00:10:15.815 --> 00:10:22.330
+you need to add those dependencies
+to that standalone module as well.
+
+123
+00:10:22.330 --> 00:10:27.715
+So that when it's bundled that it has
+the dependencies that it needs and
+
+124
+00:10:27.715 --> 00:10:30.990
+it's not dependent on the parent module.
+
+125
+00:10:30.990 --> 00:10:35.957
+So in this case,
+because I was using material within our
+
+126
+00:10:35.957 --> 00:10:40.220
+lazy module,
+I needed to import that as well.
+
+127
+00:10:40.220 --> 00:10:45.810
+And so this is how lazy modules
+work within an angular application.
+

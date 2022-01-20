@@ -1,0 +1,74 @@
+[00:00:00]
+>> In a components lifespan, there's a number of things that can happen, that we want to know about. So, is the class initialized? Is the template rendered? Has something happened to the template? And so one of the most common use cases for a lifecycle hook, is if you have a component and you instantiate a component.
+
+[00:00:34]
+So this is class and template. Your constructor is fired immediately. So, the minute you go new anything, that constructor gets fired instantaneously. But what happens is dependent on data that is not there yet. And so this was a huge problem initially, when you would reference some form of data in the constructor and it wasn't there yet, it didn't exist.
+
+[00:01:06]
+And so this is where we move this into an appropriate lifecycle hook that says hey, everything has been initialized, now you can use this data. So this is implemented as methods on the component class. And you should not call these directly like they are implicitly called, unless you're writing unit tests.
+
+[00:01:31]
+And in that case, you can actually manually call a lifecycle hook to trigger some sort of functionality. What I also recommend is that within your lifecycle hook, that you're just using that as a hook specifically to delegate to something else. So, I rarely will put logic or complex logic, inside of a lifecycle hook.
+
+[00:01:58]
+And so, this is something that I see frequently, is I'll see like MG on a net. And there will be like 200 lines of code in there of the setup this, setup this, setup, the setup this. And one, that's really hard to test. You've broken the single responsibility principle.
+
+[00:02:16]
+And there's probably nested logic, and none of that code is portable. And so, your lifecycle hooks, and I felt like I should update the slide, is that these are implicitly called and should simply exist to delegate to some other independent functionality. So if you're setting up, for instance, an observable stream, you don't have to set that up in the lifecycle hook, encapsulate that into a method and then call that from the lifecycle hook.
+
+[00:02:50]
+So, that was free of charge. I just thought of it. But be really careful about putting complex setup logic in your constructor or in any kind of a lifecycle hook. They should just be there to delegate to some other functionality and call that. When you are using a lifecycle hook, you'll notice that we used, for instance, let me pull this up, implements OnInit.
+
+[00:03:20]
+And so using the lifecycle interfaces, this is optional, but it is recommended. This allows one, the angular language services, the TypeScript compiler as well as other developers, to have a better insight of what's happening. And you get all the benefits from TypeScript in the underlying tooling. So now, this is a list of the lifecycle hooks.
+
+[00:03:49]
+And there's a lot of them, you can do some really sophisticated things with them. And I'm going to simplify this. And I am going to just come out and say that you are going to use these two lifecycle hooks more than any other one. And so ngOnInit, this is called after the first ngOnChanges.
+
+[00:04:16]
+So essentially, when the template has been hydrated at least once, this is when ngOnInit gets called. When your component or your directive, your directive has a component, is being pulled off the stage or being destroyed, ngOnDestroy is called. And this is relevant because if you have something like an event listener or an observable stream, English's pretty good about cleaning it up.
+
+[00:04:49]
+But occasionally, you, especially if performance or memory consumption is a problem, this is where you would use this specific hook to clean up and tear down any outstanding event listeners or observable streams, etc. And so, fairly simple that you can pick any one of these lifecycle hooks and you just add them to your class as a class method.
+
+[00:05:25]
+And you never have to call these directly because they get called implicitly under the hood via Angular. But this is where by, essentially, implementing this interface, you're signaling to Angular, this is what is happening, and we're using this interface. And it's able to make some compilation decisions based on that.
+
+[00:05:53]
+
+>> Will we see several lifecycle hooks and action especially like the Unsubscribe ones.
+>> Well, we will see some, specifically ngOnInit. I can do ngOnDestroy, we can see that. There's a small caveat that I'll talk about later, that there are some concessions, well, I'll say this now, there are some concessions or some things that I'm introducing incrementally.
+
+[00:06:29]
+So that conceptually, especially for new developers, it's a lot easier for them to kind of wrap their mind on what's happening, or there's an approachable linear progression that exist. The the one thing that I will say, is that right here within this ngOnInit block that I am subscribing to an observable stream and unpacking it.
+
+[00:06:58]
+And then I'm more than likely binding this to something in the template. Well, this is for demonstration purposes because in real life, what I would actually I would say it's very, very rare you would ever see me use a subscribe block inside of a component. Because I can pipe this right into a template using the async pipe.
+
+[00:07:31]
+And as a result, using the async pipe, that Angular does a really good job of cleaning it up or cleaning up that code for you. So this is where I really have to use ngOnDestroy because my components are as thin as possible. And I'm leveraging the Angular framework, specifically the async pipe, to handle that for me.
+
+[00:07:55]
+There are cases where you need to do it. But again, this would be the exception, not the rule. And so, for instance, if I saw a situation where somebody was having to use ngOnDestroy heavily and they were relying on it. The very first thing that I would do, and not to be critical, but just to eliminate the possibility, is I would check to see if that is even necessary enough.
+
+[00:08:21]
+Possibly it's indicative of a larger problem. So, I do use NngOnInit quite a bit, but ngOnDestroy, not as much because when you're using an observable stream, you can just pass that right into the template and you don't need to do that. So, but I can spin one up at some point and we can see what that looks like.
+
+[00:08:46]
+So the question is, is the async pipe a better practice, or considered the best practice, versus subscribing in your component class? And the answer is absolutely yes. If you are consuming an observable stream, technically a promise in Angular we don't do that a bunch. But observable stream, if you're going to do it in a reactive fashion, which is what Angular is designed to be, I would not unpack it in the component class, I just pipe it right into the template.
+
+[00:09:18]
+So, definitely a best practice, I can show how that works in the component driven architecture module. So the question is, is the template parsed after ngOnInit is run? And the answer is no. So, if you have a parent component that has a child component, and you're passing in data from the parent component to the child component.
+
+[00:09:50]
+That template is going to be processed and where ngOnInit is going to kick off. So when you have a template that has data binding, anytime there is data, that's essentially it's being updated or it's pushing it in via binding, is you have ngOnChanges that is going to essentially fire.
+
+[00:10:17]
+So here's new data, ngOnChanges. Here's new data ngOnChanges. Well, you can have a template that's being rendered. Typically this happens very fast, but it's being processed, but the data hasn't arrived yet or the template hasn't been satisfied. So the first ngOnChanges that's fired, meaning your template is hydrated, then ngOnInit is fire.
+
+[00:10:45]
+So where ngOnInit is important is not for the parent component, but for the child component, is you know that the templates been hydrated, now I can make some decision based on this data that's been passed down. I will say in the documentation, the Angular documentation cuz I don't remember all the life cycle hooks, but there's a pretty good graphic that shows the order that it goes in.
+
+[00:11:12]
+But ngOnChanges, that means your template has its first data that's been passed in, so it's hydrated, render then ngOnInit.
+
