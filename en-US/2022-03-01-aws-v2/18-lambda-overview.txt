@@ -1,0 +1,69 @@
+[00:00:00]
+>> There is one kind of additional extra mile that we can choose to go here. And we talk about like what it is and basically how or why you might consider doing it. But it is definitely at the point of being a little bit of a victory lap at this point, which is, let's kinda look at what we have right now.
+
+[00:00:21]
+And then we'll see. So right now we have a routes, they call everything at 200. But our user experience, if we set it up and react router to have not found and all that kinda stuff, will work. We have it distributed around the world. We have it automated CICD process.
+
+[00:00:37]
+We've got HTTPS. We've got most of the things, except for that client side routing piece. And there's a little bit of improvement with our security headers that we could do, right? And these are mostly just limitations of CloudFront that we can't get around, right, kind of, right? I kinda mentioned in the very beginning that we can program our CDNs to a certain extent.
+
+[00:01:00]
+And there are two ways to do that, Lambda@Edge and these other things called CloudFront functions. Let's talk a little bit about Lambda@Edge. Like I said, it is definitely the victory lap portion of this. We have a mostly working infrastructure for most all of the major reasons. We could make some slightly better CSP headers.
+
+[00:01:19]
+We could handle this client side routes a little bit better. But beyond that, we've got it in place. So we'll talk about the two ways you can program a CDN. We'll talk about the two differences between them. And then we've got it, right? So, Lambda is a feature from AWS that came out a while back at this point.
+
+[00:01:40]
+And basically, instead of managing servers and deploying a whole bunch of stuff and updating CentOS and stuff along those lines, you simply write some code in your favorite programming language. And you say to AWS, take my code, run my code, update Linux. I don't want to. When I was a kid, I had a step of VPS.
+
+[00:02:05]
+That was worse than this, [LAUGH] right? That was not fun. So Lambdas allow you just put code on the Internet. Predominantly JavaScript Python, in our case, for Lambda@Edge is, I think you're limited to JavaScript and Python. For CloudFront functions, I use the term JavaScript loosely, right? A JavaScript like programming language.
+
+[00:02:30]
+But you can use JavaScript or Python. You could just write some code. You're like, you host it. And if anyone needs you call it, I'll pay for the compute later and pennies on the execution. Lambda@Edge allows you to do it in all of those CloudFront edge nodes that we saw earlier.
+
+[00:02:47]
+So, on every request and every response, if you need to change anything about those HTTP requests and responses, you can, on the fly, intercept them and do things. That could be, hey, I want to modify the headers to include some kind of cookie that I need, right? Like one of the examples that I see it used a lot is like AB testing.
+
+[00:03:11]
+They have no cookies set for where they should get version a of the website, version b, give them one randomly, install that cookie. So now on the request in and out, they'll either get the new hotness or not, right? Like we can call it AB testing. You're like, I don't care.
+
+[00:03:26]
+You can also call that bluegreen deploys, right? So we just deployed a new version. Start out with 10%, then 20%. If we don't have enough, if my pager isn't going off, then start moving everyone to the new deploy. You do a whole bunch of stuff along the way in and out.
+
+[00:03:43]
+You could also hypothetically add those security headers for CSP that'll get you a higher score on like Mozilla observatory that CloudFront doesn't give you by default. You could also hypothetically say, here are the known good client side routes, call those 200, call any other garbage a 400, right?
+
+[00:04:05]
+So you can do all the kind of missing features that we had along the way, as well as other stuff. Lambda@Edge functions can even call out to a database. They can do all sorts of other stuff as well that you might need to do, analytics for segment, what have you along the way.
+
+[00:04:23]
+And there are effectively four places that you can put Lambda@Edge functions, right? It is the viewer request, which is your end user, their browser on its way into CloudFront, right? The origin requests, which is CloudFront called it the cache miss. Let's send it to, in our case, S3.
+
+[00:04:46]
+In any other case, maybe the API, so on and so forth. The origin response, so our case S3, possibly your server as it hits CloudFront and then back again on the way out, right? And it all depends on what you wanna do. The thing to note is that if you wanna stored in the cache, it kinda has to be a viewer request or viewer response, right?
+
+[00:05:09]
+And if it's not a cache miss, it's never gonna hit origin request and origin response, right? So it's like, hey, if you did need to talk to a database or something, that's probably on the origin request. They're asking for something with a set of query programs or headers, or a URL that I've never seen before, do some stuff.
+
+[00:05:30]
+But as soon as we do the stuff, don't talk to me ever again, right? Or for 24 hours, right? [LAUGH] All in those ways. So what you might wanna do really depends on what you need to do. If you want it on every request, it needs to be viewer request.
+
+[00:05:44]
+Every response, viewer response, if it misses CloudFront is going back to the origin, this origin request and origin response. So things you might do on a Viewer Request. Like I said, this is executed every request before CloudFront's cache is even checked, right? So it's like, hey, I wanna lowercase all the headers or normalize the query params to all be in the right order or something along those lines, you would do that before we check to see if it was a cache miss or a cache hit.
+
+[00:06:13]
+You might wanna see like, do they have an authorization token? Whatever you need to care about, you can do that. If you need to generate a response like, hey, listen, I know that like that route is not even gonna be found, don't waste the check on the origin.
+
+[00:06:27]
+Just tell them you can do that. But just notice that anything won't be cached cuz we never even talked to CloudFront yet. This is like, on the way in, check this thing, modify it, normalize it, all that kinda stuff. And do whatever you need to do. But since if you respond to it right then and there, CloudFront will never know, CloudFront will never cache it.
+
+[00:06:46]
+That would be by design, not a drawback, per se. So it goes into the origin requests. So, like, hey, CloudFront's like, I have never seen this before. This is another opportunity to inject some logic. Again, you can talk to databases. You can make external networks calls. You can rewrite the URLs.
+
+[00:07:04]
+You can, I dont know, based on the origin, if they don't have a langauge preference set, try to make some guesses on how you should format the dates for an API. All sorts of stuff that you might want to do. It hits either your server S3. Again, you can modify the, at this point, we have checked the server or S3, we might wanna modify any of the headers on the response before we cache it.
+
+[00:07:30]
+This is a place to do it. And then, finally, on the way out, right before we talk to the user again, any last things that you need to do. These will not be cached because we've already left CloudFront at this point. So we don't have all that necessarily in place.
+

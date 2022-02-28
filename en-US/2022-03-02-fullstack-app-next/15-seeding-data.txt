@@ -1,0 +1,148 @@
+[00:00:00]
+>> All right, so now that we got that, what we can do now is we can work on our seed scripts. Let's get some data in the database, specifically some playlists and stuff, and we can populate our sidebar with some playlists, we can do some authentication, and we can get these pages going.
+
+[00:00:16]
+So authentication is probably the biggest part of the whole app. There's so many moving pieces when it comes to authentication because all the places you have to lock down inside of an xjs apps. But I think it's really cool. I think it's really fascinating how all of it works.
+
+[00:00:32]
+So I'm really excited about the authentication part. So let's do that. So the first thing is let's create our seed, I'm over at the Prisma folder. We'll make a new file and we'll call it seed.ts. And this is where we're going to write our seed script. So the first thing is I'm gonna import from the Prisma client.
+
+[00:00:56]
+So I'm gonna say import from @prisma/client, and I'm gonna import Prisma client just like that. The next thing I'm going to is I'm gonna import bcrypt, if you had to download bcryptjs you'll just import bcrypt from bcryptjs. It should have the same API but for me it's bcrypt, I'm gonna import that, let me just fix my spelling.
+
+[00:01:17]
+There we go. And the next thing we wanna do is we want to, I have some seed data that we're gonna use to help with that. Like all the songs that I have hosted on some CDN somewhere like I have all that inside of the Notion links. So if we go here, it should be, where's that?
+
+[00:01:42]
+Here we go, if you scroll down to where it says Data and then Seed, there's this whole file where this is artistData. So copy that, you're gonna need that, there's no point of writing this by hand. It's just a bunch of random data. It will take forever to write this by hand.
+
+[00:01:55]
+So copy all that seed data there inside that link, is literally just an array of artists and songs. Then you're gonna go back and then I'm gonna inside the Prisma folder, I'm going to make a new file called songsData, songs plural Data.ts. I'm gonna paste that in there.
+
+[00:02:20]
+And again, this is just a bunch of artists and songs, because if you think about Spotify, there's two sides of Spotify, right? There's the consumer side where you're listening to music, and then there's the artists side where you're adding music. We're not working on the artist side. We're working on the consumer side.
+
+[00:02:37]
+The consumer side assumes that their song was already there. So we're gonna see the database with those songs that should have already been there. As a consumer Spotify you won't go in there and make music, you'll go in there listen to music that was already created by artists.
+
+[00:02:50]
+So this is not the Spotify admin app this is the Spotify consumer app. So the music should already be there, the seed script is the music already being there, this is us doing that. Okay, and then we're gonna import that here. So import artistsData from songsData. So we got that, and then I'm gonna make a new Prisma instance, so I'm gonna say Prisma = new PrismaClient.
+
+[00:03:18]
+And what this does is, what's really cool about this is that it handles the database connection for us. We never have to connect to a database, Prisma just handles that for us, which is really cool. Like maintaining database connections with pooling and stuff is, especially in the service environment.
+
+[00:03:34]
+I think when I started using serverless stuff when it first came out, you couldn't, actually couldn't use, most of the database is in a service environment. Because most databases were built with the understanding that they were gonna be on some server that's running for a long time with a connection that's always open.
+
+[00:03:49]
+But a service environment doesn't happen that way. So eventually you reach this point where you have too many connections and you have these cold starts and everything's really slow. Now you have all these service databases like Aurora, AWS PlanetScale, FaunaDB, got all these crazy things, even Mongo serverless now.
+
+[00:04:06]
+So it's really nice to see that people are starting to understand how that works and Prisma just kind of stress a lot of that stuff away which is really cool. So cool and then the next thing is we're gonna make a function called run. I was gonna make an a sync function, and then it's not doing anything right now but I'm gonna go ahead and call it and I'm gonna say .then.
+
+[00:04:28]
+And then I'm gonna say .finally. And what I wanna do in this .finally block is I just wanna disconnect. So I'm gonna say prisma.disconnect like so. And I want to await it. So I'm gonna say async awaits prisma.disconnects, like that. And instead of doing a dot, then I'm gonna do a .catch.
+
+[00:04:51]
+And if there is an error, I'm just gonna say process.exit1. Just exit this process, it'll probably exit anyway, and I'll just log the error just to see what happen. But I'm just trying to make sure I don't keep the database running and have like a memory leak or I wanna catch the error or something happens.
+
+[00:05:10]
+This is just my way of doing that. I typically do this on every one off script that I write, like if there's an error exit 1, which means error in terminal, 0 means non error. And then disconnect the database. So it's not just some lingering database connection going around.
+
+[00:05:31]
+One issue we are gonna have with Heroku is that, and I think this just happens because, and this is just not something you need to Next.js is with any environment that reloads off of save, every time you save and the files reload, that's gonna create a new connection.
+
+[00:05:46]
+Eventually we're gonna hit a connection limit and we're gonna get an error in the terminal, we got to stop the app and start it again. So that'll probably happen, I don't know, every 30 saves, every 40 saves. I found out when I was building this app out, it's not an issue just stop the server start it again, it'll start a new pool and we should be good.
+
+[00:06:03]
+It's only in development. Now, Let's see some things. So the first thing, I wanna seed is, I wanna insert the artist and the songs into the database, followed by a user and then followed by some playlists that have all those songs that belong to the user. So I wanna insert all those in a database, that way we can log in with a user that already has playlists, that already has songs in it, that already belong to an artist.
+
+[00:06:34]
+So we'll have all those things. So that's my goal, so we'll write a cscript for that. So the way we can do that is there's no right way, so I'm just gonna do it the way that I think is cool. So I'm gonna do a promise that all and inside this promise all I'm just gonna say artistData.map.
+
+[00:06:54]
+And then what I wanna do for each one of these artists, Artists, artists or async artists. For each one of these artists what I wanna do is I wanna return, Prisma. And you can see right now I'm getting autocomplete. Prisma knows that I have an artist entity, because it's type checked based off our schema.
+
+[00:07:20]
+So I get this nice autocomplete for prisma.artist. And you see there's playlists, there's song, there's user, we already knows all this stuff. It's pretty cool. So I'm gonna say prisma.artist, and I'm gonna say upsert. Upsert just means create or update. That's what it means, is like, if it exists, just update it to this.
+
+[00:07:42]
+If it doesn't exist, create it with this. It's literally create or update. This is gonna allow our cscript to be ran even though we might have data in it already. It won't modify it if it already exists. Maybe you want your cscript to always add new things to it.
+
+[00:07:57]
+If that's the case, you could have your cscript, delete everything first and then add it. You can also just reset the database before you run your cscript. I prefer to do it that way. I just reset my database, then run the seed scripts versus having a seed script delete everything out of the database.
+
+[00:08:12]
+There's no right way or wrong way. So we're gonna use upsert here. And then for the upsert, basically first you gotta do your query and the way you do that is you type in where. So you will say I wanna upsert, so find any artists whose name equals artist.name like that.
+
+[00:08:34]
+And then update, so if you find the artists, I want you to update it with nothing. I actually don't want to do an update here. There is a cscript I'm not trying to update anything, I really only wanna create. So, if you find an artist that already exists with his name, then there's nothing to do.
+
+[00:08:48]
+But, if you don't, I want you to create this artist. This artist gonna have a name, you can see I'm getting autocomplete here, you can see it says name string, it knows artist has names. So I can type in a name, that's gonna be artists.name, I also know that an artist must have a, what do they have?
+
+[00:09:09]
+Yeah they have songs, right? So I could insert some songs here. And this is where I think Prisma is really cool, cuz you can do nested inserts. Every other ORM that I use, you can't create nested things. You have to create them separately and then link them together.
+
+[00:09:27]
+So you have to do like multiple database calls. But in this one instance, I could also say, I also want to create, and I can go down here, and I can say, let me see. I'm sorry, not create, I can say songs, like this. And then I want to create songs like that.
+
+[00:09:52]
+And then now when I wanna create these songs, all I need to do is basically, if we go look at this data, every artist has a songs array. So I can just insert those songs for every artist. So really all I got to do is say I wanna create these songs.
+
+[00:10:09]
+All I have to do is say artists.songs.map. We're gonna grab a song like that. And for each one of these songs, I just need to add the fields for every song. So a song has a name, we get the autocomplete there, that song.name. A song also has a duration, did I add that?
+
+[00:10:33]
+No, I didn't add that, so we'll go back and add that. Actually I'll do that right now. So we're gonna go back to our song schema, gonna add a duration. I'm gonna say type Int, then hit Save.
+>> Someone had a question about the user ID being Int question mark, is that correct?
+
+[00:10:52]
+
+>> This one right here? Why is this here, there's a good reason this is here. One sec, I think this is here, let me see. Actually I think I might be ahead of myself. Let me see. No, this shouldn't be there. I think I just let the autocomplete just do it and I didn't fix it.
+
+[00:11:10]
+But I think for a one to one relationship, you have to put a question mark there because which one comes first? So one of them has to be like, not required, but this isn't a one to one. So no, you don't need a question mark there. So great catch whoever you are, thank you.
+
+[00:11:28]
+Awesome, I will push after I run this db push. So let me do a db push. So the change I did was a duration integer on the song. Now I'm going to say mpx prisma db push, cool. Sync the database with that new field, it generated the Prisma client, so if I go back to seed we should see this should autocomplete for me now with duration.
+
+[00:11:55]
+There it is, duration shows up now. So I can just say song.duration.
+>> I had a question on client side versus server side. Is it best practice to create Prisma models within the next js app, are we doing it just for this project? Should we separate server side and create the models and API using nodejs and express to keep distinction between client and server?
+
+[00:12:22]
+
+>> So, very great question. The question was, should we separate the back end stuff from the front end stuff? I would say, well, first of all, let's talk about Next.js. But next JS, there really is no separation. We haven't gotten to the part yet where you can actually write back end code inside the front end components.
+
+[00:12:40]
+Next JS allows you to do that, it encourages you to do that that was a whole point of the framework. So it's a full stack framework that does both. And we're using next JS so the answer is no, this is not just me doing it in the courses I think it's great.
+
+[00:12:53]
+Now this is exactly how you would do in a production if you're using next JS. You will put Prisma right here because next JS is a full stack framework, it's not just front end, it's also back end as you see in the Pages folder there's an API folder.
+
+[00:13:06]
+And when we get to this you'll realize every one of these files in here is a serverless function that we can use as a URL that we can hit and they can access the database and the front end can talk to that. We can also use the database directly aside the components as well without even going through the API.
+
+[00:13:23]
+So there's different ways we can do that. On a traditional app, yeah, you probably might want to separate out the back end from the front end so there's clear concerns, but you might also have your own mono repo as well and have everything there and then just deploy them separately.
+
+[00:13:39]
+But initially when I was making this course, I did do that, I was gonna just have a regular react front end, and then have like a node express or pacify back in with Prisma or something. But then I realized that that's actually not how I would build the app today.
+
+[00:13:53]
+I actually would use something like next JS and just build a full stack app. Because for me, there's just less overhead I can deploy to one platform versus two different platforms, and all my code lives together. And the sweet thing with Prisma is that you get those type checks.
+
+[00:14:08]
+So I really wanna be able to use that inside of Next.js. So if it had a different repo, I don't get that. So, yeah this is actually the way you would do with next JS, so if you go read the guides with next JS and Prisma or either one of the websites, this is exactly how they would teach you how to do it.
+
+[00:14:24]
+All right, there we go, duration and then, what else does a song need? I think we forgot one important thing on a song. Song needs a URL. How are we gonna play it? So song needs a URL. We're gonna add a string to that. I'm also gonna do a db push again.
+
+[00:14:41]
+Every time I change the schema I'm doing a push until I feel pretty confident with it, until I do a migrate, so I'll do a push again cuz I added a URL. That'll generate the schema again, and then now I'm gonna go back to my seed. And you can see this thing is freaking out, it's like, you need a URL here, which I think is so cool.
+
+[00:15:03]
+So we need that. So I'm gonna say song.URL. There we go. So now we got a URL here. And I think that's pretty dope.
+

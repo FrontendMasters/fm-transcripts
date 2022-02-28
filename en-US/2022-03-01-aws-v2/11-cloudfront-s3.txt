@@ -1,0 +1,92 @@
+[00:00:00]
+>> The S3 bucket that we created is either in US East one or possibly somewhere else if you made it somewhere else, and that doesn't really matter. But as we kind of refer to along the way, some places are further from Virginia than others. There's a free geography lesson for you.
+
+[00:00:21]
+Not only are we fun in Masters, but also geography masters is our next product that will be launching soon. It takes people longer to get those applications cuz of physics. Yes, computers can get faster, but electrons are only gonna move at max at the speed of light. So turns out probably not getting around that one until quantum computing really, and all sorts of other physics has to happen to make that happen.
+
+[00:00:47]
+Also even then, they don't just go through the air as a series of tubes or really cables but let's go with tubes. They get all of our bits and bytes everywhere. So you have a few options is you could make a whole bunch of S3 buckets, right? Put it in like S3 buckets around the world or if you think about where your API is gonna go, you could theoretically pick where you feel like your customer base is going to be.
+
+[00:01:16]
+And that that's an option, right? And for some of your server side stuff if you're not using some of the globally distributed databases, I think dynamo has a globally distributed option. I think Aurora there SQL database, you can also have a global option but they have limitations. For some levels, you have to do that, for us disaster recovery stuff along those lines.
+
+[00:01:36]
+But as front end engineers, we're not gonna worry about that. We're putting text files on the internet like the 1990s, right [LAUGH]. We could just put those text files everywhere. That's gonna be what we do. So CloudFront has a ever out of date map. This is not the out of date version of it but at any given point, it could be out of date.
+
+[00:01:59]
+I think last time we did this course three years ago, there was 144 edge locations, now there's over 300, right? So there's just basically little kinda data centers spread throughout the world, and we're gonna put our app on all of them easily, right? We're technically not, but it's really not important [LAUGH] that's the detail.
+
+[00:02:23]
+So let's kind of look at the before and after of the real world application that we had that I took some measurements for. Which is, you can guess that is probably in around US East one. See the green is all close to like the East Coast of the United States.
+
+[00:02:41]
+And the further that you get, the longer even takes, this is time to first byte. This isn't even the entire time to get the application, this is time before the very first byte hits their browsers, right? So it's like, it's over 10 times almost just shy of 20 times worse in kind of Australia and some parts of South Asia.
+
+[00:03:06]
+That is before CloudFront, this is after, right? So you see a lot more green in this case as well. CloudFront also supports HTTP/2 out of the box. What is that and why is it great? So the way that it worked before HTTP/2 is you send a request for a thing, it sends you some bytes back.
+
+[00:03:31]
+If you send more bytes that's under the request, it sends more bytes back, it can do one thing at a time. Browsers cheated for a while and they still cheat, and they'll open up 6 of those connections, right, to try to get you 6 times as much stuff in parallel, but even then they give up.
+
+[00:03:50]
+And so there used to be a whole bunch of tricks. If you really wanna optimize your performance as you put your images on one subdomain, cuz it was 6 to a given domain. You put some images there, and you put your CSS there, and you start to break stuff up.
+
+[00:04:02]
+So you have more than 6. Well, so this HTTP/2 which is just like what if we just like multiplex all this and we'll just send you everything kind of as a constant Stream and an open connection, that is how she HTTP/2 works. There's some other bonuses, so we talked about you pay for requests from S3.
+
+[00:04:27]
+You pay to get data out of S3. If CloudFront serves that request, you're not hitting S3 and it's way cheaper to serve it from CloudFront. I think there was, is it five? It's 5 gigabytes of free transfer, I don't remember the top of my head, I had this slide earlier.
+
+[00:04:46]
+Terabytes, terabytes, yeah, of transfer. I thought it was big as far as transfers, whatever, we can figure it out. But it's a lot cheaper and yeah, it won't hit your S3 bucket at all, right? The other part that's nice is it's not just about the distance. When you normally would go hit your server in US East one or wherever you were hosting your assets, your request has to go through the public internet with all the other public internet traffic, gross, right?
+
+[00:05:23]
+We're using CloudFront, it hits the CloudFront edge node, and then Amazon has their own private cables that it goes through. Yeah, right, fits with your mental model and goes through and kind of gets all the bytes. So it's usually faster even to get to wherever the S3 bucket is over Amazon's private networks, than it is going over the public internet as well.
+
+[00:05:46]
+So keeping requests from going to S3 in the beginning is obviously cheaper, because it reduce our cost because we're paying for requests out of there. At the same time, it's also faster when it does have to go there and we'll kind of look at another chart real quick.
+
+[00:06:03]
+So the other kinda cool part about how it works is there's like multiple stops along the way, which is you had all of those little intermediate nodes which are kind of shown right here. Then you have see these bigger yellow ones, these are the regional edge caches, right?
+
+[00:06:22]
+Which is so let's say they go to hit this one right here and it's not there, it's not gonna go all the way back to Virginia, it's gonna go to the closest regional edge cache first. So somebody request file. If we have it right near them, give it to them immediately.
+
+[00:06:39]
+If we don't have it right near them, okay, go to the regional edge caches. Do we have it somewhere close to them? No, at which point go all the way back to Virginia. And then on the way back the other way, we'll put it in all of those places.
+
+[00:06:55]
+So when I said that little thing before about how we're gonna put our application all over the world with tactically, now we're gonna put it in our bucket. But as it goes through all the different edge nodes to get to our customers, Amazon's gonna leave it in all those places so that when future requests come in, then we don't necessarily have to pay that cost.
+
+[00:07:17]
+Cool, one other quick note is just to talk about headers a little bit. Generally speaking, CloudFront is gonna ignore most of the request headers, right? So anything in there around any special header you might rely on. We don't rely on any for the purposes of we're building today for our static assets.
+
+[00:07:37]
+I mentioned it because it will just drop them, why? It will drop them because it's trying to figure out, do I already have something in either the regional edge cache or the edge node that I can just give them by carrying about necessarily maybe the cookie or what user agent or something along those lines.
+
+[00:07:56]
+If it's the same JavaScript file, I don't care that they're using Safari versus Chrome, just gives them the JavaScript file, right? So it tries to ignore as much about the requests as they can possibly get away with. And that is almost always the right case. I only mentioned this because if there's in our app we need to a special header to get set for authentication, you do need to allow that through and so on and so forth.
+
+[00:08:20]
+It will also add in some of its own headers after it hits the edge node. And you can take a lucky guess what sets these to true. I'll leave that as like an exercise. In this case which is if it's a desktop viewer, and so you can do stuff when we get to the lambda that just kind of stuff a little bit later where you can maybe shrink an image, right?
+
+[00:08:43]
+We'll kind of mostly talk about some of those things. The actual writing image resizing code is its own thing, but you can kind of get a little bit of knowledge about where it's coming from, and do some really interesting stuff with the request itself as we go through.
+
+[00:09:00]
+All right, cool. Let's go check on our CloudFront distribution, shall we? Say go back to cloud farm. We'll go ahead and we'll check out our distribution, and so I should be able to grab this domain. And we can see that it works in this case and super awesome.clicks should work as well.
+
+[00:09:38]
+What happens I do GTPS HTTPS now works. We have that little lock up there as well. Pretty sure we set it to redirect, but I also might have old DNS records in here as well. So we can figure that in a second. But yeah, so now our app works super awesome.
+
+[00:10:00]
+A click is secure HTTPS, we can go refresh one of these pages. In this case, it still works and everything is pretty good. That's good to know. So now, this is all kind of in place. Does that one now is everyone else's distribution? You need a second, all right?
+
+[00:10:24]
+
+>> Can you show where you associate CloudFront in route 53, I guess, I had to regenerate my SSL?
+>> [LAUGH] All right, yeah, I'll show that one more time in case you had to To regenerate your cert, so go into route 53. Go to registered domains. Now mine will be set up in this case, but we can still kind of show where we go to manage DNS.
+
+[00:10:51]
+Click that little button because just yeah, you hit View Details. Then you find a record, so we got two of them. We got the regular bear domain, and then we've got the www bro that will edit the record, and the alias instead of to an S3 should be CloudFront distribution and that should then be the autocomplete in that case
+

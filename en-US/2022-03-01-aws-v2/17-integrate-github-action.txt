@@ -1,0 +1,132 @@
+[00:00:00]
+>> So we've got a user the next step is we have to set GitHub up appropriately. There's two pieces of this, one is writing the GitHub action and then two is giving away our secrets that we created for that user. Now, for the most part, I have a set of handcrafted YAML files that I bring to different projects as being one of them that basically takes care of this.
+
+[00:00:26]
+I'm gonna type it out in the next little piece mostly so I can talk about each piece and give us time to reflect on it. This is in the notes I dropped in the chat as well. I would probably just copy and paste it. The one other thing is you've got the AWS CLI, and you need to get your distribution from somewhere else.
+
+[00:00:50]
+You can actually run this to see all of your CloudFront distributions. Since this new account, you'd likely have one. So that will get you that e, q whatever distribution ID that you had before but I will go ahead and kind of pull this in to my code base.
+
+[00:01:09]
+And then we can kind of talk about it as I type it but like I said, the chance of me messing something up slightly along the way. So you'll have to let me know if you see me make an obvious typo while I'm chatting. But we can talk about each of the different pieces of this as we go through it.
+
+[00:01:25]
+It's all good, okay. So you can, there's two ways you can go about doing this. You go into GitHub And let's actually bring this, we'll go over here, And we'll go to actions, and you can set up a workflow for yourself. And let's go ahead and let's make the font bigger for everyone involved.
+
+[00:01:59]
+If it doesn't let me do that, then I'll do in my text editor. Okay, so your GitHub workflows live in a directory called .github/workflows, and you need at least one called your main.yml, right? So if you have more than one, I have one for the main kind of deployment process.
+
+[00:02:23]
+I have one that just does linting and prettier formatting and stuff like that. I have one my TypeScript projects that will go ahead and run the TypeScript checker, so on and so forth. But you need to have at least one that is named main. And they give you kind of a basic one in this case to start with, right?
+
+[00:02:45]
+Again, like the active deployment might not be my main one but for the purposes of our time together, it is, right? So you might have the one that runs your tests as the main one that should go off. So on and so forth, right? You have one that runs your ciphertext, one that runs you jest unit tests.
+
+[00:03:02]
+One that does a TypeScript checking basically everything that you don't want to do manually when you or one of your friends opens up a pull request. So we'll name this one Deploy website. One careful thing for us is we don't wanna do it on pull requests, right? So, this is when should it happen, right?
+
+[00:03:28]
+So yeah, anytime we push to main, absolutely. We do wanna run the test whenever somebody opens up a pull request against main. But we do not want to deploy the website on a pull request. So this one we will get rid of. So now, whenever we push to main, we want to do the rest of this, That was kind of cool.
+
+[00:03:55]
+You can run it directly from the actions tab, sure. Okay, so jobs, we have this idea that we want to deploy, and it needs to run some kind of operating system so fine. The other part that's given to us for free is that it will use this GitHub action to check out the actual code, right?
+
+[00:04:15]
+This is GitHub, setting up an environment, pulling down your code. After this, you can basically run different command lines and things like here, echo, Hello, world, this is their default. One, I just hit create. We're not going to use most of this but this is kinda just showing you the kinda steps, right?
+
+[00:04:33]
+So users is any kind of prebuilt action. It turns out that not only does GitHub have some useful ones for us, but also Amazon has one that they make for configuring your AWS CLI. So you can do AWS stuff inside of a GitHub action. So we're gonna use this ability to check out the code.
+
+[00:04:54]
+But after that, the rest of this is just more demos. They're just echoing a bunch of stuff. That's very cool. I'm happy for them. I don't want it. So for us and again, we have the version of this kind of pre-built but just to step through all the pieces.
+
+[00:05:10]
+So not only are we going to use the GitHub checkout. We will also use the AWS tools as well, right, so we can say we'll name this piece. Well, I should do that above too. This one will be Checkout Repository. And after that, we will configure AWS. So that will be name, this does not get a, it's a sub-bullet.
+
+[00:05:49]
+My live YAML, if live deploying a CDN wasn't dangerous enough let's live YAML, what could possibly go wrong? So with that the name of the GitHub action that we want is actually is AWS actions and it's open source code you can go look at it. As well, which is configure-aws-credentials@v1.
+
+[00:06:11]
+Okay so now, it will configure that access key, and a secret access ID, so you can run AWS command so that new build process user that we made. But we need to tell it where to get that information from, right? We have not put this into GitHub yet.
+
+[00:06:35]
+We will do that in a second. But we're gonna put it in environment variables. We just basically need to tell this tool what environment variables it should go looking for to plug in these values. So we're gonna say for the configure aws part it's gonna use this action AWS has made for us and well say with the aws-access-key-id and then you can interpolate values in here using this syntax.
+
+[00:07:04]
+So we'll say secrets dot and we're gonna have to provide this in a second, this is not some magic value. This is like hey GitHub workflow I'm going to provide you something that I'm gonna call AWS ACCESS KEY go get that encrypted value, right? But that's what you're going to tell AWS is our access key.
+
+[00:07:29]
+So go grab that, then the next one is the AWS secret access key, Which we will call AWS_SECRET_ ACCESS_KEY so obvious second value and then what region. Those are the things when you run AWS configure before that you paste it in manually. But your the whole idea of this build process is to take you out of the picture.
+
+[00:08:03]
+So in this case we will go ahead and this one that will now be aws-region, And you can pass it as a variable. Or you can hard code it in, it is up to you if you think you are gonna reuse it with different values make it a variable this is clearly not a secret that we need to encrypt but we could, right?
+
+[00:08:29]
+It's up to you. I am not in this case. Mostly just to stick to what, that I provided you and we keep it the way I had it. So this is now set to us-east-1. I don't actually think there's a duplicate mapping clearly it's an old error. So we've got that in place so now that we'll configure the AWS CLI.
+
+[00:08:47]
+That's the next piece. Now before you saw the parts that we deleted we're just running bash commands, was just running echo, right? And we saw, that we were able to deploy our application S3, using the AWS command line. So at this point, all we're doing, is pulling that logic that we had the ability to install dependencies, do NPM run build, do that AWS S3, CP, yada, yada, yada, and to push everything else.
+
+[00:09:15]
+The one additional command that we're gonna issue is the creating an invalidation. Again, like if you chose to just set a short TTL that's fine too. I am going to set it out there as well. So at this point we'll do another step, which that step will be named, I don't nee caps, Install Modules with dependencies or what have you.
+
+[00:09:44]
+And that just say like, we know how to do that. You can do NPM install. But you can also do npm ci, which is a version that will try to cache, it's a very similar version npm install but for the purposes optimized for CI CD pipelines. So we've got that in place, and then we saw before that we need to build the application.
+
+[00:10:05]
+So we'll say build application. And could I try to jam them into the same command? I totally could but then I'm really gonna suffer when I have to debug later, right? So we'll do npm run build. Awesome, and now we wanna deploy to S 3, right? And that will just run aws s3 we'll sync it just slightly different ./build s3://.
+
+[00:10:48]
+Now you could hard code in your bucket it was a private repo that's probably fine because the bucket is not the same as your secret access key. But I don't even really wanna even though I've exposed that in my bucket over the last five hours. I'm gonna pass that in as a variable as well unlike us-east-1, but that's kinda up to you.
+
+[00:11:20]
+I love line got moved I have in install modules. So we've got that in place and then we'll do secrets let's call this one BUCKET_NAME, bucket ID, whatever as well. And then finally we want to create that CloudFront and validation Run and this is gonna be aws CloudFront, so the other one is aws s3, is aws CloudFront.
+
+[00:11:54]
+And the command is create invalidation, and then you gotta give it a distribution id. And that will be in my case secrets.DISTRIBUTION. ID and then tell it what paths. In my case, I was doing the star slash just to validate everything. Awesome, so we've got all that in place.
+
+[00:12:33]
+Now you could just invalidate index.HTML if you wanted to. But if there were images that got built, if it was like a Gatsby project that maybe like it's a little more nuanced. You can choose to refine this as much as you see fit. For the purposes of just a general use case, I might start very broad coz thinking you've invalidated things that you haven't could also be somewhat problematic.
+
+[00:12:55]
+And this is our workflow in this case. So we should be able to commit it. Commit this new file. Now we have an action, it should run. Now it will theoretically deploy a version of my site that will be mostly the same. So as you kind of this will fail, it will fail, why?
+
+[00:13:22]
+I told you to access all these secrets I never told you what the secrets were. [LAUGH] Right? So I'm gonna add in the secrets and then we're going to take a quick break and your job is to change something about the page, change it from pink to yellow.
+
+[00:13:34]
+Change it from pink, back to indigo. Do whatever you want change it and then we will kind of deploy it and see that our process works. Yeah, like I said credentials cannot be loaded. So let's put that in and then we'll go ahead and we will adjust that and send it along.
+
+[00:13:53]
+So for the settings for the repo, you go to this tab here called Secrets. And there are no secrets in this repository. We're amongst friends here. Currently, you can go add the secret. So ones we need to add the AWS access key, the basic elements we call out in that build process itself.
+
+[00:14:13]
+We're gonna take a quick break to do it. So I'm not live streaming my access key all over the place, but we want to add in the AWS access key, the AWS secret key. The Bucket ID, and then the distribution ID. Cool, so let's take about 5 minutes and we'll do that and then we'll see if our and try after you have it in place, change your code changes something else.
+
+[00:14:37]
+Change a word in it. I don't care what you do. Just verify that it works the way you think it's going to. I plugged in all my secrets One time in front of everyone in the room, I think I was fast enough. If not, I take no responsibility for anything.
+
+[00:14:52]
+So with that in place, I also made the changes changing all of the pink to yellow. So go ahead and have no idea what this look like, felt like that wasn't gonna win me any graphic design awards anyway. So I think we're okay. So I will push that up to GitHub which will kick off the build process itself.
+
+[00:15:20]
+So we can see once we have it's not totally up yet but once it goes up it will run our process which again., Just doing the same things that we did by hand before it will go ahead, it will build all the assets. It will install it, it will install dependencies, then it will build the assets.
+
+[00:15:36]
+Then it will sync them up with our s3 bucket and then it will tell CloudFront to clear the cache and get ready for the and start serving out the new hotness of my yellow website, as opposed to my pink formerly Indigo website. So let's check this out slow on the pushing for some reason I don't seem to be able to cancel that.
+
+[00:15:58]
+But I'll show you the last one that I did as well. We can see all the steps going through, the naming them is super helpful if you ever want to figure out what went wrong, right? If you just had if you had a bunch of runs in there, right or all together, then you have to go triage it yourself.
+
+[00:16:15]
+But here you would actually see what happened. You can see that it created the invalidation for CloudFront, which I can also verify in CloudFront itself as well as deploying everything just like we run it from the command line. But now I never have to run it from the command line again, any time a commit makes it into main it will automatically get deployed.
+
+[00:16:37]
+I don't think about it anymore. That does mean you have to be somewhat careful in this particular use case about what you merge into main, right? Like whether you have release branches or you can do it on other ways, we just did the simple one. This is not a workshop on GitHub actions.
+
+[00:16:47]
+It's a workshop on just automating this piece of the pipeline for ourselves. Back to my actions, we can see that's going to go through the same process. We basically know how that should play out assuming that my yellow got in there and I didn't mess up that last Git dance.
+
+[00:17:02]
+We'll go through all the steps that we saw earlier. And at that point, we now have a 90% of the way their version of what we built for a company whose product was making some amount of money I probably can't disclose that loud. But worth it right and so we've built basically the similar process
+

@@ -1,0 +1,667 @@
+WEBVTT
+
+1
+00:00:00.340 --> 00:00:04.023
+So now we gotta find a way to update
+our UI as we change songs and
+
+2
+00:00:04.023 --> 00:00:09.670
+as a song continues to play cuz right now
+it's just static, it's not doing anything.
+
+3
+00:00:09.670 --> 00:00:15.637
+Although it's functional it doesn't give
+the user any feedback on information so
+
+4
+00:00:15.637 --> 00:00:17.240
+we need to do that.
+
+5
+00:00:17.240 --> 00:00:22.911
+So the best way to do that
+is to find some way to watch
+
+6
+00:00:22.911 --> 00:00:28.870
+a certain value and
+then on some interval rerender.
+
+7
+00:00:28.870 --> 00:00:33.304
+If you ever heard of requestAnimationFrame
+that's what we have to use.
+
+8
+00:00:33.304 --> 00:00:38.496
+So requestAnimationFrame,
+you can think of it as like an interval
+
+9
+00:00:38.496 --> 00:00:43.133
+that when used,
+it's basically asking the browser like,
+
+10
+00:00:43.133 --> 00:00:47.175
+hey, can you call me
+before you paint first?
+
+11
+00:00:47.175 --> 00:00:49.135
+And the browser's like,
+sure, I'll call you first.
+
+12
+00:00:49.135 --> 00:00:55.009
+So that guarantees that it's smooth is
+usually called 60 times per second or
+
+13
+00:00:55.009 --> 00:00:57.417
+up to however faster screen is.
+
+14
+00:00:57.417 --> 00:01:01.266
+If you have 120 hertz screen it might
+be called 120 times a second, but
+
+15
+00:01:01.266 --> 00:01:03.310
+at least 60 times a second.
+
+16
+00:01:03.310 --> 00:01:05.177
+And it also handles conflicts,
+
+17
+00:01:05.177 --> 00:01:09.741
+if you have more than one thing that's
+trying to animate, it'll bash them and
+
+18
+00:01:09.741 --> 00:01:14.603
+do them together so everything's nice and
+smooth and it happens before the paint.
+
+19
+00:01:14.603 --> 00:01:20.220
+So some people like, Just do set
+interval up to 60 times a second.
+
+20
+00:01:20.220 --> 00:01:24.551
+No, that doesn't do the same thing that's
+running it in a different thread so,
+
+21
+00:01:24.551 --> 00:01:26.860
+you wanna do the requestAnimationFrame.
+
+22
+00:01:26.860 --> 00:01:31.885
+So we need to do that on some
+type of interval basically what
+
+23
+00:01:31.885 --> 00:01:38.554
+the requestAnimationFrame is but we wanna
+do it only while playing is true and
+
+24
+00:01:38.554 --> 00:01:42.880
+we need to also account for
+when you're seeking.
+
+25
+00:01:42.880 --> 00:01:47.013
+So if you're dragging we don't wanna do
+it, like imagine yourself dragging and
+
+26
+00:01:47.013 --> 00:01:51.235
+then it's also moving at the same time
+fighting your drag we don't wanna do that.
+
+27
+00:01:51.235 --> 00:01:54.823
+So in order to know when that's
+happening we need to use effects.
+
+28
+00:01:54.823 --> 00:01:58.535
+So we can do a useEffect to watch
+whether playing is true or false or
+
+29
+00:01:58.535 --> 00:02:00.702
+whether its seeking is true or false.
+
+30
+00:02:00.702 --> 00:02:05.585
+And then we can determine whether or
+not we should be animating this value or
+
+31
+00:02:05.585 --> 00:02:07.376
+not animating this value.
+
+32
+00:02:07.376 --> 00:02:10.070
+So to do that, we'll come up
+here we'll make a useEffects.
+
+33
+00:02:10.070 --> 00:02:17.476
+We'll say useEffects,
+that takes a callback.
+
+34
+00:02:17.476 --> 00:02:20.108
+This useEffect is going to
+be interested in two things,
+
+35
+00:02:20.108 --> 00:02:23.366
+it's going to be interested in
+playing state and its seeking state.
+
+36
+00:02:23.366 --> 00:02:26.572
+Just like I said, so
+we only wanna animate as we're playing,
+
+37
+00:02:26.572 --> 00:02:29.295
+not when we're paused and
+when we're not seeking.
+
+38
+00:02:34.880 --> 00:02:38.550
+And we also wanna be able to cancel the
+AnimationFrame just like you would cancel
+
+39
+00:02:38.550 --> 00:02:42.076
+a set timeout or set interval you have
+to cancel the AnimationFrame as well.
+
+40
+00:02:42.076 --> 00:02:44.081
+Otherwise you might have memory leaks and
+for
+
+41
+00:02:44.081 --> 00:02:47.180
+whatever reasons you
+just don't wanna do that.
+
+42
+00:02:47.180 --> 00:02:51.906
+So just like a set interval set timeout
+requestAnimationFrame will return
+
+43
+00:02:51.906 --> 00:02:54.460
+an ID that you can use to cancel later on.
+
+44
+00:02:54.460 --> 00:02:59.525
+So we're gonna make a reference to
+the ID and we'll call it a timer Id.
+
+45
+00:02:59.525 --> 00:03:05.204
+And then I'm gonna say if you are playing,
+or if the player is playing and
+
+46
+00:03:05.204 --> 00:03:10.978
+it is not seeking as in someone is not
+dragging the thumbnail then I wanna go
+
+47
+00:03:10.978 --> 00:03:17.430
+ahead and make a function that we're
+gonna use for our requestAnimationFrames.
+
+48
+00:03:17.430 --> 00:03:20.110
+I was gonna say,
+it's gonna make this function here.
+
+49
+00:03:20.110 --> 00:03:23.847
+And I'm gonna to say as
+this thing is animating,
+
+50
+00:03:23.847 --> 00:03:29.776
+I wanna setSeek cuz remember calling
+setSeek is what's gonna update the seek
+
+51
+00:03:29.776 --> 00:03:35.070
+value in our UI because our UI seek
+value is bound to the seek state.
+
+52
+00:03:35.070 --> 00:03:38.770
+So by setting the seek,
+we are gonna be updating it.
+
+53
+00:03:38.770 --> 00:03:45.602
+So we wanna set that to whatever
+the soundRef.current seek value is.
+
+54
+00:03:45.602 --> 00:03:48.978
+So whatever the current value of
+the song is which you saw me clicking
+
+55
+00:03:48.978 --> 00:03:51.658
+around it's working it
+does seek it's functional.
+
+56
+00:03:51.658 --> 00:03:56.179
+So the rack taller does know the current
+seek value so now we're binding that to
+
+57
+00:03:56.179 --> 00:04:00.925
+the seek state that we're keeping track of
+which is bound to the UI of the seek bar.
+
+58
+00:04:00.925 --> 00:04:04.488
+So we're just keeping
+those in sync basically.
+
+59
+00:04:04.488 --> 00:04:09.546
+And then we're gonna say timer Id is gonna
+equal a requestAnimationFrame like this,
+
+60
+00:04:09.546 --> 00:04:12.438
+and we're gonna pass in
+our function like that.
+
+61
+00:04:14.736 --> 00:04:19.665
+So this too is also recursive every
+time you do requestAnimationFrame is
+
+62
+00:04:19.665 --> 00:04:22.346
+gonna be recursive almost every time.
+
+63
+00:04:25.584 --> 00:04:29.903
+And then now we can come down here and
+we can say timer Id equals
+
+64
+00:04:29.903 --> 00:04:34.320
+requestAnimationFrame pass it in,
+so this will kick it off.
+
+65
+00:04:43.333 --> 00:04:46.726
+And then now all we have to
+do is set a return value.
+
+66
+00:04:46.726 --> 00:04:50.692
+When you return something inside of a
+UseEffects this function gets called when
+
+67
+00:04:50.692 --> 00:04:54.620
+the component that's using the useEffect
+gets unmounted from the DOM.
+
+68
+00:04:54.620 --> 00:04:57.360
+This is where we're gonna clean
+up the requestAnimationFrame.
+
+69
+00:04:57.360 --> 00:04:59.088
+So if you're using something
+like a WebSocket, or
+
+70
+00:04:59.088 --> 00:05:02.010
+set interval, this is where you
+would clean these things up.
+
+71
+00:05:02.010 --> 00:05:04.667
+So we're gonna go to clean up that and
+
+72
+00:05:04.667 --> 00:05:09.056
+we can use cancel AnimationFrame and
+then pass it a timer Id.
+
+73
+00:05:14.326 --> 00:05:19.658
+And if our conditional was initially
+false, and we end up doing none of that,
+
+74
+00:05:19.658 --> 00:05:24.346
+then I just wanna cancel the
+AnimationFrame as well with a timer Id.
+
+75
+00:05:29.500 --> 00:05:31.425
+So just to walk through this again,
+
+76
+00:05:31.425 --> 00:05:36.560
+we're gonna set up a useEffect that tracks
+the playing states and its seeking states.
+
+77
+00:05:36.560 --> 00:05:40.424
+If the music is currently playing,
+and the user is not currently seeking,
+
+78
+00:05:40.424 --> 00:05:44.164
+I wanna request an AnimationFrame which
+think of it as a set interval, so
+
+79
+00:05:44.164 --> 00:05:48.210
+it's basically gonna call this
+function right here that I called F.
+
+80
+00:05:48.210 --> 00:05:51.630
+It's gonna call it 60 times a second.
+
+81
+00:05:51.630 --> 00:05:54.800
+And every time it's called,
+it's updating the UI,
+
+82
+00:05:54.800 --> 00:05:57.780
+the seek to whatever
+the sounds current seek is.
+
+83
+00:05:57.780 --> 00:06:02.417
+So it'll be ticking and it'll be smooth
+because it's calling it 60 times a second,
+
+84
+00:06:02.417 --> 00:06:04.210
+which is 60 frames per second.
+
+85
+00:06:04.210 --> 00:06:08.021
+So to look smooth,
+that's the minimum you need as a human for
+
+86
+00:06:08.021 --> 00:06:10.350
+something to seek smooth.
+
+87
+00:06:10.350 --> 00:06:13.612
+So it might go higher depending on
+your refresh rate of your computer,
+
+88
+00:06:13.612 --> 00:06:17.318
+like on the new MacBook that have like
+promotion inside of Safari that might even
+
+89
+00:06:17.318 --> 00:06:20.450
+look faster,
+cuz those things can go up to 120 Hertz.
+
+90
+00:06:20.450 --> 00:06:24.680
+So you might see 120 frames per
+second per animation on a play.
+
+91
+00:06:25.760 --> 00:06:28.480
+And then what we do is
+then we kick it off.
+
+92
+00:06:28.480 --> 00:06:30.800
+This is a initial call.
+
+93
+00:06:30.800 --> 00:06:34.809
+So we recall requestAnimationFrame,
+it takes our function,
+
+94
+00:06:34.809 --> 00:06:38.965
+one take goes by it sets the seek,
+and then it calls itself again,
+
+95
+00:06:38.965 --> 00:06:42.159
+it sets the seek, and
+then it calls itself again.
+
+96
+00:06:42.159 --> 00:06:46.200
+And it does that over and
+over and over until we say cancel.
+
+97
+00:06:46.200 --> 00:06:50.235
+And cancel happens when a, we unmount
+this component as in we route away,
+
+98
+00:06:50.235 --> 00:06:53.945
+which in our case never happens cuz
+this player bar is always on a page
+
+99
+00:06:53.945 --> 00:06:57.872
+unless you're on the sign in or
+signup page that would be the only time.
+
+100
+00:06:57.872 --> 00:07:03.050
+Or b, this conditional was false
+which would mean you either paused or
+
+101
+00:07:03.050 --> 00:07:06.932
+you started seeking, so
+that's when it will stop.
+
+102
+00:07:06.932 --> 00:07:11.072
+Which is the only time you would see the
+SeekBar not move is if it was paused or
+
+103
+00:07:11.072 --> 00:07:13.597
+you were dragging it yourself, that's it.
+
+104
+00:07:13.597 --> 00:07:14.653
+So that's what this is doing.
+
+105
+00:07:14.653 --> 00:07:19.353
+I know it'll look harder than it is but
+then when you think about it
+
+106
+00:07:19.353 --> 00:07:24.402
+it's like yeah, that's what it would do,
+that's how it'll work.
+
+107
+00:07:24.402 --> 00:07:27.955
+So let's go check it out
+let's see what we broke,
+
+108
+00:07:27.955 --> 00:07:31.350
+I'm gonna refresh this,
+click a button here.
+
+109
+00:07:31.350 --> 00:07:34.393
+[MUSIC]
+
+110
+00:07:34.393 --> 00:07:35.670
+We got a question, Mark?
+
+111
+00:07:35.670 --> 00:07:37.390
+&gt;&gt; What about song end?
+
+112
+00:07:38.840 --> 00:07:41.020
+&gt;&gt; We'll get the song end, good question.
+
+113
+00:07:41.020 --> 00:07:43.370
+I'm saving that,
+that's where the gotcha is.
+
+114
+00:07:43.370 --> 00:07:45.020
+I was gonna see if anyone catches it.
+
+115
+00:07:46.330 --> 00:07:50.435
+But as you can see my seek is
+actually updating, it's moving,
+
+116
+00:07:50.435 --> 00:07:53.390
+it's really nice, it's totally working.
+
+117
+00:07:53.390 --> 00:07:58.121
+When I hit pause it stops, because I use
+effects and that conditional playing is
+
+118
+00:07:58.121 --> 00:08:02.780
+false so it cancels the AnimationFrame
+which stops setting the seek.
+
+119
+00:08:02.780 --> 00:08:07.792
+But when I hit play again, the useEffect
+fires again cuz it's watching the playing
+
+120
+00:08:07.792 --> 00:08:12.246
+state, now the conditional passes and
+a new AnimationFrame is started.
+
+121
+00:08:12.246 --> 00:08:14.457
+All right, and then if I start seeking,
+
+122
+00:08:14.457 --> 00:08:17.330
+you can see it doesn't move
+this is just me seeking.
+
+123
+00:08:18.700 --> 00:08:19.845
+You can even hear it scrubbing.
+
+124
+00:08:19.845 --> 00:08:25.037
+[SOUND] So that works,
+so we are good there.
+
+125
+00:08:25.037 --> 00:08:26.313
+So that logic is working,
+
+126
+00:08:26.313 --> 00:08:29.570
+the next thing we need to do is need
+to update this count right here.
+
+127
+00:08:29.570 --> 00:08:33.767
+It seems to just be stuck at whatever hard
+coded value that I have it just says 121.
+
+128
+00:08:33.767 --> 00:08:38.700
+So let us update that to
+be the current seek value.
+
+129
+00:08:38.700 --> 00:08:41.274
+So let's go back to our code and
+
+130
+00:08:41.274 --> 00:08:45.630
+that's gonna be basically
+to the left of our range.
+
+131
+00:08:45.630 --> 00:08:47.923
+So if we go down to where we at this,
+
+132
+00:08:47.923 --> 00:08:51.890
+That's why I didn't find it was
+collapsed that's why I missed it.
+
+133
+00:08:51.890 --> 00:08:54.329
+I was like, where's this thing even at?
+
+134
+00:08:54.329 --> 00:08:59.740
+So to do that, we really just wanna get
+the seek value, and it is format the time.
+
+135
+00:08:59.740 --> 00:09:04.211
+So we'll just come here, we'll get rid
+of that, we'll use that format time,
+
+136
+00:09:04.211 --> 00:09:07.169
+helper that we made, and
+we'll just pass and seek.
+
+137
+00:09:07.169 --> 00:09:12.132
+So now the UI in this text is now bound
+to whatever seek value that the song
+
+138
+00:09:12.132 --> 00:09:14.202
+is playing through Howler and
+
+139
+00:09:14.202 --> 00:09:19.186
+that's all happening because of that
+useEffect that we wrote up here.
+

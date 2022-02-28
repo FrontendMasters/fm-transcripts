@@ -1,0 +1,66 @@
+[00:00:00]
+>> My name is Steve Kinney and I am the front-end architect at Temporal, our company that does workflows as code, and a lot of the processes around making all the ways building an application can go wrong, not go wrong. So, if you need your code to be reliable at all times, you should definitely check out Temporal.
+
+[00:00:17]
+And what I'm gonna talk a little bit about today is, we spent a lot of time building client-side applications. We think a lot about, okay, is a for loop faster than a for each loop, so on and so forth. And we don't necessarily spend as much time always thinking about, how do we actually get these applications to our users?
+
+[00:00:38]
+So this workshop is a workshop on building, not only taking the client-side applications that we've built, and building the kind of professional grade infrastructure necessary to get it to our users reliably and performantly. And it's based on kind of putting together kind of multiple runs at this. Before I was the front-end architect at Temporal, I was a front-end architect at Twilio, and before that, the front-end architect and principal engineer at SendGrid.
+
+[00:01:07]
+This is the thing that we've kind of taken multiple iterations at over the course of the last few years. And how to actually build that for yourself, it's simpler than you might think. That even if you think about how long we're gonna talk about this today, we're also gonna talk about it and explain it all.
+
+[00:01:22]
+Actually putting together and putting in place the infrastructure that makes your application really performant, and reliably so, is something that is relatively in your control. And there are a lot of other ways that you can go about doing this. Especially, there are options such as nullify and Vercel in Cloudflare.
+
+[00:01:42]
+And those, for a lot of cases, might be a really great option. But there's times where you also need to do enough custom things or your company already has AWS and some of this infrastructure in place. And you're looking to tweak it, or improve it, or make it better, or you kinda wanna learn how these other companies that are building this kind of infrastructure, how they work and how you can kind of have that in place for yourself.
+
+[00:02:05]
+So, it's kind of what we're gonna cover in this course. Is we kind of build all the pieces necessary to have this infrastructure in place for a project that will work reliably, if it's your personal blog, as well as if you were building a application that makes tens of millions of dollars a year, or possibly more.
+
+[00:02:22]
+So, before we get all the way into all the moving pieces around that, let's talk a little bit about just the kind of problem that inspired a lot of this. I worked on this application, and long ago, it was a Ruby on Rails application. So, server-rendered pages, so on and so forth.
+
+[00:02:39]
+You'd render some server, some HTML on the server, send it out, there'd be some Coffee Script and some jQuery stuff would move around. Eventually, that became a React application. But it still had the fundamental problem of the four servers that were serving out this application were located outside of Chicago.
+
+[00:02:57]
+And so, the further you got from Chicago, the worse the time to first byte was, and all the subsequent other bytes. And so, performance would get worse, and worse, and worse, the further you were away from the Central Time Zone in the United States of America. Which it turns out, we had some metrics to show that India and Brazil were two of the kind of bigger regions, as well as London, where performance was actually really kind of not great.
+
+[00:03:22]
+So, we started out with our client-side code, it was hosted on a Rails app. The Rails app was located in Chicago. It was getting a little bit tricky. And we had this opportunity to, one, start thinking about where we'd put our client-side assets and eventually move the entire front-end into AWS using CloudFront.
+
+[00:03:40]
+And we'll kind of explore how we did it, and how you might choose to do it, as well. Let's look at some of the numbers first. So, we have the before column, SendGrid was based out of Denver. And so, time to Chicago, not too bad. Even then, the performance gain within the US was pretty good cuz there's actually a CloudFront edge node in Denver, as well as Minneapolis.
+
+[00:04:02]
+So that even is somewhat helpful. Go out to Frankfurt and you're going from 11 seconds down to 1.8. Mumbai, you're going from 9.6 seconds down to 1.3. And Sydney, from 12 seconds down to 0.8 seconds. So huge performance gains that didn't really involve any change in our code, right?
+
+[00:04:21]
+It was just a change in how we got that code to our users, right? Because, rather than figure out the optimal one place to put it, you can use CloudFront just to put it everywhere, right? And one user has to pay the cost of it going all the way to a given Amazon region while everyone else has it cached nearby, and they're able to get it a lot faster.
+
+[00:04:40]
+So, one person pays that original cost, every subsequent end user gets something very close to these performance levels for loading the application. Like I said, we're gonna build this application today. And what we're gonna build will have the following characteristics. And we're gonna build it to a point where we have it kinda working but it's got some trade-offs.
+
+[00:04:59]
+And then, slowly, over the course of our time together, we will address each one of those trade-offs until we have a pretty kinda solid implementation, as well as some opportunities for how you could even further improve it, after the fact. So, we're gonna get our client-side application hosted on AWS via S3.
+
+[00:05:20]
+Have it distributed globally, so that no matter where you are in the world you're getting fast access to that application. Secured with HTTPS using SSL cert. Automatically deployed, at first we'll do it by hand, at first we're gonna literally hit an Upload button. And then we will do it from the command line and then eventually we'll have it automatically deployed with a CI/CD pipeline that we'll write using GitHub actions.
+
+[00:05:42]
+And then for kind of custom things like fixing some of the security headers and stuff along those lines. We'll use Lambda, and Edge, and CloudFront functions to see that we can actually take this infrastructure and program it, and write code against it to do various things that we might wanna do.
+
+[00:05:58]
+We'll do some of the general cases together, we'll talk about some of the additional things that you might wanna do, depending on the specific needs of your application. What are we not gonna cover? So, we're not gonna cover servers, cuz this is a course on getting your phone an application, like interproduction in a scalable way.
+
+[00:06:15]
+We're gonna kinda dance next to serverless, with this idea that you can program your CDN, but we're not gonna cover AWS Lambda in depth. That is a course, in and of itself, that Frontend Masters offers. And you should absolutely check it out as soon as you finish watching the rest of this course.
+
+[00:06:32]
+So, let's look at a slide that we might show at the end of this workshop. So, we'll first get it up onto the Internet, just in someplace that Amazon's willing to put it for us. And we'll fix that URL to begin with. We'll register a domain name. There's not necessarily a requirement that you have to go register a domain name today, if you don't want to.
+
+[00:06:50]
+But I will, at least, go through the process, so you can have that in place. We'll kind of work through this list of to-do's, from the initial version that we start out with, towards the version at the very end.
+

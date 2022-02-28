@@ -1,0 +1,104 @@
+[00:00:00]
+>> Can Prisma generate and validate CRSF tokens? No, Prisma cannot do that. Although, yeah, Prisma can't do that, it doesn't really know anything about that as far, cuz that's more of like a front end issue when it comes to hijacking things on the front end. No, typically, the way you get around that with the strategy that we're doing is that you would create a refresh token that is literally just another JWT.
+
+[00:00:26]
+So you have your JWT expire, let's say it expires, I don't know, 24 hours. And then after 24 hours, you would basically have a refresh token, and then somewhere in your React app, you would have a use effect hook. That's unlike a set interval that checks every ten minutes to see if your JWT expired.
+
+[00:00:43]
+And if it did, in the background, it'll automatically exchange that JWT with the refresh token and get a new JWT, so that user doesn't have to. That would be the best user experience where no one has to do anything, it just logs you in automatically. The other way you would do it is you would just tell the user, your JWT expired, sign in again.
+
+[00:01:02]
+And you'll see that too, but typically, you would make the JWT expire a lot later.
+>> In production, how does serverless functions get executed? Like if we don't have an active server running, how will I still get access to these API endpoints?
+>> Good question. In production, how do serverless functions execute?
+
+[00:01:22]
+It's a different concept to think about. So it's called serverless because there is no server. The way they get executed is actually like a callback. So if you wrote a callback in JavaScript, that function, okay, imagine you had a callback on click. That function actually doesn't do anything until the click event fires.
+
+[00:01:39]
+The serverless function's the same way. It actually doesn't do anything until an event come in. And depending on what platform you're on, there's many different types of events. The most common one is a route. So whenever this route across the Internet is activated, that's an event. And then once that event happens, your function is executed.
+
+[00:01:58]
+So there's no server, it's literally just like a callback waiting for some incoming event. In this case, the events are the routes, so it feels and looks like an API, but in reality, these serverless functions can respond to anything. They can respond to things being added to AWSS3.
+
+[00:02:13]
+They can respond to logs. They can respond to someone updating the users on the database. They literally can respond to anything depending on what platform you go to. But in this case of Next.js, they respond to a route and a verb. So someone doing a GET request to this route, someone doing a POST request to this route, that's how they respond.
+
+[00:02:33]
+So yeah, the whole concept of a server running, there isn't one. It's just callbacks waiting on events. And as far as the technical details of how that happens, it's basically like a VM that gets spinned up, your code is zipped up in a file somewhere, an s3 somewhere.
+
+[00:02:49]
+It gets unzipped and then it gets executed. It waits around for a little bit, and then eventually, that VM shuts down and then it spins back up and someone hits it again. All right, let's do this. So first, we gotta get salty just like we did in the seed.
+
+[00:03:05]
+So we'll create a salt here and we'll just say bcrypt, oops, = bcrypt.genSaltSync, Like that. So we've got our salts. And then we need to get the email and password. So I'm the backend, I'm making the function. So I'm saying if you want to sign in, you must pass the email and password up.
+
+[00:03:32]
+And I'm gonna get that on req.body, very much like Express. If you ever use Express, you're gonna feel very comfortable here, because most of the serverless functions are pretty much based off Express. So we'll get the req.body here. And then now what we need to do is a tip to make this user.
+
+[00:03:48]
+So we're doing async await, so we'll do some try catches in here. So I'll say I wanna try, and I'm gonna catch an error just in case. So what I'm going to attempt to try is I'm gonna try to create a new user. The reason I'm putting this in a try catch because this might fail, if you give me an email that already exists in the database, the person is gonna throw an error and say this email already exists.
+
+[00:04:08]
+And that's it, that gonna cause an application error. But we don't want our process to error out simply because someone, like imagine you had a server that crashed every time someone tried to sign up with the same email. That would be terrible, right? [LAUGH] You don't want that, so that's why I'm wrapping this in a try catch.
+
+[00:04:26]
+I don't want that to happen, that's not our fault, that's a user error. So I'm gonna say user = await prisma.user.create. We're gonna attempt to create this user here. So we got the data, and then we're gonna say this email and this password, right? And then as far as password goes, obviously we want to hash this.
+
+[00:04:52]
+So we'll say bcrypt.hashSync, and this takes in the password that they sent up plus the salt that we created, so we'll do that. And then if we do get an error here, and it's either the database crashed or something wrong, but more realistically is that you just sent up an email that someone already has.
+
+[00:05:15]
+So I'm gonna set the status to a 401, as in sorry, you're not getting it here. And then I'm going to send back, and this is just optional. I always like to just send back JSON regardless. And I'm gonna send back an error property that says user already exists.
+
+[00:05:31]
+This way, when I'm on my frontend, I can always just check .error and get an error message. So that's just a standard that I've been doing. There's so many ways to handle errors on our frontend, but for me, I always just send back .error. And that's there, okay, whatever the service said, that's pretty obvious.
+
+[00:05:49]
+Then we pull a return here because we are gonna go outside of this catch. And then assuming that the user was created, we need to make a token now, so a JSON web token. And the way we can do that is I'm gonna say token = jwt.sign, so we can sign a token.
+
+[00:06:05]
+And it's really only needs two things. The requirements are one, the payload that you wanna sign. So what object do you wanna hash basically? In this case, I want to hash an object that has an email, which is gonna be the email that the user gave me. Now, we're gonna say user.email.
+
+[00:06:24]
+And then I want to pass the ID of the user, which will be user.id. And then I want to just put a time of when this was created, which will be Date.now. It's just nice to know when this thing was created. And then the next thing is you need a secret.
+
+[00:06:40]
+This is how I know that my server created this thing. So typically, we put this in an environment variable somewhere and you'll store it. We'll probably do that when we go to production but for now we're gonna type in Hello. It doesn't really matter what it is right now.
+
+[00:06:53]
+So that will be my secret. And then the third argument is some options. The first one I wanna say is expiresIn. And I'm just gonna say this expires in, I don't know, eight hours. So I could put 8h like that, and it'll expire in eight hours. I'll put anything short, this is gonna get really annoying when I'm developing up here.
+
+[00:07:15]
+I don't want to keep signing in, I don't wanna keep doing that. So I'll just put eight hours, and if it gets us, it gets us, we deserve it. Okay, Cool, so there's our token. This token is gonna be a string. So it's gonna be this really long, unique string that looks insane.
+
+[00:07:32]
+And on subsequent requests that we wanna protect, we can take a look at the string and reverse this process and get back this object. And then that's how we identify and authorize who is who. So yeah, that's how JWTs work. And then the last thing is to set this JWT in a cookie, which if you don't know how cookies work, if you set a cookie while you're on a request, before you send it back, it's gonna get added to the browser.
+
+[00:08:00]
+So if we set the cookie here and we send a response back, this cookie that we're setting will get set into the person's browser that requested us. So we're doing that, other times you'll see people just send back the JWT and JSON and it'll save it in local storage or something like that.
+
+[00:08:14]
+The local storage is fine, but it can be accessed by JavaScript. We set it as a cookie and do HTTP only. It cannot be accessed by JavaScript. It can only be accessed by HTTP. So it's probably a better method. And then you don't have to write any code on the frontend to send it up because cookies are sent up automatically anyway.
+
+[00:08:31]
+So it saves us a lot of time and it gives us a lot more security against CSRF. So we're gonna say rest.setHeader, like this. And the header that we want is called the Set-Cookie header. So we'll say Set-Cookie, and then we're gonna use this cookie package. So we say cookie.serialize.
+
+[00:08:55]
+And then the name of the cookie, you can call it whatever you want. I'm just gonna call mine TRAX_ACCESS_TOKEN, like that. Again, you'd probably put this in an environment variable somewhere too. We might do that, or at least make a constant file cuz we're probably gonna write this three more files.
+
+[00:09:11]
+So this is annoying to write it multiple times, but we'll get there when we get there. The next argument is the token that we just created. And then the last argument is an options objects that we want to pass in. So there's a couple things we wanna do here.
+
+[00:09:25]
+The first thing is we wanna make sure this is httpOnly. So that means it can only be accessed in HTTP requests and not by JavaScript. MaxAge, I think we wanna make this six hour for whales, the same as a JWT, that'll be six. I wish we could just do 6h, this library doesn't support that, or 8 hours.
+
+[00:09:49]
+So I think this will be 8, it'll be 8 times 60 times 60. Yeah, yeah, so that would be 8 hours. Cuz I think it goes by milliseconds. And then path, this is the whole website, so the root of the website. And then sameSite: 'lax', I actually forgot what this means, but I always do this.
+
+[00:10:15]
+So anybody knows what that means, let me know. I don't know what that means anymore, I've lost track, but I do it now. And then secure, this is if you want it to be HTTPS or not. We'll base this on whether the fact that we're in production or not.
+
+[00:10:31]
+So we'll say process.env.NODE_ENV === production. So if we're in production, then yeah, this needs to be httpsOnly, but obviously we're not gonna do that on localhost. And then lastly, we'll say res.json(user) to send the user back.
+

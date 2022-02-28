@@ -1,0 +1,117 @@
+[00:00:00]
+>> So anyway, Next.js 12, introduce their middleware edge functions which again sit in between the actual API service functions and your client. So that way, they can intercept any API call and do something. In this case, we're gonna make an edge function that checks the cookie to see if you have an access token.
+
+[00:00:22]
+If you don't, we're not even going to go to the server to render the page, we're just going to say, no, get out of here. We're going to redirect you, so we don't even waste resources going to our server or anything like that, which is really cool. And if you go to next AS's website they have really good examples, actually, I can just show you some of them.
+
+[00:00:45]
+Because I think it's really cool, they have really good examples on what you can do with some of the middleware. So authentication, which is what we're doing, bot protection, redirects, rewrites, handling unsupported browsers, feature flags. AV tests, analytics, eye teen, logging, there's so many different things you can do on the edge that I think is really cool.
+
+[00:01:06]
+So take a look at that, and we'll be using that cuz I think it's a great use case to do authentication. So to get started with that, it's actually quite simple, all we have to do is make a middleware file in our pages directory. So what we'll do is we'll go to our pages directory, and we'll make a new file, we'll call it _middleware.ts.
+
+[00:01:33]
+And again, we put an underscore in front of it, otherwise, it would literally make a route called middleware, we don't want. So Next.js has a convention where you put an underscore on some of these things and knows what to do. The way the middleware works is, you can put a middleware on any level inside the pages.
+
+[00:01:48]
+You can even put one here in the API, if you want, and make a middleware for that. If I put it right on the route, it's going to, this middleware is going to get executed before any one of these requests happen. So before any one of these requests actually get activated or targeted, this middleware is going to fire first.
+
+[00:02:04]
+So it's going to handle every single request coming in. So we need to write some code to only protect the pages that we want to protect, and we'll kind of go from there. So what we'll do is we'll say, actually, we don't really need to import anything right now, let's see what some TypeScript stuff.
+
+[00:02:23]
+So we'll say, first thing is we need to create a list of pages that we want to protect. Because remember, this middleware is going to run on every single route. And we don't want to block every single route, like sign in, sign up, we don't need to block.
+
+[00:02:37]
+I guess we could block the API stuff but we don't need to cuz they're all, they all they have their own handler built into one that we just made. But I guess you could block it even before that if you really wanted to, save half of a penny half of a penny half of a penny.
+
+[00:02:49]
+You could block it here on the edge, I guess, maybe the edge is more expensive there, I don't know. I know the cost analysis of that is but you could if you wanted to. But I'm just gonna make something called signed or signed and signed in pages or something like that.
+
+[00:03:07]
+It'll just be an array of all the pages I want to protect on the edge, so I wanna protect the homepage. I wanna protect anything that has playlist in it, anything that has library in it, anything like that. So I'll do that, and then all I'm gonna do is just export default a function, I'm gonna call it middleware.
+
+[00:03:33]
+And this thing, all it does is taken takes in a request like this, it doesn't take any response. Because if you, like I said this isn't actually so confusing cuz it's all in the same app, this actually isn't in a node environment. Like the API functions are in a node environment, and it's not in a front end environment, like these components will be in.
+
+[00:03:55]
+And it's also not in a node environment like our seed script will be in, it's more like a, what's the word I look for? If you ever made a web worker before, it's in a web worker environment, that's the environment that, that's the environment that edge functions run in.
+
+[00:04:14]
+So if you've ever had to make a web worker, you don't have access to a window or something like that. You got access to these very low level primitives, like a response object and a request object, and there's not really a lot of things you can do. And that's intentional, so those things can operate very fast, they don't load up a whole VM and all this other stuff.
+
+[00:04:32]
+So yeah, it's also a different environment, so right now, we're Next.js. And we have all this code living in one repo, but there's four different environments that they all run in. And it's sometimes it's hard to tell, but I think that's the feature of Next.js is that a lot of that stuff is abstracted away from you.
+
+[00:04:49]
+Because trying to do some of that stuff your own and trying to connect it together, you would just be building Next.js. So [LAUGH] just use this, okay, so now we wanna do is we wanna say if signedinpages.find. And we'll get the page and if that page triple equals recdot.
+
+[00:05:16]
+There's a property on our called next URL that Next.js puts on there, and then there's a path name. So we get the path name, so that equals anything that's an RA that means it should be protected. And then what we'll do is we'll say, token equals rec.ookies., and then the name of our cookie, which was track access token.
+
+[00:05:42]
+And then we'll say, if you don't have a token, not it as a scary movie. [LAUGH] If you don't have a token, then we're just gonna return next response, which I guess we do have to import that. So let's import that, next, give me some autocomplete, next, okay, imports, next, response from, I think it's next /server, there we go.
+
+[00:06:16]
+So import, next response.redirect, so we're going to redirect you back to sign in. If you try to go one of these pages and you're not authorized. So all this happens on an edge locally, it's just emulated, cuz obviously you don't have edge functions on your computer locally. So locally, it doesn't make a difference, but once you deploy it, this function does get executed on the edge.
+
+[00:06:45]
+I don't know exactly what versal uses if they use Google or AWS or they made their own thing, but this is actually really cool. I've used to use hash functions before, all these distractions just came out and it was really hard to do. You would deploy something to AWS at lambda at edge, and then wait 30 minutes for the propagate across the world and then you could try it.
+
+[00:07:05]
+It was terrible, you got to unzip the file to go see the logs, it was terrible, this is just so much cleaner, so it's come a long way. So you might have noticed that we're not really checking for a user here, we're just checking for a token. That's because, again, we're not in node, I can't use Prisma in here, I can't just import Prisma and try to use it in here.
+
+[00:07:25]
+Because this is not an old environment of prisms not even available, there are storage options for edge functions. What to do that that's a whole another thing, I would take us a whole another day to figure that out. Because we would find a way to take some user information out of the postgres database and stored in this edge database.
+
+[00:07:46]
+Or we're headed to use a serverless database that works in both environments, which right now, we're not using a service database. I don't think Prisma even works with a lot of service databases right now. I don't know which ones they do, which ones they don't even, that's a whole another discussion.
+
+[00:08:00]
+That's actually why edge functions are just now coming to primetime because it's like, okay, this is cool. I can do all this stuff on the edge, but how do I store things globally, right, and have them accessible immediately? And I was like, okay, we're not there yet, so a lot of companies have key value storage is on the edge.
+
+[00:08:17]
+I know Cloudflare does, I think Next.js has some options now, Redis and all these places are coming out to make this thing possible. But yeah, you can kind of do some of that stuff now, which is basically just like a database with the HTTP interface. So imagine a server that had a REST API just to interact with the database, that's what a lot of service databases are now.
+
+[00:08:39]
+That's what stitch was, MongoDB stitch was like, we took Mongo, and we threw rest in front of it. Here's a rest, here's it, here's a service database phase, when it's like, well, technically, it's a server. [LAUGH] So it's kind of weird, but I could talk about that all day, so yeah, now we have middleware, let's test it out.
+
+[00:08:58]
+So what we can do is, we don't have to add this anywhere, I don't have to do anything, it's just gonna run. So what we can do is, first, let me clear out my cookie, cuz I do have a cookie in there. And you can go there, you click on a cookie, is click this button right here, says, click on all cookies.
+
+[00:09:16]
+And then I'm gonna try to refresh and if that goes right, I should get redirected to sign up. I will, I guess I gotta start this over first before I'll do anything. Okay, you can see it says, compiling middleware, so looks like it picked up. It already did, so fast, so let me try it again, so I'm gonna home and it's not letting me go home.
+
+[00:09:40]
+It's automatically redirecting to sign in, no matter where I try to go to, if I try to go to slash, playlist, it's gonna go to sign in. So pretty cool, yeah, Mark.
+>> How to end it in test edge function [INAUDIBLE]
+>> How to end it in test edge functions, you will be the first one to do it, [LAUGH] that's a good question.
+
+[00:10:05]
+I don't think there is a common standard on how people into in test their edge functions. I would imagine it would be like testing any other API, if you're going full on WebDriver mode. And you're just testing to the browser, then nothing changes for you, how do you test any other routes?
+
+[00:10:25]
+But then obviously, I think we're, yeah, it'd be like a combination of that plus unit testing this function in the environments that you came in Webpack. I know Webpack allows you to change your bill to web workers mode, so you have that that web workers environment. With all the globals and things that come with that, so you could test it that way, if you wanted to unit test it.
+
+[00:10:48]
+But in unit testing, it would literally be the same thing, right, like if I was testing whether I got redirected or not. It doesn't matter if it's an edge function or not I'm just testing if I got redirected.
+>> Does app dot TSX run for middleware.tsx?
+>> Does app.tsx run before middle, no, because middleware happens before your app actually is even, so you got to get out of middleware.
+
+[00:11:17]
+It literally sits in the middle, if your app is the origin, it's the destination. The middleware is the thing that intercepts the request before it goes to the destination. So know the app will not execute before the middleware, because the app is runtime, whereas the middleware is happening on the network layer.
+
+[00:11:37]
+It's literally happening on the way to you, so yeah, the middleware what happened first, yes.
+>> So instead of rest this next response, right?
+>> Yes, we have next response, and that's because there actually isn't a rest here. Because again, this is like a web worker environment, and you don't have access to, so that, I could talk about that a little more.
+
+[00:12:03]
+Let's see them talk about it here, here we go edge runtime. So basically you have access to, literally, like I said, there's really not a lot you have access to, but this is it. This is all you get in this environment, you get this big request object, you get this response object, that looks pretty crazy.
+
+[00:12:21]
+Like if you want to make a response, but yeah, you don't have access to that. But you do have access to the request because most of the time, that's what you're doing. But you can also do something that looks like this, you don't have these next response, you could just do new response here like this.
+
+[00:12:40]
+You can make a new response but I've never done that before, it can be pretty crazy.
+

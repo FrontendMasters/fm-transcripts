@@ -1,0 +1,63 @@
+[00:00:00]
+>> Eventually we're gonna have to deal with the fact of what happens if you push bad code, right? Or what happens if you push better code? Right, you deploy the feature. Now you deployed a new feature. We look at the cash policies. We can go ahead and hit at it.
+
+[00:00:20]
+So we're redirecting, we can actually go in here and view this caching policy. And you can see basically the default setting. So minimum cache links for a second. Maximum, I don't know, that's a year, and by default cache everything that goes through all those CloudFront edge nodes for 24 hours, right?
+
+[00:00:43]
+So what happens if you push a new version on the page? And yeah, you've directly fingerprinted your bundles, right. But it has the same file name no matter what, or index or HTML, right. They load index.HTML that loads the right main.shot.js. So whatever your build system spits out, so that becomes tricky, which is we need to say called front.
+
+[00:01:09]
+Forget everything you know about index.HTML. There's a few ways you can go about doing this. And one of my current coworkers and I had this discussion about which is the right way to do it. I think probably both have different sets of trade offs and you get to choose.
+
+[00:01:27]
+For him he wanted to basically have index.HTML have a much shorter time to live, right? Figure everyone who visits is caching that one, right? So give it a five second, a minute, five minute TTL, right? So basically, when we say those edge nodes, the first person who gets an edge note that doesn't have the file pays the cost to go all the way back to Amazon and get it, and then everyone else keeps it.
+
+[00:01:53]
+CloudFront by default will say 24 hours, right? And then we can play this whole game again, and the one person will eat the time to go all the way back to Virginia to go get the file, right. So he kept a low one for index.HTML and then very high for the rest of the files.
+
+[00:02:13]
+Because that's the only ones changing, everything else is fingerprinted so on and so forth. I kept it high for everything, right? I'll show you the one weird trick to get around this in a second. So, you can change these as much as you want. The other thing that you can do is if you go over here to back to the behaviors menu, this is the default behavior, right?
+
+[00:02:39]
+You could create a new behavior for /index.HTML, right? And you could say all the same things. And you could set a different policy for just that file. Or you might say that, okay, for the index page, I want this, for images though keeping for a year, we know that there's no way to replace an image.
+
+[00:03:05]
+And our app hypothetical is whatever the app you're working on is, you might say, okay, images or anything in the images directory, or that goes to the images bucket. You might keep your images in a different bucket. That we know that there's no way to replace them, there's only a way to upload.
+
+[00:03:20]
+Fine, cool, keep that for a lot longer. A lot of this will depend on the nature of your application and that's totally fine. And you can figure that all out for yourself, but you can actually have different sets of cash rules for different kinds of files. And you can set those up here as well.
+
+[00:03:38]
+So you can, if you really want to, you can create a different one, if you are on the belief system that you should have a different one for index.HTML, that will totally work as well. But let's come l down to the idea that okay, let's say you set it to 10 minutes, but somebody pushed bad code, totally wasn't you.
+
+[00:03:56]
+I always say, yeah, who pushed it but who also code reviewed it? Because, it's usually the first person who blames whoever wrote the code is the one who code reviewed it and even five or 10 minutes is not acceptable to you. In that case, you have something that we like to call invalidations.
+
+[00:04:14]
+That's not just a mean thing you say to your friends, that is a thing that means something in CloudFront. So an invalidation is basically a way to tell CloudFront, forget everything you know about that file. I don't care if the time to live was five years. Don't the have five year time to live but you don't I mean, just forget it.
+
+[00:04:33]
+[LAUGH] Wipe it from your memory like the movie Men in Black, right where they see an alien and then it's just totally gone. That's basically what we wanna do to CloudFront. And I made a joke about this earlier. One of the ways we can do this, we can hit Create invalidation.
+
+[00:04:50]
+And you can type in all of the different paths that you should forget about. The limitation here is you get 1,000 of them for free after that it's fractions of a fraction of a cent, right or something along those lines but the interesting part is that you can use wild cards, right?
+
+[00:05:18]
+So, firing off 10 invalidations for 10 different file paths is 10 invalidations. That's one, right? So what I'm gonna do is we'll go ahead and that still hasn't applied, we will investigate it that is still broken in a second. We will go and investigate that cuz that should work but, yeah, things are weird.
+
+[00:05:48]
+So we'll take the site and I'm gonna open it up in my browser real quick, or my code editor. And I'm gonna search for the word indigo. And I'm gonna change all instances of indigo to pink. All right, and at that point, I'm gonna do an npm run build.
+
+[00:06:25]
+I'm just gonna effectively deploy a new version of it, and we'll do All right, unless I've messed something up. Still blue. I also should have validated with local host to see if I actually turned it pink and save the file but I'm willing to believe that's not my issue right now.
+
+[00:06:50]
+But it's blue. Why is it blue? Because CloudFront has it cached for 24 hours, right? So go ahead and we'll make an invalidation. Like we threatened to earlier. We'll say invalidate everything. And now you see it's in progress. Like I said, it's going to 300 edge nodes. It's really cool, right, that this works at all if it takes a little bit of time, we're totally into it.
+
+[00:07:16]
+Right, I, if you think about that you just spun up the ability to distribute application around the world and yeah, sure we can make some fun of the UI sometimes, still pretty cool technology under the hood. I am impatient so I am gonna hit Refresh. You see now it's pink cuz I invalidated the cache.
+
+[00:07:34]
+I got a fresh version, so on and so forth. So, that is invalidation. One of the places that we're gonna use it is when we build a CI/CD pipeline, right? That way, we're gonna say, when you deploy a fresh version, what I want you to do is to go ahead and send out an validation when the new version has been uploaded.
+
