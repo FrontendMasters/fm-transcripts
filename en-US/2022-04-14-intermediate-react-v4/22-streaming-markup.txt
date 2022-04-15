@@ -1,0 +1,175 @@
+[00:00:00]
+>> So we're gonna do a little bit more to do that we're gonna do to make this even more performant. But any questions so far? This is like the Hello World of server side rendering. Yeah.
+>> Got a question, but I just right now spent the last week and a half figuring out how to make some of our parts of our site do this.
+
+[00:00:19]
+To fix the user experience, I appreciate seeing this. Like icons slowly lagging, like loading in that was just jarring to the user as opposed to just showing it off, and slightly delaying when they could click on it.
+>> Yep, It's really frustrating for a user to see something trying to interact with it, and not have it be interactive, cuz then they think it's broken.
+
+[00:00:41]
+
+>> Yeah, or I think it's also when it moves out of the way all sudden, like you go to Click and then the ad comes in and-
+>> Like as a good reason, flare, or flash of unstyled text, or flash of unstyled content, right? All sorts of reasons for why that can happen.
+
+[00:00:58]
+But yeah, if you're taking enough time there that a user can see something, make a decision and try and do it, they're either gonna think that they're doing it wrong. Or they're thinking I think, that you suck which is the more correct thing to think, right? You might ask me what happens, Brian, if I go to slash something like a non-valid thing right?
+
+[00:01:21]
+Right now it's just gonna be a giant error, and it's not gonna work. Now you can make React handle this, you can make React Router, deal with hey, 404, didn't find this, I'll redirect you to the homepage, you can do that. And you can see how to do that in the React Router docs if you want to do that.
+
+[00:01:38]
+Here is the big problem with how to do at the moment with React Router version 6. That was not a problem with React version 5. StaticRouter used to let you pass in a context object that allows you to then read afterwards. Hey, how'd the rendering go, right? So you can then ask yourself okay, cool.
+
+[00:01:57]
+Did I 404, did I 500? And then here you could have said res.status, 500 if it went wrong. This is a positive thing because if you tell Google hey, 200, Google's like cool, I'm gonna update your SEO for this, right? So if you're on a serious website, you do have to care about that.
+
+[00:02:18]
+Or 400 or 300 or something like that, right? If you do a redirect. Right now, the way that we have this right now, it's gonna 200 on everything. So you're always telling Google, please update my SEO right now. This is still possible to do with React Router version 6, I dropped the link in there if you wanna go in and actually dig into it.
+
+[00:02:38]
+It's pretty involved now and it used to be really easy, and now it's hard, I'm a little peeved about that. Cuz I don't like it when you take something away from a user that was really nice to have. Basically their reasoning is hey, we made Remix, you should use Remix.
+
+[00:02:59]
+That's on them. Remix is very cool to be fair, but, okay, So we just did server side rendering -1, which is like the Hello World. We're gonna take this a step further and we're gonna do streaming now, which is a little bit cooler. We're all about cool code here.
+
+[00:03:22]
+We do stuff because it is cool. [LAUGH] That's funny that's literally my first line of my notes here. I'm not joking, I'm such a nerd. [LAUGH] I just need to prove my point to you. I'm just a damn broken record. Anyway, let's make it cool. So what we're gonna do, go back to your code here.
+
+[00:03:48]
+So instead of doing render to string, we're gonna do render to node stream. A stream is a data type inside of inside of node, that this is what it sounds like. It's kind of like a bash stream or like a command line stream, where data progressively arrives, right?
+
+[00:04:10]
+As opposed to render to string just like it does everything and then spits out the entire thing at the end. Node stream is going to progressively give you pieces as it renders it. With the advent of HTTP version 2, we can stream mark-up to the users. So we can have long live connections like here's a little bit more, here's a little bit more, here's a little bit more.
+
+[00:04:31]
+Okay, I'm done right? As opposed to HTTP 1.1 was just like, here's everything all at once. Now if we had a giant application, for example, something like LinkedIn or Facebook, this is a massive deal, right? Because there's so many things coming down. We're sending down literally probably 50 kilobytes of just straight up HTML, right?
+
+[00:04:50]
+This makes a big difference. For application it might even be slower, so this is probably a bad idea, but it's fine. So we're gonna modify I think pretty much just this part right here, so you can probably just, Delete at least this part down here at the bottom.
+
+[00:05:10]
+The first thing we're gonna do here at the top is we're gonna say res.write(parts[0]). So why? Why are we doing this immediately? Well, one, we already know what it is, right? If you look at our index.html, in fact, now we have a built version, so let's look at that.
+
+[00:05:35]
+dist, front end index.HTML, up into not rendered. This part we already know all of this, right? This never changes, we can just send them this immediately. Why this is actually critical and a big part of the web performance is what is in here? The stylesheet just lets the browser go ahead and get started and loading all the CSS while we're still figuring out the rest of the node markup.
+
+[00:05:59]
+So this actually can be a pretty big win performance wise because the user immediately starts getting the CSS. So we're kind of multitasking now, as opposed to them getting all of the market all at once. The browser then starts parsing, hits the CSS, it's not paying attention to the rest of the DOM at all until it finishes parsing all of this.
+
+[00:06:19]
+It finishes downloading and then parsing all the CSS, and then it continues, right? Unless you're doing something like preload or prefetch or something like that, but suffice to say that can be kind of slow, particularly on like a low end device and if you have a lot of CSS.
+
+[00:06:34]
+By doing this, we get to get them started on that immediately, then we render all of our code. Okay, so we do that. Honestly, this might be the biggest win of the entire thing with Velum. What am about to show you. Then I'm gonna say const stream = renderToNodeStream(reactMarkup).
+
+[00:07:01]
+This is gonna kick off the node render and it's just gonna start spitting out parts as soon as it's done with it. Okay, and then I'm gonna say stream.pipe, so I'm going to connect that stream to the user via this. Critically I have to tell it, this is not the end.
+
+[00:07:21]
+I got more stuff to do as soon as you're done click to finish parts, right? So you just say end: false, otherwise as soon as it finishes streaming this it's gonna say cool, he's done or she's done or they're done, and then just finish the stream. Okay, then we're gonna say, stream.on and so as soon as they're done with this render to node stream, finish it out there and say, res.write(parts 1 Write the last bit of it, for example, if you remember correctly.
+
+[00:08:08]
+Here in the index.html, this is where the JavaScript is, it's after the not rendered. So very critical that you get that there. And then here I'm gonna say res.end just to let the stream know we have finished the request, you can mark this as a 200 and close it out.
+
+[00:08:29]
+Well, I guess it would have already been marked as a 200. But in any case, you can finish out the request, you can close the connection. Now, in case you didn't know that, you actually never have to end your connection. You can keep sending stuff to users via HTTP push.
+
+[00:08:44]
+In fact, there is a wonderful course on Frontend Masters called the Complete Intro to Real Time taught by a very dashing and attractive teacher. That I show you how to do exactly just that. Seems like a cool guy, I hear he's cool, anyway. Okay, so now this should work and this should be streaming markup instead of just one big payload all at once.
+
+[00:09:15]
+Critical here, make sure you stop and start your server. In fact, I probably should have mentioned that earlier. This is building your server every single time and it's also building your application. So if you're making changes, if I wanna do a console.log here, This won't happen until I stop and start the server again.
+
+[00:09:38]
+Again, this is what I told you, it's not a great developer experience right now. It'll take a bit to get that working, but you would use something like Node Daemon or Node demon or Node demon, gotta catch them all. There's no official way to pronounce that, by the way, in case you're wondering, it's however you choose to pronounce it.
+
+[00:09:59]
+Okay, so now localhost 3000. We're not really gonna see a difference, because it's all localhost and going super fast. But this has the potential be a significant improvement in performance. Now, I'm going to implore you, with code splitting, with render to string and render to node stream, measure it, make sure that it actually is a better performance thing.
+
+[00:10:22]
+I'm pretty sure that for an app as small as Adopt Me is, I think it's probably a net negative, just my guess. So you need a certain amount of heft, you need to have some intelligence in terms of how and where you're splitting your application for this to actually be effective.
+
+[00:10:40]
+But for example, when I was at Netflix, we did measure it and we made some pretty significant gains in terms of signups, right? Because there's a ton of research out there that the faster your web performance is, to a point, the better your conversion rate's gonna be, so.
+
+[00:11:02]
+All right, that is server-side rendering. Any questions? Yeah?
+>> The only question I have here so far is, this is from about ten minutes ago. What if production is not Express?
+>> Okay, so I am showing you everything in terms of Express.js, which is just a pretty thin server side framework for Node.js.
+
+[00:11:33]
+If you're coming from Ruby it's most comparable to something like Sinatra, where it's just really meant to be as bare bones as possible. It really looks just about the same, because these req and res objects here, request and response, these are not Express objects. These are actually directly Node native objects.
+
+[00:11:56]
+Which is to say something like Fastify, something like Restify, they expose the same objects. You can even write this in terms of HTTP, right? There's a import http from http, which is the direct HTTP library from Node.js itself. Express does not do very much for you. The reason why I even include in in the first place is I did not wanna write the Express static.
+
+[00:12:22]
+This line right here is 30 lines of code that I just didn't wanna write. Otherwise you could've just done everything with HTTP. So I guess my point being here is, The exact syntax will vary from framework to framework a little bit, but the concept here is always the same.
+
+[00:12:51]
+Cool, okay, other questions?
+>> Is SSR better for securing API keys?
+>> Is server side rendering better for securing API keys? No, I mean, for an API key, the point of an API key is so you can make a request against an API. And if you're gonna do that in the browser, no matter what, gotta send down the key.
+
+[00:13:24]
+There's no way to kind of obfuscate that. You always have to have secure API keys no matter what. So it's either gonna be behind your own API. So for example, let's say I'm making requests to the Google Maps API, right, which is not free anymore. I either have to hide it behind my own API and hide my API key that way, or I have to send it to the user, which is bad cuz they're gonna steal it.
+
+[00:13:48]
+Someone's gonna steal it. So yeah, let's go with no bearing. Yeah.
+>> How would this process process differ for a TypeScript code base?
+>> I mean relatively little, because we're already running our entire server through a build process. Which is the challenge with TypeScript and Node is you have to build your server.
+
+[00:14:18]
+We did that, we could literally just rewrite this as, hell let's try it, see what happens. Worse that happens is that I embarrass myself. So it's gonna be upset by some types I think that's because it doesn't know about that, that's fine. Cannot find name, anyway, obviously TypeScript is already gonna be pretty upset by a bunch of these things.
+
+[00:14:53]
+So anyway, you would have to go and fix all these type errors. But once you have done that, everything would work just fine.
+>> Tomcat won't work.
+>> Thank God I'm not a Tomcat expert. [LAUGH] I don't know how Tomcat would play into this. Yeah, I don't know enough to speak to that.
+
+[00:15:11]
+I have much more familiarity with something like Nginx. In which case you would just probably have Nginx be the ingress to your pod or Kubernetes or whatever service provider you're using there. And then that would pool your connections basically through this front door of your Node front end, middle end, server, right?
+
+[00:15:33]
+But at that point, we're just talking about how your networking works. Server side rendering doesn't make that any more interesting or less interesting. The only thing that it makes it mildly interesting at all is basically all of your requests to your clients probably at some point are gonna hit your Node front end, right?
+
+[00:15:51]
+And then those are gonna fan out to other services in your, Your micro-services or however you choose to do that. Cool. Other questions?
+>> Yeah, I can have a general just review question between code splitting and server side rendering and streaming markup. I know we've talked a lot about not solving performance issues until they become an actual problem to solve, of these three solutions for getting better performance.
+
+[00:16:27]
+I guess, how do they kind of compare to each other in terms of like, no deliverable results, that makes sense.
+>> Yeah. The point of code splitting is to reduce the amount of kilobytes that a user needs to get the application working. So, that's like I'm loading the homepage, and I have some buttons that I want the users to be able to click as fast as possible, that time to first interactive is where code splitting really shines Time to first meaningful interactive, I don't know if that's actually a metric, but I just invented it and it seems really good to me.
+
+[00:17:13]
+Time to first meaningful interactive, yeah, something like that, that's where code splitting is really helpful. You're basically saying I'm delaying making all this other stuff work to make sure that this thing works immediately, this is optimizing for and these are just two strategies to get the same thing.
+
+[00:17:31]
+That being server side rendering the render to string or render to streaming, your goal is to first meaningful paint, right? So it's not to interact if this doesn't help interactive it might even make interactive a tiny bit worse. But what you're trying to do here, is you're trying to make it so that the user sees something meaningful as fast as possible.
+
+[00:17:53]
+Which of those is more important, really depends on what your application is doing, right? For blog post, you don't care if it's interactive, the people just want to read things which this can handle just fine. Ecommerce, yeah, you want that thing as interactive as fast as possible because the user clicks on it like, they're trying to click the buy button and it doesn't work.
+
+[00:18:11]
+And then they click it 19 times and then they buy it 19 times, someone's going to be upset, right? Now speaking from experience, or anything like that, but that definitely happened to me, thank you, Angular, thank you, Brian who wrote crappy Angular, that's a better way of putting it.
+
+[00:18:31]
+I'm kind of probably oversimplifying a little bit, but those are probably maybe the chief wins from those two different things. And you can probably, you can, you can mix and match them a little bit to say, all right, we're gonna do a server-side rendering and then send the minimum amount of JavaScript.
+
+[00:18:44]
+In fact, a really kind of cool performance optimization that occurred to me, what you would do here, let's look at our just normal index, html. You would build two packages, one would be here in the head of a script tag of like, you might even just make it directly in here like the most critical Jas goes here, right.
+
+[00:19:09]
+So that the user gets this immediately right away, you could probably then put here style, The most critical CSS, and then you could move this down here, to after the user gets this afterwards, right? Or you can do something like this defer, so you can put all this stuff up here as well, and then if you did something, I think module has different semantics that I'm not thinking of at the moment.
+
+[00:19:42]
+But there's a defer, and there's another one a sync, which basically says like, I want you to load this particular damn time like this, don't block here. This would be tricky to get right, but if you could, you could basically get the user downloading everything as fast as possible, but not blocking the browser from finished rendering.
+
+[00:20:08]
+Yeah, I would have to work a lot more on that, cuz now we will get into a spider's webs have a bunch of problems, but it could be pretty cool if you could get it right, that answer your question?
+>> Yeah, no, I really appreciate it like, the broad level perspective on use case and just strategy so,
+
+[00:20:30]
+
+>> Cool.
+

@@ -1,0 +1,153 @@
+[00:00:00]
+>> We do have to change the way our app works a tiny bit. When you're rendering in a node environment, you cannot access the DOM. I think that makes sense. However, we've coded our entire application up to this point, thinking that it's going to be running in the DOM.
+
+[00:00:16]
+Now, I can help you cheat a little bit, and I intentionally helped you write it in such a way that we didn't have to change very much. But basically, it means that for that critical path, first render, we have to get the, basically, window and document out of the way, and fetch, for that matter.
+
+[00:00:34]
+So an example of where this could have been a problem. Here in Modal, notice that here we have to do document.createElement("div"), right? You can't call document in node, this will crash, right? No, I made it here in such a way that you don't have to. So it's fine, cuz we don't render modal on the first render, right?
+
+[00:00:54]
+Don't render modals on the first render. I think that's generally just a good rule of not being a crappy human being. I probably just offended someone there, that's fine. [LAUGH] Welcome to the hill I die on, modals are terrible. But if you are trying to render modal on the first render, this would crash, right, because you're calling document.
+
+[00:01:14]
+So you have to go take care of all those concerns upfront. And then the other thing that we can do here is we're calling from here, Render from react-dom here. This is obviously gonna try and talk to the window and the document, right? So we actually have to move this into a special file.
+
+[00:01:36]
+So just create a file here with me called ClientApp.js. You can call it whatever you want. I called it ClientApp cuz this is what's actually going to render in the browser. So everything that you put in ClientApp.js will happen in the browser and will not happen in node.
+
+[00:01:52]
+So think about all the things that you might wanna do. For example, Google Analytics, you don't wanna fire analytics from your server, you wanna fire analytics from their browser. So you'd put all of your Google Analytics calls here in ClientApp.js. So what we're gonna do here instead of rendering App out here, like we do here in this document call, which would definitely crash, we're gonna just say export default App.
+
+[00:02:20]
+We're just gonna copy and paste that, cuz we're gonna put that in ClientApp. And then we'll get rid of render up here on line 1. Okay, here in ClientApp, we're gonna put that line of render here. So first of all, We're going to import, render from react-dom, and we're going to import App from ./App, okay?
+
+[00:03:00]
+Now, we have one more problem, With App.js here. What about BrowserRouter? Well, BrowserRouter only can happen in the DOM. Kind of a problem, because we still need a router, right? So we're gonna pull this out as well. And you can just delete those components here from React. Link will work, everything else will work, it's just specifically BrowserRouter can't be rendered in Node, it has to happen in the browser.
+
+[00:03:35]
+So here in ClientApp, we're also going to import BrowserRouter from react-router-dom, and then we'll just wrap App here, BrowserRouter. There you go, like that. Okay, we're not quite there, we actually don't wanna use render. Now, why? Render makes the fundamental assumption that we're constructing this app from nothing, right?
+
+[00:04:14]
+It's telling React, it's like, all right, here's your space, get started. What we need to tell React is, hey, we already did this for you, we just want you to take over existing markup, right? Cuz what we're gonna do is, on our first pass, we're going to render out the complete app.
+
+[00:04:30]
+We're gonna send that down to the user so they immediately get static HTML. Then we have to tell React, I already did the HTML part for you, I want you to just take over the existing static markup. And the way you do that, instead of saying render, we're gonna say hydrate.
+
+[00:04:50]
+Cuz you can never drink enough water. The idea is, it's like you dry it out, right, and then you send it down, and then it rehydrates it on the other side. Or it's just someone trying to remind themselves to drink more water. It's one of the two, I can't figure out which it is.
+
+[00:05:12]
+One last thing here in index.html, instead of having the entry point be App.js, we have to tell Parcel where to start. And the new place to start is ClientApp.js. And I still have this here, I gotta go delete that, delete those two things too. Okay, I think so far we are ready to go into node mode, which I meant to rhyme just now.
+
+[00:05:52]
+So first thing here is we're gonna npm install, and we're gonna use Express. This is not a commentary that you should or should not use Express, it's just the one that everyone's familiar with. I tend to use express a lot, cuz I've been writing node for a decade.
+
+[00:06:16]
+And that's just the one that I can write without thinking about it. But I will tell you that if I was gonna start a startup today, I probably wouldn't build it on Express. Fastify would probably be a strong choice there. I'd probably write my frontend service in Next, and then my APIs in something like Fastify.
+
+[00:06:37]
+Or Express, Express is fine. When I was at Netflix, we used Restify, which is really similar. Okay, so now we have package.json, we look here, we have express right there, great. Last thing here, ya, no, we got that, that's fine. Go to your package.json, we're there. So we have dev here that'll start our server.
+
+[00:07:09]
+We also need to start our web server. So we're gonna put start here. And we also have to have to build. Let's do build first, cuz that's gonna make more sense. Okay, so build is going to do parcel build, which is fine. And then start is gonna do npm -s, which is silent, I think, is what that means.
+
+[00:07:43]
+You're gonna run build. So basically, every time that I run start, I wanna make sure that I build the server anew again, which is what that's gonna do. And then we're gonna end. You might need to change how that works if you're in Windows and not in PowerShell.
+
+[00:08:03]
+Anyway, yeah, I'm wondering if the double ampersand works in Windows. I don't remember exactly how to do it. If you're having trouble with it, then just make npm run start node dist/backend/inde.js. And then just make sure you always run build first, that's the way that you take care of that.
+
+[00:08:28]
+For the rest of you just go ahead and do npm -s run build, it's just easy to forget to run build and you'll be wondering, I just changed this code, why is it not rebuilding? So just an easy way to not do that. Okay, now we do have to give parcels and configuration cuz we actually needed to build multiple things now, why?
+
+[00:08:51]
+Well, if you think about it, our entire application is written in jsx, we're gonna try and run jsx in node, which means something needs to compile it, Because node doesn't speak jsx. Node also doesn't speak ES module by default either, right? So down here at the bottom, we're gonna just add a couple of little configuration items, it called targets.
+
+[00:09:17]
+And we're gonna make two targets. One's gonna be called front end, which is basically what we've already been doing. And its source is gonna be source/index.html, right? And it's public URL, Is going to be /frontend We're basically just telling it where to find it, okay? And underneath that, we're gonna have a back end now that we were not doing previously.
+
+[00:10:05]
+Source is gonna be in, Server/index.js, I guess this can be an array or cannot be an array, either way is fine. I think I originally had multiple things here and took that out. Either way, both are fine. Optimize, because this is not being sent over the wire, we don't need to like minify it and manage it and all that kind of stuff.
+
+[00:10:32]
+It's actually preferable if we don't cuz we'll get better error messages. So for optimize, we're gonna put that as false contexts. So we're gonna tell it please build for node. And then, we'll have to tell what version of node to build for. And we're gonna tell it to build for whatever version of node you're using.
+
+[00:10:53]
+I'm using node 16. So I'm gonna tell it to build for 16 Again, I have a ligature there. This is angle bracket equal and when I put them together, my font pushes them together to make it look like that I need a colon there. Okay, This is what parcel is gonna read to build this.
+
+[00:11:32]
+And this is also the way you would build it to go out to production. So you can kinda take this as like a double lesson in terms of, this is how you would set up parcel to build multiple things to go to production. We're not gonna build a good developer experience here.
+
+[00:11:45]
+You typically, what you wanna do is you'd wanna have parcels start on your web server and then it's like hot refresh dev server in there, right? But that would add a lot of code to make that all supported for a nice developer experience. And I'm just gonna show you how to build this for production for today.
+
+[00:12:05]
+Okay, now you and I have to write a node server together. And there's a little bit to write here, so let's do that together, make a new folder here and call it server, then here make a new file and call it index.js Now you could write this in common js typically that's how you write node-js, how you previously have been writing it.
+
+[00:12:33]
+Future node code will be ES modules. So let's just do that. It's already running through parcel anyway, so might as well make it futuristic JavaScript. Import express from express. Import renderToString from react-dom/server. So there's a special like little sub package here that allows us to render the stream from react-dom.
+
+[00:13:08]
+We're gonna import a module from React Router DOM called StaticRouter react-router-dom. Again they mimic the same pattern which is server. We're gonna import our good friend fs, from fs, this is file system, it's just a node core module. And import app from ../source/App. Okay, these are all of our core modules.
+
+[00:13:50]
+We're gonna declare the port that we're gonna be listening on. So you can either just set that to straight up be 1000, I have a force of habit from working at a cloud provider for too long to say process.env.PORT or some default port which is 3000. The reason why I do it this way is if you deploy it to like Azure for example, it will provide you an environment variable to tell you what port to listen because it's always a nonstandard port.
+
+[00:14:19]
+It's a security thing, kind of, not really, probably just the way they do it. Okay, we're gonna kind of cheat this a little bit. There's a lot of ways that you can think about how to do server side rendering. A lot of people will make a special react component that's only meant to be rendered on the server that renders the body of the HTML.
+
+[00:14:42]
+We don't need to do that right now, so we're not going to, but you could do it that way, and I'll say it's probably one of the more common ways to do it. What we're gonna do instead is we're going to read from our generated HTML document. In fact, you can see here.
+
+[00:14:58]
+Well, we haven't built it yet. This is going to get built into another HTML document that's gonna be put into our dist folder, right? That's going to have all of the correct JavaScript and CSS linked, rather than try and figure out what parcel did, we're just going to take that generated file and we're going to use that to server-side render.
+
+[00:15:19]
+So let me show you what I mean. I'm gonna say const html = fs.readFileSync And we're gonna read from dist/frontend/index.html, right? This is the generated index html which is gonna have all the correct paths. And then we'll say ToString here. In general, I don't recommend using readFileSync for node, unless you're starting up your server, right?
+
+[00:15:53]
+I'm only gonna do this once. It's gonna pause the invocation of the rest of the code here until this is done. You don't wanna do that in your response cycle to your users, that would be dumb, but it's fine for starting up, okay. Const parts equals, so if you look at this document now, this index at HTML, where does our react code go, our react markup?
+
+[00:16:25]
+It goes right here, right. So I wanna render this part first, I wanna not render not rendered, and then I wanna render the rest of it. So typically what people will do here is they'll put some fancy comment of break here or something like that. That would be like the normal sane thing to do.
+
+[00:16:46]
+I'm just gonna break on not rendered because why not. It's a good delimiter, right. No, it's a terrible delimiter but we're gonna do it anyway. HTML.split not rendered. This is just a string function, right, parts is a string, you can see literally right there, it is a string.
+
+[00:17:11]
+And then we're just splitting on it on not rendered, so we're basically using it like a commo we would in a string, right, but we're doing it literally on the string not rendered. So not rendered will not be included, right, cuz the limiters are not included when you call split.
+
+[00:17:28]
+So now parts zero will be all of this, and parts one will be all of this. Now, let me tell you why this is a horrible idea, what happens if we have the string not rendered somewhere in our react app? It will be fine in our react app, but let's say somewhere else in our index.HTML for whatever dumb reason it got output here, then it would mess up everything.
+
+[00:17:57]
+So we're making this a little fragile but it's fine. Okay, const app equals express, we're making a new server, we're gonna serve all of our static assets.app.use for slash front end, express.static, dist.front end. This will just correctly serve all of our front end assets. That's where we set the public URL to be slash front end so this would all work correctly.
+
+[00:18:32]
+Okay, and then we're gonna say app.use takes in a request and a response. And then here is where all the magic is going to happen. Const react markup equals, and again, remember this is going through Babel, or it's not what is going through Babel but it's going through Parcel.
+
+[00:18:55]
+So we can actually write JSX directly in our note code and that's totally fine. So we're gonna see a static router location equals req.URL, so we're passing in the URL from the request to static router. This is going to run a server side rendering of this, and then we're gonna render app.
+
+[00:19:18]
+At the end of this react markup is going to be whatever the generation is of this or basically the create element thereof. Then once this is all done, we're gonna say res.send. Basically just parts zero + render to string react markup, + parts one, right. In my notes I did it as a template string, you can do it either way, whatever seems more clear to you.
+
+[00:20:04]
+That's it, this will now be the complete server side rendering of our code, and then you just gonna say res.end. Console.log, I always do this just to remember what port I'm on. Listening on http://localhost: port, port, port, port, port, okay, and then app.listenonport Okay, there's three dots there, just need two.
+
+[00:21:01]
+Before I take some questions, let me make sure that this actually invokes, okay, I'm gonna run NPM run start. Okay, package.JSON, I messed up that this should be engines number 44 there. This is one of my favorite things about Parcel though, their error messages are awesome, right. Did you mean to call this engines?
+
+[00:21:32]
+Yes I did So here you can see everything that the front end built here, which is good. We can see here with the backend built, index.JS. Now I can just control click on this, and my app still works. Now if you look at the mark, I'm just doing view source here, right.
+
+[00:22:03]
+Oops, notice that the adopt me, all this stuff that was being generated in React is now being generated on the server. So the users getting actually more complete looking application. To kind of drive home my point a little bit, one, no one turns off their JavaScript anymore, you can assume that at all times users have JavaScript enabled.
+
+[00:22:26]
+That's not a thing anymore. I hear people say, well this needs to work without JavaScript enable, we're past that point. But this works without JavaScript. So this page, right, it's rendering, all of this stuff is coming through so no JavaScript is executing, obviously our app is not functional, right.
+
+[00:22:51]
+But they at least get the first view without any JavaScript enabled.
+
