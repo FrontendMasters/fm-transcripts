@@ -1,0 +1,98 @@
+[00:00:00]
+>> The next thing we're gonna do is introduce what I call a transform. And this is not a formalized GraphQL concept, but I think every codebase of the kind that we're building here today involves something like this and it's nice to sort of put it all in one place.
+
+[00:00:21]
+What I mean when I say transform, it's something that converts from the database representation of an entity to the GraphQL representation of the entity. Just think of it as, if there were private data on a field or a slight difference in naming and I think we have one in our app, where the database thinks.
+
+[00:00:42]
+A tweet has a field called message by the GraphQL schema, if I recall, calls it body. So that it's just we need to do a little mapping here. These are just very simple back end front end mapping functions. And they shouldn't do much more than that. Because often you need to reuse these over and over.
+
+[00:01:06]
+So I'm gonna call this transforms.ts just create a new module for this purpose and we will introduce our first transform here and this is for a tweet. So let me grab the code for that.
+>> Someone in Chad mentioned the adapter pattern
+>> The adapter pattern, yes, we have some fans of the Gang of Four book in chat.
+
+[00:01:29]
+This is a yeah, I guess it could be considered an adapter. When I think about the adapter design pattern that's usually something that plugs into a larger object where you're not using the adapter directly but you provide it. It's kind of related to the strategy pattern. So a cleaner example of the adapter pattern might be in our Apollo server when we're loading a schema.
+
+[00:01:54]
+There is this pluggable file loader thing, that we can give this load schema sync function, we don't know what load schema sync is doing, but based on which type of file we're loading, there's a different adapter that we can provide, on a per file type basis. But we're we're never invoking this thing directly, that's kind of what I think of when I think adapter.
+
+[00:02:27]
+All right, let's create our first transform, sorry let me reorganize my windows here because I keep sliding back to that other one. There we go, perfect. So, here we go. This is going to transform a tweet, we'll take a database representation of the tweet, its database representation because the type begins with DB right there.
+
+[00:02:48]
+And what do we omit a tweet which is part of our generated code. So we know that this is a GraphQL entity of some kind. And we're omitting a field called author, why? Because authors are related record that's a field of type user and that's going to require its own transform, right?
+
+[00:03:09]
+We don't want this thing to do anything more than transforming sort of the most basic and primitive data that relates to a tweet. So let's grab this whole thing, drop it in that newly created file. And we see an error up here. That means we've kind of need to rerun our code gen.
+
+[00:03:32]
+Remember we've touched our resolver. So we're gonna need to build up our representation of the GraphQL schema and TypeScript. I'm being lazy here. All right, new types came in error went away. We are good to go. Here's an example of a nice little mapping here. That's kind of important.
+
+[00:04:08]
+Body versus message, this is a good time to do that. And there might be things on this that we don't want to pass through. Cool so there's our transform, next we're going to want to import this into our query resolvers, and we're gonna create a tweets resolver function So let's go to our query resolver, add this import, and then we will get our tweets resolver function.
+
+[00:04:44]
+And here it is. We'll just add it right here below suggestions. All right, now I'm just to be safe I see that es Lint is bugging me here. I think it's probably just not caught up with the latest changes to the types. I'm gonna restart es lint real quick.
+
+[00:05:08]
+And we'll see if things go away. Seems good. All right, let's talk about like, what does this code mean, right? We just pasted a bunch of stuff in here. I want you to understand what's going on. So first off, this is a resolver and this is a good time for us to talk about the three arguments that a resolver is passed.
+
+[00:05:30]
+This here is known as the parent. When we get into cascading in resolvers, right? Like the idea of tweets have an author and we resolve the tweet and then we have to go deeper to resolve the author, this will become more clear, but just think of it as like we're at the top level here, right?
+
+[00:05:52]
+We're right in this query resolver here, so parent isn't going to be especially useful for us in this context. We're right up at the top. There is no useful parent for us. This argument here is aggs. This is where if we accepted parameters here which we will get to soon.
+
+[00:06:12]
+This is where we would find those parameters. Like if I was requesting one tweet, and I needed to provide a tweet ID, or the Favorites associated with a particular user, this is where I would get my user ID. It's where those arguments come in. And then this of course, is the context object.
+
+[00:06:32]
+This is where we can hang useful things, and it's this little scratch area that, because of the way we've used context, we've defined context with the function, right? By that I mean this function here, right? We're gonna get an this function invoked every time a request comes in we'll get a fresh empty area, we can put whatever we want in there and then once things are returned to the client.
+
+[00:07:02]
+That goes away, we start fresh next time. So those are the things that our resolvers pass. Now what are we doing here? While we're calling db.get all users and we're iterating over all of the users and we're putting them into a cache, why? Because as we're assembling this list of tweets, we're gonna have to go and look up the list of authors and we can very easily just sort of like put them in memory.
+
+[00:07:27]
+And then sorted out down the road without having to hit our database. Now you could query your database, each and every time but I would advise against that. In a more realistic scenario, what you would probably do is retrieve your tweets, get the list of user IDs associated with the authors of those tweets.
+
+[00:07:48]
+And then prime your cache with that subset of users, right? But it's often way cheaper to make that one query, where you're getting a collection of things back, rather than a bunch of little tiny queries in a loop because just like that, without I mean, it's just a lot of round trips and even worse if you're doing them sequentially.
+
+[00:08:11]
+All right, so here, DB two favorite count map. So, in our database we have a concept of favorites. Let me look at my schema.Graph QL. We have not defined a favorite type here, but just think of this for now as a many to many relationship between users and tweets, right?
+
+[00:08:37]
+Tweets can have many people who've liked them. Users can like many tweets, many to many. So it's sort of you may have heard of this concept of a join table. This is like a record in a join table. Just think of it as like add something that holds a tweet ID and a user ID, let me show you what this looks like in the database, here you go.
+
+[00:08:58]
+Tweet ID, user ID some timestamps and an ID in and of itself like that's it's just sort of an edge in our graph, so to speak. Now, we still in order to get our stats right? In order to produce this object, even though we're not exposing favorites as an entity through our API yet, we're still gonna need to count them to complete this part of the exercise.
+
+[00:09:26]
+And we need to just come up with the right integer for now. So we're getting all of the favourites. And then we are getting the current count, right? If there's an existing count in this map for the tweet ID, we use that otherwise we start at 0. And then we increment the count by 1, and put it back into the map.
+
+[00:09:55]
+So effectively this map starts out as empty. And then we're counting starting at 0. And so eventually, any tweet that has likes of any kind, that will show up in this map. So I have tweet IDs and then a number. All right, then we're gonna grab all the tweets, we're gonna map over them, we're going to cache them, and then transform them and return them.
+
+[00:10:23]
+So ultimately what we're gonna end up returning is the Graph QL representation of a tweet and we will have cached information about how many favorites each tweet has all the users and all the tweets. Let's see what happens. So I'm gonna go to my dev tools here and let me clear this out.
+
+[00:10:47]
+Start fresh, note that Apollo studio has It is hitting pulling your API every so often and it's already picked up on the fact that tweets is a new query that's available. So just click this and what do we want here we want a body and then author, name, handle something like that.
+
+[00:11:16]
+Let's run this. all right, so, we've got the body. Great, I see a lot of different body here. A lot of different tweets, author is no. And the reason it's no is because we haven't done anything with author yet. And it's a nullable type so this is fine.
+
+[00:11:34]
+Now there are two things that we could do in order to make this work. We could either in here as we're transforming this, we could say like author let's do this just for fun. This is temporary code so don't bother to copy this in here. So I'm going to borrow the code from our current user resolver just so we have access to this first user I could do this.
+
+[00:12:04]
+Unreachable code detected because I don't want to return the first. User this is es lint complaining again I'm just going to bump it restarted. Okay, so Let's spread properties and I promise I'm using the right version of node here all right we can make this happy. Fine, if you want me to do it the old way, I can do it the old way.
+
+[00:12:33]
+Object design. So if we save this we're effectively merging these two objects together. Let's see what Graph QL is the studio says hey look at that authors coming in. So one option we have is to eagerly populate this thing as we're deserializing, this tweet object. But let's say that we don't want to do this because this would mean even if you didn't ask for it, depending on whether the query is requesting this particular field, it would either be dropped away or kept.
+
+[00:13:05]
+But let's say that we want to refrain from doing that extra work, unless we really need it. So I'm going to backup here. To this point and this is where we should see a no again and we do.
+

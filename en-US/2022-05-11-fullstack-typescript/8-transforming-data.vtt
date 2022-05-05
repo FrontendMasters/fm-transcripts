@@ -1,0 +1,884 @@
+WEBVTT
+
+1
+00:00:00.450 --> 00:00:07.220
+The next thing we're gonna do is
+introduce what I call a transform.
+
+2
+00:00:07.220 --> 00:00:10.636
+And this is not a formalized
+GraphQL concept, but
+
+3
+00:00:10.636 --> 00:00:15.760
+I think every codebase of the kind that
+we're building here today involves
+
+4
+00:00:15.760 --> 00:00:21.170
+something like this and it's nice
+to sort of put it all in one place.
+
+5
+00:00:21.170 --> 00:00:26.414
+What I mean when I say transform, it's
+something that converts from the database
+
+6
+00:00:26.414 --> 00:00:32.140
+representation of an entity to
+the GraphQL representation of the entity.
+
+7
+00:00:32.140 --> 00:00:37.450
+Just think of it as, if there were private
+data on a field or a slight difference
+
+8
+00:00:37.450 --> 00:00:42.285
+in naming and I think we have one in
+our app, where the database thinks.
+
+9
+00:00:42.285 --> 00:00:47.085
+A tweet has a field called
+message by the GraphQL schema,
+
+10
+00:00:47.085 --> 00:00:49.490
+if I recall, calls it body.
+
+11
+00:00:51.760 --> 00:00:54.570
+So that it's just we need to
+do a little mapping here.
+
+12
+00:00:54.570 --> 00:00:59.990
+These are just very simple back
+end front end mapping functions.
+
+13
+00:00:59.990 --> 00:01:01.420
+And they shouldn't do much more than that.
+
+14
+00:01:02.770 --> 00:01:06.334
+Because often you need to
+reuse these over and over.
+
+15
+00:01:06.334 --> 00:01:12.164
+So I'm gonna call this transforms.ts just
+create a new module for this purpose and
+
+16
+00:01:12.164 --> 00:01:16.839
+we will introduce our first transform
+here and this is for a tweet.
+
+17
+00:01:16.839 --> 00:01:19.530
+So let me grab the code for that.
+
+18
+00:01:19.530 --> 00:01:22.285
+&gt;&gt; Someone in Chad mentioned
+the adapter pattern
+
+19
+00:01:22.285 --> 00:01:24.543
+&gt;&gt; The adapter pattern, yes,
+
+20
+00:01:24.543 --> 00:01:28.410
+we have some fans of the Gang
+of Four book in chat.
+
+21
+00:01:29.760 --> 00:01:34.520
+This is a yeah,
+I guess it could be considered an adapter.
+
+22
+00:01:34.520 --> 00:01:39.348
+When I think about the adapter design
+pattern that's usually something that
+
+23
+00:01:39.348 --> 00:01:44.027
+plugs into a larger object where you're
+not using the adapter directly but
+
+24
+00:01:44.027 --> 00:01:45.180
+you provide it.
+
+25
+00:01:45.180 --> 00:01:48.173
+It's kind of related to
+the strategy pattern.
+
+26
+00:01:48.173 --> 00:01:52.899
+So a cleaner example of the adapter
+pattern might be in our Apollo server
+
+27
+00:01:52.899 --> 00:01:54.956
+when we're loading a schema.
+
+28
+00:01:54.956 --> 00:01:59.482
+There is this pluggable file loader thing,
+that we can give this load
+
+29
+00:01:59.482 --> 00:02:04.322
+schema sync function, we don't know
+what load schema sync is doing, but
+
+30
+00:02:04.322 --> 00:02:07.210
+based on which type of file we're loading,
+
+31
+00:02:07.210 --> 00:02:12.233
+there's a different adapter that we
+can provide, on a per file type basis.
+
+32
+00:02:12.233 --> 00:02:16.375
+But we're we're never
+invoking this thing directly,
+
+33
+00:02:16.375 --> 00:02:20.262
+that's kind of what I think
+of when I think adapter.
+
+34
+00:02:27.110 --> 00:02:31.127
+All right, let's create our first
+transform, sorry let me reorganize my
+
+35
+00:02:31.127 --> 00:02:34.330
+windows here because I keep
+sliding back to that other one.
+
+36
+00:02:34.330 --> 00:02:35.620
+There we go, perfect.
+
+37
+00:02:37.320 --> 00:02:39.260
+So, here we go.
+
+38
+00:02:39.260 --> 00:02:41.360
+This is going to transform a tweet,
+
+39
+00:02:41.360 --> 00:02:44.510
+we'll take a database
+representation of the tweet,
+
+40
+00:02:44.510 --> 00:02:48.930
+its database representation because
+the type begins with DB right there.
+
+41
+00:02:48.930 --> 00:02:54.030
+And what do we omit a tweet which
+is part of our generated code.
+
+42
+00:02:54.030 --> 00:02:57.833
+So we know that this is
+a GraphQL entity of some kind.
+
+43
+00:02:57.833 --> 00:03:01.880
+And we're omitting a field called author,
+why?
+
+44
+00:03:01.880 --> 00:03:05.944
+Because authors are related record
+that's a field of type user and
+
+45
+00:03:05.944 --> 00:03:09.222
+that's going to require its own transform,
+right?
+
+46
+00:03:09.222 --> 00:03:14.167
+We don't want this thing to do
+anything more than transforming sort
+
+47
+00:03:14.167 --> 00:03:18.601
+of the most basic and
+primitive data that relates to a tweet.
+
+48
+00:03:18.601 --> 00:03:22.020
+So let's grab this whole thing,
+drop it in that newly created file.
+
+49
+00:03:25.943 --> 00:03:29.200
+And we see an error up here.
+
+50
+00:03:29.200 --> 00:03:32.690
+That means we've kind of
+need to rerun our code gen.
+
+51
+00:03:32.690 --> 00:03:35.050
+Remember we've touched our resolver.
+
+52
+00:03:35.050 --> 00:03:39.415
+So we're gonna need to build
+up our representation of
+
+53
+00:03:39.415 --> 00:03:42.423
+the GraphQL schema and TypeScript.
+
+54
+00:03:48.559 --> 00:03:49.560
+I'm being lazy here.
+
+55
+00:03:54.761 --> 00:03:59.560
+All right,
+new types came in error went away.
+
+56
+00:03:59.560 --> 00:04:03.780
+We are good to go.
+
+57
+00:04:03.780 --> 00:04:05.970
+Here's an example of a nice
+little mapping here.
+
+58
+00:04:05.970 --> 00:04:08.060
+That's kind of important.
+
+59
+00:04:08.060 --> 00:04:10.880
+Body versus message,
+this is a good time to do that.
+
+60
+00:04:10.880 --> 00:04:14.420
+And there might be things on this
+that we don't want to pass through.
+
+61
+00:04:14.420 --> 00:04:17.229
+Cool so there's our transform,
+
+62
+00:04:17.229 --> 00:04:22.846
+next we're going to want to import
+this into our query resolvers,
+
+63
+00:04:22.846 --> 00:04:27.180
+and we're gonna create
+a tweets resolver function
+
+64
+00:04:33.128 --> 00:04:38.150
+So let's go to our query resolver,
+add this import,
+
+65
+00:04:38.150 --> 00:04:42.960
+and then we will get our
+tweets resolver function.
+
+66
+00:04:44.340 --> 00:04:45.151
+And here it is.
+
+67
+00:04:49.142 --> 00:04:52.949
+We'll just add it right
+here below suggestions.
+
+68
+00:04:54.836 --> 00:05:01.130
+All right, now I'm just to be safe I
+see that es Lint is bugging me here.
+
+69
+00:05:01.130 --> 00:05:04.772
+I think it's probably just not caught up
+with the latest changes to the types.
+
+70
+00:05:04.772 --> 00:05:06.500
+I'm gonna restart es lint real quick.
+
+71
+00:05:08.590 --> 00:05:09.948
+And we'll see if things go away.
+
+72
+00:05:09.948 --> 00:05:12.188
+Seems good.
+
+73
+00:05:14.536 --> 00:05:17.570
+All right, let's talk about like,
+what does this code mean, right?
+
+74
+00:05:17.570 --> 00:05:19.140
+We just pasted a bunch of stuff in here.
+
+75
+00:05:19.140 --> 00:05:20.950
+I want you to understand what's going on.
+
+76
+00:05:20.950 --> 00:05:25.133
+So first off, this is a resolver and
+this is a good time for
+
+77
+00:05:25.133 --> 00:05:30.090
+us to talk about the three arguments
+that a resolver is passed.
+
+78
+00:05:30.090 --> 00:05:32.220
+This here is known as the parent.
+
+79
+00:05:33.290 --> 00:05:38.040
+When we get into cascading in resolvers,
+right?
+
+80
+00:05:38.040 --> 00:05:42.422
+Like the idea of tweets have an author and
+we resolve the tweet and
+
+81
+00:05:42.422 --> 00:05:47.698
+then we have to go deeper to resolve
+the author, this will become more clear,
+
+82
+00:05:47.698 --> 00:05:52.110
+but just think of it as like we're
+at the top level here, right?
+
+83
+00:05:52.110 --> 00:05:54.657
+We're right in this query resolver here,
+so
+
+84
+00:05:54.657 --> 00:05:59.050
+parent isn't going to be especially
+useful for us in this context.
+
+85
+00:05:59.050 --> 00:06:00.010
+We're right up at the top.
+
+86
+00:06:00.010 --> 00:06:02.490
+There is no useful parent for us.
+
+87
+00:06:02.490 --> 00:06:05.310
+This argument here is aggs.
+
+88
+00:06:05.310 --> 00:06:11.200
+This is where if we accepted parameters
+here which we will get to soon.
+
+89
+00:06:12.340 --> 00:06:14.260
+This is where we would
+find those parameters.
+
+90
+00:06:14.260 --> 00:06:18.877
+Like if I was requesting one tweet,
+and I needed to provide a tweet ID, or
+
+91
+00:06:18.877 --> 00:06:22.134
+the Favorites associated
+with a particular user,
+
+92
+00:06:22.134 --> 00:06:24.427
+this is where I would get my user ID.
+
+93
+00:06:24.427 --> 00:06:29.890
+It's where those arguments come in.
+
+94
+00:06:29.890 --> 00:06:32.400
+And then this of course,
+is the context object.
+
+95
+00:06:32.400 --> 00:06:37.296
+This is where we can hang useful things,
+and it's this little
+
+96
+00:06:37.296 --> 00:06:42.100
+scratch area that,
+because of the way we've used context,
+
+97
+00:06:42.100 --> 00:06:46.260
+we've defined context with the function,
+right?
+
+98
+00:06:46.260 --> 00:06:52.360
+By that I mean this function here, right?
+
+99
+00:06:52.360 --> 00:06:56.414
+We're gonna get an this function invoked
+every time a request comes in we'll get
+
+100
+00:06:56.414 --> 00:06:59.333
+a fresh empty area,
+we can put whatever we want in there and
+
+101
+00:06:59.333 --> 00:07:01.620
+then once things
+are returned to the client.
+
+102
+00:07:02.690 --> 00:07:04.610
+That goes away, we start fresh next time.
+
+103
+00:07:06.190 --> 00:07:08.729
+So those are the things
+that our resolvers pass.
+
+104
+00:07:08.729 --> 00:07:10.157
+Now what are we doing here?
+
+105
+00:07:10.157 --> 00:07:14.919
+While we're calling db.get all users and
+we're iterating over all of the users and
+
+106
+00:07:14.919 --> 00:07:17.590
+we're putting them into a cache, why?
+
+107
+00:07:17.590 --> 00:07:22.644
+Because as we're assembling this list of
+tweets, we're gonna have to go and look up
+
+108
+00:07:22.644 --> 00:07:27.880
+the list of authors and we can very easily
+just sort of like put them in memory.
+
+109
+00:07:27.880 --> 00:07:32.160
+And then sorted out down the road
+without having to hit our database.
+
+110
+00:07:32.160 --> 00:07:36.019
+Now you could query your database,
+each and every time but
+
+111
+00:07:36.019 --> 00:07:38.340
+I would advise against that.
+
+112
+00:07:38.340 --> 00:07:43.603
+In a more realistic scenario, what you
+would probably do is retrieve your tweets,
+
+113
+00:07:43.603 --> 00:07:48.610
+get the list of user IDs associated
+with the authors of those tweets.
+
+114
+00:07:48.610 --> 00:07:52.090
+And then prime your cache with
+that subset of users, right?
+
+115
+00:07:52.090 --> 00:07:55.104
+But it's often way cheaper
+to make that one query,
+
+116
+00:07:55.104 --> 00:07:59.452
+where you're getting a collection of
+things back, rather than a bunch of
+
+117
+00:07:59.452 --> 00:08:03.586
+little tiny queries in a loop because
+just like that, without I mean,
+
+118
+00:08:03.586 --> 00:08:08.449
+it's just a lot of round trips and even
+worse if you're doing them sequentially.
+
+119
+00:08:11.416 --> 00:08:19.480
+All right, so here,
+DB two favorite count map.
+
+120
+00:08:19.480 --> 00:08:24.100
+So, in our database we have
+a concept of favorites.
+
+121
+00:08:25.100 --> 00:08:27.550
+Let me look at my schema.Graph QL.
+
+122
+00:08:27.550 --> 00:08:32.268
+We have not defined a favorite type here,
+but just think of this for
+
+123
+00:08:32.268 --> 00:08:37.530
+now as a many to many relationship
+between users and tweets, right?
+
+124
+00:08:37.530 --> 00:08:40.280
+Tweets can have many
+people who've liked them.
+
+125
+00:08:40.280 --> 00:08:44.440
+Users can like many tweets, many to many.
+
+126
+00:08:44.440 --> 00:08:47.520
+So it's sort of you may have heard
+of this concept of a join table.
+
+127
+00:08:47.520 --> 00:08:49.770
+This is like a record in a join table.
+
+128
+00:08:49.770 --> 00:08:54.483
+Just think of it as like add something
+that holds a tweet ID and a user ID,
+
+129
+00:08:54.483 --> 00:08:58.890
+let me show you what this looks
+like in the database, here you go.
+
+130
+00:08:58.890 --> 00:09:02.750
+Tweet ID, user ID some timestamps and
+an ID in and
+
+131
+00:09:02.750 --> 00:09:09.220
+of itself like that's it's just sort
+of an edge in our graph, so to speak.
+
+132
+00:09:09.220 --> 00:09:13.950
+Now, we still in order
+to get our stats right?
+
+133
+00:09:13.950 --> 00:09:16.175
+In order to produce this object,
+
+134
+00:09:16.175 --> 00:09:21.260
+even though we're not exposing favorites
+as an entity through our API yet,
+
+135
+00:09:21.260 --> 00:09:26.420
+we're still gonna need to count them
+to complete this part of the exercise.
+
+136
+00:09:26.420 --> 00:09:29.264
+And we need to just come up
+with the right integer for now.
+
+137
+00:09:31.680 --> 00:09:33.310
+So we're getting all of the favourites.
+
+138
+00:09:34.550 --> 00:09:39.910
+And then we are getting the current count,
+right?
+
+139
+00:09:39.910 --> 00:09:44.138
+If there's an existing
+count in this map for
+
+140
+00:09:44.138 --> 00:09:49.060
+the tweet ID,
+we use that otherwise we start at 0.
+
+141
+00:09:49.060 --> 00:09:55.550
+And then we increment the count by 1,
+and put it back into the map.
+
+142
+00:09:55.550 --> 00:09:58.460
+So effectively this map
+starts out as empty.
+
+143
+00:09:58.460 --> 00:10:01.510
+And then we're counting starting at 0.
+
+144
+00:10:01.510 --> 00:10:07.054
+And so eventually,
+any tweet that has likes of any kind,
+
+145
+00:10:07.054 --> 00:10:09.950
+that will show up in this map.
+
+146
+00:10:09.950 --> 00:10:11.680
+So I have tweet IDs and then a number.
+
+147
+00:10:13.370 --> 00:10:18.998
+All right, then we're gonna grab all
+the tweets, we're gonna map over them,
+
+148
+00:10:18.998 --> 00:10:23.965
+we're going to cache them, and
+then transform them and return them.
+
+149
+00:10:23.965 --> 00:10:28.763
+So ultimately what we're gonna
+end up returning is the Graph QL
+
+150
+00:10:28.763 --> 00:10:33.923
+representation of a tweet and
+we will have cached information about
+
+151
+00:10:33.923 --> 00:10:39.635
+how many favorites each tweet has
+all the users and all the tweets.
+
+152
+00:10:39.635 --> 00:10:40.535
+Let's see what happens.
+
+153
+00:10:42.145 --> 00:10:46.095
+So I'm gonna go to my dev tools here and
+let me clear this out.
+
+154
+00:10:47.775 --> 00:10:55.903
+Start fresh, note that Apollo studio has
+It is hitting pulling your API every so
+
+155
+00:10:55.903 --> 00:11:00.877
+often and
+it's already picked up on the fact that
+
+156
+00:11:00.877 --> 00:11:05.144
+tweets is a new query that's available.
+
+157
+00:11:05.144 --> 00:11:11.010
+So just click this and
+what do we want here we want a body and
+
+158
+00:11:11.010 --> 00:11:16.288
+then author, name,
+handle something like that.
+
+159
+00:11:16.288 --> 00:11:17.792
+Let's run this.
+
+160
+00:11:17.792 --> 00:11:21.610
+all right, so, we've got the body.
+
+161
+00:11:21.610 --> 00:11:24.280
+Great, I see a lot of different body here.
+
+162
+00:11:24.280 --> 00:11:27.700
+A lot of different tweets, author is no.
+
+163
+00:11:27.700 --> 00:11:31.670
+And the reason it's no is because we
+haven't done anything with author yet.
+
+164
+00:11:31.670 --> 00:11:33.500
+And it's a nullable type so this is fine.
+
+165
+00:11:34.500 --> 00:11:37.400
+Now there are two things that we
+could do in order to make this work.
+
+166
+00:11:38.840 --> 00:11:43.713
+We could either in here as
+we're transforming this,
+
+167
+00:11:43.713 --> 00:11:48.490
+we could say like author
+let's do this just for fun.
+
+168
+00:11:48.490 --> 00:11:52.525
+This is temporary code so
+don't bother to copy this in here.
+
+169
+00:11:52.525 --> 00:11:56.570
+So I'm going to borrow the code from
+our current user resolver just so
+
+170
+00:11:56.570 --> 00:11:59.442
+we have access to this
+first user I could do this.
+
+171
+00:12:04.611 --> 00:12:07.520
+Unreachable code detected because
+I don't want to return the first.
+
+172
+00:12:11.274 --> 00:12:16.094
+User this is es lint complaining again
+I'm just going to bump it restarted.
+
+173
+00:12:16.094 --> 00:12:21.599
+Okay, so Let's spread properties and
+I promise
+
+174
+00:12:21.599 --> 00:12:25.360
+I'm using the right version of node
+here all right we can make this happy.
+
+175
+00:12:29.540 --> 00:12:33.510
+Fine, if you want me to do it the old way,
+I can do it the old way.
+
+176
+00:12:33.510 --> 00:12:34.250
+Object design.
+
+177
+00:12:35.470 --> 00:12:40.353
+So if we save this we're effectively
+merging these two objects together.
+
+178
+00:12:40.353 --> 00:12:45.839
+Let's see what Graph QL is the studio
+says hey look at that authors coming in.
+
+179
+00:12:45.839 --> 00:12:49.854
+So one option we have is to eagerly
+populate this thing as we're
+
+180
+00:12:49.854 --> 00:12:52.830
+deserializing, this tweet object.
+
+181
+00:12:52.830 --> 00:12:56.938
+But let's say that we don't want to do
+this because this would mean even if
+
+182
+00:12:56.938 --> 00:13:01.048
+you didn't ask for it, depending on
+whether the query is requesting this
+
+183
+00:13:01.048 --> 00:13:04.450
+particular field,
+it would either be dropped away or kept.
+
+184
+00:13:05.610 --> 00:13:09.201
+But let's say that we want to
+refrain from doing that extra work,
+
+185
+00:13:09.201 --> 00:13:10.900
+unless we really need it.
+
+186
+00:13:10.900 --> 00:13:12.107
+So I'm going to backup here.
+
+187
+00:13:14.925 --> 00:13:20.030
+To this point and this is where we
+should see a no again and we do.
+

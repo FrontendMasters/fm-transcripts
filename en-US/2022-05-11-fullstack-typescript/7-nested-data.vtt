@@ -1,0 +1,648 @@
+WEBVTT
+
+1
+00:00:00.440 --> 00:00:03.774
+The next topic we're going to
+tackle is Nested data, and
+
+2
+00:00:03.774 --> 00:00:08.220
+the idea of retrieving related records
+that have a relationship with some of
+
+3
+00:00:08.220 --> 00:00:11.150
+the top level records
+we've already dealt with.
+
+4
+00:00:12.470 --> 00:00:20.020
+For example, this is the new schema,
+we're going to add to our schema.Graph QL.
+
+5
+00:00:20.020 --> 00:00:25.042
+And we have a new type we will
+introduce called user stats.
+
+6
+00:00:25.042 --> 00:00:29.709
+This is where we're going to see tweet
+count following count and follower count
+
+7
+00:00:29.709 --> 00:00:33.957
+and where you'll see that appear in
+the Twitter UI is these three areas in
+
+8
+00:00:33.957 --> 00:00:39.200
+the header they're currently at zero, we
+need to provide some real numbers first.
+
+9
+00:00:39.200 --> 00:00:44.035
+So you can imagine these might be
+aggregated values that we have to go and
+
+10
+00:00:44.035 --> 00:00:46.640
+retrieve from some other place.
+
+11
+00:00:46.640 --> 00:00:49.250
+Maybe it's more expensive to go and
+retrieve them.
+
+12
+00:00:49.250 --> 00:00:52.456
+And we don't necessarily want
+to grab all that information for
+
+13
+00:00:52.456 --> 00:00:54.860
+other people's accounts, right?
+
+14
+00:00:54.860 --> 00:00:57.780
+Like these other accounts that
+are not the currently logged in users.
+
+15
+00:00:57.780 --> 00:01:01.389
+So that's an example of something
+where we need that for up here but
+
+16
+00:01:01.389 --> 00:01:04.040
+we most certainly do not need it for
+every tweet.
+
+17
+00:01:05.860 --> 00:01:11.720
+We're gonna introduce the concept of
+a tweet which is related to a user and
+
+18
+00:01:11.720 --> 00:01:15.217
+that each tweet has
+an associated author and
+
+19
+00:01:15.217 --> 00:01:19.060
+tweets have a tweet stats object as well.
+
+20
+00:01:19.060 --> 00:01:23.659
+So this is where we're going to
+get into the idea of sort of a top
+
+21
+00:01:23.659 --> 00:01:27.907
+level resolver and
+then cascading down into specialized
+
+22
+00:01:27.907 --> 00:01:32.080
+resolvers that will take care
+of these nested objects.
+
+23
+00:01:34.490 --> 00:01:39.470
+All right, let's grab this and
+drop it into our schema.graphQL file.
+
+24
+00:01:39.470 --> 00:01:41.690
+Here's my schema .Graph QL file.
+
+25
+00:01:41.690 --> 00:01:44.377
+I'm just going to add this to the bottom,
+right?
+
+26
+00:01:44.377 --> 00:01:49.104
+If there's no particular importance
+of ordering in this file,
+
+27
+00:01:49.104 --> 00:01:51.474
+just do whatever works for you.
+
+28
+00:01:51.474 --> 00:01:54.605
+I think there is another
+change to make and
+
+29
+00:01:54.605 --> 00:01:58.820
+that is adding a top level query for
+the array of tweets.
+
+30
+00:02:00.130 --> 00:02:03.480
+Normally we'd want this to be
+retrieved on a per user basis.
+
+31
+00:02:03.480 --> 00:02:06.910
+But let's just pretend in this world,
+everyone sees the same tweets.
+
+32
+00:02:08.140 --> 00:02:13.270
+So we're going to add this
+to the query top level type.
+
+33
+00:02:13.270 --> 00:02:17.107
+We're also going to add this effectively,
+
+34
+00:02:17.107 --> 00:02:23.470
+a has one relationship,
+where each user has a user stats object.
+
+35
+00:02:23.470 --> 00:02:25.263
+So we'll add that to the user type.
+
+36
+00:02:29.682 --> 00:02:31.010
+Put that right here at the bottom.
+
+37
+00:02:32.420 --> 00:02:38.937
+Great, that is the extent of what we need
+to do in terms of schema modification.
+
+38
+00:02:38.937 --> 00:02:44.324
+Now just just note, author and
+stats on a tweet are nullable
+
+39
+00:02:44.324 --> 00:02:48.980
+fields they do not end with
+this exclamation mark.
+
+40
+00:02:50.600 --> 00:02:53.370
+Same is true for the stats field.
+
+41
+00:02:53.370 --> 00:02:57.467
+This is what we need to do if these fields
+
+42
+00:02:57.467 --> 00:03:02.195
+are populated on an as needed basis,
+right?
+
+43
+00:03:02.195 --> 00:03:07.296
+In order to sort of save the effort of
+abstaining from getting that data and
+
+44
+00:03:07.296 --> 00:03:09.220
+putting it together.
+
+45
+00:03:09.220 --> 00:03:10.840
+They need to be nullable right.
+
+46
+00:03:14.130 --> 00:03:18.943
+All right, so
+the next thing we're gonna do is add
+
+47
+00:03:18.943 --> 00:03:23.768
+some more objects to our context object,
+right?
+
+48
+00:03:23.768 --> 00:03:27.936
+This is the thing that the database is
+sort of held on and it travels along and
+
+49
+00:03:27.936 --> 00:03:31.725
+each resolver and gives us access
+to all sorts of different things.
+
+50
+00:03:31.725 --> 00:03:37.329
+We're going to create
+some little caches So
+
+51
+00:03:37.329 --> 00:03:40.321
+let's open up our Apollo server.ts and
+
+52
+00:03:40.321 --> 00:03:45.520
+let's go down to where that context
+is defined, which is right here.
+
+53
+00:03:47.070 --> 00:03:49.240
+And we're going to add some new things.
+
+54
+00:03:50.770 --> 00:03:53.447
+We'll call them DB tweetcash.
+
+55
+00:03:55.489 --> 00:03:59.363
+And there'll be an empty object and
+
+56
+00:03:59.363 --> 00:04:04.401
+then we're going to have
+another empty object
+
+57
+00:04:04.401 --> 00:04:09.965
+DB tweet to favorite count map and
+then DB user cache
+
+58
+00:04:17.737 --> 00:04:20.790
+All right, so
+we're getting a little type error here.
+
+59
+00:04:20.790 --> 00:04:27.420
+It's telling me object
+literal has properties on it.
+
+60
+00:04:27.420 --> 00:04:31.351
+An object literal may only
+specify known properties.
+
+61
+00:04:31.351 --> 00:04:33.460
+Has anyone know why we're
+getting this error?
+
+62
+00:04:33.460 --> 00:04:39.711
+What's the purpose of excess
+property detection and TypeScript?
+
+63
+00:04:43.604 --> 00:04:45.813
+Let me put it to you a different way.
+
+64
+00:04:48.732 --> 00:04:50.370
+So let's return this object.
+
+65
+00:04:50.370 --> 00:04:54.780
+Let's like it make our arrow
+function a little bit more explicit.
+
+66
+00:04:54.780 --> 00:04:56.340
+This means exactly the same thing now.
+
+67
+00:04:57.450 --> 00:05:04.810
+And if I were to do this
+The error goes away.
+
+68
+00:05:06.430 --> 00:05:08.840
+Kind of interesting the way that happens,
+right?
+
+69
+00:05:08.840 --> 00:05:11.921
+In many situations,
+just sort of taking a value and
+
+70
+00:05:11.921 --> 00:05:15.800
+holding it in a variable that
+doesn't affect much of anything.
+
+71
+00:05:16.920 --> 00:05:19.919
+Right, almost every other
+type error we would see,
+
+72
+00:05:19.919 --> 00:05:24.590
+continuing to appear we would have
+meaningfully change the situation.
+
+73
+00:05:24.590 --> 00:05:29.048
+However, for
+this particular type of error,
+
+74
+00:05:29.048 --> 00:05:33.710
+the problem has to do with TypeScript.
+
+75
+00:05:33.710 --> 00:05:38.501
+Well, the thing TypeScript is
+warning us about is these three
+
+76
+00:05:38.501 --> 00:05:42.932
+things are not on the tweet
+resolver context interface.
+
+77
+00:05:42.932 --> 00:05:48.269
+And if we return this object literal
+anyone who's using this value,
+
+78
+00:05:48.269 --> 00:05:54.890
+they're not going to be able to safely
+access these extra things that we have.
+
+79
+00:05:54.890 --> 00:05:57.977
+So it's sort of like
+we're creating this and,
+
+80
+00:05:57.977 --> 00:06:02.377
+it's almost guaranteed that you'd
+have to do some dangerous thing
+
+81
+00:06:02.377 --> 00:06:06.000
+like casting downstream
+in order to access these.
+
+82
+00:06:06.000 --> 00:06:11.509
+Now if we hold them in a variable like
+this, now it's in theory down here.
+
+83
+00:06:13.960 --> 00:06:18.816
+If I could access this right there
+could conceivably be a purpose for
+
+84
+00:06:18.816 --> 00:06:23.754
+me using this in some way right cuz I
+can pull it off the variable even if
+
+85
+00:06:23.754 --> 00:06:28.270
+things outside the function can
+only access DB because that's
+
+86
+00:06:28.270 --> 00:06:32.060
+the only thing on this interface, right?
+
+87
+00:06:32.060 --> 00:06:37.007
+So that's why access literal property
+checking kind of goes away when you
+
+88
+00:06:37.007 --> 00:06:38.850
+hanging off of a variable.
+
+89
+00:06:38.850 --> 00:06:43.755
+But in any case,
+we solve this in a more reasonable way
+
+90
+00:06:43.755 --> 00:06:46.810
+by adding this stuff to our type.
+
+91
+00:06:47.920 --> 00:06:50.674
+So, we're gonna go to resolvers.ts so,
+
+92
+00:06:50.674 --> 00:06:54.440
+we're going to define the types for
+these things.
+
+93
+00:06:54.440 --> 00:06:56.989
+And all of these will be records
+
+94
+00:07:08.745 --> 00:07:10.850
+So we've got a record of DB tweets.
+
+95
+00:07:10.850 --> 00:07:17.591
+That's a record of, DB users.
+
+96
+00:07:20.576 --> 00:07:26.120
+And then this last one, the long name,
+tweet to favorite count map.
+
+97
+00:07:28.140 --> 00:07:32.119
+This is going to be just
+a simple string to number.
+
+98
+00:07:32.119 --> 00:07:36.020
+All right, so
+how are we gonna end up using these?
+
+99
+00:07:36.020 --> 00:07:39.880
+Well, first, let's see,
+the errors went away.
+
+100
+00:07:39.880 --> 00:07:43.450
+These things are present on the type,
+these are no longer access.
+
+101
+00:07:43.450 --> 00:07:49.110
+They belong to this interface,
+they were just adhering to the contract.
+
+102
+00:07:49.110 --> 00:07:52.070
+In fact, if we were lacking these,
+we would get errors.
+
+103
+00:07:52.070 --> 00:07:54.550
+Course, which is just as it should be.
+
+104
+00:07:54.550 --> 00:07:56.200
+So what are we going to use these for?
+
+105
+00:07:56.200 --> 00:08:01.012
+Well, there are some situations where
+there's a situation we may run into in
+
+106
+00:08:01.012 --> 00:08:04.416
+a moment where we we could
+run into what's known as like
+
+107
+00:08:04.416 --> 00:08:06.790
+the n plus one query problem.
+
+108
+00:08:06.790 --> 00:08:09.050
+So let's imagine we're
+getting the list of tweets.
+
+109
+00:08:09.050 --> 00:08:14.000
+And in order to do that, we have to Figure
+out authors of all the respective tweets.
+
+110
+00:08:14.000 --> 00:08:17.260
+Let's say that we have 100
+tweets all by the same author.
+
+111
+00:08:17.260 --> 00:08:21.312
+If we do this in a naive way, and
+we say, first we grab the tweet, and
+
+112
+00:08:21.312 --> 00:08:23.516
+then we get the user ID of the author,
+
+113
+00:08:23.516 --> 00:08:27.490
+and then later on we'll query
+the database for that author.
+
+114
+00:08:27.490 --> 00:08:31.975
+Well, we could end up going
+to our database 100 times to
+
+115
+00:08:31.975 --> 00:08:35.930
+get that one record, over and
+over and over again.
+
+116
+00:08:35.930 --> 00:08:42.670
+So what we want to do is kind of pre fill
+some information, reuse things if we can.
+
+117
+00:08:42.670 --> 00:08:46.283
+And this is where we're going to hang
+things, so that as we move through
+
+118
+00:08:46.283 --> 00:08:50.442
+different resolvers, we can take advantage
+of the fact that we've sort of primed
+
+119
+00:08:50.442 --> 00:08:54.381
+a cache with some data and save ourselves
+from hitting our database too hard.
+
+120
+00:08:56.040 --> 00:09:01.155
+And at that lower level, you may not
+have the context to know whether
+
+121
+00:09:01.155 --> 00:09:05.930
+it's appropriate to use the cache or
+to make a query yourself.
+
+122
+00:09:05.930 --> 00:09:10.403
+You can just sort of use something that's
+there if somebody who knows more put it
+
+123
+00:09:10.403 --> 00:09:13.130
+there for you, if that makes sense.
+
+124
+00:09:13.130 --> 00:09:15.560
+So that's what these two
+are going to be used for.
+
+125
+00:09:15.560 --> 00:09:16.980
+Tweet to favorite count map.
+
+126
+00:09:16.980 --> 00:09:22.410
+This is like a similar intention but
+rather than saying, here's a tweet,
+
+127
+00:09:22.410 --> 00:09:26.632
+go iterate through all of
+the favorites in the database and
+
+128
+00:09:26.632 --> 00:09:30.010
+count how many pertain to this tweet,
+right?
+
+129
+00:09:30.010 --> 00:09:32.200
+That's a full iteration
+through all of our favorites.
+
+130
+00:09:32.200 --> 00:09:36.129
+So what we can do is iterate through
+all of the favorites at once and
+
+131
+00:09:36.129 --> 00:09:39.855
+create a map of like this tweet
+had six and this tweet had four.
+
+132
+00:09:39.855 --> 00:09:43.814
+We can do one pass through the array
+with sort of a array.reduce and
+
+133
+00:09:43.814 --> 00:09:47.138
+just tally things up Is up in
+the appropriate buckets and
+
+134
+00:09:47.138 --> 00:09:51.061
+then downstream we already
+have the counts ready to go.
+
+135
+00:09:51.061 --> 00:09:55.744
+So that's the purpose here to do
+a little bit of work ahead of time and
+
+136
+00:09:55.744 --> 00:09:58.551
+save ourselves from excessive querying
+

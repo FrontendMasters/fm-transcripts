@@ -1,0 +1,87 @@
+[00:00:00]
+>> The final thing we're going to do to our Twitter app is populate this part of the UI down here for trends, at this point this is the only thing that's still coming from fixture data. And we're gonna use this opportunity to talk about a new concept in GraphQL and how it relates to Typescript and that's the idea of union types.
+
+[00:00:29]
+So, we have this concept of a union in GraphQL, you're almost certainly if you've used this before in the typescript world. And this is a case where you can have multiple things that are trending, you can have a hashtag that is trending, or you can have a topic.
+
+[00:00:47]
+And that topic might refer to some entity For which we have a name and an image, and that'll be shown in the little card. So, this is gonna be a case where you'll make a request that will give you a mixed bag of results. There's some polymorphism happening here, and we're going to have to think about how can we create that?
+
+[00:01:10]
+And then on the receiving end, how can we process that? Even, how do we query for this kind of thing, where our mixed bag could involve different properties depending on which type of entity a member is? So, as usual, we will begin by modifying our GraphQl schema. Let's grab this and paste it in, this should be self explanatory.
+
+[00:01:35]
+We can see tweet count is something that is common between hashtag trend and topic trend. Topic trend has the possibility of having a topic trend quote associated with it. And so this is kind of the nested record that's only there for the topic trend. And then of course what the user is asking for is just give me trends, a mix of both of these things, give me a list of these trend things.
+
+[00:02:02]
+So, hopefully fairly straightforward. And into the schema they go, put them right at the bottom, great. We're also going to almost certainly, yes, have to add a top level query, right? This is the entry point, this is how somebody's asking for a list of trends. So, let's add that to our query type all the way up at the top.
+
+[00:02:33]
+And finally just to get the last little bit of GraphQL stuff out of the way before we run our code gen. This is what we're going to add to our get current user query. This is much more than the current user at this point, right? We're getting the suggested people to follow, we're gonna get trends now.
+
+[00:02:53]
+So, you can think of this almost like the the initial load for global things in our particular version of Twitter that has no routing. So, there's a new syntax here, dot, dot,dot.on topic trend, dot, dot,dot.on hashtag trend, this is basically telling GraphQL what to do In the case that a member matches one of these two types.
+
+[00:03:22]
+And within these braces we get the opportunity to describe the fields we're interested in on a per member basis. So, for example, we're getting tweet count on both, we're getting this deeper object only in the case of the topic trend, so we're gonna grab this whole thing we're gonna drop it in.
+
+[00:03:48]
+In App.tsx and it'll get current user, make sure I wrote that down, yes, App.tsx, in the Get_Current_User summary and we will just add it as a top level thing because it's a top level query, oops, I did not copy that. Great. All right, time to codegen. Client yarn codegen, and server.
+
+[00:04:22]
+Yarn codegen. Awesome. That should be good. All right, let's handle the server part first, so we're going to need to create a little transform and this is the most interesting one because we have to use a type card, and I have on the database representation of these topics.
+
+[00:04:45]
+I've given us kind, so let me show you the database types for these things. Let me collapse this one, kind and it has a string literal type. Does anyone know what this is called? This is this is trivia, is not about do you understand TypeScript? This is about do you remember the specific words we used to describe?
+
+[00:05:14]
+Checking for this and narrowing types based on this. Nicholas got it, discriminated union. Good job, Nicholas. That's the fancy type theory word to use here. So, effectively what that means is, we'll see when we paste this in. We can check for that field, and that will let us in one branch of our code.
+
+[00:05:46]
+If up here T could be a trend of any kind, and what does that mean? It's either of these two things. Now if kind is topic, well, we know we're a topic trend. Otherwise, everything that's not a topic trend, which is a hashtag trend. So, you can use this kind property and string literal types to have a discriminated union, effectively discriminating or doing special things to cater two, either of these two types to kind of a common pattern to use.
+
+[00:06:27]
+Of course, I like using the word kind because it's not type the word type as a way to frequently used in this code base as it is. All right, so we're gonna add a new top level query resolver in our query.ts because we've got that new trends that returns an array of trends, right?
+
+[00:06:50]
+In our schema we added this, so now we need to go to the query resolver and add the appropriate resolver for that. Here's the import for the transform and here's the resolver. A really simple one that just passes things straight through from the database, through this map function, and out.
+
+[00:07:18]
+I'll put that up at the top just to make it easy for folks to read. And bump ESLint just still unhappy with me, all right. Next, well, I wanna show you what happens before we go on to this next step because we can see the problem that the next step solves.
+
+[00:07:49]
+Trends, let's ask for trends and, Let's just get the hashtags that are trending. So, the error message we get back says, this abstract type trend must resolve to an object type at runtime for field Query.trends. Either the trend type should provide a resolve type function, or each possible type should provide an isTypeOf function.
+
+[00:08:24]
+This is telling us we need something that helps us sort this mixed bag into different piles, so that those can trickle through their respective resolvers and then be put back together in this different mixed bag, right? So, the way we're going to solve that is taking the first suggestion which is, resolveType.
+
+[00:08:47]
+So, we're gonna create this special method in a new resolver for trend, it's --resolveType, and you can see what what's happening here is, we're basically using a type guard we're seeing. like if this contains a property called hashtag that is a string, let's call this a hashtag trend, otherwise, we call it a topic trend.
+
+[00:09:13]
+This will solve this problem trend.ts in our resolvers folder. This is because although it's a mixed packed GraphQL needs to know which members need to go down which paths in the tree of resolvers. I didn't wire it up to the main object of resolvers, that would help right?
+
+[00:09:37]
+All right, let's do that. So, we're gonna just do this. Yep, it effectively was never being ever being used as if it didn't exist, all right, let's check it out now. Boom, there we go. Yeah, see, isn't that interesting? I get like an empty object, and then an object with the field I asked for, and then an empty object.
+
+[00:10:10]
+What do you think's happening here? It's the other flavor of object. So, effectively unless you say, give me a certain set of properties and you cover all of the bases, you have the potential to get back empty objects. Something else you can add just it's a good thing as a debugging step, typename.
+
+[00:10:33]
+Actually, let me see if we can do this. Look at that. That's a nice way where you can start to see like, hey, what else coming in here? And I think, can I do this? No, it's not even gonna let me do that even though it's in theory, it's a common that exist on all of the things but that you'd have to be pretty sophisticated to know what that means.
+
+[00:11:02]
+And it could be a totally different thing in both cases, right? Yeah, hopefully, this is good if you're an example based learner and you kind of can just look at this and see, hey, this is the observed behavior, it helps you form a mental model for how it works.
+
+[00:11:23]
+Can I do both? I'm curious. Hey, yes, I can. So, cool. I think this means our back end stuff works, right? The last thing we need to do is wire this up to the UI, so we're gonna go back into our App.tsx. We're gonna add one more destructured thing in the object that we're pulling properties off data, which is everything that's coming back in this GraphQL query.
+
+[00:11:56]
+App.tsx, here it is, boom. We're just added that little piece there. And filter through the trends. Because, interesting, I'm gonna try without filtering just for fun. I think it may have been notable at one time, but it's not now we'll have to see. All right, right bar, We're gonna pass the real trends into this right bar component instead of the fixture data.
+
+[00:12:40]
+There it is. Yep, I think it might have been nullable in earlier version of my project, it wouldn't have hurt if you put the filter and it's just kind of pointless. And let's look at the UI. Hey, we got a lot of trends here, and these are the little quote things that are attached to the topics, right?
+
+[00:13:01]
+So, this is a topic trend, here's a hashtag, here's a topic, with the little attached thing. So, we get a whole list of these things. A mixed bag, a union type working through GraphQL into TypeScript, actually from TypeScript into GraphQL and back into Typescript. And that is it, we're done with the app
+

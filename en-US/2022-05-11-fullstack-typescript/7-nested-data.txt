@@ -1,0 +1,69 @@
+[00:00:00]
+>> The next topic we're going to tackle is Nested data, and the idea of retrieving related records that have a relationship with some of the top level records we've already dealt with. For example, this is the new schema, we're going to add to our schema.Graph QL. And we have a new type we will introduce called user stats.
+
+[00:00:25]
+This is where we're going to see tweet count following count and follower count and where you'll see that appear in the Twitter UI is these three areas in the header they're currently at zero, we need to provide some real numbers first. So you can imagine these might be aggregated values that we have to go and retrieve from some other place.
+
+[00:00:46]
+Maybe it's more expensive to go and retrieve them. And we don't necessarily want to grab all that information for other people's accounts, right? Like these other accounts that are not the currently logged in users. So that's an example of something where we need that for up here but we most certainly do not need it for every tweet.
+
+[00:01:05]
+We're gonna introduce the concept of a tweet which is related to a user and that each tweet has an associated author and tweets have a tweet stats object as well. So this is where we're going to get into the idea of sort of a top level resolver and then cascading down into specialized resolvers that will take care of these nested objects.
+
+[00:01:34]
+All right, let's grab this and drop it into our schema.graphQL file. Here's my schema .Graph QL file. I'm just going to add this to the bottom, right? If there's no particular importance of ordering in this file, just do whatever works for you. I think there is another change to make and that is adding a top level query for the array of tweets.
+
+[00:02:00]
+Normally we'd want this to be retrieved on a per user basis. But let's just pretend in this world, everyone sees the same tweets. So we're going to add this to the query top level type. We're also going to add this effectively, a has one relationship, where each user has a user stats object.
+
+[00:02:23]
+So we'll add that to the user type. Put that right here at the bottom. Great, that is the extent of what we need to do in terms of schema modification. Now just just note, author and stats on a tweet are nullable fields they do not end with this exclamation mark.
+
+[00:02:50]
+Same is true for the stats field. This is what we need to do if these fields are populated on an as needed basis, right? In order to sort of save the effort of abstaining from getting that data and putting it together. They need to be nullable right. All right, so the next thing we're gonna do is add some more objects to our context object, right?
+
+[00:03:23]
+This is the thing that the database is sort of held on and it travels along and each resolver and gives us access to all sorts of different things. We're going to create some little caches So let's open up our Apollo server.ts and let's go down to where that context is defined, which is right here.
+
+[00:03:47]
+And we're going to add some new things. We'll call them DB tweetcash. And there'll be an empty object and then we're going to have another empty object DB tweet to favorite count map and then DB user cache All right, so we're getting a little type error here. It's telling me object literal has properties on it.
+
+[00:04:27]
+An object literal may only specify known properties. Has anyone know why we're getting this error? What's the purpose of excess property detection and TypeScript? Let me put it to you a different way. So let's return this object. Let's like it make our arrow function a little bit more explicit.
+
+[00:04:54]
+This means exactly the same thing now. And if I were to do this The error goes away. Kind of interesting the way that happens, right? In many situations, just sort of taking a value and holding it in a variable that doesn't affect much of anything. Right, almost every other type error we would see, continuing to appear we would have meaningfully change the situation.
+
+[00:05:24]
+However, for this particular type of error, the problem has to do with TypeScript. Well, the thing TypeScript is warning us about is these three things are not on the tweet resolver context interface. And if we return this object literal anyone who's using this value, they're not going to be able to safely access these extra things that we have.
+
+[00:05:54]
+So it's sort of like we're creating this and, it's almost guaranteed that you'd have to do some dangerous thing like casting downstream in order to access these. Now if we hold them in a variable like this, now it's in theory down here. If I could access this right there could conceivably be a purpose for me using this in some way right cuz I can pull it off the variable even if things outside the function can only access DB because that's the only thing on this interface, right?
+
+[00:06:32]
+So that's why access literal property checking kind of goes away when you hanging off of a variable. But in any case, we solve this in a more reasonable way by adding this stuff to our type. So, we're gonna go to resolvers.ts so, we're going to define the types for these things.
+
+[00:06:54]
+And all of these will be records So we've got a record of DB tweets. That's a record of, DB users. And then this last one, the long name, tweet to favorite count map. This is going to be just a simple string to number. All right, so how are we gonna end up using these?
+
+[00:07:36]
+Well, first, let's see, the errors went away. These things are present on the type, these are no longer access. They belong to this interface, they were just adhering to the contract. In fact, if we were lacking these, we would get errors. Course, which is just as it should be.
+
+[00:07:54]
+So what are we going to use these for? Well, there are some situations where there's a situation we may run into in a moment where we we could run into what's known as like the n plus one query problem. So let's imagine we're getting the list of tweets.
+
+[00:08:09]
+And in order to do that, we have to Figure out authors of all the respective tweets. Let's say that we have 100 tweets all by the same author. If we do this in a naive way, and we say, first we grab the tweet, and then we get the user ID of the author, and then later on we'll query the database for that author.
+
+[00:08:27]
+Well, we could end up going to our database 100 times to get that one record, over and over and over again. So what we want to do is kind of pre fill some information, reuse things if we can. And this is where we're going to hang things, so that as we move through different resolvers, we can take advantage of the fact that we've sort of primed a cache with some data and save ourselves from hitting our database too hard.
+
+[00:08:56]
+And at that lower level, you may not have the context to know whether it's appropriate to use the cache or to make a query yourself. You can just sort of use something that's there if somebody who knows more put it there for you, if that makes sense. So that's what these two are going to be used for.
+
+[00:09:15]
+Tweet to favorite count map. This is like a similar intention but rather than saying, here's a tweet, go iterate through all of the favorites in the database and count how many pertain to this tweet, right? That's a full iteration through all of our favorites. So what we can do is iterate through all of the favorites at once and create a map of like this tweet had six and this tweet had four.
+
+[00:09:39]
+We can do one pass through the array with sort of a array.reduce and just tally things up Is up in the appropriate buckets and then downstream we already have the counts ready to go. So that's the purpose here to do a little bit of work ahead of time and save ourselves from excessive querying
+

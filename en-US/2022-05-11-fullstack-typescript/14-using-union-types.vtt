@@ -1,0 +1,776 @@
+WEBVTT
+
+1
+00:00:00.182 --> 00:00:05.030
+The final thing we're going
+to do to our Twitter app is
+
+2
+00:00:05.030 --> 00:00:09.555
+populate this part of the UI down here for
+trends,
+
+3
+00:00:09.555 --> 00:00:16.485
+at this point this is the only thing
+that's still coming from fixture data.
+
+4
+00:00:16.485 --> 00:00:23.459
+And we're gonna use this opportunity to
+talk about a new concept in GraphQL and
+
+5
+00:00:23.459 --> 00:00:29.290
+how it relates to Typescript and
+that's the idea of union types.
+
+6
+00:00:29.290 --> 00:00:32.778
+So, we have this concept
+of a union in GraphQL,
+
+7
+00:00:32.778 --> 00:00:38.643
+you're almost certainly if you've used
+this before in the typescript world.
+
+8
+00:00:38.643 --> 00:00:43.185
+And this is a case where you can have
+multiple things that are trending,
+
+9
+00:00:43.185 --> 00:00:47.285
+you can have a hashtag that is trending,
+or you can have a topic.
+
+10
+00:00:47.285 --> 00:00:52.095
+And that topic might refer to some entity
+For which we have a name and an image,
+
+11
+00:00:52.095 --> 00:00:55.570
+and that'll be shown in the little card.
+
+12
+00:00:55.570 --> 00:01:00.084
+So, this is gonna be a case
+where you'll make a request that
+
+13
+00:01:00.084 --> 00:01:02.897
+will give you a mixed bag of results.
+
+14
+00:01:02.897 --> 00:01:06.361
+There's some polymorphism happening here,
+and
+
+15
+00:01:06.361 --> 00:01:10.407
+we're going to have to think
+about how can we create that?
+
+16
+00:01:10.407 --> 00:01:14.470
+And then on the receiving end,
+how can we process that?
+
+17
+00:01:14.470 --> 00:01:19.367
+Even, how do we query for this kind
+of thing, where our mixed bag could
+
+18
+00:01:19.367 --> 00:01:24.779
+involve different properties depending
+on which type of entity a member is?
+
+19
+00:01:27.275 --> 00:01:32.000
+So, as usual, we will begin by
+modifying our GraphQl schema.
+
+20
+00:01:32.000 --> 00:01:35.800
+Let's grab this and paste it in,
+this should be self explanatory.
+
+21
+00:01:35.800 --> 00:01:40.084
+We can see tweet count is something
+that is common between hashtag trend and
+
+22
+00:01:40.084 --> 00:01:41.680
+topic trend.
+
+23
+00:01:41.680 --> 00:01:49.060
+Topic trend has the possibility of having
+a topic trend quote associated with it.
+
+24
+00:01:49.060 --> 00:01:52.820
+And so this is kind of the nested record
+that's only there for the topic trend.
+
+25
+00:01:52.820 --> 00:01:57.350
+And then of course what the user is
+asking for is just give me trends,
+
+26
+00:01:57.350 --> 00:02:01.810
+a mix of both of these things,
+give me a list of these trend things.
+
+27
+00:02:02.950 --> 00:02:03.820
+So, hopefully fairly straightforward.
+
+28
+00:02:07.305 --> 00:02:12.940
+And into the schema they go,
+put them right at the bottom, great.
+
+29
+00:02:13.940 --> 00:02:18.409
+We're also going to almost certainly, yes,
+have to add a top level query, right?
+
+30
+00:02:18.409 --> 00:02:22.350
+This is the entry point, this is how
+somebody's asking for a list of trends.
+
+31
+00:02:22.350 --> 00:02:26.579
+So, let's add that to our query
+type all the way up at the top.
+
+32
+00:02:33.030 --> 00:02:36.859
+And finally just to get the last
+little bit of GraphQL stuff out
+
+33
+00:02:36.859 --> 00:02:39.670
+of the way before we run our code gen.
+
+34
+00:02:39.670 --> 00:02:43.550
+This is what we're going to add
+to our get current user query.
+
+35
+00:02:43.550 --> 00:02:46.560
+This is much more than the current
+user at this point, right?
+
+36
+00:02:46.560 --> 00:02:53.369
+We're getting the suggested people to
+follow, we're gonna get trends now.
+
+37
+00:02:53.369 --> 00:02:57.843
+So, you can think of this almost
+like the the initial load for
+
+38
+00:02:57.843 --> 00:03:03.216
+global things in our particular version
+of Twitter that has no routing.
+
+39
+00:03:03.216 --> 00:03:08.348
+So, there's a new syntax here,
+dot, dot,dot.on
+
+40
+00:03:08.348 --> 00:03:13.251
+topic trend, dot,
+dot,dot.on hashtag trend,
+
+41
+00:03:13.251 --> 00:03:17.698
+this is basically telling
+GraphQL what to do In
+
+42
+00:03:17.698 --> 00:03:22.846
+the case that a member matches
+one of these two types.
+
+43
+00:03:22.846 --> 00:03:27.197
+And within these braces we get
+the opportunity to describe
+
+44
+00:03:27.197 --> 00:03:31.690
+the fields we're interested
+in on a per member basis.
+
+45
+00:03:31.690 --> 00:03:34.748
+So, for example,
+we're getting tweet count on both,
+
+46
+00:03:34.748 --> 00:03:38.717
+we're getting this deeper object only
+in the case of the topic trend, so
+
+47
+00:03:38.717 --> 00:03:41.988
+we're gonna grab this whole
+thing we're gonna drop it in.
+
+48
+00:03:48.359 --> 00:03:52.670
+In App.tsx and it'll get current user,
+make sure I wrote that down,
+
+49
+00:03:52.670 --> 00:03:57.275
+yes, App.tsx, in the Get_Current_User
+summary and we will just add it
+
+50
+00:03:57.275 --> 00:04:02.201
+as a top level thing because it's a top
+level query, oops, I did not copy that.
+
+51
+00:04:06.855 --> 00:04:07.751
+Great.
+
+52
+00:04:12.659 --> 00:04:14.010
+All right, time to codegen.
+
+53
+00:04:15.933 --> 00:04:20.656
+Client yarn codegen, and server.
+
+54
+00:04:22.920 --> 00:04:23.897
+Yarn codegen.
+
+55
+00:04:26.792 --> 00:04:27.939
+Awesome.
+
+56
+00:04:30.477 --> 00:04:31.688
+That should be good.
+
+57
+00:04:31.688 --> 00:04:36.432
+All right, let's handle the server part
+first, so we're going to need to create
+
+58
+00:04:36.432 --> 00:04:40.215
+a little transform and this is
+the most interesting one because we
+
+59
+00:04:40.215 --> 00:04:45.810
+have to use a type card, and I have on the
+database representation of these topics.
+
+60
+00:04:45.810 --> 00:04:53.993
+I've given us kind, so let me show you
+the database types for these things.
+
+61
+00:04:58.646 --> 00:05:03.124
+Let me collapse this one, kind and
+it has a string literal type.
+
+62
+00:05:04.514 --> 00:05:06.065
+Does anyone know what this is called?
+
+63
+00:05:06.065 --> 00:05:09.185
+This is this is trivia,
+is not about do you understand TypeScript?
+
+64
+00:05:09.185 --> 00:05:14.394
+This is about do you remember
+the specific words we used to describe?
+
+65
+00:05:14.394 --> 00:05:18.320
+Checking for this and
+narrowing types based on this.
+
+66
+00:05:19.520 --> 00:05:21.870
+Nicholas got it, discriminated union.
+
+67
+00:05:23.190 --> 00:05:24.000
+Good job, Nicholas.
+
+68
+00:05:25.790 --> 00:05:30.990
+That's the fancy type
+theory word to use here.
+
+69
+00:05:30.990 --> 00:05:34.480
+So, effectively what that means is,
+we'll see when we paste this in.
+
+70
+00:05:36.010 --> 00:05:42.684
+We can check for that field, and that
+will let us in one branch of our code.
+
+71
+00:05:46.764 --> 00:05:54.350
+If up here T could be a trend of any kind,
+and what does that mean?
+
+72
+00:05:54.350 --> 00:05:56.000
+It's either of these two things.
+
+73
+00:05:57.800 --> 00:06:02.240
+Now if kind is topic, well,
+we know we're a topic trend.
+
+74
+00:06:03.430 --> 00:06:08.230
+Otherwise, everything that's not a topic
+trend, which is a hashtag trend.
+
+75
+00:06:08.230 --> 00:06:11.548
+So, you can use this kind property and
+
+76
+00:06:11.548 --> 00:06:16.218
+string literal types to
+have a discriminated union,
+
+77
+00:06:16.218 --> 00:06:22.134
+effectively discriminating or
+doing special things to cater two,
+
+78
+00:06:22.134 --> 00:06:27.600
+either of these two types to
+kind of a common pattern to use.
+
+79
+00:06:27.600 --> 00:06:31.993
+Of course, I like using the word kind
+because it's not type the word type as
+
+80
+00:06:31.993 --> 00:06:34.936
+a way to frequently used
+in this code base as it is.
+
+81
+00:06:38.282 --> 00:06:43.419
+All right, so we're gonna add a new
+top level query resolver in our
+
+82
+00:06:43.419 --> 00:06:50.146
+query.ts because we've got that new trends
+that returns an array of trends, right?
+
+83
+00:06:50.146 --> 00:06:55.041
+In our schema we added this, so now we
+need to go to the query resolver and
+
+84
+00:06:55.041 --> 00:06:57.823
+add the appropriate resolver for that.
+
+85
+00:07:04.159 --> 00:07:09.280
+Here's the import for
+the transform and here's the resolver.
+
+86
+00:07:10.680 --> 00:07:14.739
+A really simple one that just passes
+things straight through from the database,
+
+87
+00:07:14.739 --> 00:07:16.660
+through this map function, and out.
+
+88
+00:07:18.680 --> 00:07:21.540
+I'll put that up at the top just
+to make it easy for folks to read.
+
+89
+00:07:23.780 --> 00:07:30.001
+And bump ESLint just still
+unhappy with me, all right.
+
+90
+00:07:30.001 --> 00:07:35.275
+Next, well, I wanna show you what happens
+
+91
+00:07:35.275 --> 00:07:40.403
+before we go on to this
+next step because we
+
+92
+00:07:40.403 --> 00:07:46.130
+can see the problem that
+the next step solves.
+
+93
+00:07:49.060 --> 00:07:52.879
+Trends, let's ask for trends and,
+
+94
+00:07:58.964 --> 00:08:02.426
+Let's just get the hashtags
+that are trending.
+
+95
+00:08:02.426 --> 00:08:07.706
+So, the error message we get back says,
+this abstract type trend
+
+96
+00:08:07.706 --> 00:08:13.210
+must resolve to an object type at
+runtime for field Query.trends.
+
+97
+00:08:13.210 --> 00:08:17.584
+Either the trend type should
+provide a resolve type function, or
+
+98
+00:08:17.584 --> 00:08:21.493
+each possible type should
+provide an isTypeOf function.
+
+99
+00:08:24.915 --> 00:08:29.929
+This is telling us we need something
+that helps us sort this mixed bag into
+
+100
+00:08:29.929 --> 00:08:35.765
+different piles, so that those can trickle
+through their respective resolvers and
+
+101
+00:08:35.765 --> 00:08:40.490
+then be put back together in
+this different mixed bag, right?
+
+102
+00:08:40.490 --> 00:08:46.118
+So, the way we're going to solve that is
+taking the first suggestion which is,
+
+103
+00:08:46.118 --> 00:08:47.330
+resolveType.
+
+104
+00:08:47.330 --> 00:08:52.461
+So, we're gonna create this special
+method in a new resolver for trend,
+
+105
+00:08:52.461 --> 00:08:57.592
+it's --resolveType, and
+you can see what what's happening here is,
+
+106
+00:08:57.592 --> 00:09:01.253
+we're basically using
+a type guard we're seeing.
+
+107
+00:09:01.253 --> 00:09:06.295
+like if this contains a property
+called hashtag that is a string,
+
+108
+00:09:06.295 --> 00:09:11.900
+let's call this a hashtag trend,
+otherwise, we call it a topic trend.
+
+109
+00:09:13.830 --> 00:09:17.453
+This will solve this problem
+trend.ts in our resolvers folder.
+
+110
+00:09:22.287 --> 00:09:27.255
+This is because although it's a mixed
+packed GraphQL needs to know which
+
+111
+00:09:27.255 --> 00:09:31.420
+members need to go down which
+paths in the tree of resolvers.
+
+112
+00:09:33.168 --> 00:09:37.070
+I didn't wire it up to the main object
+of resolvers, that would help right?
+
+113
+00:09:37.070 --> 00:09:37.935
+All right, let's do that.
+
+114
+00:09:42.435 --> 00:09:43.945
+So, we're gonna just do this.
+
+115
+00:09:48.942 --> 00:09:54.649
+Yep, it effectively was never being
+ever being used as if it didn't exist,
+
+116
+00:09:54.649 --> 00:09:57.425
+all right, let's check it out now.
+
+117
+00:10:00.778 --> 00:10:03.150
+Boom, there we go.
+
+118
+00:10:03.150 --> 00:10:04.740
+Yeah, see, isn't that interesting?
+
+119
+00:10:04.740 --> 00:10:09.201
+I get like an empty object, and then
+an object with the field I asked for, and
+
+120
+00:10:09.201 --> 00:10:10.700
+then an empty object.
+
+121
+00:10:10.700 --> 00:10:13.260
+What do you think's happening here?
+
+122
+00:10:13.260 --> 00:10:15.509
+It's the other flavor of object.
+
+123
+00:10:15.509 --> 00:10:21.066
+So, effectively unless you say,
+give me a certain set of properties and
+
+124
+00:10:21.066 --> 00:10:27.003
+you cover all of the bases, you have
+the potential to get back empty objects.
+
+125
+00:10:27.003 --> 00:10:33.910
+Something else you can add just it's a
+good thing as a debugging step, typename.
+
+126
+00:10:33.910 --> 00:10:35.072
+Actually, let me see if we can do this.
+
+127
+00:10:39.159 --> 00:10:41.170
+Look at that.
+
+128
+00:10:41.170 --> 00:10:46.477
+That's a nice way where you can start to
+see like, hey, what else coming in here?
+
+129
+00:10:46.477 --> 00:10:47.483
+And I think, can I do this?
+
+130
+00:10:50.791 --> 00:10:54.985
+No, it's not even gonna let me do
+that even though it's in theory,
+
+131
+00:10:54.985 --> 00:10:57.929
+it's a common that exist
+on all of the things but
+
+132
+00:10:57.929 --> 00:11:02.210
+that you'd have to be pretty
+sophisticated to know what that means.
+
+133
+00:11:02.210 --> 00:11:06.163
+And it could be a totally different
+thing in both cases, right?
+
+134
+00:11:06.163 --> 00:11:10.543
+Yeah, hopefully, this is good if
+you're an example based learner and
+
+135
+00:11:10.543 --> 00:11:15.361
+you kind of can just look at this and
+see, hey, this is the observed behavior,
+
+136
+00:11:15.361 --> 00:11:18.372
+it helps you form a mental model for
+how it works.
+
+137
+00:11:23.009 --> 00:11:24.420
+Can I do both?
+
+138
+00:11:24.420 --> 00:11:25.050
+I'm curious.
+
+139
+00:11:26.360 --> 00:11:27.207
+Hey, yes, I can.
+
+140
+00:11:31.395 --> 00:11:32.583
+So, cool.
+
+141
+00:11:35.470 --> 00:11:38.670
+I think this means our back
+end stuff works, right?
+
+142
+00:11:38.670 --> 00:11:41.084
+The last thing we need to do
+is wire this up to the UI, so
+
+143
+00:11:41.084 --> 00:11:43.370
+we're gonna go back into our App.tsx.
+
+144
+00:11:43.370 --> 00:11:48.635
+We're gonna add one more destructured
+thing in the object that we're pulling
+
+145
+00:11:48.635 --> 00:11:54.470
+properties off data, which is everything
+that's coming back in this GraphQL query.
+
+146
+00:11:56.100 --> 00:12:00.060
+App.tsx, here it is, boom.
+
+147
+00:12:00.060 --> 00:12:01.489
+We're just added that little piece there.
+
+148
+00:12:04.956 --> 00:12:10.190
+And filter through the trends.
+
+149
+00:12:12.780 --> 00:12:19.850
+Because, interesting, I'm gonna try
+without filtering just for fun.
+
+150
+00:12:19.850 --> 00:12:26.320
+I think it may have been notable at one
+time, but it's not now we'll have to see.
+
+151
+00:12:27.420 --> 00:12:32.616
+All right, right bar,
+We're gonna pass the real
+
+152
+00:12:32.616 --> 00:12:37.486
+trends into this right bar component
+instead of the fixture data.
+
+153
+00:12:40.741 --> 00:12:41.476
+There it is.
+
+154
+00:12:44.856 --> 00:12:48.104
+Yep, I think it might have been nullable
+in earlier version of my project,
+
+155
+00:12:48.104 --> 00:12:52.052
+it wouldn't have hurt if you put the
+filter and it's just kind of pointless.
+
+156
+00:12:52.052 --> 00:12:53.528
+And let's look at the UI.
+
+157
+00:12:56.621 --> 00:12:58.370
+Hey, we got a lot of trends here, and
+
+158
+00:12:58.370 --> 00:13:01.947
+these are the little quote things that
+are attached to the topics, right?
+
+159
+00:13:01.947 --> 00:13:05.642
+So, this is a topic trend,
+here's a hashtag, here's a topic,
+
+160
+00:13:05.642 --> 00:13:07.620
+with the little attached thing.
+
+161
+00:13:07.620 --> 00:13:09.810
+So, we get a whole list of these things.
+
+162
+00:13:11.370 --> 00:13:15.604
+A mixed bag, a union type working
+through GraphQL into TypeScript,
+
+163
+00:13:15.604 --> 00:13:19.693
+actually from TypeScript into GraphQL and
+back into Typescript.
+
+164
+00:13:19.693 --> 00:13:22.190
+And that is it, we're done with the app
+

@@ -1,0 +1,99 @@
+[00:00:00]
+>> So now, it's time for us to create a new resolver. And you can create resolvers that are on a per type basis. So we're gonna create two new resolver on a per type basis, one is gnna be called User.ts and one's Tweet.ts. Just gonna finish up the backend work here before we move to the front end here.
+
+[00:00:24]
+So, on the website, you can see that we have in this inner resolvers section, we've got our User.ts resolver. Let's paste that in here, and then we'll do the same thing for tweets. We'll look at this code real carefully once we paste it. All right, an auto format, if you like.
+
+[00:01:03]
+All right, one more thing we have to do, and that is in our Resolvers.ts, that sort of stitches everything thing together. This is where we want something like this, user and tweet and we want to import those here, Just like that. So what I added were these import lines and I just sort of, I'm assembling them all together.
+
+[00:01:30]
+You're trying to match what the schema looks like, Right, where you've got query, you've got user, you've got suggestion. You don't need to have all of them necessarily. But anytime you're doing what we're about to do, with these nested deeper fields, you will end up doing something like this, but the structures of these things should match.
+
+[00:02:01]
+Okay, and everything is type checking properly now, because, remember, we ran-yarn-codegen immediately after our schema changes. So finally, I wanna talk about the code that we just pasted. So let's look at our User.ts. So this is for stats, right? This is user stats, this would be the stuff that's at the top of the Twitter UI, this stuff up here, following, followers, tweets, these are three counts.
+
+[00:02:32]
+And you can see we're faking two of them, just because I don't want you to have to do repetitive stuff here. And we don't have the concept of following in this model, so we're just putting a fudge number there. Here we're saying getUserTweets, so that gives us an array of tweets, and we get the length of that list.
+
+[00:02:54]
+And something new here, this first argument, user. So what's happening here in terms of the flow of what's calling into what, when you make that top level query for current user, if someone has requested stats, this will be called first. And then whatever this returns, when you get into this user.stats thing, you'll have whatever the top level resolver returned, you'll have access to that.
+
+[00:03:31]
+So that's how we're able to call user.id. Now, we're making a call to our database here. I don't think this is a problem, because we're getting the current user once. This is not something that's happening for each tweet. We're not requesting stats there. This would be a problem if we're doing this a 100 times.
+
+[00:03:51]
+You could end up with 101 database queries, one for every stats and then one for the user, right? Or sorry, you'd have one for the list of tweets, and then on a per user basis, potentially, one or more queries, it'd be pretty awful. But in this case, this is appropriate, right?
+
+[00:04:16]
+And we're just getting this array, getting its length. Let's see what happens in our Apollo Studio. So we're gonna ask for currentUser > stats, and let's get everything that they have there. So just to format it real nice. Boom, so we haven't tweeted at all with this user, which is fine, this is to be expected, and here are the numbers that are coming out.
+
+[00:04:53]
+I see question in chat. What did I put in f.tsx? I have not touched my client side code quite yet for this step So we can consider the back end work pretty much done, but let's talk about the tweet stats here. So we'll want tweets > body > stats, and let's just do a favorite count, run it.
+
+[00:05:25]
+So we see different favorite counts here, we see 1, we see 4, and here's the body coming through. So this is evidence that we're actually counting stuff up in the back end. We can get even more confidence about that by sort of picking apart this thing we pasted into the tweet resolver.
+
+[00:05:42]
+So first off, here's our stats thing. Here's us using this TweetToFavoriteCountMap, just for fun Let's log that out, let's see what it looks like. Fire it off, and look at that, we've got tweet IDs and then numbers. So this is the result of us looping over them and sort of just counting them and incrementing by one.
+
+[00:06:13]
+It's no database call required for this, and so it's absolutely fine to do this for each record, right? So that's all that's happening here, nothing too fancy. And again, because this is sort of a sub-resolver, we see the parent object here is available for us, which is what we need so that we can use the proper ID, right, this is called for each tweet.
+
+[00:06:39]
+So let's get that out of the way. What about the user, the author, right, which is of type user. So this is where we can grab the tweet, and note that I am using this dbTweetCache. So this is a common issue, right, that we're trying to solve. The Graph QL representation of this object, when we say author, what you expect to find there is an object that represents the user.
+
+[00:07:07]
+But in the database representation, let's see if we can go to the type definition here. Oops, wrong type definition. I want the db tweet. Here, we have a user ID, right? So it's like the idea of, are we referring to a user, or do we actually have a user?
+
+[00:07:36]
+That's why it's important for us to have access to this database representation of the tweet. This tweet here is missing its author. It is our job, in fact, to go and find that author, right? Tweet.author right now would be null. So if we have this lower level record that just has the user ID, that's what's gonna let us grab the user ID here and populate it.
+
+[00:08:05]
+And again, we're throwing wherever we find that something's missing, because this is a non-nullable field. Or sorry, this is a nullable field, but we wanna make sure that we provide something reasonable in the case where it fails. So that's all this is, we're just using these two caches.
+
+[00:08:26]
+No database queries here, because this is gonna be to support a list of tweets, and these will be called many times. All right, so that's all of our back end code we've walked through all of it. In this next step, we're going to consume this data in the UI.
+
+[00:08:50]
+The first thing we'll need to do in the UI is we'll open up our App.tsx, and we'll look at the GraphQL query we have for getting the current user. We're going to add something to the current user piece of the query. And you see, I get a nice little autocomplete here from the GraphQL, like VS Code extension.
+
+[00:09:13]
+So I want stats and I want all of these in there. Follower, following, and tweet count. And it turns out that the fact that this was missing here, that's what prevented us from getting fully away from our fixture data for the current user. So if we were up here, you might notice, nope, I guess this is also missing it.
+
+[00:09:41]
+In any case, I think that that's why everything's falling back to zero, because this was missing in the first place. In any case, we can start wiring this through that header component that we have. And we should start seeing those numbers are no longer zero. So let's get rid of anywhere that we see, This current user, or just in this one place for now, let's pass this instead.
+
+[00:10:11]
+So this should have real data and let's check out our UI. It's still 0. You know why it's, well, no, I was gonna say, we haven't tweeted yet, but I should still have followers. Let's log into the console and see what's happening. Sometimes there's a little caching issue or you have to stop and restart things.
+
+[00:10:43]
+There's current user, and interesting, I don't see stats coming through. You know what it could be, I wonder if we CodeGened on the client side, that would be the first thing I'd wanna try. I'm not getting a type error, but it's worth a shot. Cuz we did, yeah, we did just add this here.
+
+[00:11:13]
+That could cause this problem. Oop, there we go, that was it. So, remember the code generation, especially on the client side, it's not just about types. It's also about that function and making sure that it's building the GraphQL query properly. So it's important that you do that, even beyond just the type checking aspect.
+
+[00:11:37]
+The next thing we're gonna do on the client side here is wire up the list of tweets. So remember we have that tweet, top level query, Up here, this is something we just added in the previous step. So we're going to actually consume that and start to get away from that fixture data, the currently hard coded list of tweets.
+
+[00:12:00]
+So first thing we have to do here is go to a timeline, react component. And you can see here, this is our fixture data. This is Timeline.tsx. We're going to add a new GraphQL query that represents fetching this data. And we can get rid of the fixture data, by the way, we're gonna replace that.
+
+[00:12:22]
+So let's go to the course website. Let's scroll down to this Tweets section, and here is the stuff to add as an import, right, since this is the first query that we're using here. Put that up top, and the new query. And, of course, right after this, what are we gonna have to run, because we have changed the GraphQL stuff?
+
+[00:12:47]
+CodeGen, we're gonna have to CodeGen again, so that the types for this are built. Great, and this type error should go away shortly. Well, now it's just telling us we haven't used it yet, which is great. Okay, we have some more stuff to add, right, within the component.
+
+[00:13:11]
+So again, we're using this hook, which is built on a per query basis, it's part of what's generated for us. The things it returns are a loading state, an error, if one exists, and then ultimately the data that will come back. This will be truthy, once the data arrives.
+
+[00:13:29]
+So we're returning some trivial feedback here in the event that things don't look like they're going well. And then if we look like we have some data, we can destructure it, get the list of tweets. So I'm gonna paste this in before the return within the component. So just some really simple feedback here, you would want a much better error handling experience, but I don't wanna make this any more complicated than it has to be.
+
+[00:14:03]
+So by the time we get down here, tweets is, Of this type. It's not a null, it's definitely gonna be an array, and the array is gonna contain non-null things. So perhaps, we can just iterate over this. Let's replace this capital TWEETS with the tweets. And if that's es lint bugging me again I will just, yep, tell it to [SOUND].
+
+[00:14:39]
+All right, and let's save it and look back at our UI and see what happened, we have some more tweets here. So this is stuff that's actually coming from the database and this is the evidence that we're really wiring this app up. We're starting to remove the fixture data and power it with real things, all through the GraphQL API.
+

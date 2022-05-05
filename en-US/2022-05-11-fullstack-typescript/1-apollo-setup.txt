@@ -1,0 +1,109 @@
+[00:00:00]
+>> The first thing we're gonna need to do is set up an Apollo server. And we're gonna do that by creating a new module Apollo-server,ts in the source folder of the server sub-project, I'm going to go ahead and do that now. And then the contents of the file should be everything below.
+
+[00:00:19]
+And we're gonna paste this in and then walk through this file and describe exactly what it is we're dealing with here. So I'm gonna go in here, Apolloserver.ts and paste. Okay, so, a lot going on here and I'm just gonna create a little breathing room. So we're building a function, it looks like it takes in a database of some sort an HTTP server and an express application.
+
+[00:00:55]
+So, this database is necessary because we want to attach this database eventually to something called a context. And this is just a little object that's for convenience, available to anywhere that we're fetching data, right? It's almost like making this globally available to our data fetching code, and this will be much more clear later.
+
+[00:01:16]
+We're not using it for now that's why we're prepending it with an underscore, little pro tip here. TypeScript if you have no unused parameters, compiler option enabled, it will light up things like this, right? This thing is declared but its value is never read, prepending it with an underscore, tells TypeScript to kind of, don't worry about it, right?
+
+[00:01:42]
+So, this comes from other languages where this is a language feature, and it's easy to spot these as unused. So, that's why we're using an underscore here, and when we use it, we'll delete that underscore. All right, now we have this typedefs thing. So, let's get into that last, but I'll tell you that this is the GraphQL schema, and we're gonna talk about what that means independently.
+
+[00:02:06]
+So, I'll collapse that for a moment, but just for now, say that it describes the types. This will become our source of truth for the types that are going over the wire, over our network, that's what this will evolve into. So, that's this typedef variable, and then we're creating an Apollo server, passing in our typedefs and we're installing a plugin that effectively lets us wire this thing up with express as a middleware.
+
+[00:02:39]
+So, that's why we're using this Apollo server express package here. We're starting up GraphQL, like starting up the Apollo server, and then calling this apply middleware function which kind of installs it onto the main express app. And remember, that's what passed into here. So ultimately, what we're doing is we're creating an express app somewhere else wherever we're using this function, and we're passing it in to create Apollo server.
+
+[00:03:09]
+And then this function we're looking at here, it'll instantiate an Apollo server, it'll install the Apollo server onto the express app and then it'll return the Apollo server because we might need that somewhere else. Now, let's talk about this thing here, the GraphQL schema and it's in tagged template literal with GQL.
+
+[00:03:33]
+And that's important here because there are a bunch of nice set of VS code extensions that light this up syntax highlighted give you a little autocompletes if you use this GQL name here. It also happens to do some other stuff that processes the string. So, what are we dealing with here?
+
+[00:03:55]
+Well, first off, this is equivalent to a set of interfaces in the TypeScript world. And you can see down here, we have a type called user, and we have a type called suggestion, these are the things that we'll start with. Now, also there's this type called query. Query is special in the GraphQL world.
+
+[00:04:17]
+This is kind of the entry point when we're asking for data, so in the rest world, you can think of this as your get requests. So, here we have something where it's like a user, someone's asking for the current user. And down here we have something that says, I want an array of suggestions in the in the Twitter UI by the way, this is the suggestions area, this little who to follow thing, and we see just one item in there.
+
+[00:04:50]
+Great, and so we can see like current user, this returns a user, suggestions and then we see the square brackets here, seems arrayish. This is actually the way to denote an array of suggestions, just wrap it in square brackets. There's no concept of a tuple in GraphQL, so that's why, like, you might look at this if you're using your TypeScript intuition here, this looks like a tuple of length one, with one suggestion, no, this is the way GraphQL represents a race.
+
+[00:05:24]
+And then we have these exclamation points here. So, in TypeScript, we use question marks to indicate optional properties. By default, things are optional in the Graph QL world, and by that I mean their nullable fields, they could come back no. There is no current user, maybe that means that we're not logged in, it could be.
+
+[00:05:48]
+An exclamation mark is the way we say something is non-nullable. So, it's sort of an inversion of the way you think about this, you don't have to say when something is optional ,you have to say when something is required. When the types should represent that this is always here, I got a user back, I will have an ID, I will have a name, right?
+
+[00:06:14]
+Well, we'll end up with some nullable things that are missing this exclamation mark later on. And often these are things that we want, they're the expensive things to assemble. In our example of that doctor UI, remember we might have to hit someone's calendar to see if they're busy or not.
+
+[00:06:31]
+That would be a good example of something that you would make nullable because if nobody asks for it, you wanna be able to just say, like, don't worry about it. We're not going to get that, we'll get your information back to you fast rather than comprehensive. All right, now, finally, like I have two exclamation marks here, I have a suggestion, bang, and then that's inside this little array notation, and then I have another bang outside of it.
+
+[00:06:58]
+What does this mean? So, first off, we can look at this and this means the user object will always be there, it will not be a no, and this is the equivalent exclamation mark there, right? I'm going to give you an array back, it's never going to be missing.
+
+[00:07:18]
+What this inner one means is that, you will find no nulls within the array. So, it's about whether members of the collection can be null, versus the collection itself being null. And you have two independent, non-nullable operators there to indicate those two different things
+>> But it could still be empty, right?
+
+[00:07:42]
+
+>> The question is, could it still be empty? Absolutely, you can still have an empty array that contains no nulls. That meets both requirements, no nulls in the array and the array is present. That means that in our back-end code, even if somebody did not ask for suggestions, well, it doesn't make that sense in this case because it's a top level query.
+
+[00:08:05]
+But let's say, what if we had this done here? Another one, right? Like a user has suggestions, it's like it's a has many relationship here. In this case, anytime we marshal the data together, we gather together data to say, I've fetched a user back, and even what was requested was like these three fields here and nothing else.
+
+[00:08:26]
+We wouldn't be obligated to make this an empty array, like it something has to be there in our back-end code, if we say it is non-nullable. So, that's something you have to think about carefully and we'll get to that when we start dealing with relationships, sort of a tight coupling between, can we save time by avoiding putting this data together?
+
+[00:08:51]
+And is it possible for this field to be missing, like null on the record? They're sort of interrelated in this situation.
+>> And what enforces that requirements and I guess?
+>> It's a very good question. What enforces that requirement? In our example today, two things, at compile time you will have type information that is built from the schema, and you will have TypeScript doing the enforcing.
+
+[00:09:16]
+At runtime the GraphQL infrastructure that's part of Apollo server, that will actually validate that your schema matches the code that is aligned with your schema, and that you're returning the right thing. And we're gonna hit some of those errors. But there is some help because there's such a strong opinion about how data is shaped and how we ask for data.
+
+[00:09:39]
+There is a validation thing that helps us ensure we have everything wired up correctly. Well, we will hit that problem and then solve it, it is planned, my usual style of failure driven development. Okay, so that's basically all we have here. We talked about arrays, we talked about this exclamation mark.
+
+[00:10:03]
+One thing I didn't talk about yet was sort of the primitive types. So, you have strings, you have Booleans, you have numbers, actually you have an int type here, we could do this and it would be totally fine. Yep. So, I should not leave it like that though, that's asking for problems.
+
+[00:10:32]
+These are your primitive entities, you're missing a couple things, like you don't have a date, but you should think of these as mapping one to one with what you could put in JSON. Now you can define your own entities, right? These are called scalers by the way, you can define your own scalers if you like, we're not gonna get into that, I would leave that to a course dedicated to GraphQL.
+
+[00:10:54]
+We're more focused on compatibility between GrappQL and Typescript, and how you can get the benefits of everything working together. That hopefully describes everything you're seeing here, there are no interfaces everything sort of begins type so far, so we've created this one file. Let's continue on with our instructions.
+
+[00:11:16]
+So, hopefully we understand everything that's going on in this code we just copied and pasted. Okay, so in the entry point for the server code, which is index.ts, we're gonna add some imports. So, let's go ahead and do that. Imports go at the top, and we're gonna add the following two lines immediately below the static route, right?
+
+[00:11:46]
+This is where the images are served up the fav icon, all the just the static files. So, we're gonna put this below where we see the static stuff. That is here. And we're using the imports now which is great. And then there's one last thing we're gonna do just to make our life easier.
+
+[00:12:15]
+And it's a small little change in a logging line here that will give us a nice clickable link to a convenient thing, this will take us to the Apollo dev tools. So, instead of this empty string we're gonna replace it with Apollo server GraphQL path. Paste, okay. And I believe that should be enough to get us up and running.
+
+[00:12:43]
+We go all the way down, I don't see any errors, I already see this string here /GraphQL that wasn't there before. So, I'm gonna click on the second link localhost 3000/GraphQL and you should see something like this, so this is the Apollo's studio entry point. And I can hit query my server, you can see we're still running on local host here, and now we'll be off local host but we're actually we're gonna still be hitting our own API.
+
+[00:13:15]
+So, you should see yourself looking at something like this. You won't see this query here, this is sort of left over from when I was testing things out. But this is where you document your API, where you can explore it, we're gonna be using this extensively today. And, I wanna just try something, let's see what happens.
+
+[00:13:41]
+I'm gonna, like, on the side thing here, the side rail, I'm gonna say, I wanna make a query, I wanna query for current user, and it's giving me fields to pick from. Let me just ask for the current users name, and let's fire this off, and we get an error message.
+
+[00:14:03]
+So, this is an answer to the question like, who's doing the validating for me? We can see this is at runtime, we're getting some good feedback here, cannot return null for a non-nullable field, query.current user. But another way to say this is, we've not implemented anything that will return a current user, all we've done is like, set up the GraphQL server with nothing wired up to it yet.
+
+[00:14:30]
+So, it's gonna return null for everything no matter what we asked for. But this is an example of it's kind of type checking happening at runtime.
+

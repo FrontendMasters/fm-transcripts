@@ -1,0 +1,93 @@
+[00:00:00]
+>> The next topic we're going to deal with is this concept of mutations. And if you think about the equivalent in the REST API mental model, this would be put post or delete requests, things that actually write data into a database. And the first thing we'll need to do is add a mutation to our GraphQL schema like query mutation is a top level collection of resolvers.
+
+[00:00:28]
+And we gonna to need to create the equivalent piece of our schemas. So I'm just gonna copy this, and I'll paste it into our schema.graphql. I like to keep these up at the top because when I'm trying to reason my way through how things flow from, for example, before we were dealing like with tweets and then it goes down to sort of tweets.author as a separate sub resolver.
+
+[00:00:52]
+I like thinking about things in terms of top to bottom. So let's look at the create tweet field in this schema, we can see that it looks sort of like function and that is because this is the first situation where we are taking in variables. You can think of these as arguments.
+
+[00:01:10]
+So looks very similar to TypeScript syntax. In that we have variable name and then the type and then variable name and then the type and this is the return type. So what this is going to amount to when we start using this on the client is it's gonna be kind of like we call a function called Create tweet.
+
+[00:01:30]
+We pass in a user ID and a body, and we get a promise that resolves to a tweet. As everywhere else, as is the case everywhere else these exclamation marks mean this thing cannot be null. Both in terms of the variables passed in, they cannot be null. And you can rely on actually getting a tweet back, not nothing.
+
+[00:01:54]
+So there's our schema alteration. Now we need to create a new resolver to go along with this new type. So let's open in our server, sub project, the resolver's folder and we're going to create a mutation.ts. And there is some code on the website that you can copy and paste, here it is.
+
+[00:02:22]
+As usual it's pasted in let's talk about it. All right, and let's run our CodeGen here because we of course changed our change our schema a bit. So I'm gonna run it in the server sub project, and yarn CodeGen, can see the green checkmarks, that's great. This looks like implicit any issues.
+
+[00:02:54]
+Just give it a sec, I'm gonna just restart TypeScript server. Let's see what happens. Hey, that looks better all right, and what's going on here? That's ESLint. Let's pump that. A bunch of things. Good, no errors. So let's study what's going on here. So first, this is the first case.
+
+[00:03:18]
+I told you it was possible, but this is the first case where we're actually doing it. An async resolver, right. We're taking advantage of the fact that create tweet either needs to return a tweet, or a promise that resolves to a tweet. And when you're dealing with mutations where you're actually writing something to a database, this is where async usually is most likely to happen.
+
+[00:03:42]
+When you're getting data from a database, sometimes that is something that happens synchronously. You don't necessarily have to make sure that the entity that you just persisted exists before moving on. So this is where we're waiting on something to happen. All right, so here is parent. We're not using that.
+
+[00:04:06]
+That's why we have an underscore before it. args this is the first time we're taking in arguments and you can see that the type of args It has this body and user ID field. Those are coming from here user ID and body. So you may think of these if this were a function, right?
+
+[00:04:25]
+These would be local variable names. They only have a meaning within the function. Here these are more like query params. So their name is significant. And whatever these names are thatt needs to be consistent in your server side code when you're plucking these off this args object. And in your client side code when you're providing those variables in the query these are the names that you're going to use.
+
+[00:04:48]
+So name them carefully, they have to have meaning. And it's part of your public API where if you change it, you might break people,. But thankfully in this situation, you get type errors all over the place which is. Helpful in terms of helping you refactor. So those are the args.
+
+[00:05:06]
+And because they're non nullable, we know that they're both going to be a string. Next, we use db.createtweet, which returns a promise that resolves to a dB tweet. So it's gonna persist it and then it's gonna give you back this entity that was just persisted but this does a little bit more here.
+
+[00:05:27]
+This eslint again, yeah, let's just ignore that. So this creates timestamps so that right before it's persisted, I probably should have created one timestamp and serialized it twice. But you're gonna get two dates stringified and then an automatically generated unique ID. So you don't have to provide those.
+
+[00:05:48]
+This is a common thing for a database to do, right? You don't want to feed it IDs, it creates the IDs. So there you go. We'll end up with our DB tweet after awaiting. Next, we have a tweet map. So we're going to reuse the same caching object that we can put these entities from the database in So that downstream resolvers can do their job.
+
+[00:06:13]
+In this case, remember, tweets have authors and even after we persist this thing in order to return it, that tweet dot author resolver, that's this one here, this is still going to be cold. And so we need to make sure that dbTweetCache and dbUserCache have the right things in them.
+
+[00:06:32]
+Now, thankfully, we'll know when we pull out what we hope is cached in there, we will get a nice error in the event that something's missing. And by the way, If we remove this, note that we have DB user or undefined. So we're using a recent compiler option here called no unchecked index, access to TypeScript compiler option that says.
+
+[00:07:02]
+Whenever we use, like square bracket notation, the type of the thing that comes back always has the possibility of being undefined. Because this we're hoping something's in there if we did our jobs, something's in there. But we're obligated to make sure that what we got back is truthy, before we go and continue to use it.
+
+[00:07:24]
+So that's part of the reason I'm doing this. And it's exactly what you would want if you're using this as a cache, right? It would give you that great feedback. And in this situation, you could also fall back and say, all right, nothing is in the cache. Let's actually hit the DB and let's get this thing, and at least we can get the data, right?
+
+[00:07:44]
+Cool, so we're going to populate the Tweet map. And we're going to transform the tweet and we're going to return it. It seems good. I actually noticed that we have a little bug in here. Now we could complete this exercise, even with this bug, but I'm gonna fix it.
+
+[00:08:06]
+And that is we didn't put the author in the author cache here. And I think we would get around this cuz we're not actually returning. Like when we're making this query, we're not getting the author back. That wouldn't be too bad though, we could say, object.assign, tweet transform And, We'll put in author.
+
+[00:08:43]
+You don't have to do this I'm just doing it for. For completeness sake, so we've already got the user ID up here right this is something that we were given as an argument. If the author is not found because we're getting by user ID and that could, is that already guard us here.
+
+[00:09:13]
+Looks like it's pretty confidently returning us an author. We should do it anyway. And we'll make a nice little error message here. Again, don't feel pressured to copy this down, but I'm just sort of, Improving it on the fly. And then here we would say transform For our user transform, do we have this?
+
+[00:09:49]
+I guess we can just pass in the DB author here because it doesn't need to be transformed. Yet don't need that await all right. So now we can be assured that the author will be populated in this case. And that means that user.author this resolver here, well sorry we never had one here.
+
+[00:10:15]
+Tweet.author, tweet.author will never be called because when the tweet comes back after that first resolver will already have this thing in place it will already work and we should be good to go. All right so one more thing we have to do what you didn't do before, mutations we need to hook it up in our big collection of many resolvers.
+
+[00:10:41]
+And we'll just follow the pattern up here right so all the resolvers are sort of joined together. And I think we should be good to go there's no we could try to create a tweet. I'm tempting fate a little bit here. Just want to make sure my database has no changes in it, great.
+
+[00:11:12]
+So if we screw things up and we put a value in there that's not reasonable we can always revert that JSON file and get into a good state. So let's try to do this using the dev tools just because it's good to know how to do this in case you have to in the real world.
+
+[00:11:30]
+So we've got at the top level route types we have a mutation, we have create tweet. Note on the bottom there's this new little area that just became useful. It's got user ID and it's got body. So we gonna need a real user ID and we could get that with GraphQL actually, if we get rid of this, let's make a query and just get the current user ID.
+
+[00:11:59]
+Boom, query, awesome, there is a string. So let's paste that down here for user ID. And then say, first tweet. All right, and now let's go back and let's create that mutation query. Here we go, create tweet. And what do we want back? Let's just get the ID back, boom.
+
+[00:12:29]
+All right we got a tweet ID back and let's see what happened in our database there's db.json and there it is So that's us testing our first mutation the creation of a tweet
+
