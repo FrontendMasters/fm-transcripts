@@ -1,0 +1,60 @@
+[00:00:00]
+>> All right, so I'm gonna cover one last bit just going through it, it's good to know we're not gonna do any exercises on it. But this is a very important thing cuz you'll get yourself stuck in situations sometimes where you care about having an atomic process. So atomicity, basically means if one operation of a series of many operation fails, let's roll them all back.
+
+[00:00:23]
+So I don't wanna be in an incomplete state because if I let's say I wanna run 10 operations to update a table or a database in any database for that matter. I don't want if three of them fail in the process but then seven of them succeed. It becomes difficult to know what state my data is in, especially if one of the other pieces relied on the other piece of data.
+
+[00:00:47]
+So in order to make sure that doesn't happen, I want the whole process to be atomic, if one thing failed, let's just do it again. Because I don't wanna just fail even cuz I don't want it to process through. And in fire store you have two tools at your disposal for atomic transaction, you have Batch Writes and transactions.
+
+[00:01:06]
+A Batch Write basically is a big collection of operations that you want to run, you can call batch.set Batch.update, batch.delete, and you pass in the operation you want to run inside of there. And then when you run batch.commit, it will attempt to put all those together in one transaction.
+
+[00:01:26]
+So the way it works is, is that I can set a batch, so batch.set I call it with a document and then I just pass the date I want batch.update. Saying you pass in a document, the data that you need to update and then same thing with delete the document as well.
+
+[00:01:43]
+And then since it's asynchronous, you will run a try catch and you await the commit and if there's a problem, you can catch it in here. And if there's a problem, that's great because I'd rather have it all fail than be in some incomplete state. So at anytime in your app where you're really relying on multiple transactions that happen all at once.
+
+[00:02:01]
+Or multiple operations that happen all together and if they were to happen together and really make things difficult, this is the tool you use so Batched Writes. And it's important to note that Batched Writes have a limit of 500 documents per batch. So if you're doing something that goes well beyond 500 you'll need to split it up into multiple batches.
+
+[00:02:22]
+And while that is a fairly frustrating limitation, what I found is is that most of the time if you are updating more than 500 or something, several thousand. It's good to do it in small batches if you're doing something like fan out which we'll show with con functions here in a bit.
+
+[00:02:38]
+Where I say hey, I wanna update all of my user profile information that I have spread out or denormalized. I may only wanna do that 500 at a time, and it's okay if my data is in an inconsistent state as long as I eventually get it into the consistent state.
+
+[00:02:54]
+And you'll see that a lot in systems where you update your profile and you might see it on yours but then on another screen, it's not available yet. Because it somewhere in the background is running all of that. And then maybe a minute later, maybe an hour later, depending on how their system works, you'll be like everything is consistent now.
+
+[00:03:09]
+So that's known as eventual consistency and it's another hallmark of no SQL. And so yeah, updating over a period of time with this is fairly common. So then there's also transactions, so transactions are similar to Batched Writes where something fails everything fails. But Batched Writes are more so I don't care about the current state of data, I want to overwrite the current state of data.
+
+[00:03:32]
+Transactions, they work off of something called optimistic concurrency control. So in a lot of databases when you want to do a transaction, it's gonna have to lock at the database to say no one else can touch these parts of the database. Because I'm doing something important here and it would really mess everything up if someone tried to access this.
+
+[00:03:52]
+Well in Firestore that could be detrimental because of on a client level, cuz let's say you access the lock from your web app and then you're lost connection. What happens? Do we just hold lock until they regain? You can basically be locking parts of your database for indeterminate periods of time, so we do not lock.
+
+[00:04:14]
+What we say is is we're going to assume that the transaction is going to work but if it doesn't work, if the data has changed, then we're gonna retry it again until it does work. So it gets around locking, so no parts get locked, and it just gets reran.
+
+[00:04:32]
+So in this case, let's say that we're building a game and new points were awarded to the user. And we didn't wanna just overwrite with the new points, we wanted to say hey add these new points to the current state. Or you can start by running a transaction and this gives us a transaction object.
+
+[00:04:49]
+Where we can say get data at this location, and usually check to see if the document exists because otherwise you don't wanna run the transaction. Then you mutate the data here, so we're gonna add the score, and then we're going to run the transaction. And so what's important is that at this point, Firestore knows, all right, we got the data at this point in time.
+
+[00:05:13]
+Now let's say before I run transaction.update, that this data gets updated. Well, I don't want it to overwrite with whatever, so if my credit score was 10, and I was gonna get 10 more points, so my score will be 20. But during the meantime, let's say I got 10 more points, well, I want my score to be 30, not 20 again.
+
+[00:05:32]
+This one would be 10 plus 10, it would know that, I wouldn't know about the new update. So when this reaches the server FireStore knows you thought that happened when the score was 10. Now the score is 20 let's run it again and so then it will do that again and so that way it'll will continue to try to update without messing with the old data.
+
+[00:05:59]
+So transactions are a really good way if you're building games or anything that really relies on turns and state they all have to be run and transaction All right, so that was all the FireStore we made it through, that's the biggest section, they're all pretty relaxed from here on out.
+
+[00:06:19]
+We're gonna get into authentication and then we're gonna focus on security. And then we'll probably speed run through some stuff with Cloud Functions, the Cloud Functions they're pretty easy to get through.
+

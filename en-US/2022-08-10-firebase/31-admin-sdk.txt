@@ -1,0 +1,60 @@
+[00:00:01]
+>> All right, which one is this? Yes, so this one right here, this is a very advanced use case. Let's say the user has a feature called budgets, which I kind of talked about earlier, where multiple users can collaborate on a budget. And so budgets have a budget ID, but also, how through the UI would I be able to add a user to my budget?
+
+[00:00:26]
+I would need to know their UID, and how would I get their UID from the client application? Well my security rules won't allow it because I say only users can know information about their own profiles. So how could I ever as a user say, hey, I'm gonna enter in their email, I want to get their UID and say that they can collaborate with me?
+
+[00:00:50]
+So instead of opening up access to a user's information, I can use cloud functions to say, write a request to create a subcollection within the budget called collaborator requests. And then it's going to have a document ID of the email. And then when this new email document is created, I can look up the user with the admin SDK to see, hey, what is their email?
+
+[00:01:18]
+And then from there, I can say, hey, they exist, that's great, let me add them for you. So the admin SDK, it's a trusted environment or the functions are a trusted environment that are running the admin SDK. It is handling all of the important trusted actions that the client users shouldn't have access to.
+
+[00:01:39]
+So this way I can still add users, I just say, request that I have a collaborator, that function will trigger and say, of course, let me add that for you. And then that gets added into, not into collaboratorRequests, will write it into the collaborators field. And then that new user will be able to access and do everything.
+
+[00:01:59]
+So it automatically handles some of the stuff for role-based security as well. And the way that that would work is is that let's get the email first, so the email, it's going to be context.params. So we have the email, and we wanna write to /budgets/{budgetId}. And this is gonna be a sub collection of collaborators, collaborators, and it's going to be keyed off the UID.
+
+[00:02:33]
+So this way I can write a security rule that says, hey, we find the collaborators by their UID, and it's really easy to match on security roles this way. So I need a document to be able to write to this place. So I'm gonna say uidDoc = firestore.collection('budgets'), but how do I know what the document ID is or budget ID?
+
+[00:03:03]
+I can get that from params. And say, .doc(budgetId), and then .collection('collaborators'). So this is the UID doc. I need to get the UID, though, so the way I can do that is actually with the admin SDK for Firebase auth. So doing that I can say, auth = getAuth();.
+
+[00:03:35]
+And one thing that I accidentally glossed over I wanna talk about is that functions actually carries a lot of environment variables for you. So I can call the functions SDK, call this config function. And at runtime it populates all of the, like a service account and all this important information into the Firebase field.
+
+[00:03:55]
+So I can actually initialize a Firebase app without having to know what my security account is or setting that up. We can do that on your behalf, you just tap into this function, and then it's properly authenticated. So now that I have the admin SDK, I can say auth.getUserByEmail, so I can get their email.
+
+[00:04:22]
+And get the result back. And this comes back as a user record, so I'll just write userRecord. And then now I can call .doc of the user record, no, userRecord.uid. So I have this uidDoc, and so from here, I can just say uidDoc.set, and I'll set the role to collaborator.
+
+[00:05:03]
+Now, something that's actually really important to understand with functions are is that functions need to know when to tear down, how long should they be running for? So what I did right here is when I said, await batch.commit, one of the things I think it still works for this case, but what I should really say is return batch.commit().
+
+[00:05:23]
+Because it's returning the promise, and once that promise resolves, functions goes, I have no other work to do, let me tear down. So that's less time they're running, that's less time that you're being billed for and everything. So that's a best practice is to always return a promise from a function, unless you're doing an HTTPS function and there's no returning a promise there, it's just request-response.
+
+[00:05:46]
+So in this case I can return the set, and that tells me that I'm done with this function. So now let's go and test this. So I'm gonna save. And one thing to notice too is this whole entire time, I'm not tearing down the emulator and re-running. When I write my code hot reloads everything for me.
+
+[00:06:08]
+Let me clear, no, let me clear this. All right, so I'm going to create a budget. So budgets, I'll create a budget ID, I'll call it good_budget. Name, don't really need a name, but Good Budget, Save. Now within good_budget, I'm gonna copy and paste it because I know I'm gonna get it wrong, collaboratorRequests.
+
+[00:06:39]
+Next, and so the document ID is going to be an email. So david@example.com, and I can just, for data duplication sake, just put it in there as a field. Now when I save, one second, I'm gonna go in and go, there it is. There's collaboratorRequests, and if I go to Logs, you're gonna see we have it in there.
+
+[00:07:07]
+Say go to Logs, we got an error, there is no user record corresponding. Well, that's not great because, well, the user doesn't exist, so it's not able to do that. So something I should do is I should try and catch that, and if it doesn't exist say, maybe I could send an email out to invite that user to join.
+
+[00:07:27]
+In this case, I'm going to keep this as is just to show it working. And I'm going to grab a user, let's invite this user, this uid. Or what's their email, actually? I want this email, let's see, this one. And let's go into budgets, collaboratorsRequests, we'll add another one.
+
+[00:07:53]
+Save, and then now we have that. We go into collaboratorRequests, it automatically popped up with collaborators. That's the same UID, and the role is collaborator. And so now that would work with our security rules. So in the case that if the user was not authenticated, what I'd really wanna do here is try, Catch the error, and right now I'll return Promise.resolve to make sure that it knows to tear down.
+
+[00:08:28]
+But what I could really do is say send an email to join.
+

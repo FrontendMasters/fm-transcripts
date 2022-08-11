@@ -1,0 +1,115 @@
+[00:00:00]
+>> Another thing about serverless systems, real time systems, is that you should never really trust local dates. So, let's say this is an app that tracks marathon results. And let's say we created this very sophisticated system which when I cross the start time it marks my start, when I cross the finish line it marks my end.
+
+[00:00:23]
+And let's say that we had a code that kind of ran like this says, let's update the David doc, we have his name and let's write the time that they finished at, and then I could calculate the time based upon the start at and end at, right? Well, what if I set my phone to start before the race started?
+
+[00:00:41]
+Or maybe what it I set it to, like just break the world record, and so my phone could have a different date and time on it than what my server expects, and so you can never really trust a local date because a user's clock can be different. A user can even to intercept and try to write malicious dates to you.
+
+[00:00:59]
+So what do we do? Firestore has a concept of server timestamps, and you just import that from the Firebase library. And what this does is, this acts as a placeholder, and it says when I get up to the server, insert what the server time is in this spot.
+
+[00:01:17]
+So, we can always be confident that what dates you see, what server timestamps are bona fide, real not spoofed dates. So, in this case, when the user crosses the finish line, I know that that was the real time that they did. And another thing with real-time systems are incrementing values, and something like just adding plus one like another, like another view or something like that is surprisingly more complicated than you realize.
+
+[00:01:48]
+Because the first thing you need to do is you have to know what's the state of the data, okay? How many likes are there? Are there seven right now? Okay, great. Now, I wanna add to eight likes, all right, now I want to write to that. But while I'm doing that, what if 10 other people liked it?
+
+[00:02:03]
+And so I went from seven to eight but someone else went from eight or someone went to nine, and then I overwrite, and then it goes back to eight. So, incrementing is very difficult because so much can happen in a real time system. So, how do we know that we can do those writes in order?
+
+[00:02:21]
+Yeah, so how do we know that something didn't happen during that process? Well, Firestore provides an increment function that handles a lot of the complexity for you. We'll see at the very end at how you do these atomic transactions in depth. But this is a nice convenience method where you can import decrement or increment, and you add a number, and it will actually handle that process for you, well, actually queue up the proper ordering rather than running into any race conditions, But it's important to that, especially for increments and decrements and things like that and for all Firestore documents, is that Firestore does have a limit of only being able to reliably handle one write per second to a single document.
+
+[00:03:12]
+So, if you have all of these writes going to a single document, It will do its best but at one point it might fail and say, hey, these needs to happen at a slower pace. This tends to not be a problem in many systems and this also tends to be something why we use generated IDs, and we distribute out those updates through a whole list rather than on one specific document.
+
+[00:03:35]
+But this is something to know if you're building a very highly real-time system. Yes.
+>> Is there a limit to the number of paths that we can listen to for updates? Does Firebase handle that for us, or is that something that we need to optimize and manage multiple listeners?
+
+[00:03:55]
+
+>> You know, I don't think I've been asked that question in many years or if ever, that the number of listeners on paths in your application. I will need to check that. I do not believe you are limited to the number of paths that you can listen to.
+
+[00:04:11]
+You are limited to how far down you can nest within collection documents collection, or what can fit into a document, like a document can only be up to one megabyte in size, and also you can put nested objects into those, and I think that goes to some really long number that most people don't use.
+
+[00:04:29]
+So you do have limitations on pathing and storage, but I do not believe you have any limitations on what you can listen to and any limitations that we would put on it as well, you would probably run into slowdown in the browser beforehand because the browser would just be doing so much or just processing so much data.
+
+[00:04:49]
+That's a very good question. And again, back to it again, in CRUD systems or in request response systems, we tend to say let me fetch data, or I mean, post data in this case where you create a new user, and now I have this new user ID. In Firestore systems, we do not await for these responses, we just make them, and we let the cache behind the system handle it.
+
+[00:05:17]
+So, right here updateDoc and then wait for the response, updateDoc wait for the response. And this keeps all of our UI snappy, we're not waiting on anything because what's actually happening behind the scenes here is that when I call updateDoc with David!, this callback right here on the second time, it does not go through the server.
+
+[00:05:40]
+It actually fires off locally before the server confirms that this write was allowed. And this, we call this latency compensation, there's other fancy terms for this called optimistic concurrency control where we basically assume that it's going to be good and if it's not good then we can roll back from it.
+
+[00:05:59]
+And so in security rules in Firestore when you go offline, and you start making lots of updates, well I can't verify that any of those updates work against the server because I don't have a connection. So it's going to fire off locally and the app will continue to work, but then as soon as the app regains connections, all of those pending rights that are pending to the server go off, the server sees which ones were allowed, which ones were denied, and it will actually write back to the client and reconcile the state for you.
+
+[00:06:31]
+So, what you might see in an app is if you had ten rights, and let's say two of them had bad types, or for some reason they were rejected, Firestore will just pluck those two out of the cache and then your list of ten will go to eight.
+
+[00:06:44]
+So, all those things are handled behind the scenes and those are cases where in traditional systems, or CRUD systems you would be listening, or you'd be checking to see the results from the server if there was a problem and then redoing the state yourself, you don't do that in Firestore.
+
+[00:06:59]
+It just automatically does the state for you, and that's just another example of why you tend to not listen to the results.
+>> Is there a way we got the synchronization going on, it kinda happens seamlessly, we don't know, the user doesn't know [INAUDIBLE] it's invisible and that's awesome.
+
+[00:07:15]
+Is there a way to indicate because you haven't gotten updates in a while to say, hey, you, you haven't talked to Firestore in fact, you're kinda offline that maybe isn't the internet connection but as a Firestore connection?
+>> Yes, absolutely, we are getting right to that, so we will get here.
+
+[00:07:33]
+Yeah, give me like two slides. Yeah, that's a great question. And so yes, we can await from mutation functions, or I can await for this, but when I'm offline, this part right here, it will hang offline. And so I want my app to continue to working offline, but it won't if I await.
+
+[00:07:51]
+And that is because I'm opting into the behavior of saying wait for the result from the server before I can continue on this operation. So if you've ever used like a Redux system before, this is like a good way of thinking about it, with Redux, you dispatch an update.
+
+[00:08:06]
+At no point in Redux do you say let me add something and then get it back, you say I want to dispatch that a user was added and then that goes through a reducer and then that gets called through the store. And so it's this constant flow where you're never directly manipulating state, you're always dispatching new different types of state updates, and Firebase works the same exact way, you dispatch updates to Firebase, and it synchronizes them back across clients.
+
+[00:08:38]
+And what's really powerful here, too, is that we also have document change types. So within Snapshots, I told you there's lots of really useful methods. There's the doc changes array, which will tell me you from what I've started listening what kind of changes occurred? There's three types of changes, I can see documents that were added, modified or removed.
+
+[00:09:00]
+And whereas when I showed you the Firestore console, and we saw it lighting up like a Christmas tree, it actually uses this underneath the hood to say, hey, when something is added, let me enter it in as green when something is modified, let me flash it orange and when it's removed, let me then highlight it as red and delete it from the DOM.
+
+[00:09:20]
+So, this is really powerful because it allows us to know what kind of events happened. So for any very stateful style apps, you can indicate what changes are going on. And this looks like actually a really complicated bit of code if you don't like the reduce method, but it's actually pretty simple what's going on, is that we're passing on this blank object of added, modified, and removed arrays, and so it's an object of arrays.
+
+[00:09:50]
+And then as we reduce over doc changes, we can say hey let, me go into the object of either added, so current.type, is it added, is it modified, is it removed? And then let me add that snapshot into it. And so now, I'll have a whole object of what has been added, removed or deleted.
+
+[00:10:08]
+And then from there, I can do lots of really cool stateful things within my app. So now, getting into all the questions of offline. So, when we do offline with Firestore, we need to opt into that behavior before we see any of the benefits of it. And we can do that by importing, there's actually two offline behaviors, there's multi tab persistence and just regular persistence.
+
+[00:10:37]
+When Firestore at first launched, it only launched with regular persistence and if you opened up another tab of that same app, it would not be able to sync those changes because syncing real time updates offline across multiple tabs is very difficult. If you actually go to many popular apps, I'm not sure about Google Docs anymore.
+
+[00:10:59]
+I know for a while if you opened up Google Docs in two tabs, it would say like, hey, we can't sync offline changes across two tabs, we'll only work in one. It was a pretty difficult problem to solve, and eventually we got around to doing it in a very predictable manner.
+
+[00:11:14]
+And so now we have enabled multi tab IndexedDB persistence, where all tabs actually sync across the same cache across the system. So, you can see really cool things with that, whereas if one tab is connected to the internet, and another tab is not because you've disabled it with Dev Tools, it will still write all of your updates in the offline tab online because it's syncing to a cache that is connected to the internet.
+
+[00:11:41]
+So, it is very powerful and a really cool way of showing real time updates. So, to your question of how can I tell users, hey this data might be stale or hey these rights haven't happened to the database yet? That is all in SnapshotMetadata. So, here in on Snapshot, the first time it fires, I'm gonna get my first name of myself and the very first time I'm going to see that it's gonna say from cache is false on the metadata, and has any pending rights is false because I got my data, nothing has happened yet.
+
+[00:12:19]
+Now I'm gonna call updateDoc, and I'm gonna have data David with exclamation mark and I have new updates that come in. So, I'll get my new state of data, so my new name, and then, on the second time, I will have FromCache is true because this data has been updated from the cache, and then hasPendingWrite is also true because it says, hey this write is going off to the server.
+
+[00:12:47]
+And so, one way of telling users whether their data is synchronized with the server or not is you do it from hasPendingWrite. FromCache is not as reliable or is not an indicator, I should say, of whether it's from the server or not because certain data can be from the cache from that document and certain cannot be.
+
+[00:13:05]
+But with hasPendingWrite, you know that hey, not all the data within this document has been synchronized with the server yet, and this is what I use. So if you were creating like a photos grid and you wanted photos to upload, you could make that photo open opacity 0.7 because it has pending writes.
+
+[00:13:25]
+And so it's a really good way of letting the user know, hey, you're writing data, but it's not quite saved on the server yet.
+

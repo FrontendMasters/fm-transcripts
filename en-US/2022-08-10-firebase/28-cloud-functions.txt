@@ -1,0 +1,69 @@
+[00:00:00]
+>> So now we're getting into one of the really fun parts of, or is in my opinion, in Firebase, and that's Cloud Functions. So Cloud Functions are a way for you to write server code without running a server. So you write a snippet of server code, and we will run that code in response to some event that happens within the Firebase ecosystem.
+
+[00:00:21]
+And there's a whole set of events that we're gonna go through here in just a minute to check out. And it's really cool and it allows you to do very powerful things. So the way to think about it is that sometimes you might need to get data that's located on a server somewhere else.
+
+[00:00:38]
+Or sometimes you might wanna do something that's very private like make a payment. And that's gonna have private API keys and things like that that need to be hosted on a server, and you can't have those embedded in the client. And that is something that is really the whole use case for Cloud Functions.
+
+[00:00:55]
+So whenever a document gets created in Firestore, let's trigger that. And let's call an external API to get that data and return it back into Firestore. Or, hey, a user got created in Firebase authentication. Let's send a welcome email out to them. And maybe I have an account setup with SendGrid or something like that So it's really important to think about sort of the triggering mechanism here is that we have this server code that lives up in the cloud.
+
+[00:01:27]
+But in order to access it, we do something usually via the Firebase JavaScript SDK. So I added a document. I created a user. So all of these things are trigger based. They are actions that begin on the client, but then take over on the server. And one thing about functions are is that functions are trusted environments.
+
+[00:01:51]
+So that means that we're going to be using the Admin SDK, which is a server-side SDK that's very similar to what you'll see on the client side, except it has ultimate permissions. It gets created with something special called a service account. And a service account is a special kind of user that has access to do whatever.
+
+[00:02:14]
+It actually bypasses security rules. It is basically a mega admin user and it has the ability to do all these things. So you can use this service account or this Admin SDK with the service account inside of a cloud function, and you have access to do whatever you need to do within your system.
+
+[00:02:34]
+So inevitably when we talk functions, and before I get into showing the code form, it's important to talk about cold start. So cold start is a very talked about thing in serverless space. And basically, cold start is the time it takes from your function from not being booted up at all to running your code.
+
+[00:02:55]
+And so this is really important because certain things might be more time sensitive than others. And with cold start is that it can range anywhere between 500 milliseconds to higher, depending on what your use case is. You might be doing something very complex inside of a cloud function that takes five seconds to complete.
+
+[00:03:15]
+So obviously, the cold start may be only 500 milliseconds, but then the full running time plus cold start is gonna be those extra five seconds as well. Also, something that can affect cold start is if you have a lot of node modules. So if you install a ton of node modules into your cloud function, and you deploy it out, those have to be installed.
+
+[00:03:36]
+Those have to be booted up for your runtime to work. So one of the best practices for really reducing cold start is also making sure if you don't need that module or if I could get something that works a bit lighter. That's a really good way of reducing cold start.
+
+[00:03:51]
+And then there's also ways to pay your way out of cold start. Cloud Functions has a feature called min instances, which allows you to reserve a specific amount of instances that will kind of always be warm and ready to go. So if you expect a lot of traffic, you can reserve 20 cloud functions.
+
+[00:04:12]
+And then when those requests comes in, it's ready to pick them up and you don't have to worry about cold start. But you pay to keep around those instances. And this is something I consider not including into it, but I think it's worth checking out because if you go and check out more documentation.
+
+[00:04:27]
+Very recently, just like the other month, in fact, Cloud Functions got a really big reboot, where we call it Cloud Functions v2. And it has a lot of great implications for cold start because it actually has a lot of new features that make cold start a lot easier to manage.
+
+[00:04:49]
+So in Cloud Functions v1 world, every time a function is invoked, it creates an instance, and you can handle one request to a function per instance. So if another request comes in, it has to spin up another function, and so on, and so forth. Whereas with Cloud Functions v2, we have concurrency, which means that a function can be invoked.
+
+[00:05:14]
+And if another request comes in, that function says, I'm alive, I'm active, I can take that one as well. That sounds good. And by default, I believe it's 80. And I think it can go up to 1,000 functions. So that way, it can really lessen the amount of cold start that you incur.
+
+[00:05:33]
+It also means that the way you write your functions just programmatically matters. Because if you are only ever dealing with one request per function, then you can almost think about each function as a sandbox for that user's information. So it runs that one time, you can get that user's information, and this function tears down.
+
+[00:05:55]
+Whereas a concurrent function is gonna spin up, and it can take multiple requests. So if you create an app, a Firebase app that's associated with a certain name or for the user, well, that better be pertinent for another request that comes in. Or if you create a global state inside of that function that's called current user, well, that current user could be somebody else that comes in.
+
+[00:06:18]
+So those are just really important dichotomies to keep in mind when you're thinking about Cloud Functions v1 versus v2. Both are still heavily supported and have really cool use cases for one versus the other. And v2 is still very early on. Not all triggers that we're gonna be going over today are currently supported in v2, but it's just a good thing to know.
+
+[00:06:40]
+So the way we set up functions is kinda the Firebase CLI handles a lot of it for you. You write Firebase init functions, and then it goes through this whole process where it generates out your folder structure for you and even boilerplates a little function for you. And it actually creates this very function right here.
+
+[00:06:59]
+And this is the signature of a function. You require functions from the firebase-functions SDK. You create a name, so exports.helloWorld. And we specify the type of trigger, which is an HTTPS trigger. And then on request, let's do something. And so if I were to deploy this trigger, I would get a URL handed back to me.
+
+[00:07:22]
+And anytime someone sent any type of request, post, get, put, patch, whatever, it will trigger that, and I can do something with it. And that's what to do to deploy, just say firebase deploy. And if you wanna be very specific and not accidentally deploy your Firebase hosting site, you can say deploy only functions.
+
+[00:07:40]
+And so that's a lot of showing, it's time
+
