@@ -1,0 +1,95 @@
+[00:00:00]
+>> All right, you're about to get excited, Kent, because [LAUGH] I love this feature. It is magic, and I'm gonna do my best to explain it to you of how it works. But first, let's implement it so we can see what the user experience is like. So I'm gonna open up our exercise 9 customer ID here.
+
+[00:00:20]
+And the first thing that I'm going to do is implement this piece, because it turns out that you actually can use all these components even if you're not using the defer API that we're gonna use here in a second. So we'll update all of our UI, make sure that still working as feature parity, and then we can bring in everything else.
+
+[00:00:40]
+So first of all, I should mention that this feature requires React 18 streaming. You cannot use this feature currently with any other framework or any other version of React. And in addition to that, you have to be streaming. And this project is already configured for that. When this defer API is stable and actually published, we will have docs to show you how to implement this function, but you basically copy paste this, and not a lot of changes you need to make here.
+
+[00:01:11]
+The important piece is renderToPipeableStream with a remix server, and this will just send pieces chunks of the data as they come in. I'm not a streams expert, there may be a course about streams on Frontend Masters, I'm not sure actually. But yeah, definitely, there is.
+>> Complete intro to real time.
+
+[00:01:36]
+
+>> Yes, sweet, so streams are a thing on Frontend Masters. Above my paygrade, I guess is how they say that. So we have this all configured for streaming with remix or with React, and so now we can use these features in remix. Another important piece here that I should mention is you wanna make sure that your host support streaming as well, because there are a lot of hosts that don't, or at least some of their offerings don't.
+
+[00:02:02]
+So anything currently that's built on wraps AWS Lambda, AWS lambda today in August 2022 does not support streaming. What they do when you try to stream is they will buffer it all up and wait until the connection is closed and then they will flush it out to the client, which is basically not.
+
+[00:02:22]
+That's not at all streaming far as the user's concerned. So there are popular hosts like Netlify and Vercel, both wrap AWS. However, both of those also wrap other services, Netlify has an offering that wraps Dino, and Vercel has an offering that wraps Cloudflare. And both of those services do support streaming.
+
+[00:02:45]
+And of course, if you're shipping a Docker container that has no JS or something or even been as a runtime, those do support streaming, and so you can use that. Just make sure that your host supports streaming. If you're unsure, you're gonna ask them, and they will tell you.
+
+[00:03:02]
+And just make sure that you understand each other when you do. Okay, great, so with that established, we have streaming enabled, everything is working. And having that streaming configured in our Entry server, doesn't actually start doing anything all that useful or interesting. It is technically streaming the HTML.
+
+[00:03:21]
+So it is technically a little different, but it's basically the same. We're not taking advantage of any of those streaming features until right now. So suspense is a React component that you can use. And inside of suspense, you can put components that can suspend. And hopefully, you never yourself have to write a component that suspends cuz it involves throwing promises.
+
+[00:03:45]
+And who wants to throw promises? Not me. So even in courses where I teach about suspense and how to make a suspending component, together we build a suspending abstraction so that we can do that somewhere else, cuz it's not a lot of fun. And this await component is from remix, and this is the suspending component.
+
+[00:04:08]
+So it is await from remix, and this accepts a couple of arguments, and in fact, it also accepts children, so we'll put that there. So first of all, you're gonna need a fallback element. So this is what to show when the children of the suspense component are suspending.
+
+[00:04:32]
+So, if we're still waiting for these children to finish and resolve their promises, this is what we should show while we're waiting. And for that, we have an InvoiceDetailsFallback that we can use. That is the fancy pulsing thing that we have. And then for our await, and we're gonna use the resolve prop here.
+
+[00:04:54]
+And this is going to be the promise that we're going to wait for. Now, currently, we don't have a promise, we're still loading everything with JSON. So we're still waiting for everything. But as it turns out, you can await anything in regular JavaScript. You can say, await hi, and this is hi, that is type of string right there, so yeah, at runtime.
+
+[00:05:19]
+So that is totally possible, something that you can do. And in the same way, this component, you can pass it even something that's not a promise. And so that's what we're gonna do right now, and then we'll turn it into a promise later. So what we're going to be deferring, what we're gonna be waiting for is the customer details.
+
+[00:05:38]
+And then in the case of an error, we want an errorElement. Then we're going to have an ErrorFallback here. And we'll just say, Something dun went wrong. There we go. ErrorFallback, and it looks like actually I need to use the message from a bad message. Okay, cool. So now, here is the fun part of await.
+
+[00:06:10]
+If you all thought that render props were gone, they're back, baby. And back with a vengeance, cuz this feature is amazing. So we're gonna grab all that and stick it into here. And the value that we get out of this is our customerDetails. So it's the resolved value of the promise that you provided.
+
+[00:06:29]
+Again, this isn't a promise yet, but you can still resolve a non-promise. So that's what this value is going to be, we've got all of our types and everything is still nice. So we're gonna reference the resolved customerDetails. And all of this should still work. This is feature parity, exactly the same way that it was before we made all of these changes.
+
+[00:06:50]
+So it's still gonna be slow, we're still waiting for all those invoices and everything, and we're still getting the skeleton and all of that stuff. Okay, so no changes other than the code. However, with these changes, we can now do some really awesome stuff. So coming back up here, I don't want to wait for the customerDetails.
+
+[00:07:12]
+So we're going to unconcurrent this stuff to make it a little easier to see what the changes are. So first, I'm going to say, here's my CustomerInfo = await that. And then we're gonna need to spell it right. Here we go. And then our customerDetails = await this, okay?
+
+[00:07:33]
+So this is not what you typically wanna do, if the two things aren't dependent on each other, you wanna run them concurrently with promises. Wait, or premise.all, but this will make it a little easier to see what we're doing here. So now, what we're gonna do is I'm actually not going to return the customerDetails as an object, I'm going to change this to the customerDetailsPromise.
+
+[00:08:01]
+And that's what I'm going to assign to customerDetails, because I am going to not await. No more waiting, and I'm going to send a promise. Now, JSON is going to serialize that promise into object object, the object you think that it does. So we're going to use defer instead.
+
+[00:08:20]
+And this is gonna come from remix-run/node. And we no longer can, or there's no point in doing this anymore, where we check, does the promise exists? Of course, it's going to exist, TypeScript knows that. So we get rid of that. When you defer something, you give up the opportunity to say, 404, that doesn't exist anymore, because we don't know until after the document's gone, the status has already been set.
+
+[00:08:46]
+This is just a trade off that you make when you're streaming in general, is that you started sending something. That status is part of that first chunk that you send to the browser, and so there's no way to change that status. There is, however, what is it called?
+
+[00:09:02]
+It's status 103, if we go see if this pulls it up for us. No, that's not what I was looking for, 103 Early Hints is what it's called. This is still, I believe experimental. Yeah, a bunch of browsers don't support this yet, but this allows us to give a preliminary status code intended to use with header to allow the user agent to start preloading resources.
+
+[00:09:29]
+This would actually be quite cool, because it would allow you to say, hey, I'm working on your request. I'm gonna do some stuff, but here's some JavaScript files, some CSS files, and I'm pretty sure you gonna need. So start loading those while I finish putting together this thing.
+
+[00:09:44]
+It's actually kinda cool. But again, mostly only useful for slow backends. If your backend is fast, it's not gonna do too much for you. So anyway, barring that, which is still experimental, you give up your opportunity to change the status code based on something that you're streaming. All right, so with that, we are done.
+
+[00:10:06]
+So we await this stuff that is fast, we do not await the stuff that is slow. We defer and we send a promise instead. And then on this side of the network, we get what is a promise. So this customerDetails is now a promise which we are passing to our await component passing as the result value.
+
+[00:10:32]
+And this is complaining now because this could actually be no. See before, we were checking if it was known, we're gonna throw in an error. Now, it's like, hey, it actually could be no. I'm gonna leave it as a exercise for the viewer to handle that case. It's unlikely to happen, because in this specific case, because of the customer info exists, customerDetails are probably going to exist, too.
+
+[00:11:04]
+So in this use case, we're probably fine to just stick with that. But you might wanna add something here that says, no invoice details, however you wanna do that. Okay, so we're done, that's it. Tada, check this out. Boom, there it is. Like lightning, kind of like our client side fetching thing, but very different from our client side fetching thing.
+
+[00:11:25]
+For one thing, you can actually notice right from the start, look at the fav icon. It's still spinning. Our client side fetching didn't have that. Our client side fetching was spinning, spinning, and then it stopped, and then the request to go get the data went out, right? In this case, we are streaming in the response.
+

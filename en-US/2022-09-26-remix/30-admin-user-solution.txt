@@ -1,0 +1,124 @@
+[00:00:00]
+>> All right, welcome back to the last exercise of the day. What a miracle it is that you made it to this side. [LAUGH] All right, so we want to protect some routes. One thing that's important for you to know is that Remix is responsible for managing the network chasm.
+
+[00:00:22]
+So it's the one that's gonna be calling your loaders to get the post data, to get the code, to navigate between all of these different routes. So if we start here, we go to Blog Posts, we go to My First Post, we go to Admin, and each one of these routes has its own loader defined, as well as its code.
+
+[00:00:48]
+And Remix is rather than saying, okay, call the parent loader, then call its child, and then call its child, and so on all the way down the line, we're going to say, just run them all concurrently. That way, it's as fast as possible. You don't have a stepping stone, you have a waterfall, it just goes right down to the bottom.
+
+[00:01:07]
+This makes it faster. This also makes things a little challenging for us for what we're trying to accomplish now. And that is, we want to make it so that no user who is not an admin, who is not the admin user, should be able to see this admin link, or even get to this admin page, or performing these admin actions, or any of that.
+
+[00:01:30]
+Because if they're run at the same time, then you can't just do the check in one place, and say, if they're not an admin, get them out of here. You have to do the check in every single one of the loaders. This is not great. However, the Remix team acknowledges this, and has some really good ideas for how to deal with this specific problem.
+
+[00:01:56]
+And so that will come eventually probably in the form of another export, where you'll just, again, we haven't shipped anything, so I do hesitate to ever say anything about that. But you'd go to the parent route, and you'd have some sort of export like beforeLoader, or something, or like dangerously run before loader.
+
+[00:02:17]
+Because you're you're putting yourself on the slow path, everything will be at least as slow as this is, right? So I'm not sure what it will be, but there will be a solution for this particular problem. But that said, you don't have to wait for this solution if this really bothers you a lot, because, again, Remix integrates with other node frameworks.
+
+[00:02:40]
+And so you could have an express middleware that runs before Remix even sees the request that handles this and boots them out if they're trying to access or do something that you don't want them to. So if it was really important to you, you could have something that sits before Remix to handle this.
+
+[00:03:01]
+And another thing is, most of the time, you actually are going to do something with the admin user, or with whatever user you're trying to access. So only this user has the power to edit their tweets, if only we could be so lucky. Then you're going to first get that user, and then you're gonna try and edit the tweet.
+
+[00:03:23]
+And it's not gonna work, because that user doesn't have access to the tweet anyway. So typically, you don't have to intentionally add these protections. They will just naturally happen as you're accessing data, and trying to go get the user's info. But in our case, actually, that is not the case.
+
+[00:03:40]
+All we need is some fancy require admin user function that we're gonna write to just make sure that the admin user or the user performing this action or loading this data is the admin user. Okay, so with all of that said, and one other thing that I didn't mention also is that when we go, yeah, I don't have a link that'll send us to this.
+
+[00:04:08]
+But when you navigate between, well, yeah, I do, here we go. So when I navigate between these, you see that I'm loading some data for this route, but I'm not loading the list of posts for the parent route, right? So there are also plenty of situations where the child loader will run, but the parent loader will not.
+
+[00:04:29]
+And so that's another reason why you can't depend on the parent loader, cuz sometimes the child just runs by itself. So that's why we have to do things in this way. So we're gonna create a function called requireAdminUser. And we'll say make a function called requireAdminUser that takes a Request, and this request object is going to have our user's information.
+
+[00:04:53]
+And we actually already have a requireUser, which will pull the userId out of the request. If you look at that, that is going to get the userId from the request, so we can go to get userId. Ultimately, that comes to the Session. The session comes out of the cookie, so that's how the authentication is working in this app.
+
+[00:05:12]
+We have a cookie, and then we get the USER_SESSION or the userId out of that session so that we can get the user's ID. Then we pull that from getUserById, so now, we have the user. And if there is no user, in this case, then we're gonna log them out.
+
+[00:05:30]
+We're gonna say, hey, logout, go get me that response. This is going to get the session and destroy that session. This effectively sets the cookie to a max age of zero, so that the browser will delete the cookie. So that's what logout is gonna do in the case that there is no user.
+
+[00:05:46]
+So that is what we're going to do. We're gonna build on top of all of this work to get our user from requireUser with the request. If no user exists, then we're going to throw. We're basically gonna do, actually, you know what, we don't need to worry about that, cuz that's handled for us, so there will always be a user.
+
+[00:06:12]
+But if that user is not the admin user, then we need to throw. So we'll say, user.email is not, wait, [LAUGH], wait, user email, thank you TypeScript. You know how long we would have spent debugging that if we didn't have Typescript? Yeah, you got to use TypeScript, folks.
+
+[00:06:32]
+Okay, user.email. So if the user.email is not equal to our ENV.ADMIN_EMAIL, then we're going to throw await logout(request);. We'll just boot them off over to the login screen, so that's where this redirects them to home. We could also change this to a redirect to redirect them to the login, specifically to the login screen, but yeah, I think, we'll just logout.
+
+[00:07:05]
+Get them out of there, they're not supposed to be here, you're not allowed. Otherwise we'll return user;. Cool, and we'll export this. All right, so with that now, I can go to my admin route, and I'm going to await requireAdminUser with the request, and we're gonna get that request from our loaderArgs.
+
+[00:07:33]
+And this route, the admin route, specifically, is now protected. User should not be able to get to our post/adminRoute. But again, they can curl a URL, they can do whatever they want to, cuz each one of these are API endpoints. And so we can't just protect this and assume everything else is protected.
+
+[00:07:54]
+So we're going to also go to our index, we'll add our export function called loader. This needs to be async. This will take our ([request): LoaderArgs), And await requireAdminUser with the request. And then, important note that a loader must return a response. So we're going to return a JSON response that just has nothing.
+
+[00:08:31]
+Okay, and then finally for the slug, Here, we gonna request and await requireAdminUser. Oops, Okay, now, we got all the things protected. Well, if I come over here, and when it did a refresh, it's like, hey, you gotta get out of here. So let's go log in, kody@remix.run, Kody loves you.
+
+[00:09:04]
+And there we go. I can get access to this, but if I try when I'm not logged in, it'll send me over to login. Neato fredo burrito, one other thing I forgot, the action also needs to have this protection, await requireAdminUser, cuz again, somebody could curl this directly, so you do have to be careful.
+
+[00:09:26]
+All right, so it's not very nice for users of our little blog to see this admin link, and be like, sweet, I can go be an admin now, and then get sent straight over to login. I think that's kinda silly. And it's also not very nice for us as admins to look at a post, and be like, I need to make a change.
+
+[00:09:47]
+Now, I guess, I'll have to go to the admin place. It would be nice if I had a little edit link if I'm an admin, right? We're progressively enhancing based on the information that we have, right? So we're going to make a Handy Dandy Notebook, no, just kidding.
+
+[00:10:01]
+[LAUGH] I heard a couple of chuckles, you know what I'm talking about. Yeah, we'll put this in utils. And right after use optional user, I'm gonna export a function called useOptionalAdminUser. And this is going to be a User or undefined, and I'm going to get my user from useOptionalUser.
+
+[00:10:33]
+And if that (user?.email is !== ENV.ADMIN_EMAIL), is that nice that we have the invite everywhere, server client all over? That's kinda nice. If it's not, then we'll return undefined, otherwise, we'll return the user. So now, we have a way to get the admin user in our components. If the user is the admin, then we'll get them.
+
+[00:10:56]
+So now, we can come over to, let's see, our post listing page, where we list all of these, and we're rendering that admin link. And we'll just say, useOptionalAdminUser, get our admin user, or yeah, adminUser. And we'll only render this if we have the admin user, otherwise, we won't render anything.
+
+[00:11:23]
+And yes, I'm a big fan of ternaries, don't you bring this into my codebase, no thanks. I've got a blog post about that actually, if you want to know that. Okay, sweet, so now, if I'm not logged in, no admin link, if I am, admin link. Ta-da, that's nice.
+
+[00:11:43]
+Last thing that I wanna do is on the slug here, let's say useOptionalAdminUser( ), const adminUser. And we're gonna copy this link, cuz it's nice and styled the way I want, adminUser ?. So if we are the admin user, then we'll render out a link. Oops, I'll call it edit, otherwise, no.
+
+[00:12:15]
+Bring in the link, and yeah, that should do it. [SOUND] Now, we got edit, all right, that's right. This needs to go to, /posts/admin/, post-slup, there we go. Okay, edit, ta-da, so that's nice, nice little enhancement for us. But again, it is only for us, not for any people just reading your post.
+
+[00:12:52]
+Last thing I think I wanna show about this is because all this authentication stuff was built for us, you didn't get a chance to see, how are we getting an admin user and our components and stuff. That's a little bit beyond the scope of a Remix fundamentals workshop, but I will show that code to you, because I think this will give you maybe a little preview of how this works.
+
+[00:13:15]
+This, again, is all generated for you by the Indie stack, and so, yeah, you can just use that. But the way that this works is, first, the root is responsible for getting the user's data from the server to the client, so it gets it in through the loader.
+
+[00:13:33]
+But you'll notice the route is actually not using the user at all, there's nothing in here about the user. So in our utils, we have a function called useMatchesData, just a handy little utility that uses this useMatches function from Remix run React. So this will tell you all of the matching routes that are active right now.
+
+[00:13:56]
+So here are all of our matching routes, and each one of these elements in the array has some information about the route, specifically the route ID as well as the loader data for that route. So that's what we're doing here, is we're saying, hey, I want you to find me the data for the route that matches this ID.
+
+[00:14:18]
+Now, you can look at what the IDs are, but in our case, where is the use? Yeah, in our case, the root route, the ID for root route is simply root. So we say, useMatchesData, get me the data for the root loader. And now, I've got my data.
+
+[00:14:37]
+If that data doesn't exist for some reason, or the data.user is not a user type, so we're doing some runtime assertion here, that's an assertion function in TypeScript, fancy TypeScript magic there. So if they're not a user, then just return undefined;, otherwise, return data.user. So that's how we get the optional user.
+
+[00:14:58]
+And then we actually also have a user which will throw an error if there's no user return, so you could actually use this on pages that are alike. There should absolutely be a user here, if there's not, then something's wrong. And now, your types are a little nicer, because you don't have to do an undefined check, so that's all that's all about.
+
+[00:15:17]
+And so we're just built on top of that to check. In addition to checking that the user exists, also we want to make sure that email is correct. All right, and that is the last exercise for our day. What questions do you have about this exercise? We'll get into general questions here in a little bit, but what questions do you have for exercise ten?
+
+[00:15:41]
+
+>> Regarding the useMatchesData, will it throw if it doesn't match anything for? Yeah, so useMatchesData, because we've implemented ourselves, there won't be any throwing going on here, it'll just return undefined. Yeah, you could though. [LAUGH]
+

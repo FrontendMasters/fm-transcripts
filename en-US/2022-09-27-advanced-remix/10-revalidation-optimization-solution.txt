@@ -1,0 +1,116 @@
+[00:00:00]
+>> All right, we're back from exercise four, hopefully you had a good time working with this unstable API. Like I said, this should hopefully be stable pretty soon. But we're just working out what API we really want to offer to you, and so it's very possible that this will change.
+
+[00:00:17]
+But I would say that it is totally safe to use this API today, because whatever we end up switching to will satisfy the use case. So it's not like we're gonna pull the use case out from under you. If you do ever use unstable APIs in any library, just make sure you're always checking every new version bump before you just upgrade.
+
+[00:00:39]
+Because, yeah, that is unsafe, that's why it's prefixed with unstable. So with all of that said, our objective in this exercise is to make it so that our user, which is loaded right here, is not reloaded as we're making changes to something completely different, right? Because it wouldn't make any sense for the user data to be refetched just because we submitted a deposit.
+
+[00:01:05]
+It's not like I logged out or anything, right? So we don't need to refetch the user on every single request, or every single mutation of the data. In particular, for apps like this, the user doesn't change, except for when they log in or log out. And for the bulk of the time, the users in the application, they're not going to be changing their user information.
+
+[00:01:29]
+So if you've ever used the React.memo API, it actually has a second argument called the comparator, which allows you to compare previous props to the upcoming props. And you decide whether your component needs to rerender. So this is an optimization that you opt into, and when you do that, those comparator functions are actually kinda difficult to write.
+
+[00:01:52]
+And so I typically don't recommend that you write those. And yeah, React.memo is a completely different thing. But yeah, in the same way, shouldReload will give you information about where you're at currently and where you're going so that you can determine whether or not you want to update or reload.
+
+[00:02:16]
+And this shouldReload runs on the client, because that's the only place where it's relevant. If we're doing a server render, then yeah, of course, we're not reloading, we're loading all of the data. So it's just for client transitions going from one route to another. Or when we've made some sort of mutation, and we're deciding should we load this data, or should we reload this data?
+
+[00:02:39]
+Okay, so with that out of the way, actually, let's just make sure we've got our test case here, so we can compare before and after. So if I add an amount here, and I hit Create, then you notice we have our POST. This is the POST to, yeah, there's our method POST, to actually update this.
+
+[00:03:02]
+And then when that POST is finished, then we do some GETs for, this is the data root. That's kinda implementation detail stuff, but you can see in the query string there, we're revalidating the data for the route. This is for the sales route, and the sales/invoices route, and the invoice ID.
+
+[00:03:20]
+So you can see that the root would be the whole app. The sales/invoices is right here, as well as right here. And then our invoice ID is this invoice right here. So each one of these routes is being revalidated concurrently, and so it's nice and quick. But it is unnecessary to revalidate, actually, most of these.
+
+[00:03:44]
+We don't need to revalidate the root, we don't need to revalidate the sales, or the invoices. However, I wouldn't bother personally adding this optimization, really, to any of these, honestly. I don't think that it's that big of an issue to just revalidate this stuff. However, for the purposes of your education, I think we'll at least make it so that the root is not revalidated, so that's the goal.
+
+[00:04:15]
+So we'll go into the root route, and this is an export, so we're going to export const unstable_shouldReload, and this is a shouldReload function. That's the type for this. It is a synchronous function, cuz we're not gonna wait to find out if we should reload. We're going to synchronously determine whether we should reload.
+
+[00:04:37]
+And there are a couple of things that you get as a part of this. You get the params, you get the previous URL, where you're coming from, and the URL that you're going to, and the submission that is triggering this revalidation here. And that's what we want to determine, there are two cases.
+
+[00:04:53]
+When you're using this API, you're responsible for thinking, okay, so what are the cases where my loader data could change? So you look up at your loader data, and you say, okay, so my loader is getting the user. What are the situations where this getUser could return something else, something different?
+
+[00:05:13]
+And that's why the way this API works is it's part of the route itself, rather than being part of some other route that triggered the revalidation through mutation, is because the responsibility for whether it should revalidate should belong to the thing that determines what data it's getting, right?
+
+[00:05:34]
+And so we're gonna keep these two things in the same file to say, okay, now I'm looking at my loader, I see all of the data that it's getting. What are the situations where this data could change? That's the mental model that you should be holding in your head.
+
+[00:05:48]
+So for us, it is when there's a submission to log in or log out. That's the only time that the user will change. Sometimes this will be a fair bit more complicated for you, but for us, this is actually pretty straightforward. So we've got our submission that is being handled.
+
+[00:06:05]
+So we can say, if the submission.action is login, so if we're doing a POST or something to login route, then we'll return true. Otherwise, if we're submitting to the logout route, then we should return true. Otherwise we return false. And of course, you could rewrite this differently. I think I write this a little differently, but that's the basic idea.
+
+[00:06:32]
+So if we're submitting either to login or logout, we should reload. Otherwise, we don't need to bother reloading. And actually, just for funsies, let's console.log the submission right here, so we can see why that didn't end up getting called. So we'll console, or, yeah, let's look at the network here first.
+
+[00:06:51]
+We'll add another submission here. And you'll notice we have one fewer than we had before. So we have our POST, and now we're revalidating the sales route and invoice ID, but no root route being revalidated here. If we look at our console, we'll see the submission there. And the reason is the action was to /sales/invoices, yada, yada.
+
+[00:07:20]
+If I go and log out, then we don't get that log, because this was an action to that logout route. If I go kody@remix.run, Kody loves you, then again that was a submission to the login route, and so that decided to revalidate, okay? The mental model is, if you're going to opt into this, think about when do I need to reload this data, the data for this loader.
+
+[00:07:52]
+And so actually in that case, I put this here at the bottom, just cuz I wanted to get it out of the way, cuz it's unstable and yucky. Just kidding, it's not yucky, it's fine. But it might make more sense to colocate those two things. Here's the loader, here's when that loader data should change.
+
+[00:08:07]
+I think that makes sense to put those two things together. Sweet, yeah.
+>> Just to clarify, this can be on any route, not just the root?
+>> Correct. [LAUGH] Cool, any other questions from chat, or in the room, yeah.
+>> Another one slightly related, but, in a production app would you hardcode these routes?
+
+[00:08:33]
+Or is there some sort of route manifest, or strongly typed routes that you can reference in a-
+>> I see, yeah, so that you're not referencing all of this stuff. Yeah, we could go to the login route here. And our form, we've got a lot of forms. We could actually just say, you know what, I want this to post to api/login, whatever.
+
+[00:08:57]
+So I just busted my revalidation, right? I'm not aware of any utility that you can use to have all these types. But you could totally extract these, and just make it a rule, like we do not use just regular strings here, yeah. Would I do that? I don't know, yeah, I think it'd probably okay.
+
+[00:09:22]
+It's something like this in particular, it's actually really easy to see that you busted it. Cuz when you try to log in, it won't work, cuz you're not revalidating the root. And I'm pretty sure that would be the case most of the time. I suppose you could break the logout, and never try to log out.
+
+[00:09:40]
+But why would you not try, if you change the logout, you'd probably wanna try the logout. So I'm pretty sure you would always know that you busted something. And hopefully you're testing, so.
+>> If you put your console.log on the first line, logging gets called three times?
+>> Yes, good question.
+
+[00:09:58]
+So you should not rely on this only being called one time. This will be called, I actually I'm not sure why it would be called three times. But I'm not concerned by the fact that it is, yeah, I can't answer specifically why. But yeah, do not rely on this only being called once per revalidation.
+
+[00:10:21]
+Yeah, it's gonna be, and actually the same applies for your components as well. If you log in here, things like StrictMode, and various other sundry things are going to trigger plenty of rerenders. You don't really need to worry about that typically in a Remix app, just thanks to the fact that, because of nested routing, in particular.
+
+[00:10:46]
+But yeah, if you were to console.log(useTransition), that's the main one that's gonna be triggering all of the rerenders, is these transitions. So that could be the reason that our shouldReload is logged in multiple times.
+>> How would we handle it if the user session could be invalidated by responses from outer unauthorized routes?
+
+[00:11:11]
+
+>> Yeah, so I'm pretty sure the question is about, my data can be changed by other systems or other users or something, so how do I know? Or how do I update the data in the app when the user is not the one who triggered the mutation? So this is, we start getting into real-time conversations and stuff like that.
+
+[00:11:31]
+And the easiest way to deal with that is with server-sent events, we actually talked about this a little bit in the React Fundamentals workshop. But if you look at, yeah, SSE, there's this demo by Jacob Ebey that shows how to use server-sent events with Remix, and it's really awesome.
+
+[00:11:53]
+If you take a look at this, which is a resource route, it has a loader that sends a response, which is a ReadableStream. So this keeps the response, or the HTTP request, open between this browser and server for an extended, a very long time, until it's closed, really.
+
+[00:12:13]
+And so it can continue to send updates over time. This is only communication between the server and the client, which for a lot of use cases is all you need. The clients don't typically need to send any more than just an HTTP request every now and then to the server.
+
+[00:12:31]
+And so then you use the platform, just the EventSource, to subscribe to that event and get updates. So if that's the sort of thing that you want to update, there's nothing built into Remix, necessarily, for that. We're just using the platform for this. The ReadableStream is not a Remix thing, Response is not a Remix thing, it's all just platform stuff.
+
+[00:12:49]
+And so you just use those platform APIs to manage, like, somebody just updated this data. I'm gonna go and tell all the clients that that data has been updated, they need to revalidate. So that's how I would do that.
+
