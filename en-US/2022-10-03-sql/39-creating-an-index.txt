@@ -1,0 +1,81 @@
+[00:00:00]
+>> So we talked about index. We talked about this okay, sometimes your Postgres planner will choose not to use an index. We talked about a little bit about unique. So by if you set unique on a, some sort of row column in your database. So that actually ends up being by necessity an index.
+
+[00:00:24]
+So let's go look at I have a good example here. So if I was creating this American addresses, table, it have its own ID, this primary key would be the ID for right so this would have its own index because it's the primary key. And then I would have street address, city and state.
+
+[00:00:45]
+If I'm having some sort of database, or sorry, some sort of table street addresses I want that to be unique right I don't want to have two entries of a personal lives on 1,2.3 Main Street, right. Because I'm pretty sure there's a 1, 2, 3 Main Street and literally every city in America, so I can't have street address by itself Be a unique index.
+
+[00:01:08]
+It probably can't even be for the city, right? Because it could be in different parts of the city or, sorry, there could be Springfield in Illinois and Springfield in another state, right? So you can't do just street, address, and city, you have to do its street address, city, and state what you can do with this unique constraint here, right?
+
+[00:01:28]
+And this will actually create an index for you. So when you start searching for addresses by complete with street, city, and state, you'll actually be using an index. So that unique constraint can be useful for more than just keeping things unique in your tables. It can also be really useful for lookups it also helps for insertion performance.
+
+[00:01:53]
+Because if you had a unique constraint without an index, every time that you inserted something into or Table. It would have to look at literally every row in the other table to make sure that it was unique. That's too slow. That's why it creates an index for you.
+
+[00:02:09]
+
+>> Sorry, maybe I missed this, but does that create a new column?
+>> No.
+>> No. No, okay. This does not create a new column it just creates a constraint going back to my query that I have been writing let's do x, okay? This one. Let's say it's absolutely critical for me that I need to be able to query by movie name.
+
+[00:02:39]
+if I'm writing a movie searching application that seems very reasonable that I would search by name. So, let's create an index on it. Because 5060 pretty expensive for something I'm going to be doing a lot, like some sort of code hot path. So I'm gonna say create index.
+
+[00:02:59]
+Call whatever you want index name, that's a pretty common one to call it. ON movies, the name of the table. Name, the name of thing that you're indexing on. 178,000 rows is actually not that much Postgres can deal with billions of rows. That's why this is still really fast.
+
+[00:03:25]
+Now if I run this again, I went from 5060 to 1230 a little bit of a performance increase, right? You see that I went from a sequential scan to a bitmap heap scan, which is another kind of index scan. In fact, you see right there a bitmap index scan.
+
+[00:03:52]
+The reason why it's not quite an index scan is because there still could be multiple Tron legacies, which is true, right? This took 27 milliseconds this took well, you can have to look at these combined together. So this took 27.5, this took almost two milliseconds. So, over a 10x speed up, it's kind of wild right that it was that simple for us to do that.
+
+[00:04:18]
+So are you well placed in a well created index makes a huge amount of difference is just really hard to pick the right one. [LAUGH] That when you get it, it's so sweet. I'm showing very simple examples. It's on purpose cuz one, I have a really hard time myself identifying the correct ones, and normally you would have.
+
+[00:04:40]
+If you're doing something like I showed you that really long query, I usually have to go find someone that's really advanced in databases. They're usually not even an engineer, they're usually some sort of operations person. Or like a consultant that actually works for Oracle or something like that.
+
+[00:04:57]
+It's a whole separate pool of talent to have of choosing the right index.
+>> Can you just do delete index as well?
+>> I think it's drop,
+>> Drop, okay. Yep. Okay, so closing that loop on that I've created maybe like three indexes at professionally at my day job, in my entire career.
+
+[00:05:37]
+It's almost always been an operations person that's gone in and like actually done the identifying the slow queries, finding the index, working with engineering to get that setup, all that kind of part. It's normally a team effort, not just some Cavalier engineer saying like, I'm gonna write some indexes today and speed up the application.
+
+[00:05:55]
+It's normally that not that easy. We are gonna do some more interesting indexes here in just a second. Specifically, we're gonna do some, we're gonna use views together with indexes to make some really huge performance benefits. But I wanted to talk to you a little bit about what kind of other indexes you can have.
+
+[00:06:17]
+I showed you B tree that's the default one makes sense for looking for exact matches on things, right? Or doing ordering and those kinds of things, right?There are a few more to talk about. We're about to talk about gin indexes. So I'll leave that for us to talk about gin indexes.
+
+[00:06:35]
+There's hash indexes that's really useful if you're doing strict to quality checks for things and you need it fast and in memory. But it cannot handle anything other than does this equal this, whereas like a B tree can order things, right? Can you, hey, use the B tree index to sort this for me.
+
+[00:06:53]
+It does that really fast too. We did that already, just to show you explain, analyze. Order by name limit 10 so again, notice this used index scan so it's using the tree to order by. We got that for free because it comes with B tree. The other cool thing is you're not limited to ascending descending.
+
+[00:07:30]
+It actually is really you can see it says index scan backwards it's actually able to use indexes backwards as well. That was not always the case. You can actually tell it to index things backwards if you're going to be doing descending because obviously it's a little it's actually literally the same.
+
+[00:07:49]
+So in this case, it doesn't even matter but you can actually tell it to index it backwards. But apparently in this case it would have made zero difference. They allow you to do it so maybe it's useful, I don't know. Just can use for full text searches but it ends up with some false positive sometimes so frequently Jen is preferred once we're getting into these ones these are ones I've never used before.
+
+[00:08:16]
+So I actually I'm just telling you for the sake of completion or but I haven't used them. There's SP-GIST, which is more special use case. This is more useful for clustering things and like nearest neighbor. You can actually use postgres to say, like, here's three different zip codes, give me the three nearest neighbors to those, right?
+
+[00:08:38]
+I've never used it like that. And then BRIN I have used the BRIN before. This is for extremely large tables. You use BRIN for when you're, you can't actually fit a B tree index. It's because it would be too big you have BRIN which is a little bit more compact but a little less powerful.
+
+[00:08:57]
+So a left a little link here for you if you want to go to check those out and read more in depth in them than I've talked about. But just know B tree almost always, hash sometimes, change somewhat frequently and we'll talk about change here in a second.
+
+[00:09:12]
+Everything else is wild west to me.
+

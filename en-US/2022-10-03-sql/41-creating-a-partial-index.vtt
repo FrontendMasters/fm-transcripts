@@ -1,0 +1,357 @@
+WEBVTT
+
+1
+00:00:00.074 --> 00:00:03.124
+Let's do partial indexes.
+
+2
+00:00:05.866 --> 00:00:08.716
+So we're gonna go back here with a gin.
+
+3
+00:00:10.840 --> 00:00:12.792
+We're gonna copy this query really quick.
+
+4
+00:00:15.594 --> 00:00:17.988
+Actually we can just grab all of these.
+
+5
+00:00:17.988 --> 00:00:21.460
+So we're gonna be looking at
+category names for just a second.
+
+6
+00:00:22.700 --> 00:00:25.976
+So specifically category_names.
+
+7
+00:00:25.976 --> 00:00:28.040
+So we're gonna be looking
+at category_names.
+
+8
+00:00:29.410 --> 00:00:33.256
+It has a category ID,
+a name and a language.
+
+9
+00:00:33.256 --> 00:00:36.686
+Fathom for a moment, this is an enormous
+table it's actually not small.
+
+10
+00:00:36.686 --> 00:00:43.009
+So SELECT COUNT(*) FROM category_names;
+
+11
+00:00:43.009 --> 00:00:48.547
+you can see 36,000, it's not 0.
+
+12
+00:00:50.684 --> 00:00:55.267
+Let's say that we have an English
+website that 99.999% of our
+
+13
+00:00:55.267 --> 00:00:59.625
+traffic is all English, but
+we do have a German language as well.
+
+14
+00:00:59.625 --> 00:01:03.622
+Most of our users that are going to
+be querying just the English part and
+
+15
+00:01:03.622 --> 00:01:06.693
+really don't need to have
+the German parts indexed.
+
+16
+00:01:06.693 --> 00:01:11.539
+If I say create index on category names,
+all the German stuff is
+
+17
+00:01:11.539 --> 00:01:16.671
+gonna get indexed, which would be
+wasteful for most of our users.
+
+18
+00:01:16.671 --> 00:01:18.747
+What do we do about that?
+
+19
+00:01:18.747 --> 00:01:21.493
+Well, you can actually add
+a where clause in your index.
+
+20
+00:01:23.444 --> 00:01:28.988
+So, And you can say here
+
+21
+00:01:28.988 --> 00:01:33.841
+SELECT DISTINCT language,
+
+22
+00:01:33.841 --> 00:01:43.353
+count(*) FROM category_names
+GROUP BY language.
+
+23
+00:01:43.353 --> 00:01:50.827
+You can see we mostly have English and
+German category names.
+
+24
+00:01:52.524 --> 00:01:57.691
+But less than a third of our table is,
+not less than third,
+
+25
+00:01:57.691 --> 00:02:00.727
+less than half anyway, is English.
+
+26
+00:02:00.727 --> 00:02:03.460
+So it'd be useful if we could
+only index on that side.
+
+27
+00:02:03.460 --> 00:02:06.795
+So let's go grab this query right here.
+
+28
+00:02:12.316 --> 00:02:16.498
+If we do that, you can see,
+Get a sequential scan and
+
+29
+00:02:16.498 --> 00:02:19.077
+that's gonna be about 832.
+
+30
+00:02:22.419 --> 00:02:24.762
+But let's go ahead and
+create this index here.
+
+31
+00:02:26.929 --> 00:02:31.415
+So we're gonna say CREATE INDEX,
+whatever you wanna call it,
+
+32
+00:02:31.415 --> 00:02:33.794
+index_en_category_names.
+
+33
+00:02:35.589 --> 00:02:42.275
+ON category_names(language)
+
+34
+00:02:42.275 --> 00:02:47.118
+WHERE language = 'en'
+
+35
+00:02:50.141 --> 00:02:53.288
+So now we have an English
+language in index.
+
+36
+00:02:53.288 --> 00:02:57.332
+So if I run that same category,
+or that same query again,
+
+37
+00:02:57.332 --> 00:02:59.539
+notice I get way better times.
+
+38
+00:02:59.539 --> 00:03:04.100
+So I went from I set a time of 1:32 and
+a execution time
+
+39
+00:03:04.100 --> 00:03:08.868
+of 6:41 to 9:05 or so
+know this is 132, right?
+
+40
+00:03:08.868 --> 00:03:11.359
+So basically all that
+setup time ended up being,
+
+41
+00:03:11.359 --> 00:03:15.394
+that's interesting that it ends up being
+the same or is the same as that got it.
+
+42
+00:03:15.394 --> 00:03:21.743
+Okay, so anyway,
+&gt;&gt; So
+
+43
+00:03:21.743 --> 00:03:25.988
+will it only use this index when you
+have a where clause for English?
+
+44
+00:03:25.988 --> 00:03:27.136
+&gt;&gt; Correct.
+&gt;&gt; Okay.
+
+45
+00:03:27.136 --> 00:03:31.214
+&gt;&gt; So the planner can see that your where
+clauses matches up in a table to use those
+
+46
+00:03:31.214 --> 00:03:31.851
+together.
+
+47
+00:03:31.851 --> 00:03:39.708
+So you can see I went from 832
+down to 641, a small improvement.
+
+48
+00:03:39.708 --> 00:03:43.450
+The set of time is pretty big and
+when you add those WHERE clauses,
+
+49
+00:03:43.450 --> 00:03:45.573
+the set of time gets bigger, right?
+
+50
+00:03:45.573 --> 00:03:50.876
+Nonetheless, it's what,
+it's 25% better-ish.
+
+51
+00:03:50.876 --> 00:03:51.691
+It's not nothing.
+
+52
+00:03:53.592 --> 00:03:57.961
+But let's run that same query again for
+'de'.
+
+53
+00:04:00.724 --> 00:04:02.548
+And we're right back to that 832, right?
+
+54
+00:04:02.548 --> 00:04:04.813
+So it's actually only doing part of it.
+
+55
+00:04:04.813 --> 00:04:08.026
+In our case,
+if I was actually really doing this,
+
+56
+00:04:08.026 --> 00:04:10.486
+it's probably about the same speed.
+
+57
+00:04:10.486 --> 00:04:12.042
+In fact, we can even just try it and
+
+58
+00:04:12.042 --> 00:04:14.415
+see what happens,
+I actually haven't tried this.
+
+59
+00:04:14.415 --> 00:04:18.215
+What did I call that drop that index?
+
+60
+00:04:18.215 --> 00:04:23.933
+Idx something or other
+&gt;&gt; Idx_en_ category_names.
+
+61
+00:04:23.933 --> 00:04:28.186
+&gt;&gt; There we go, and
+then we will create that again and
+
+62
+00:04:28.186 --> 00:04:31.337
+we'll just drop this WHERE clause.
+
+63
+00:04:33.794 --> 00:04:36.143
+Try that again with the English names.
+
+64
+00:04:39.357 --> 00:04:42.895
+So we went from, I think 672 to 674.
+
+65
+00:04:42.895 --> 00:04:48.090
+No, 641 30 units
+
+66
+00:04:48.090 --> 00:04:55.898
+that's an effectual time
+this was 993 to 987.
+
+67
+00:04:55.898 --> 00:05:00.648
+So that's just gonna be on the how busy
+is my computer right now kind of thing.
+
+68
+00:05:00.648 --> 00:05:07.413
+But now, if I go back and I do that, this
+one this will also get the same benefit.
+
+69
+00:05:07.413 --> 00:05:12.819
+So you can see this one took 3893,
+probably because it wasn't cached and
+
+70
+00:05:12.819 --> 00:05:16.495
+probably for I don't know,
+other reasons as well.
+
+71
+00:05:16.495 --> 00:05:19.831
+So in this case, if this was a code
+hot path, I probably just loop and
+
+72
+00:05:19.831 --> 00:05:22.057
+all the German stuff as well,
+might as well,
+
+73
+00:05:22.057 --> 00:05:25.243
+the performance benefits of
+including German was not that big.
+
+74
+00:05:25.243 --> 00:05:29.535
+But, if there was a million entries,
+in this database or a billion,
+
+75
+00:05:29.535 --> 00:05:31.536
+it would make a big difference.
+
+76
+00:05:31.536 --> 00:05:34.352
+So all these tradeoffs be
+making these your head,
+
+77
+00:05:34.352 --> 00:05:37.380
+I just wanna show you that
+you can do partial indexes.
+

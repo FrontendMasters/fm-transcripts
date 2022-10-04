@@ -1,0 +1,45 @@
+[00:00:00]
+>> Let's do partial indexes. So we're gonna go back here with a gin. We're gonna copy this query really quick. Actually we can just grab all of these. So we're gonna be looking at category names for just a second. So specifically category_names. So we're gonna be looking at category_names.
+
+[00:00:29]
+It has a category ID, a name and a language. Fathom for a moment, this is an enormous table it's actually not small. So SELECT COUNT(*) FROM category_names; you can see 36,000, it's not 0. Let's say that we have an English website that 99.999% of our traffic is all English, but we do have a German language as well.
+
+[00:00:59]
+Most of our users that are going to be querying just the English part and really don't need to have the German parts indexed. If I say create index on category names, all the German stuff is gonna get indexed, which would be wasteful for most of our users. What do we do about that?
+
+[00:01:18]
+Well, you can actually add a where clause in your index. So, And you can say here SELECT DISTINCT language, count(*) FROM category_names GROUP BY language. You can see we mostly have English and German category names. But less than a third of our table is, not less than third, less than half anyway, is English.
+
+[00:02:00]
+So it'd be useful if we could only index on that side. So let's go grab this query right here. If we do that, you can see, Get a sequential scan and that's gonna be about 832. But let's go ahead and create this index here. So we're gonna say CREATE INDEX, whatever you wanna call it, index_en_category_names.
+
+[00:02:35]
+ON category_names(language) WHERE language = 'en' So now we have an English language in index. So if I run that same category, or that same query again, notice I get way better times. So I went from I set a time of 1:32 and a execution time of 6:41 to 9:05 or so know this is 132, right?
+
+[00:03:08]
+So basically all that setup time ended up being, that's interesting that it ends up being the same or is the same as that got it. Okay, so anyway,
+>> So will it only use this index when you have a where clause for English?
+>> Correct.
+>> Okay.
+>> So the planner can see that your where clauses matches up in a table to use those together.
+
+[00:03:31]
+So you can see I went from 832 down to 641, a small improvement. The set of time is pretty big and when you add those WHERE clauses, the set of time gets bigger, right? Nonetheless, it's what, it's 25% better-ish. It's not nothing. But let's run that same query again for 'de'.
+
+[00:04:00]
+And we're right back to that 832, right? So it's actually only doing part of it. In our case, if I was actually really doing this, it's probably about the same speed. In fact, we can even just try it and see what happens, I actually haven't tried this. What did I call that drop that index?
+
+[00:04:18]
+Idx something or other
+>> Idx_en_ category_names.
+>> There we go, and then we will create that again and we'll just drop this WHERE clause. Try that again with the English names. So we went from, I think 672 to 674. No, 641 30 units that's an effectual time this was 993 to 987.
+
+[00:04:55]
+So that's just gonna be on the how busy is my computer right now kind of thing. But now, if I go back and I do that, this one this will also get the same benefit. So you can see this one took 3893, probably because it wasn't cached and probably for I don't know, other reasons as well.
+
+[00:05:16]
+So in this case, if this was a code hot path, I probably just loop and all the German stuff as well, might as well, the performance benefits of including German was not that big. But, if there was a million entries, in this database or a billion, it would make a big difference.
+
+[00:05:31]
+So all these tradeoffs be making these your head, I just wanna show you that you can do partial indexes.
+

@@ -1,0 +1,80 @@
+[00:00:00]
+>> Now, I'm going to give you a little project to do. Projects in Node.js, but I've done most of the Node.js programming for you. So you really just have to focus on the query parts of this, and ultimately I give you the answers as well. So don't feel too stressed out if you don't know what's going on.
+
+[00:00:23]
+We're gonna be using the pg package today, I linked you to the docks which is node-postgres. This is the most common connector between Node.js, and Postgres, there are others. You're welcome to choose whatever you want but just to show you it is by far the most used. This top green line is how many times this is installed per day.
+
+[00:00:49]
+Which is on the order of three and one half million times per day. So it's pretty common. One of the reasons I continue to use PG, it's just the one that I've always used, right? And the other thing is that it gives you access to the underlying query language.
+
+[00:01:03]
+So I can actually write my own queries to go out to Postgres. Many other things are more ORMs, which are object relation managers. That sounds right to me. So I'm gonna go with it. I don't remember.
+>> Object Relational Mapper.
+>> There you go Object Relational Mapper. That sounds better.
+
+[00:01:22]
+[LAUGH] Basically, you define a bunch of configurations and then it generates queries for you. I prefer to write the queries myself, but that is up to you. In any case this is a SQL class so you have to write the queries. So, I'm just gonna give you a tiny overview of Postgres or node-postgres this this is mostly just so you can do okay in this part of the class.
+
+[00:01:49]
+Pg has two ways to connect to the database a client and a pool, today I would invite you to use a pool. The primary differences a client is one atomic connection to the database. So, if I connect a client to the database, I have exactly one connection that I'm writing queries back and forth with and getting results with.
+
+[00:02:10]
+And then as soon as I'm done, I close it and the entire connection is closed. A pool is something more that you'd use with a web service where you request a client from the pool, it gives you back a client. And then it will put that client back into the pool and it will not disconnect that client necessarily it could.
+
+[00:02:32]
+The reason why that's useful is imagine you have a web service that's doing 100 requests per second. The act of opening a client, connecting to it, handshaking, giving the credentials, establishing SSL, all those kinds of different things it's expensive to open and close those connections continually. So what the pool does is it recycles those connections between different requests.
+
+[00:02:56]
+So that it doesn't have to continually open and close sessions. You don't really have to care too much. Basically, you just have to do this. You require pg and you make a new pool, you give it the username, the host, the data base and whatever port that you're going out on.
+
+[00:03:16]
+But I'm pretty sure you could replace pool here with client, and I think it would still work exactly the same way you would just have one client instead of many. Rule of thumb here basically is, if you're writing a script where you're just like making a bunch of requests and then being done with it, use a client.
+
+[00:03:32]
+If you're writing web services where it's gonna be long lived and there's gonna be many things making connections, use a pool. Or if you want something even simpler than that just generally use pools. You can just kind of always use pools and be fine. Okay. So as long as you're following along, this will be the correct code here to connect you to a database and from node.
+
+[00:04:01]
+Here I can just kinda give you some troubleshooting advice. Make sure the credentials are the same, make sure that your docker container is running, make sure the port is exposed, make sure all of your data is in there, okay? And then this is how you actually are gonna end up making a query to Postgres.
+
+[00:04:24]
+So you're gonna say await cuz this gives you back a promise, the await will actually wait for the promise to finish, right? Pull that query and then whatever you wanna send to the database here. You don't have to give it the semicolon, it will insert the semicolon for you.
+
+[00:04:41]
+And then rows will be whatever you got back from the database. There's other metadata that it will give you back from the database, this objects that it gives you back has a lot of stuff. For the purposes of our course, I think all you're gonna need is rows.
+
+[00:05:02]
+This can be literally anything right here. This is gonna be the row query that gets sent to the database, okay? I wanted to talk just a brief moment about SQL Injection, because now that we're doing web services and dealing with user data, this is where SQL Injection becomes a problem.
+
+[00:05:19]
+You don't wanna get hacked, right? That's kinda the gist of SQL Injection. I would say SQL Injection, I think it's fair to say it's the most common way you get hacked. So let's say, I have this query right here. SELECT * FROM ingredients WHERE id=$(id). And I'm getting the id from the request query, right?
+
+[00:05:43]
+So basically, I'm selecting something from the ingredients table, and the user is providing me with the id to do that. Why is this query such a bad idea? I'm passing this id raw in from the user directly into the id which means the user can put anything there.
+
+[00:06:07]
+Anything that will go directly into my query to my database, is very bad. Cuz what happens if they put in this? Do not run this. Well, I guess it wouldn't work, so it doesn't matter. But this is what it would actually get to run against your database. So SELECT * FROM ingredients WHERE id=1:, finish first query.
+
+[00:06:29]
+Second query, DROP TABLE users. This will drop your users table, right? And you will lose a ton of data. This is called SQL Injection, right? And then, the dash dash here, imagine I had other things after this. Like a limit of five, offset ten, right? It would comment everything else, the query wouldn't fail.
+
+[00:06:52]
+This is just one way that's destructive. They could destroy my database this way. But they could also write a second select query in here, and have that return from your database. Or they could add themselves as an admin, they could do a bunch of stuff that would be really harmful to your database.
+
+[00:07:08]
+Again this is called SQL Injection. Have you ever seen the XKCD comic of little Bobby Tables? This is where that joke comes from. So did you really name your son Robert'); DROP TABLE Students? [LAUGH]. Right, cuz that would get input into their system, and that would drop their database anytime that it got ran, right?
+
+[00:07:33]
+Well we've lost this years' students records. I hope you're happy. And I hope you've learned to sanitize your database inputs. I did not name my son little a Little Bobby Tables. Anyway, that's where that joke comes from. So, how do we make sure that doesn't happen? How do we sanitize our inputs from our users?
+
+[00:07:59]
+Node-postgres, the client that will do this for you as long as you use it correctly. So here I say await pool query and then here I put this dollar sign one where I'm going to put the user input, right? And then I just give it to in order, in this case I'm just giving it the id, and then node-Postgres will take care of all the standardization for you.
+
+[00:08:18]
+You can just trust node-Postgres. So if I was putting three things in here I'd have dollar sign one, dollar sign two, dollar sign three. And then I would just put those here in order, in this array that I passed to pool.query. I put this one in here just cuz this tripped me up when I was doing this app so I wanted to clue you in on it.
+
+[00:08:37]
+So if you need to put the percentage signs in here, cuz you're doing the kind of the fuzzy search there. You put it in here, you don't put it inside the dollar sign, cuz that percentage dollar sign one percentage wouldn't work. So you have to put it in to the array So it will look like this.
+
+[00:09:02]
+So you might have to do some string concatenation into what gets sanitized, is what I'm saying.
+

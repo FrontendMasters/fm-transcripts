@@ -1,0 +1,63 @@
+[00:00:00]
+>> So while views are not tools for performance, a materialized view is a tool for performance. So this is what I saw when I ran it last week, 293,871. That is a too expensive query no matter how you choose to slice and dice it. But let's say you really care about movie or actors and actresses that tend to act in the same sorts of films, and that's really important to your application.
+
+[00:00:27]
+We need some way to track that then, right? So you show your boss that scenario, your boss is like, this is amazing, great job, engineer, go build the page that does this. You lose your mind because you're running four second queries, you cannot ship something like that. So you know that you need to do some sort of performance optimization here.
+
+[00:00:53]
+So I'm a product manager now, so I think of everything in terms of user requirements and user journeys. Here, it's talking about your product requirements here. You wanna show you user cool graphs and stuff from your database, the query that you get is really expensive, but think about it.
+
+[00:01:12]
+Actors and actresses do not release movies every day, they release maybe a movie a day, maybe ten movies a day, not very many movies per day are released. Which is to say that if you have a user that's querying on day old information, that's fine, totally an acceptable cost, which means this is a very cachable kind of thing.
+
+[00:01:38]
+So let's talk about what kind of caching strategies you might use. You might have some thing like Redis, where you just run this query once per day, and then you populate a Redis cache or a memcache cache. This would be a good use for something like, LinkedIn has a product called Voldemort, where it source intermediaries.
+
+[00:02:02]
+There's a myriad of others, you could have your app service cached in the memory, right? There's another thing you can do there. I'm gonna show you how you do it directly at the database level, called a materialized view. The advantage here is we're gonna create a view that's actually a cache.
+
+[00:02:20]
+And the nice thing about this is it's still a table, so you can still do joins off of the materialized view as well. You get all of the performance benefits, and you get all the view benefits of it being useful. The only downfall is that it's cached, right?
+
+[00:02:35]
+It's actually running the query, it's actually making a separate table and storing it, and it's not running the query again, it's just keeping the results. So the only difference on how you make them is instead of saying create view, which I could definitely just leave this out and then we just create another view, it'll just be a very, very slow view.
+
+[00:02:53]
+But if you put MATERIALIZED here, it's going to cache it. So I'm going to do CREATE MATERIALIZED VIEW, it's going to be that same query. The only thing down here as I added WITH NO DATA, let's do that really quick. So you can see there, it took no time, which is suspicious because we know it's a very slow query.
+
+[00:03:19]
+When I put WITH NO DATA here, I created the materialized view and I did not populate it yet. Cuz again, this is a really expansive query, you may not wanna run that materialized view immediately, you might wanna wait till down time, right? So if I say, SELECT * FROM, what we call it, actor_categories, It's gonna be like you can't do that because you didn't populate it.
+
+[00:03:51]
+Just to show you, it does show up here. Here's actor_categories, it's a materialized view. So how do we populate it? I've actually told us right there, you just say, REFRESH MATERIALIZED VIEW. I'm gonna run that, and I'm going to say actor_categories, and then now, this is gonna be slow.
+
+[00:04:18]
+Okay, it's done. So to sum that up, We did it WITH NO DATA, you can say WITH DATA. If I put WITH DATA there instead of WITH NO DATA, it'll immediately run the query for the first time and populate it. But now, I have this cached version of this query.
+
+[00:04:39]
+And again, this is actually using a view directly in it as well, which is kinda cool, right? So the materialized view is kind of downstream from the view. But I do a bunch of updates to actors_roles_movies and movie_ids, and stuff like that, that's not going to affect this query because it's cached, right?
+
+[00:04:59]
+So every time that I want to update that, I'm gonna have to say, again, REFRESH MATERIALIZED VIEW, cuz that data will get stale over time. It will not update that cache until I run that again. But the nice thing is I've run it once and then all my users can query from it instead of having every user query the really expensive query.
+
+[00:05:17]
+Did you understand the trade off there? You're trading off slightly stale data for tons query performance. So what did I have up here that I just asked for order by descending? So if I say, ORDER BY, what did we order by? Any other one? Count DESC LIMIT 10.
+
+[00:05:52]
+Okay, so this is what we saw before. If you remember, that was almost 300,000. If I say, EXPLAIN ANALYZE now, We went down from 290,000 to 88,000, we went down from 4 seconds to 200 milliseconds. We are definitely going in the right direction, that's still pretty expensive, right?
+
+[00:06:25]
+Why is it still expensive? Well, let's see how many are in the table, SELECT COUNT (*), FROM actor-categories. There are 4.1 million rows, that's a lot, right? Cuz you think about it every after that's been in any category ever has a row, that's a lot of permutations. That's going through a lot of rows to figure out that Order By.
+
+[00:06:58]
+That Order By is actually what is making it really expensive. You can see it's doing a Gather Merge, that's what the part is actually going to be really expensive there. One more thing that I want to tell you, every time that you run this one right here REFRESH MATERIALIZED VIEW, if you do it like this, it locks the table, which can be really scary.
+
+[00:07:26]
+Let's say I had that actors_categories page on my website, and I ran this in the background and someone tried to query it while it was being refreshed, it locks the table. Which means that query would fail or it'd wait, one of the two. That's bad, right? And I think it locks the underlying tables as well, that might be true.
+
+[00:07:50]
+That one I'm less sure about. Anyway, lock's so scary, that's my point. You can do something that says, REFRESH MATERIALIZED VIEW concurrently, so if I added concurrently after this, it's gonna go way slower but it won't lock the table. Yeah, it doesn't lock underlying tables, it just locks the view.
+
+[00:08:09]
+Now, I remember that. But if I did this, I'm scared to even run out on it, CONCURRENTLY, let's just do it. Well, apparently have to do some stuff to get that will concurrently to work. But suffice to say, if you don't wanna lock the table, you have to set up your view in such a way, and the you can do concurrently, and that will not lock the table.
+

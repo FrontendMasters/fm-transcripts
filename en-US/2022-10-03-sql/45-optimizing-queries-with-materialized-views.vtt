@@ -1,0 +1,572 @@
+WEBVTT
+
+1
+00:00:00.059 --> 00:00:03.863
+So while views are not tools for
+performance,
+
+2
+00:00:03.863 --> 00:00:07.773
+a materialized view is a tool for
+performance.
+
+3
+00:00:07.773 --> 00:00:13.862
+So this is what I saw when I
+ran it last week, 293,871.
+
+4
+00:00:13.862 --> 00:00:18.518
+That is a too expensive query no matter
+how you choose to slice and dice it.
+
+5
+00:00:18.518 --> 00:00:22.957
+But let's say you really care about movie
+or actors and actresses that tend to act
+
+6
+00:00:22.957 --> 00:00:27.338
+in the same sorts of films, and that's
+really important to your application.
+
+7
+00:00:27.338 --> 00:00:29.359
+We need some way to track that then,
+right?
+
+8
+00:00:32.547 --> 00:00:37.423
+So you show your boss that scenario, your
+boss is like, this is amazing, great job,
+
+9
+00:00:37.423 --> 00:00:40.023
+engineer, go build
+the page that does this.
+
+10
+00:00:40.023 --> 00:00:44.212
+You lose your mind because you're
+running four second queries,
+
+11
+00:00:44.212 --> 00:00:46.657
+you cannot ship something like that.
+
+12
+00:00:46.657 --> 00:00:53.537
+So you know that you need to do some
+sort of performance optimization here.
+
+13
+00:00:53.537 --> 00:00:55.247
+So I'm a product manager now, so
+
+14
+00:00:55.247 --> 00:00:58.920
+I think of everything in terms of
+user requirements and user journeys.
+
+15
+00:00:58.920 --> 00:01:01.868
+Here, it's talking about your
+product requirements here.
+
+16
+00:01:01.868 --> 00:01:07.093
+You wanna show you user cool graphs and
+stuff from your database,
+
+17
+00:01:07.093 --> 00:01:12.225
+the query that you get is really
+expensive, but think about it.
+
+18
+00:01:12.225 --> 00:01:16.553
+Actors and
+actresses do not release movies every day,
+
+19
+00:01:16.553 --> 00:01:21.067
+they release maybe a movie a day,
+maybe ten movies a day,
+
+20
+00:01:21.067 --> 00:01:24.467
+not very many movies per day are released.
+
+21
+00:01:24.467 --> 00:01:29.728
+Which is to say that if you have a user
+that's querying on day old information,
+
+22
+00:01:29.728 --> 00:01:32.759
+that's fine, totally an acceptable cost,
+
+23
+00:01:32.759 --> 00:01:36.128
+which means this is a very
+cachable kind of thing.
+
+24
+00:01:38.992 --> 00:01:43.738
+So let's talk about what kind of
+caching strategies you might use.
+
+25
+00:01:43.738 --> 00:01:48.620
+You might have some thing like Redis,
+where you just run this query
+
+26
+00:01:48.620 --> 00:01:53.772
+once per day, and then you populate
+a Redis cache or a memcache cache.
+
+27
+00:01:53.772 --> 00:01:56.883
+This would be a good use for
+something like,
+
+28
+00:01:56.883 --> 00:02:02.363
+LinkedIn has a product called Voldemort,
+where it source intermediaries.
+
+29
+00:02:02.363 --> 00:02:03.832
+There's a myriad of others,
+
+30
+00:02:03.832 --> 00:02:06.899
+you could have your app service
+cached in the memory, right?
+
+31
+00:02:06.899 --> 00:02:08.850
+There's another thing you can do there.
+
+32
+00:02:10.943 --> 00:02:14.133
+I'm gonna show you how you do it
+directly at the database level,
+
+33
+00:02:14.133 --> 00:02:15.622
+called a materialized view.
+
+34
+00:02:15.622 --> 00:02:20.417
+The advantage here is we're gonna
+create a view that's actually a cache.
+
+35
+00:02:20.417 --> 00:02:22.789
+And the nice thing about this
+is it's still a table, so
+
+36
+00:02:22.789 --> 00:02:25.381
+you can still do joins off of
+the materialized view as well.
+
+37
+00:02:25.381 --> 00:02:28.103
+You get all of the performance benefits,
+and
+
+38
+00:02:28.103 --> 00:02:31.043
+you get all the view
+benefits of it being useful.
+
+39
+00:02:31.043 --> 00:02:35.588
+The only downfall is that it's cached,
+right?
+
+40
+00:02:35.588 --> 00:02:39.036
+It's actually running the query,
+it's actually making a separate table and
+
+41
+00:02:39.036 --> 00:02:42.815
+storing it, and it's not running the query
+again, it's just keeping the results.
+
+42
+00:02:42.815 --> 00:02:46.991
+So the only difference on how you make
+them is instead of saying create view,
+
+43
+00:02:46.991 --> 00:02:51.493
+which I could definitely just leave this
+out and then we just create another view,
+
+44
+00:02:51.493 --> 00:02:53.661
+it'll just be a very, very slow view.
+
+45
+00:02:53.661 --> 00:02:57.861
+But if you put MATERIALIZED here,
+it's going to cache it.
+
+46
+00:02:57.861 --> 00:03:03.228
+So I'm going to do CREATE MATERIALIZED
+VIEW, it's going to be that same query.
+
+47
+00:03:03.228 --> 00:03:08.830
+The only thing down here as I added
+WITH NO DATA, let's do that really quick.
+
+48
+00:03:11.668 --> 00:03:14.612
+So you can see there, it took no time,
+
+49
+00:03:14.612 --> 00:03:19.305
+which is suspicious because we
+know it's a very slow query.
+
+50
+00:03:19.305 --> 00:03:21.585
+When I put WITH NO DATA here,
+
+51
+00:03:21.585 --> 00:03:26.535
+I created the materialized view and
+I did not populate it yet.
+
+52
+00:03:26.535 --> 00:03:31.019
+Cuz again, this is a really expansive
+query, you may not wanna run that
+
+53
+00:03:31.019 --> 00:03:36.058
+materialized view immediately, you
+might wanna wait till down time, right?
+
+54
+00:03:36.058 --> 00:03:41.028
+So if I say, SELECT * FROM,
+what we call it, actor_categories,
+
+55
+00:03:45.633 --> 00:03:51.049
+It's gonna be like you can't do that
+because you didn't populate it.
+
+56
+00:03:51.049 --> 00:03:52.710
+Just to show you, it does show up here.
+
+57
+00:03:52.710 --> 00:03:57.427
+Here's actor_categories,
+it's a materialized view.
+
+58
+00:03:57.427 --> 00:03:59.745
+So how do we populate it?
+
+59
+00:03:59.745 --> 00:04:05.928
+I've actually told us right there,
+you just say, REFRESH MATERIALIZED VIEW.
+
+60
+00:04:05.928 --> 00:04:10.848
+I'm gonna run that, and
+I'm going to say actor_categories, and
+
+61
+00:04:10.848 --> 00:04:13.274
+then now, this is gonna be slow.
+
+62
+00:04:18.095 --> 00:04:19.618
+Okay, it's done.
+
+63
+00:04:19.618 --> 00:04:27.161
+So to sum that up, We did it WITH NO DATA,
+you can say WITH DATA.
+
+64
+00:04:27.161 --> 00:04:29.682
+If I put WITH DATA there
+instead of WITH NO DATA,
+
+65
+00:04:29.682 --> 00:04:33.349
+it'll immediately run the query for
+the first time and populate it.
+
+66
+00:04:35.114 --> 00:04:39.484
+But now,
+I have this cached version of this query.
+
+67
+00:04:39.484 --> 00:04:42.871
+And again, this is actually using
+a view directly in it as well,
+
+68
+00:04:42.871 --> 00:04:44.460
+which is kinda cool, right?
+
+69
+00:04:44.460 --> 00:04:47.541
+So the materialized view is kind
+of downstream from the view.
+
+70
+00:04:49.300 --> 00:04:53.813
+But I do a bunch of updates to
+actors_roles_movies and movie_ids, and
+
+71
+00:04:53.813 --> 00:04:58.689
+stuff like that, that's not going to
+affect this query because it's cached,
+
+72
+00:04:58.689 --> 00:04:59.225
+right?
+
+73
+00:04:59.225 --> 00:05:03.129
+So every time that I want to update that,
+I'm gonna have to say, again,
+
+74
+00:05:03.129 --> 00:05:06.847
+REFRESH MATERIALIZED VIEW,
+cuz that data will get stale over time.
+
+75
+00:05:06.847 --> 00:05:10.024
+It will not update that cache
+until I run that again.
+
+76
+00:05:10.024 --> 00:05:14.090
+But the nice thing is I've run it once and
+then all my users can query from it
+
+77
+00:05:14.090 --> 00:05:17.649
+instead of having every user
+query the really expensive query.
+
+78
+00:05:17.649 --> 00:05:19.088
+Did you understand the trade off there?
+
+79
+00:05:20.909 --> 00:05:26.075
+You're trading off slightly stale data for
+tons query performance.
+
+80
+00:05:26.075 --> 00:05:31.356
+So what did I have up here that I
+just asked for order by descending?
+
+81
+00:05:34.556 --> 00:05:42.360
+So if I say, ORDER BY,
+what did we order by?
+
+82
+00:05:44.171 --> 00:05:47.243
+Any other one?
+
+83
+00:05:47.243 --> 00:05:52.439
+Count DESC LIMIT 10.
+
+84
+00:05:52.439 --> 00:05:56.385
+Okay, so this is what we saw before.
+
+85
+00:05:56.385 --> 00:05:59.408
+If you remember, that was almost 300,000.
+
+86
+00:05:59.408 --> 00:06:02.124
+If I say, EXPLAIN ANALYZE now,
+
+87
+00:06:05.750 --> 00:06:11.910
+We went down from 290,000 to 88,000,
+
+88
+00:06:11.910 --> 00:06:18.210
+we went down from 4 seconds
+to 200 milliseconds.
+
+89
+00:06:18.210 --> 00:06:21.225
+We are definitely going
+in the right direction,
+
+90
+00:06:21.225 --> 00:06:23.880
+that's still pretty expensive, right?
+
+91
+00:06:25.876 --> 00:06:28.686
+Why is it still expensive?
+
+92
+00:06:28.686 --> 00:06:32.461
+Well, let's see how many are in the table,
+SELECT COUNT (*),
+
+93
+00:06:35.482 --> 00:06:38.897
+FROM actor-categories.
+
+94
+00:06:41.046 --> 00:06:48.245
+There are 4.1 million rows,
+that's a lot, right?
+
+95
+00:06:48.245 --> 00:06:53.270
+Cuz you think about it every after that's
+been in any category ever has a row,
+
+96
+00:06:53.270 --> 00:06:55.366
+that's a lot of permutations.
+
+97
+00:06:55.366 --> 00:06:58.769
+That's going through a lot of
+rows to figure out that Order By.
+
+98
+00:06:58.769 --> 00:07:03.479
+That Order By is actually what
+is making it really expensive.
+
+99
+00:07:03.479 --> 00:07:05.496
+You can see it's doing a Gather Merge,
+
+100
+00:07:05.496 --> 00:07:09.118
+that's what the part is actually
+going to be really expensive there.
+
+101
+00:07:09.118 --> 00:07:14.215
+One more thing that I want to tell you,
+every time that
+
+102
+00:07:14.215 --> 00:07:19.541
+you run this one right here
+REFRESH MATERIALIZED VIEW,
+
+103
+00:07:19.541 --> 00:07:26.244
+if you do it like this, it locks
+the table, which can be really scary.
+
+104
+00:07:26.244 --> 00:07:30.902
+Let's say I had that actors_categories
+page on my website, and
+
+105
+00:07:30.902 --> 00:07:33.103
+I ran this in the background and
+
+106
+00:07:33.103 --> 00:07:38.538
+someone tried to query it while it was
+being refreshed, it locks the table.
+
+107
+00:07:38.538 --> 00:07:43.588
+Which means that query would fail or
+it'd wait, one of the two.
+
+108
+00:07:43.588 --> 00:07:46.001
+That's bad, right?
+
+109
+00:07:46.001 --> 00:07:50.553
+And I think it locks the underlying
+tables as well, that might be true.
+
+110
+00:07:50.553 --> 00:07:51.617
+That one I'm less sure about.
+
+111
+00:07:51.617 --> 00:07:55.122
+Anyway, lock's so scary, that's my point.
+
+112
+00:07:55.122 --> 00:08:00.675
+You can do something that says,
+REFRESH MATERIALIZED VIEW concurrently,
+
+113
+00:08:00.675 --> 00:08:05.619
+so if I added concurrently after this,
+it's gonna go way slower but
+
+114
+00:08:05.619 --> 00:08:07.544
+it won't lock the table.
+
+115
+00:08:07.544 --> 00:08:09.759
+Yeah, it doesn't lock underlying tables,
+it just locks the view.
+
+116
+00:08:09.759 --> 00:08:11.870
+Now, I remember that.
+
+117
+00:08:11.870 --> 00:08:18.773
+But if I did this, I'm scared to even run
+out on it, CONCURRENTLY, let's just do it.
+
+118
+00:08:18.773 --> 00:08:23.575
+Well, apparently have to do some stuff
+to get that will concurrently to work.
+
+119
+00:08:23.575 --> 00:08:26.641
+But suffice to say,
+if you don't wanna lock the table,
+
+120
+00:08:26.641 --> 00:08:30.882
+you have to set up your view in such a
+way, and the you can do concurrently, and
+
+121
+00:08:30.882 --> 00:08:32.530
+that will not lock the table.
+

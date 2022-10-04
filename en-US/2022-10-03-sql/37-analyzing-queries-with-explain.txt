@@ -1,0 +1,98 @@
+[00:00:00]
+>> So you and I just finished the movies database portion here. We looked at the exercises, we looked at the answers, we looked at pgAdmin. All good things. We are now going to get into query performance. Which honestly is one of my favorite parts this cuz it, it's cool to see something that goes really slow and then to do something and then watch it go really fast.
+
+[00:00:28]
+That's a really rewarding cycle for me. And so I am by no means a query performance expert, but I'm going to show you the very low-hanging fruit of how to speed up a query. You've already seen me use a couple of times say explain analyze on some of these, so I'm going to say docker PS you can see here.
+
+[00:00:55]
+I would like to connect to this one which is calling docker apps db1. So if you're going to continue using pgAdmin just make sure you're using the correct name to connect to your database. When I say docker exec here instead of having SQL cuz that's what I was calling it, you're gonna call it whatever it says right there.
+
+[00:01:23]
+Which is probably not Postgres-apps, it's probably whatever the name of the folder is that you started your docker-compose in, which was probably SQL- apps is what I'm guessing most of you are seeing. It just has to be whatever the name of your container is. So now this will work for me.
+
+[00:01:40]
+If that's not working for you, because I'm not gonna be using it anymore, you can also just say docker kill blah, docker ps. You can also kill the other one as well, docker kill blah. Then you can say docker run, this is the one that I called SQL.
+
+[00:02:04]
+So that's running again and that can just say docker exec SQL. Anyway, point being you have to call it the correct thing whatever the thing is hopefully, I showed you how to do that, that is up to you. You can ask if you're running pgAdmin, you can continue running all the queries in here as well.
+
+[00:02:26]
+That's totally fine. But I'm going to stick to the command line. So here we are. Okay. So I want to look at two different queries with you, select star from movies, to where name equals Tron Legacy which I have an abnormal love for this movie it's not a good movie I'm not asserting at all the story is awful but it's like it's one the music you can't deny the Daft Punk soundtrack is amazing.
+
+[00:03:07]
+And two just a beautiful movie. That again. Okay, if you see this from time to time here, either your container is having a little blip or your container could also not be done starting up yet if you connect too fast to it. Because what happens when this container starts is it starts the container.
+
+[00:03:36]
+Then it runs a bunch of queries to seed all of the data in it, and then it's ready to query from and if you do that too fast it's a problem. Okay, anyway, enough about my weird love of the movie Tron Legacy. You can see here that when I query, I said select star from movies where name equals Tron Legacy, okay?
+
+[00:04:02]
+I'm gonna do a second query here, select * from movies where ID equals 21103, which you can see here, they are both getting exactly the same movie, right? So looking at these two queries here, which I just put right there. Which of these queries is gonna perform better?
+
+[00:04:31]
+
+>> The second one.
+>> The second one? This one right here? Why? There's couple of reasons.
+>> Yeah.
+>> Name is like a filter versus ideas. A key.
+>> Yeah, that's a good way of putting it. So when you do where name is Tron Legacy, it doesn't know ahead of time that there's only gonna be one Tron Legacy.
+
+[00:04:59]
+So it's actually going to look at literally every row, all 178,000 rows in our table looking for Tron legacies. ID is a primary key it knows that there is exactly one, furthermore, it's also indexed by default because it is a primary key, so it doesn't actually even go through row by row.
+
+[00:05:20]
+It actually uses a separate data structure called a B-tree, as in a computer science self-balancing tree to go and find exactly the thing that we're looking for. Now, how would we ever know that beyond just that, that? Well, first of all, if you look at movies, wow, there's a lot of constraints on this.
+
+[00:05:44]
+But let's look at movies pkey, you can see this as a primary key that is using the B-tree based on the ID. In other words, this has an index. Right? So if I say explain, so let's start from, actually we can just add it on the front of anything.
+
+[00:06:05]
+If I say explain on this, You can see right there it uses what's called an index scan. Anytime that you see an index scan, it means that you're doing a good thing, right? If the Postgres planner which is what this is called if the planner is selected to use an index that means you chose a good index ahead of time or you wrote a good query to use an index.
+
+[00:06:31]
+If we go back to here and this one, and I say, explain, You can see it uses the dreaded sequential scan, which it means it starts the top and looks at every single row, row by row. This You can see here, based on the cost is widely different than the other one.
+
+[00:07:01]
+The second number here 8.44 tells you the total time. So this took 8.44 units, we'll talk about the units in the second, you'll just know that it's relative. Just took 8.44 units to find this movie those Tron movie. This one took over 5000 units to find. This is many magnitudes better because I was able to use an index.
+
+[00:07:37]
+Yes, so my computer is even running slow today. So, that is the one thing about this cost thing. Your computer is measuring itself, so I actually measured this a couple of days ago, and I got better performance a couple of days ago. So my computer is just running slower today.
+
+[00:07:51]
+So it's not an exact science. It's just a computer measuring itself. So, I'm gonna get different numbers on you, I'm sure you're probably not seeing 5006 you're probably seeing something else, right? Okay, so explain is the abbreviated output. If you wanted the extended output, you put analyze. Explain analyze.
+
+[00:08:14]
+And you get a little bit more on here. It'll give you actual times. It'll tell you how many loops it went through, what the filter was, how many rows removed by the filter. That's a pretty useful one to know. You can see here that it removed a lot of stuff, right?
+
+[00:08:31]
+So let's look at the one where it's the id is. Okay, this one uses an index scan. It doesn't even have to remove rows, right? Because that's not really a concept and knows that it's looking for exactly one thing because it's using an index. Search for it. So, let's type, I'll talk about a few things here.
+
+[00:08:58]
+Lets talk about the cost. So the cost here. And I'm borrowing this from another blog post I left a link to it if you want to read it. Cost units are anchored by default to a single sequential page read costing 1.0 units. So one page read it considers to be a thing, right?
+
+[00:09:24]
+It anchors it to that cost because if that's gonna differ between platforms, right? My computer is running ARM, right? Yours is running X86, right? That might run faster on different computing architectures or faster on Windows, faster on Linux. So it's done to that, you can compare apples to apples on one computer.
+
+[00:09:44]
+We shouldn't be comparing from my computer to your computer because it's gonna be different. So, it's a relative unit and it's meant to just you can say this one runs faster than this one on this computer that's really all the point of the cost The second number is the total cost that went from I clicked enter to disk run to completion.
+
+[00:10:07]
+The first number is the setup. So you'll notice on the sequential scan, it has a setup cost of zero. That makes sense because it doesn't set anything up. It just starts going, it picks the first row and it just goes, right? This does because using the correct index involves accessing the tree and then going through the tree and finding the thing.
+
+[00:10:31]
+That's not free. This is where it gets really confusing for people that are using indexes. Let's talk about like what an index is before I get much more into it. You can tell Postgres in advance I'm going to query using this kind of shape, this kind of pattern in advance.
+
+[00:10:50]
+What Postgres then goes and does is it takes all these things. It assembles a separate data structure that is optimized for searching. So if I say I'm going to be searching a lot by name, if that was something that was really important to me in my application, I can say, hey, Postgres go create an index on name.
+
+[00:11:13]
+And the next time I try and do a search like this, it'll use the index instead of using the just sequential scan. And I can speed up this query by quite a lot, which is pretty cool, right? That's the entire idea of an index. And he uses what's called B-trees, which is a type of self-balancing tree.
+
+[00:11:38]
+Just to give you a little preview of what that actually means, in my other course the complete intro to computer science, Which again is on front of masters. I actually teach you how to write one of these. In this AVL tree lesson, basically, it creates a tree like this, where it can go find those things really quickly, right?
+
+[00:12:04]
+So instead of having to look at literally every record in the database, it actually goes and finds it using a tree, which is a logarithmic growing thing. So you If you add another million rows to the database, that tree doesn't grow very much. What I'm showing you here is actually what's called an AVL tree, which is a very simplified version of what a B-tree is.
+
+[00:12:32]
+A B-tree is much more complicated, but it ends up being much faster look things up. Okay. So that's what an index is. There are other types of indexes besides B-trees. And we will look at those here in just a moment.
+

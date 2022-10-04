@@ -1,0 +1,76 @@
+[00:00:00]
+>> Now, we're gonna talk about GIN. I like GIN.
+>> [LAUGH]
+>> That's it, next lesson. [LAUGH] GIN stands for Generalized Inverted Index, and not juniper-flavored base spirits. I guess it is that, too, but we're not talking about that right now, maybe later. It is specifically really useful where multiple values could apply to one row.
+
+[00:00:31]
+And when I say that that's like full text search where you could have, if I'm searching for Tron Legacy, I could be searching for Tron, I could be searching for Legacy, both of those values would apply to one row. As opposed to a strict equality check where you're looking for Tron Legacy as a full search string.
+
+[00:00:51]
+So GIN's gonna be really useful for two of the things that I've shown you today, one of them I alluded to already, which is full text search. The other one is for JSONB columns, because if you think about it, if I'm looking for tags that apply to a recipe, dessert would apply to one of them, gluten-free would apply to it.
+
+[00:01:11]
+Like it would have multiple correct values of that, or what would apply to an individual JSONB column. So I'm gonna show you how to set it up. We actually don't have enough JSONB for this to actually work, but I'm gonna show you how you would set it up.
+
+[00:01:25]
+So let's say I had this new movie reviews table, and all it had was an ID, a movie ID, and then all of the scores as a JSONB. So just copy and paste all of these with me, okay? So we'll come back over here. So you can see now I have a bunch of movies, I have a bunch of movie reviews.
+
+[00:01:50]
+Some of them have Washington Post scores, some of them don't. So if I wanted to search for all Washington Post reviews, or something like that, or let's say Rolling Stone reviews, he would do something like this, right? SELECT * FROM movies WHERE movie_reviews scores > 'rolling_stone'. So you can see here this gives me back all the Rolling Stone ones.
+
+[00:02:16]
+So here I can do EXPLAIN ANALYZE. And it's doing a sequential scan because it's not a very long table. Now, if I wanted to create an index on all of those various different review types, you could do that with this one. So you'd say CREATE INDEX ON movie_reviews, WHERE, I set out where, but USING rather, USING, and then you say gin here scores.
+
+[00:02:56]
+So you have to tell it, what type of index which we're using a GIN index, generalized inverted index, yep. And then that's gonna create an index. Now, I can run that again, and like I said the planners can be smart enough to say, you don't have that many rows in there.
+
+[00:03:19]
+I'm not gonna use an index, that would take me way longer than just sequentially scanning through these. Cuz again, Postgres is really good at reading a lot of stuff really quickly. That's the entire point of Postgres. So this actually didn't really help us, but if we started adding 10,000 of these rows, it would start using these.
+
+[00:03:39]
+And that's the point of GIN, it's really useful for these kinds of multiple values apply to one column kind of searches.
+>> Why was it still way faster even if it didn't use the index? If you look at the planning time, I guess, way faster but-
+>> I guess it is, it's 25 times faster though.
+
+[00:03:59]
+Probably just ended up, you know what, I bet you it's cached, that would be my guess. So let's say if I ran this with Washington Post, my guess it's gonna go back to, Being slow again. Nope, maybe it did get faster, I was not expecting that. It's still doing a sequential scan but maybe it's utilizing the index in some way.
+
+[00:04:31]
+That one is actually a mystery to me, but my other guess is that it's probably still caching. Cuz even if it's looking for something else, it probably was able to utilize the same cache underneath the hood. You would expect that to kind of tell you that I use this thing.
+
+[00:04:51]
+But I don't know, JSONB, if you're gonna index JSONB, you're gonna use GIN. Those two should just kind of go together in your brain. I am gonna show you how to use GIN and we're actually gonna see some performance benefit now. We're gonna use something called a Trigram.
+
+[00:05:10]
+So let's say we want this to search for all Star Wars movies in movies. You can say SELECT *, let's just say name, cuz we don't need all of it. FROM movies WHERE name ILIKE 'star wars'. So you can see here, we got 30 rows of things that are like Star Wars Okay?
+
+[00:05:43]
+Now, let's explain and analyze this. We looked at everything, so we did a sequential scan on movies, it took about 5,000 units cost, right? And it looked at 178,000 rows, so 100 milliseconds, not great, not bad. What if you want, let's say that's a really important part of our app, so how do we optimize for that?
+
+[00:06:14]
+Well, let's talk about trigrams. A trigram is, as you might imagine, it's three characters together. If you split a word into trigrams, in fact, let's just show you what that looks like, you can SELECT SHOW_TRGM('star wars'). It will show you all the various different trigrams that it will make out of the word Star Wars.
+
+[00:06:40]
+Blank, blank s, blank, blank w, st, wa, ar, ars, rs, sta, tar, war. It's showing you every permutation that it can make of three characters together of Star Wars. We can then index on that, and then using GIN, GIN will then use that same algorithm to do multiple values that apply to one row, two indexes, which makes it really fast to do full text search.
+
+[00:07:14]
+Here's an actually fascinating thing, GIN came before JSONB. So they invented the search algorithm before they invented the data type that it searches on. That it was so effective that they didn't have to invent a new type of index for JSONB, they just applied the same principle using JSONB.
+
+[00:07:33]
+I thought that was a really interesting, they were so good at doing the generalized inverted index that they didn't have to reinvent the wheel once this new data type came around. Okay, so we saw EXPLAIN ANALYZE from Star Wars. Let's create an index, ON movies, USING gin on name, and then we're gonna give it a specific type of index, which is gin_trigram operations.
+
+[00:08:10]
+This is not the only one that you can do with GIN, there's other methodologies of doing it, but this is the only one that I'm familiar with. So you can see that was actually a decently hefty operation, it took like a second, which again, is really quite slow for 178,000 rows.
+
+[00:08:29]
+If you're going to create an index in production, it can be really slow, you might be ready you need to have some downtime, it can be slow enough. So just be aware that creating indexes is expensive. All right, so now let's do, this was about 5,000, right? Let's do the exact same query now, but we've done it with GIN.
+
+[00:08:52]
+So we went from 5,000 down to 152. Notice this had 0 setup though, and this has 88 setup. 88 setup is a lot actually, but it's expensive to use these kinds of specialized indexes. But we went from 103 milliseconds down to, Less than 1, so not too bad.
+
+[00:09:22]
+So rows removed by index I don't know, it's always interesting to look at these, we can see we ended up doing a Bitmap Index Scan, which is ultimately what we wanted. So, very cool. Most of it you can see it was a sprint planning, and a little bit more than half a sprint planning.
+
+[00:09:43]
+Whereas on the other one, planning was 0.2 but it took 100 milliseconds. So again, this is why the planner is super cautious about when it uses an index, because it knows using indexes are expensive.
+
