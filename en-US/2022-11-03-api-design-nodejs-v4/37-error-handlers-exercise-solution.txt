@@ -1,0 +1,146 @@
+[00:00:00]
+>> Okay, so, What we're gonna do next is basically, We're going to have to go in and override the default Express error handling. And we need to go in and augment all of the handles that we wrote so far that do asynchronous things. I'm talking about the sign in, the sign up, the product, all the stuff we just did, all the stuff that you did.
+
+[00:00:29]
+And we're gonna have to handle those asynchronous errors, so that they can bubble up to our error handling. Otherwise our service is going to crash every time someone does something silly, all right? Or every time a timeout happens, or anything. So that's what we'll do, you can start on that now if you want to.
+
+[00:00:47]
+When we come back, we'll do it together. I hope everyone had some time to handle your errors, [LAUGH] and if not, we'll do it together. So let's hop right into it. First thing is, I want to create the error handler that's gonna handle the errors to do something, I don't know, little more customized then just sending out an error message.
+
+[00:01:18]
+So, what I wanna do for my error handler is, I want to send back a different status code, or different message, depending on what type the error might be. And I can change the error type, it's just an object, I can do whatever I want. So what I'm gonna do is, I'm gonna just have, I don't know, three different types of errors.
+
+[00:01:36]
+So I can say if err.type === 'auth', I can say res.json, or I can say res.status(401). And I don't actually have to do another res.json, I can actually chain this. I just don't like doing it, but you can just do json like this, it chains. And I can just send back a message saying unauthorized, if I want to.
+
+[00:02:09]
+So if error.type is auth, it's that, else if err.type is, input. So if you send back some wrong input or something like that, I can say res.status is 400, which is a bad request. I can send back a message json, and I could say like, invalid input. And I can say else just default to, it's basically our fault, that's a 500.
+
+[00:02:51]
+I'm gonna say res.status(500).json(message: 'oops, that's on us'). And now I need to handle some errors. So let's do that. I'm just gonna go into the user one, we did that one. And how do you catch an asynchronous error?
+>> In the catch?
+>> In the catch?
+>> In the try-catch?
+
+[00:03:19]
+
+>> A try-catch, yeah, you can try-catch it. Try-catch something asynchronous. But here's where it starts to get tricky when you start try-catching everything. One is scoping, so variables created in a try are not accessible outside of the try. So then you gotta start hoisting your variables, and or just doing every single thing in the try-catch like that.
+
+[00:03:53]
+That's one option. The problem with that is if you have two asynchronous things happening aside, there's one try-catch. And then let's say the catch triggers, how do you know which one of those errored out? So you need two separate try-catches to handle two separate errors. So you can determine which error type was what so you can respond differently.
+
+[00:04:17]
+So it just basically just gets really bloated with try-catches everywhere when you wanna do something like handling errors asynchronously. There is a way around this, there's a little function, maybe I'll show it later. I don't wanna show it now, but you can get around using try-catch everywhere with async await.
+
+[00:04:37]
+You can use destructuring, actually, and do some pretty cool stuff. But for now we're just gonna try-catch everything. Just put everything in here, unless it's more than one, and then we can talk about what that will look like. So if there is an error, then I'm just calling next.
+
+[00:04:55]
+I'm gonna say next error, but before I call it, I'm gonna say error.type. I could just add a type here. And if this broke, if create user broke, assuming the database connection didn't mess up or whatever, I'm just gonna blame the user. And I'm gonna say it was a bad input, you sent up a username that was already taken, so that's what I'm guessing.
+
+[00:05:21]
+But in reality, you would probably want to inspect this error right here to see that it was indeed that error from the database. Because Prisma will throw an error that has an error code and an error message. You can look at that to determine if it was indeed someone using the same username.
+
+[00:05:40]
+Or was it because the connection to the database failed, and it's actually it should be a 500, and not the user's fault. You can get very specific with it. If your product is an API, you probably are very cautious about those errors. If your product isn't an API, it's probably not that big of a deal that you know exactly what error did what.
+
+[00:05:58]
+Because it's your API for your product, you just need to make sure your server doesn't crash, and you can investigate the errors later. Just put just enough information that you need, and you don't need all the detail. But for an API that's a product, yeah, you would wanna make sure you have the exact errors.
+
+[00:06:15]
+A link to the documentation that talks about this error status and what it does, and things like that. GitHub and Stripe does a really good job on that. Error handling is a big deal. There's people dedicated on a team whose job is just to do error handling. It's that big of a deal.
+
+[00:06:34]
+Okay, so let's check this out. So I say I'm gonna create a new user, type input if it's broken, so let's try that. So one, that means we gotta get past the input validation that's already put in place, or did we even add input validation to user? I don't think we did, which is fine.
+
+[00:06:57]
+Where's that at? That's in index, no, that's in server. There we go, yeah, we don't have input validation. But even if we did, I can still get past it. I can still have a username, I can still have a password. And this could still fail because the username was already taken, right?
+
+[00:07:11]
+Because the input validation isn't gonna check the database to see if there's a user with that username already in there. I guess you could have it do that, but why? When a database is gonna do it for you automatically, because of the unique constraint on your schema? There's no point of querying a database ahead of time.
+
+[00:07:24]
+What's the point of having a unique constraint? So let's try to create two users with the same thing and see what happens. Okay, so if I say, POST to user with a body of, "username": "rick", "password": "cheese". So if I do that, I get a new user, cool, that should work.
+
+[00:08:05]
+If I do it again, aha, I get our 400 bad request, "message": "invalid input", right? And that's exactly what I had in our error handler, if we go back and look at that, Here, so it was, it triggered this, error type of input, 400, 'invalid input'. And that's because that's what I did here.
+
+[00:08:34]
+I said, if this throws an error, it's type is input, and call next, so that's what happened. So our error handler works, our little errors type system works, doesn't get more sophisticated. There's nothing stopping you from creating CustomErrors, That extends the error class, right? You could do that, and then you can check for those custom errors inside your error handler.
+
+[00:09:07]
+In fact, there's packages that already have some of these. If you ever used GraphQL, Apollo's built in with a lot of this stuff. That's just the next level, but maybe it's worth it. Okay, let's do one more. Let's go to a little more advanced one. How about one for product, so, For product, Yeah, so let's find one that has input validations.
+
+[00:09:43]
+Okay, so for updateProduct, or actually, let's do createProduct. So for createProduct, this will never run unless the input validation passes. So, in what scenario would this database query cause an error? If this database query did throw an error, why would it?
+>> If we increase the name length?
+
+[00:10:14]
+
+>> If we increase the name length, yeah, did we actually add that constraint? I don't remember, yeah, I think you might be right. I actually was not thinking of that, that's really good. [LAUGH] Yeah, you're right, if it's more than 255, yeah. So yeah, I guess it could still fill input, because we're not checking for 255 on our input middleware.
+
+[00:10:36]
+Although we could, we could go to Express validator, like max length 255. And then, if that was the case, then why would this fail, if we did have that? Assuming we had that, why would this fail?
+>> If it doesn't belong to the user?
+>> If it doesn't belong to the user, exactly.
+
+[00:10:55]
+If it doesn't belong to the user, it should fail, that's exactly right. And the other one is, which is true for any database query. Is that the database just might have messed up, might have lost the connection. Something happens, somebody pulled the plug, talking over HTTP or any protocol over the Internet is always going to be finicky.
+
+[00:11:19]
+So it's not always gonna be talk to database, everything came back. You might just have a connection problem, which is a server problem. So it could be that too, so we wanna handle those, so let's do that. So we'll go back into product. And let's do just that.
+
+[00:11:35]
+So right now, well, I guess for createProduct, it doesn't matter if it doesn't belong to the user, because you're creating it. So yeah, I guess maybe not for that. On read, if I was getting a product, then yeah, it would throw an error, but for create, Yeah, cuz I'm only putting in the req.user.
+
+[00:11:53]
+So yeah, that should be an error. The only really error here for this one would be if the database messed up. So in this case, there is no scenario in which the user could have messed this up, assuming we had the 255 limit check on the input middleware.
+
+[00:12:12]
+So in that case, I would do a try-catch, and this would just be a 500 because we messed up. If this thing broke, it's probably because we messed up, cuz how else would you have messed this up? So I'll just do that. Try, catch, And then, because by default, all errors default to 500, I don't have to give it a type, so, I can just say next.
+
+[00:12:44]
+I don't know why it keeps doing that, next tick, and then we just need to bring in next. And really that's just how you have to play it. You have to go scenario by scenario and think about why might this throw an error. And try to catch that error, figure out what that error type would be.
+
+[00:13:08]
+And then report it, collect it, log it appropriately. So it could be very tedious, and creating an error system is tough. It's usually a lot easier to do before you start writing the code. After you write the code, and you gotta go back and augment it with an error handling solution, in my opinion, it's a lot tougher.
+
+[00:13:24]
+But it is case by case basis, and this isn't even including transactions, right? A transaction is like, let's say inside of createProduct, not only do we create a product in a database, but we go talk to this other API like Stripe, and we create something there. And then we update something else in the database when Stripe comes back, we do all these multiple operations.
+
+[00:13:46]
+But let's say halfway through one of the five operations we do, number four failed, right? We probably wanna roll back and undo all the other things that we did. So the database isn't in a wonky state of halfway did some of this stuff but didn't do this stuff.
+
+[00:14:05]
+Cuz you probably don't have the ability to resume where you left off. So you need a transaction to roll that back. When you start doing transactions, you absolutely need to know which error happened. Because some errors are gonna require you to roll back and some won't. So it's imperative to know what threw and why it threw.
+
+[00:14:24]
+So thinking about that is a really good exercise. Okay, so I've tried to create a product, yeah, we get a 500, so let's try to create a product. Go here, we're gonna POST to API, product, put a name, Of whatever, it's probably not gonna break. Because the database, well, it might break for some other reason.
+
+[00:15:04]
+But it shouldn't break because the database is fine, it's not broken. I said the only scenario in which this might break will be because of database didn't connect. But we do have that character limit, so I guess we could test that just to see. So I'm gonna just run into that limit right quick.
+
+[00:15:24]
+I think that's 255, that has to be 255. I can't tell, let's see. Yeah, okay, there we go. So we hit the limit. And right now this threw the error on create, but our database actually shut down. I mean, I'm sorry, our server actually shut down. So it looks like, let's see why that might have been.
+
+[00:15:46]
+That should have been caught, Here, so let's see, product, try, product, Why would this not have been caught? The only reason I could think this wasn't caught is because this handler belongs to a subrouter. And our error handler is on the main router stack. And that might be a reason, we can try, let's see what happens.
+
+[00:16:20]
+So let's go to router. And let's add an error handler here on the router. So we'll say router.user, I'm going to add an error handler here. And let's see what happens. That's my hypothesis, I guess. Let's see what happens. And res.json, 'in router handler', let's see, run that again.
+
+[00:17:00]
+Run that again. Yeah, that's exactly right. So because the handlers for all the resources that aren't user are in the subrouter, their errors aren't gonna bubble up to the main router's error handling. So if you have a subrouter, you also have to add an erro handler for that router at the bottom of those routes as well.
+
+[00:17:33]
+I forgot about that little gotcha. Cool, any other questions on error handling? Most of the stuff is mostly just the same. Obviously, the only thing that's probably slightly different would be the, Updates where there might be more than one query. So you have to do multiple try-catches, but still the same.
+
+[00:17:57]
+You just gotta think about why would this break, and what type of error would it be? Would it be caused by a user doing something? Hopefully our input validators eliminated most of what a user could do to cause our stuff to break as far as values are existing or not existing and types of values.
+
+[00:18:16]
+Or is it outside of our control, there's some logic in here that hits a third party API. We're talking to the Pokemon API and that broke, and that's why our thing broke, or is it a technical issue? The database connection stream broke, or we dropped the connection, right?
+
+[00:18:31]
+You gotta think about what and why would something break? And then plan for that, try-catch that, inspect the error, see what it is, and then handle it appropriately.
+

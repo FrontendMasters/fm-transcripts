@@ -1,0 +1,126 @@
+[00:00:00]
+>> So let's get to the fun part, finally actually making the handlers where we actually do database queries and stuff like that. Okay, let's go back to the course site. And basically, what we're gonna do with the handlers is very similar to what we did with the user handler that we created earlier.
+
+[00:00:22]
+So we're gonna create a new file inside the handlers folder for every single resource in which we have handlers for, which for us, there's only three more that we have. We have updates, products, and update points, so we're gonna make a file for each one of those. And we have to make an accompanying handler for each route that we already created, right?
+
+[00:00:44]
+So, for instance, for product, we need a handler for get product, get product by ID, put product by ID, post product and delete product by ID. So that's five handlers for each one of these, so it's 15 handlers we gotta make. The good news is, for the most part, they're relatively the same.
+
+[00:01:05]
+Kind of, but not really. They just have the same approach. It's just that the details are gonna be slightly different, as you saw when we were going through the inputs, like, maybe we shouldn't trust this, or maybe we should verify this. So you're never really gonna get it right the first time, especially when it comes to relational data and multi-tenancy databases and who has access to what.
+
+[00:01:28]
+But it's nice just to get the broad strokes and just to get it out there, and then you can kind of see from there what you need to do. Because even writing these queries, this is going to affect like how you would have to go back and make different indexes in a database, right?
+
+[00:01:44]
+Because an index is just an optimization around a query, but if you don't even know what queries you're gonna write, how do you know what to index? So typically this changes a lot, it just sends ripples throughout the whole app about things that you might have to change.
+
+[00:01:58]
+But like I said, we'll do the broad strokes and we'll mostly get it there. And we can talk about any compromises that we made or things we would have to do in a fully production environment. Cool, okay. Well, let's do it, so what we're gonna do is we'll start with some of them.
+
+[00:02:21]
+We probably could do products, maybe some of the updates together, and then I'll let you do the rest of them on your own, and you'll have just a lot of context to go off on, okay? So let's start with product. Go to handlers. Gonna make a new file here.
+
+[00:02:40]
+And we'll call it product.ts, like that. And I'm just gonna export some functions here. I'm gonna create one that says getProduct, or I'll say, getProducts, I should say, plural, and this will be the one for a GET request to /product. This will get you all the products for the signed-in user.
+
+[00:03:09]
+Not every product on the app because that wouldn't be good. It's a handler, so it takes a request and a response. I'm going to import Prisma here, From my db file that I created. It's gonna be asynchronous. And now, I gotta think about what query I need to make in order to get all the products for the user.
+
+[00:03:43]
+So let's think about that. Let's look at the schema. If I have a user, if I have a user's ID, how can I get all the products for that user? Well, I know a user has products array on it, that seems like the easiest go-to move. It's already there, and I know product has a belongsTo, which is a user.
+
+[00:04:04]
+So I could say, give me all the products where the belongsToId matches the user. There's two different ways you can do it, I mean, that's just denormalization. It depends on how you want to do it. I don't think there's a right or wrong at this point. I'm probably just gonna go with the user since it's already there.
+
+[00:04:22]
+So we're inside of a product's handler, but we'll be querying the user table. So that might seem weird, but when it comes to getting data from a database in a relational database, and sometimes this is basically the denormalization is. Sometimes you have to go a different path to get what you want versus going directly to the thing.
+
+[00:04:42]
+Because it might not be optimized in that way, which is, again, coming back to what I said about writing these handlers sometimes affects how you index things in your database because the queries can change that. So for now I'm just gonna go after users. You can go down to products if you want, it doesn't matter how you want to do it.
+
+[00:05:00]
+So I'm just gonna say const, I gotta get the full user because the user that's attached to req.user is not the full user. That only has the user's ID and the username, but it doesn't have all the other stuff on the user, so I actually have to query for the user again.
+
+[00:05:17]
+So I'll see await prisma.user.findUnique (). And then, if you're doing a query in Prisma, you have to use a where property. So where, and then what fields you wanna filter on. So where ID is req.user.id. And then outside of the where, I can say, include, like this, which is an object, and I can say, include: { products : true }.
+
+[00:05:57]
+And this will ensure that the products are joined. In the case of SQL, it's like it's joining the table, it's making sure the products come in. In the case of Mongo, this would be called, I haven't used Mongo in a while, there's a word for this in Mongo.
+
+[00:06:18]
+I can't, population. This would be a population in Mongo, so it's the equivalent of that. It's just like pull it in and ensure it's there, okay? So we have that. And then, now what we wanna do is, and you can even go further. You can say, include the products.
+
+[00:06:37]
+And then for the products include, what field does a product have, a name, you can say include a name field on a product if you want, or something like that. So it can get pretty deep, but we're gonna get the whole product. Okay, so now I can say, res.json({data}).
+
+[00:07:02]
+I always like to just send back an object with the data property on it. Because if I wanna client side, like for instance, I just send back the data without that, if I just say user.products here, If I just sent that back and I never prefixed the data that's coming back from the API, whenever the client gets this data, it's always gonna be a different shape.
+
+[00:07:27]
+In this case, it's an array, another thing, it would be an object, right? So always just to, for me, always just put an object with a data property, and then whatever data that's coming back goes there. And it also allows you to do things, like I can send back data, I can also send back errors if I wanted to.
+
+[00:07:44]
+I can also send back other things. I don't know what it is, whatever you want to send back. So it's just saying that's where the data is. And it's just a lot easier to check on the front end when you know that the data is always on that field versus this or that, yes?
+
+[00:08:00]
+
+>> Shouldn't it be product in the include instead of products?
+>> It depends on the schema. Let's see, your schema might be different. My schema is products, but if your schema is singular, product, then yeah, it would be, but this is dependent on yours. I pluralized mine because it's an array, so it bothered me not to have it pluralized.
+
+[00:08:24]
+That's the sweet thing about Prisma, it'll tell you. So if I put product, it'll tell me that's not right, because it's type checked. So if yours is telling you that it should be product, that's probably because you have product in your schema and not products. All right, so we got that.
+
+[00:08:40]
+Let's make another one. So, that's to get all the products, now let's get one product, and I'm gonna just comedies. I'm just gonna say, get all. The reason I'm putting comments here is so when you go look at this, I'm gonna push this up, and when you start working on your own, you'll know what theme to follow for the purpose.
+
+[00:09:03]
+Like, I need to do a get all, okay? It looks something like this, or I need to do a get one, it looks something like this, so that's what I wanna do, okay? So now for get one, we'll just say export const getOneProduct, that's gonna be async. (req, res).
+
+[00:09:34]
+How can we get one product? First of all, how do we know what product to get? Anybody wanna guess?
+>> With the ID?
+>> Yeah, with the ID, the ID on the URL, the parameter here. We know what product to get is because you should have given us an ID.
+
+[00:10:04]
+And if you didn't give us an ID, this route wouldn't have even been triggered and this function wouldn't be running in the first place. So it can only run unless you do a get request to /product/ anything after that, which we're assuming is an ID. So how do we access that?
+
+[00:10:22]
+Well, we can get the ID from the request object, so Id would be req.params.Id. Params is the query, or not the query parameter, the route parameter, here, and parameter's just a colon. So that one middleware that we added in the server, that's called urlencoded, it's doing that basically.
+
+[00:10:48]
+So it's turning the parameters to an object for us, and the query string and all that stuff. So we have our id. So now that we have our id, we can query the product table, or the product collection, if you're using Mongo, to find a product that belongs to the signed-in user and has this id.
+
+[00:11:18]
+Right, because I guess we could just query for the id, but wouldn't that mean anybody could just send any product id?. And we query for it and send it back, right? So we have to make sure it's scoped to the signed-in user and it's this d. And if you go look at our schema, we don't have an index for that, we didn't tell our schema, hey, you need to index for a product id and a combination of a belongsToId.
+
+[00:11:51]
+So this is why I said your queries usually make you go back and change your indexes. So we would have to come here and do something like index, like id and belongsToId for this query to work. Well, it will still work without the index, but if you want it to be optimized, you have to do that.
+
+[00:12:13]
+But that's advanced database stuff, [LAUGH] you probably don't have to concern yourself with that. I'm just trying to give you the pro-tips, okay? Anyway, let's do the quarter, so we can say product = await prisma.product.find. I guess we'd say find first. If we had the index, I guess we could do findUnique, maybe we can still do findUnique, let's see what happens.
+
+[00:12:42]
+So we'll say findUnique where, id is id, and belongs, yeah, it's not letting me do it, yeah, we gotta do find first, that's what I thought. So fine first, id is Id and then belongsToId is req.user.id, and we're gonna send it back, res.json({data: product}). Right now, we've been naive intentionally about whether or not a product is there, whether or not it errored out or not, we're gonna handle errors later.
+
+[00:13:20]
+But right now, just assume that it always works. [LAUGH] There's never gonna be an error and there's never gonna be a problem. So if you're wondering why we're not checking this stuff, it's because we will, just not right now. Yes?
+>> What's the difference between findFirst and findUnique?
+
+[00:13:44]
+
+>> So findFirst, it's more like a, So you can't, maybe there's some fields where you can't index. For instance, when you're doing like faceting or filtering, like I need to find a combination of certain things that aren't indexed. And there could be many, maybe I have 100 products and 10 of them have the same name.
+
+[00:14:09]
+I wanna find the first one that matches this name. Whereas findUnique is saying there's only one product ever in the database that has this combination. And it basically just tells Prisma how to write the query differently, right? How you query for multiple things that could be the same versus how you query for something that's guaranteed to be unique is gonna be different.
+
+[00:14:34]
+Because databases treat unique things differently than they treat non-unique things. So ultimately, it's probably gonna come down to speed. But the way you should think about it is, because we don't have a unique index on this, technically the database is convinced that there might be more than one instance of this combination.
+
+[00:14:53]
+So we're saying find the first one of it. But if we index these, this would actually be unique and we could probably just do findUnique and get that optimization from the database. Not having to scan the entire collection or the entire table to find our thing. I guess the difference is like saying findFirst is loop through an array and find the first thing that matches.
+
+[00:15:15]
+Whereas findUnique is go to this object to this key and grab me the thing at that key, that's the difference.
+

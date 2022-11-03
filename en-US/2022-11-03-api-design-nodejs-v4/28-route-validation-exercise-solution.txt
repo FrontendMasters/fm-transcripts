@@ -1,0 +1,145 @@
+[00:00:00]
+>> Okay, so what we'll do is, I wanna give you some time to go through and follow the exact steps that I just did, which was one, identify where an input validation needs to exist. So we're talking a put, we're talking a post. Two, identify what the resource is, so a product or an update.
+
+[00:00:28]
+The reason you've got to do that is because you have to go to the schema to understand what it is on that resource, That you need to create or that you can use to update, so you know what validations to make, right? And then lastly, create an input validator or many input validators for that route.
+
+[00:00:51]
+So remember, this is middleware, so I can add as many of them as I want, it doesn't matter, I just gotta add a comma. So you can add as many of those as you want, or you can put them in an array, it doesn't matter. It doesn't have to be one, as long as they come after the route and before the handler Let's just go ahead and validate these routes.
+
+[00:01:19]
+So first thing I'm gonna do is, I noticed that this piece of code here, where we get the validation results, we check to see if the errors are there. And if they are, we send back a 400 with errors, that's gonna be the same, no matter what route.
+
+[00:01:39]
+I mean, there's nothing specific to product in this piece of code anywhere. It's just gonna be the same no matter where you do this. So I'm actually gonna turn this into a middleware that we can use after our validation middleware, so I don't have to rewrite every single time.
+
+[00:01:56]
+So I'm gonna go into over here, I'm gonna go into our modules, I'm gonna make a new file called middlewares. Or middleware, I guess, I don't know if that's plural, whatever. And I'm gonna export, A new function here. I'm gonna call it handleInputErrors, I guess, or something like that.
+
+[00:02:27]
+And it's gonnaa be middleware. Right, and all its gotta do is this, it's gonna copy this code here, bring it over, Import(Validation Result). And if that's not the case, then it'll just call next to go on to the handler. So now ,all I have to do is just add this handleInputErrors middleware after any of the input in middleware that I'm going to write for any of the routes.
+
+[00:03:16]
+Again, this is just one of the a million ways. We're gonna talk about error handling later, that's probably gonna contradict this. There's just so many different ways on how to handle things and they're all very flexible. So this is just how I see it, because I would hate to have to copy and paste this so many times, and then go back and like, actually, I wanna send back a 402 for some reason.
+
+[00:03:41]
+And then I gotta go change 402 everywhere, it would just suck to do that over and over. So I'm just gonna put it in its own little thing. All right, so now I'm gonna go back to the router, and I can get rid of this thing here. And instead, I can say, handleErrorInputs like that, and it should do the same thing.
+
+[00:04:11]
+So I'm gonna give that a try, just to make sure that that works, and then we'll continue on. So I'm gonna start my server. Go back to Thunder Client, Try to do this again, and yeah, it still works, everything still works the same. So this is a great use case of middleware, of just sitting before a handler, trying to protect it.
+
+[00:04:37]
+Because the thing I'm always optimizing for, the thing I'm always thinking about, is how do I ensure that the handler is only doing business logic and nothing else? I just don't want it to do anything else, because once you actually start writing big handlers, like, this thing has to create a user.
+
+[00:04:57]
+And then it has to create a customer on stripe, and then it has to subscribe them to a subscription, and then it has to send off analytics. That handler is gonna get so beefy, the last thing that I wanna do is like, and you also gotta check for inputs, and you also have to do a log, and you also have to do, it just gets tedious.
+
+[00:05:16]
+And then, if you wanna change how you report to analytics, but you wrote it in 30 different handlers, we have to change it in 30 different places. Whereas if you wrote it in one middleware, you only got to change it in that one middleware. Okay, so the next one would be a post for a product.
+
+[00:05:33]
+So what do you need to create a product? I don't know, let's see. I think we need a name, and we need a belongs to ID. Okay, now, let me ask you this, should the user send up the user ID along with a name that we will associate this product with?
+
+[00:06:00]
+Should we trust the ID that the user sends up as the ID that we associate this product with, why not?
+>> Because they can send anything, they can send my ID.
+>> Right, they can send anyone's ID.
+>> Never trust the user.
+>> Right, not so, right, we don't want them to send us an ID.
+
+[00:06:21]
+The ID that we're gonna assign to this product is the ID of the signed in user, which is, remember, we already have, this is the power of middleware, we already have a middleware that does that, right? If we go to auth, that's what this protect middleware does, It figures out who is the user that's making the request, right, and it attaches it here to req.user.
+
+[00:06:45]
+So if we needed to know what ID to add to the product, it would be on req.user.id and not req.body.id, because we can't trust that ID. That can be any ID, and if we just assign that to the product, some user is now creating products for another user.
+
+[00:07:05]
+I don't know why they would do that, but that's what would happen. Because we have a multitenant database, we have to be very careful about whose information we're touching and ensuring that it's scoped to the signed in user. So when it comes to user information, only ever trust this user.
+
+[00:07:22]
+Don't trust the user that information that they're sending up, cuz you just don't know. Yeah, so that was a tricky one, but it comes with lots of mistakes. [LAUGH] I remember I made this product one time that did not do things like that. And people were just changing each other's stuff all the time, and I was like, I have no idea what's going on, cuz I just didn't do those checks.
+
+[00:07:46]
+And yeah, it was very, very wild. Okay, so for that, just means we won't be doing a check for belongs to, that's not something we wanna check for, because we don't want you seeing that at all. In fact, we could probably do a check that says, if you do send it, throw an error, but we're not gonna check for that, so instead, we're just really just gonna use the same thing.
+
+[00:08:06]
+There's a name and handleInputErrors, so we'll do that. And then we'll keep moving for updates. So for update, we gotta put, update's a little more sophisticated than a product, cuz it has a title, a body, Status, well, status is default, so I guess that's not required at least.
+
+[00:08:37]
+And then version and asset are also not required, and then it has a product ID. Now, should we trust the product ID that a user would send up to associate with this update? That's a trick questions, seeing how I just talked about how not to trust users.
+>> We can, but we need to check whether this product belongs to that user or not.
+
+[00:09:05]
+
+>> Exactly, yes, we can trust it only if we verify that the product ID that they sent up actually belongs to the user that is making the request, and then we can associate it. Because we actually don't have any other place to get the ID, so you would have to give it to us.
+
+[00:09:23]
+We don't know what product you wanna assign this to. So yeah, we can, but then we also have to verify. So it's just those little things that have to happen. And this is why I try to keep the handlers very light, because you have to do all this stuff inside of them.
+
+[00:09:39]
+And the last thing you wanna do is, I'm also checking to see if they sent me a field. So yeah, I see you've been in the trenches before [LAUGH].
+>> I already burned my fingers.
+>> Right, so for put. On update, we want, yeah, so all the things you can update on an update would be a title, a body, a status, a version, an asset.
+
+[00:10:11]
+Probably not gonna let you update the product, because an update belongs to a product, why would it belong to another product eventually? That's kinda weird. I can't even think of a UI that would say, change, no, that wouldn't even make sense. So we won't add that to update.
+
+[00:10:27]
+So let's go back to our route here, and let's do that. So I'm gonna say body, Title, sorry, did I get rid of that? There we go. Body, title, we have, I think there's an exist, yeah, so you could do exist. But I think we want these to be optional, so body isOptional.
+
+[00:10:59]
+I think there's optional by default. No, there it is, optional, there we go. Okay, so we got that, and then we have body, Body, I was like, I know it's called something, and then that's also optional. And then we have, Body. What was the other one? Status, version, and asset.
+
+[00:11:41]
+Status, Version, And asset. Well, I guess asset would be different, because this will be an image upload and you wouldn't know the URL for it, so maybe not, that's something different, it's like, you're gonna upload something. Okay, this thing is super long, let me just bring this on to the next slide.
+
+[00:12:21]
+Okay, and that's still, there we go. So as you see, this is just getting long. This is why, as we said earlier, you probably wanna put this in another file or something like that. So it's not just for the same thing of maintaining your handlers and keeping them.
+
+[00:12:39]
+You probably want your routes to just to do route stuff and not have all this fluffy middleware stuff hanging around. So maybe you would put this somewhere else in input. It's separate inputs file and you just import them in, had to do that before, yes.
+>> With status, don't we have to validate to make sure it's one of the options provided, or do we let [INAUDIBLE] handle that?
+
+[00:13:03]
+
+>> That was literally just about to ask that question, great question. I was gonna ask if anyone handled that with status being an enum or not. Anyone figured out how to only choose one of the different types of statuses that's possible for the update, which in this case will be IN_PROGRESS, SHIPPED, or DEPRECATED?
+
+[00:13:28]
+No, no one tried it. Well, I do believe that there is a .one, it's oneOf, I believe. Pretty sure, there's, let's see, pretty sure there's a .one, Or, I'm sorry, I think it's you gotta do oneOf first, there we go. So oneOf, and then you can say body.
+
+[00:14:04]
+Let me see, what's the names of them? There we go, IN_PROGRESS, SHIPPED. PROGRESS, you gotta put an array, I'm sorry, there we go. So (IN_PROGRESS), body, (SHIPPED) and then body, what was the last one, DEPRECATED, yeah. So yeah, that's how you would say that, so it would just be one of these.
+
+[00:14:41]
+
+>> This'll think optional's a method call?
+>> Is it? Yeah, I guess that makes sense, is you could do chaining.
+>> One last note, version, line 31, missing the S.
+>> For the oneOfs, do we still have to refer to the status?
+>> Yeah, so I think the way that it works is you can say, status first like this, and then comma oneOf, there we go.
+
+[00:15:10]
+As you can see, this can get pretty crazy. The more complicated these get, the more you can just, they have like a, we can just write a schema, and you can just check it against an entire schema if it starts to get too complicated like this. So that's another way to do it as well, thought about doing it that way, but for the most part, it's an overkill.
+
+[00:15:45]
+Okay, and then for post, it's pretty much the same thing, except for some of these things just aren't optional, so I'm just gonna just copy this whole thing. And, Can you go to the next line? Yeah, it's almost the same thing, except for, yeah, the title is definitely not optional, you have to give us a title, which is gonna be exists.
+
+[00:16:06]
+And you have to give us a body which exists. You can say isString too if you wanna go all in on it. There's really no limit to it. For the status, you don't have to give us that, because we do a default one, so that's fine. The version is also default, so I think that's fine as well, and, What's that?
+
+[00:16:39]
+Okay, I will look into that. Yeah, I think we're fine with just these two here on that. And then for our updatepoint, I figured those. We just need a name and a description, For the update, so let's do that. So for put on an update, we could just say, body, Name, we do our optional, isString if you really wanna get all that in there, And then body., I'm sorry, description, Dot optional().isString.
+
+[00:17:40]
+And let me break these down on multiple lines Okay, and then lastly, for creating an updatepoint, We'll just do this. Pretty much mostly the same, the only difference is, you would have to send up the update ID, so body (updateId).exists().isString. And these are not optional anymore. There we go.
+
+[00:18:35]
+I actually think there's a better way to do oneOf, and I wanna look it up cuz it bother me
+>> Chat, reporting a couple of errors with oneOf.
+>> Yeah.
+>> And if you check the documentation on it, there's a check method.
+>> I guess you don't even really need oneOf, that's what I was trying to figure out.
+
+[00:18:54]
+I think you could just do, body(status).isIn. And then you can do that. So it's gotta be one of these, I misspelt status. Like this. So you say IN_PROGRESS, SHIPPED, DEPRECATED. I guess it's how I've always done it. The oneOf thing, pretty cool, but never really used that one.
+

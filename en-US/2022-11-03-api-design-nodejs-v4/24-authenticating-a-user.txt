@@ -1,0 +1,95 @@
+[00:00:00]
+>> So we got that. Now, we need to do the same thing for sign in. So let's do the same thing for sign in. So export const sign in request response. Let's think through this. Create new user, make sense. We took the username and the password you gave us.
+
+[00:00:20]
+We hash that password. We've got to use it from the database. Assuming it works, created a token from it and sent you back the token. I was signed in work.
+>> We have to get the token from the request added?
+>> No, no token yet, sign in, just like creating a user also issues a token.
+
+[00:00:44]
+They're signing in because they don't have a token. Yep, so no token yet.
+>> And just one question. In the token, we are putting the user object and user object will have the password, right?
+>> It does but we specifically said in our create that we're only putting the ID and the username.
+
+[00:01:04]
+Yeah, we pass the whole user object but we don't use all the properties on it, yeah. Good call, yeah, you don't wanna put the password on a JSON web token. Yeah, that would be bad, yeah. I mean, let's just think about it. What does it mean to even sign in?
+
+[00:01:21]
+
+>> That we need the username and password.
+>> We need the username and password cuz, I mean, think about you're on a sign in form. Don't you type in your username or email password? Okay, what do you think is happening with that? How do they know?
+>> Checking something.
+
+[00:01:37]
+
+>> Yeah, what is it checking? What do you think? What's being checked
+>> If your name and the password exists somewhere.
+>> Okay, so there's a user with this username in the database. Okay, cool, I found you. You're in the database. But how do I know you're you?
+
+[00:01:52]
+Anybody couldn't do your username? How do I know you are you?
+>> Your password is unique to your name.
+>> Okay, so password, let's talk about password. What am I looking at your password at? Look at this line right here, right? I'm gonna compare the password you sent up when you signed in to the hashed password that this user has in the database.
+
+[00:02:17]
+And if they match, you must be who you say you are, right? Cuz I already found you by username, so you exist and your password matched what was in the database if I hashed it again. So either you got this person's password or you are who you say you are, so that's what we're gonna do.
+
+[00:02:36]
+I love the way you think. So let's do that. So first, let's find the user. So user would be await.prisma.user.findUnique and you put an object in there with a where property. I need an async. So I'm saying prisma.user.findUnique where, and I could say where username is gonna be, req.body.username.
+
+[00:03:11]
+You gotta send me your username if you wanna sign it. I'm not going to pass password here. The reason I'm not gonna pass password here is because it would not find the password. Because the password that you're sending up on sign in is a plain text password, but the password that's in the database is a hash password.
+
+[00:03:29]
+They would never match, so I can't put password here. You might say, why won't you just hash the plain text password and search the database for a combination of a user that has this username and that has password? Yeah, I could do that. But then we'd have to go back to indexing and we'll have to put an index on a password, which would probably be really expensive in every way you could think of.
+
+[00:03:52]
+So it's probably not the best use case to index a password. Think something that changes frequently and there's a better way to do it and that's why we made that helper function. So we're not gonna query for a combination of a username and a password. Instead, we're just gonna see if there's a user period with this username.
+
+[00:04:11]
+We're not saying this you yet. We're just saying, is there even a user with his username? That's first step. Second step is, okay, I'm gonna look at that user's hashed password and see if it matches the password that you pass me in plain text. If those things match, when they're both hashed, you must be who you say you are.
+
+[00:04:28]
+Cuz you have the right username and you have the password that match that username. So that's what we're gonna do. So I'm gonna say const isValid. And I'm gonna say await comparePasswords. And the first password is the plain text one. So I'll say req.body.password and the second one is the hash which would be user.password.
+
+[00:05:06]
+Okay, and I can say, if not is valid, then you just knew someone's password and tried to sign in but you didn't have the right. Someone's trying to hack your account. That's what's happening, or you just fat fingered your password, one of the two. So if not is valid and I can be, yeah, get out here.
+
+[00:05:28]
+Res.json401, res.status401, which means not authorized and I can send a message if I want to. Nope, and I'm gonna return, cuz I don't want it to continue. But if it is valid, cool. You are who you say you are, everything checks out. Let me go ahead and create your token right quick.
+
+[00:05:54]
+And send you that token back so you get access to the rest of the API.
+>> Just one question. When we are doing the compare password, why we need to do async because it should be in the memory later comparing or?
+>> Yeah, so that's a great question, so why don't we do async?
+
+[00:06:10]
+It basically comes down to how bcrypt is designed. So bcrypt has three different ways to do these methods. You could do them synchronously, but you specifically have to say compare sync or hash sync, and then it synchronously. If you don't do that, you'll get the asynchronous version which, by default, returns a promise.
+
+[00:06:29]
+Both of these return a promise. Or you can just pass a call back into it that old school that way but I'm not doing that. So I'm gonna use the async await cuz this is a promise and this is a promise but, yeah, you're right. You can do it in memory if you pass sync, yeah.
+
+[00:06:46]
+
+>> And another question is in the Prisma, while we are doing the where clause.
+>> Yes, the where clause here.
+>> Yeah, directly taking the value from request body.username. Does it secure the, I mean, taking the time.
+>> You know too much, so no, there is no input validation happening right now on the body.
+
+[00:07:09]
+That is something that we're gonna talk about tomorrow. But yeah, right now, no, we're trusting the user.
+>> Some of the ORM does the, I mean, input.
+>> Yeah, some ORMs do input validation. I think there's some things you can do in Prisma. To do that, I know a Mongo, you can write middleware and Mongo schema to validate different things.
+
+[00:07:33]
+I don't even do that stuff in SQL. There's some things but I don't know whether Mechanism and Prisma that allows you to do that. But regardless, we would probably validate inputs in a middleware anyway. We would just throw in a middleware on the route somewhere that would validate those inputs before they even got to the handler.
+
+[00:07:53]
+Because my philosophy is, I want the handlers to not even think about off. I don't want them thinking about validations. I don't want them thinking about inputs. I just want them to, by time they execute, they can assume everything is right. Because all the middleware before them did all the other stuff, right?
+
+[00:08:10]
+That way, you're not repeating the logic in every single handler that you have. Check to see if the user's there. Check to see if the input's good. You're gonna do that copy and paste over every single handler was used. Put that on one middleware, then that's just the middleware's job, and the handler is protected.
+
+[00:08:26]
+So you know when a handler was called. It was a correct API call and not you just separate your business logic from the other logic, basically.
+

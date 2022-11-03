@@ -1,0 +1,974 @@
+WEBVTT
+
+1
+00:00:00.750 --> 00:00:02.631
+We're gonna talk about authentication and
+
+2
+00:00:02.631 --> 00:00:05.539
+it's gonna be the first time we
+interact with the database as well.
+
+3
+00:00:05.539 --> 00:00:08.936
+So we don't just want
+anyone using our API.
+
+4
+00:00:08.936 --> 00:00:13.987
+Like yes calls is cool because it
+doesn't think about cores that like it
+
+5
+00:00:13.987 --> 00:00:19.122
+allows you to prevent different IP
+addresses or different requests that
+
+6
+00:00:19.122 --> 00:00:24.190
+have specific headers or different
+type of methods from interacting.
+
+7
+00:00:24.190 --> 00:00:27.936
+But it doesn't tell you who the person is,
+what role they might have,
+
+8
+00:00:27.936 --> 00:00:31.572
+if their account is in good standing
+like it doesn't tell you that.
+
+9
+00:00:31.572 --> 00:00:36.151
+It's just saying if this request is
+even able to make a request that's what
+
+10
+00:00:36.151 --> 00:00:36.810
+calls is.
+
+11
+00:00:36.810 --> 00:00:38.342
+It's typically called a pre-flight check.
+
+12
+00:00:38.342 --> 00:00:43.680
+It's like the browser sends off a API
+calls to your server ahead of time.
+
+13
+00:00:43.680 --> 00:00:46.900
+Let's say you wanna make a post
+request to Stripe's API.
+
+14
+00:00:46.900 --> 00:00:49.508
+The browser will go to
+Stripe's API first and be like,
+
+15
+00:00:49.508 --> 00:00:51.900
+is this client allowed to
+even talk to you Stripe?
+
+16
+00:00:51.900 --> 00:00:56.016
+And then Stripe will respond back,
+what a chorus option saying like,
+
+17
+00:00:56.016 --> 00:00:58.051
+these are the things that I allow.
+
+18
+00:00:58.051 --> 00:01:01.607
+When the browser says like yeah this
+client fits that then the browser
+
+19
+00:01:01.607 --> 00:01:03.029
+will send off your request so
+
+20
+00:01:03.029 --> 00:01:06.369
+they actually makes two requests
+when it does that in the browser.
+
+21
+00:01:06.369 --> 00:01:08.662
+Okay that isn't the same
+as authentication,
+
+22
+00:01:08.662 --> 00:01:12.426
+authentication is like okay now that
+your request actually got accepted and
+
+23
+00:01:12.426 --> 00:01:16.860
+you can go forward, who are you again
+like that's authentication, who are you?
+
+24
+00:01:16.860 --> 00:01:18.076
+Are you allowed?
+
+25
+00:01:18.076 --> 00:01:19.646
+What do you allowed to do?
+
+26
+00:01:19.646 --> 00:01:22.051
+What is your information what is your ID?
+
+27
+00:01:22.051 --> 00:01:25.970
+So, we want to add authentication,
+because our database is multi tenant,
+
+28
+00:01:25.970 --> 00:01:28.080
+what is multi tenant mean?
+
+29
+00:01:28.080 --> 00:01:31.469
+It just means that we don't have
+one database for every user,
+
+30
+00:01:31.469 --> 00:01:35.249
+there's one database and it's got
+every user is on that database and
+
+31
+00:01:35.249 --> 00:01:38.330
+every users information
+is on that database.
+
+32
+00:01:38.330 --> 00:01:42.327
+So we have to be very careful that
+we don't let some users see some
+
+33
+00:01:42.327 --> 00:01:44.470
+other users data.
+
+34
+00:01:44.470 --> 00:01:45.707
+So how do we do that?
+
+35
+00:01:45.707 --> 00:01:50.144
+How do we make sure that user one
+only sees user one's data and
+
+36
+00:01:50.144 --> 00:01:51.808
+not user two's data?
+
+37
+00:01:51.808 --> 00:01:53.349
+Because they're in the same database.
+
+38
+00:01:53.349 --> 00:01:58.559
+So it's like, well, we needed a way to
+identify what users make an API call,
+
+39
+00:01:58.559 --> 00:02:03.020
+so we can scope all their queries and
+rights, to the user.
+
+40
+00:02:03.020 --> 00:02:04.223
+How do we do that?
+
+41
+00:02:04.223 --> 00:02:06.330
+Well, that's where
+authentication comes in.
+
+42
+00:02:06.330 --> 00:02:11.220
+We can, now identify and
+authenticate someone, based off something.
+
+43
+00:02:11.220 --> 00:02:16.049
+So the pros are we're gonna do,
+its called a JWT, or JSON Web Token or
+
+44
+00:02:16.049 --> 00:02:18.350
+some people pronounce it jot.
+
+45
+00:02:18.350 --> 00:02:21.131
+I'm never gonna say that,
+I refuse to call it a jot.
+
+46
+00:02:21.131 --> 00:02:24.520
+It's a JWT, or
+it's a JSON Web Token in my book.
+
+47
+00:02:24.520 --> 00:02:27.117
+But if you want to call it jot,
+you can call it that.
+
+48
+00:02:27.117 --> 00:02:29.178
+What is a JSON Web Token?
+
+49
+00:02:29.178 --> 00:02:31.500
+Well, you don't need to
+be a crypto expert, and
+
+50
+00:02:31.500 --> 00:02:34.402
+I'm not talking blockchain
+crypto talking cryptography.
+
+51
+00:02:34.402 --> 00:02:37.270
+[LAUGH] You don't need to be
+a cryptologist to understand
+
+52
+00:02:37.270 --> 00:02:38.280
+a JSON Web Token.
+
+53
+00:02:38.280 --> 00:02:44.130
+It's basically TLDR, take a JavaScript
+object or whatever you want on it and
+
+54
+00:02:44.130 --> 00:02:48.810
+that JavaScript object,
+given a secret, which is a string,
+
+55
+00:02:48.810 --> 00:02:53.400
+can deterministically be
+converted to some random string.
+
+56
+00:02:54.780 --> 00:02:59.978
+And that string can be converted back to
+the same object given the same secret.
+
+57
+00:02:59.978 --> 00:03:04.620
+It's almost like hashing but not quite I'm
+not a scientist so don't quote me on it.
+
+58
+00:03:04.620 --> 00:03:09.445
+But I can deterministically always get
+the same result to and from that string in
+
+59
+00:03:09.445 --> 00:03:13.774
+that object if I use the same secret and
+that's what a JSON Web Token is.
+
+60
+00:03:13.774 --> 00:03:17.980
+The reason we do that is because we don't
+have to store anything on a server.
+
+61
+00:03:17.980 --> 00:03:22.272
+The alternative would be something like
+a session where you have to keep track of
+
+62
+00:03:22.272 --> 00:03:26.179
+who's logged in and your API right now,
+which just eats up resources and
+
+63
+00:03:26.179 --> 00:03:29.535
+then you got to do session management and
+I don't wanna do it.
+
+64
+00:03:29.535 --> 00:03:33.727
+JSON web token, the client stores the
+token on their own client and then he's
+
+65
+00:03:33.727 --> 00:03:37.939
+got to sit with every single request
+because the service is going to check it.
+
+66
+00:03:37.939 --> 00:03:40.613
+Every single request is like,
+yeah, we got to check,
+
+67
+00:03:40.613 --> 00:03:43.694
+if you are the same person every time and
+that's annoying, but
+
+68
+00:03:43.694 --> 00:03:47.200
+it's better than storing whether or
+not you're logged in or not.
+
+69
+00:03:47.200 --> 00:03:50.870
+So it's a trade off,
+we'll be using JSON Web Tokens.
+
+70
+00:03:50.870 --> 00:03:53.040
+So let's create some JSON Web Tokens.
+
+71
+00:03:53.040 --> 00:03:55.790
+First, we need to download some things.
+
+72
+00:03:55.790 --> 00:03:58.438
+So we're going to npm
+install all of these goodies.
+
+73
+00:03:58.438 --> 00:04:03.040
+So npm install we go here and
+do this here.
+
+74
+00:04:04.170 --> 00:04:10.430
+Npm install jsonwebtokens,
+all lowercase plural bcrypt and dotenv.
+
+75
+00:04:10.430 --> 00:04:13.542
+If bcrypt doesn't install
+on your computer cuz
+
+76
+00:04:13.542 --> 00:04:18.443
+sometimes it doesn't why don't mind
+just I think it's jsonwebtoken,
+
+77
+00:04:18.443 --> 00:04:22.590
+sorry not tokens if bcrypt
+doesn't install on your computer.
+
+78
+00:04:23.590 --> 00:04:27.168
+For some reason it like there's
+issues with like, older Intel's or
+
+79
+00:04:27.168 --> 00:04:30.880
+newer in ones like there's sometimes
+issues that that doesn't work.
+
+80
+00:04:30.880 --> 00:04:34.039
+There's an alternative that has the same
+API that usually works let me know,
+
+81
+00:04:34.039 --> 00:04:34.680
+we can find it.
+
+82
+00:04:35.710 --> 00:04:43.274
+But yeah, install those jsonwebtoken,
+singular, bcrypt and dotenv.
+
+83
+00:04:43.274 --> 00:04:47.124
+We're gonna create a new file a new folder
+and a file we're gonna create a new folder
+
+84
+00:04:47.124 --> 00:04:50.327
+called modules and we're gonna make
+a new file in there called auth.
+
+85
+00:04:50.327 --> 00:04:55.069
+So I'm gonna go inside of source
+we're going to folder we'll call it
+
+86
+00:04:55.069 --> 00:04:59.584
+modules inside of modules I'm
+gonna get a file called auth.ts.
+
+87
+00:04:59.584 --> 00:05:04.933
+So this is just kind of my approach I
+typically create like a utils folder or
+
+88
+00:05:04.933 --> 00:05:09.680
+I don't always give it some random
+name I've been using utils for
+
+89
+00:05:09.680 --> 00:05:14.371
+awhile I recently switched over
+the modules cuz I like the icon.
+
+90
+00:05:14.371 --> 00:05:22.153
+So [LAUGH] yeah they're called
+modules now, so, there you go.
+
+91
+00:05:22.153 --> 00:05:25.815
+But yeah, I like to put my auth stuff in
+one file versus like having it sprinkled
+
+92
+00:05:25.815 --> 00:05:27.120
+all across the app.
+
+93
+00:05:27.120 --> 00:05:30.990
+Because they typically rely on each other,
+like all things rely on each other anyway,
+
+94
+00:05:30.990 --> 00:05:33.907
+so I put them in one file,
+even though they're like functional,
+
+95
+00:05:33.907 --> 00:05:35.142
+they do different things.
+
+96
+00:05:35.142 --> 00:05:37.662
+One might be a middleware,
+one might be a handler,
+
+97
+00:05:37.662 --> 00:05:40.720
+one might be some utility function,
+but they're all off.
+
+98
+00:05:40.720 --> 00:05:43.127
+So I'll put them in one file
+that might not be your flow.
+
+99
+00:05:43.127 --> 00:05:47.451
+You might wanna put all middleware in
+one file, all handlers in one file,
+
+100
+00:05:47.451 --> 00:05:49.230
+all whatever in one file.
+
+101
+00:05:49.230 --> 00:05:53.930
+I like to do I don't like to box myself
+into one thing I just do what feels right
+
+102
+00:05:53.930 --> 00:05:58.790
+and from my experience, I hate having
+ten files open to deal with all changes.
+
+103
+00:05:58.790 --> 00:06:00.654
+I just rather have one file open and
+
+104
+00:06:00.654 --> 00:06:04.390
+it's usually off that has all
+those changes all the time.
+
+105
+00:06:04.390 --> 00:06:08.680
+Like for Jacob's computer, make sure
+you turn off the auth and like okay,
+
+106
+00:06:08.680 --> 00:06:11.280
+then it's like, I just want this one file.
+
+107
+00:06:11.280 --> 00:06:12.756
+Like I don't feel like doing all this.
+
+108
+00:06:12.756 --> 00:06:14.778
+Okay, so
+we're gonna do this stuff on one file.
+
+109
+00:06:14.778 --> 00:06:19.109
+So a couple things we're gonna do is first
+we're gonna create a function to create
+
+110
+00:06:19.109 --> 00:06:20.065
+a JSON Web Token.
+
+111
+00:06:20.065 --> 00:06:26.771
+So let's do just that auth.js,
+we're gonna import JSON,
+
+112
+00:06:26.771 --> 00:06:31.513
+I'm gonna call it jwt from JSON Web Token.
+
+113
+00:06:31.513 --> 00:06:35.114
+I gonna export const createJWT, and
+
+114
+00:06:35.114 --> 00:06:41.450
+remember JWT is basically
+converting an object to a string.
+
+115
+00:06:41.450 --> 00:06:46.274
+So we need an object,
+we want this object to
+
+116
+00:06:46.274 --> 00:06:50.970
+be something that is unique about a user.
+
+117
+00:06:50.970 --> 00:06:55.319
+So when we undo the string and
+turn it back to an object, outcomes,
+
+118
+00:06:55.319 --> 00:06:59.609
+that unique thing about the user
+that we can use to identify user.
+
+119
+00:06:59.609 --> 00:07:02.752
+So what is something unique about a user
+that we can use to identify a user?
+
+120
+00:07:02.752 --> 00:07:03.426
+ID?
+
+121
+00:07:03.426 --> 00:07:04.812
+Yeah, it will be an ID and
+
+122
+00:07:04.812 --> 00:07:08.379
+also any other unique thing on
+the user which will be a username.
+
+123
+00:07:08.379 --> 00:07:12.310
+So I'm gonna put a username and
+an id in the JSON Web Token.
+
+124
+00:07:12.310 --> 00:07:14.127
+So later on when I get back to user,
+
+125
+00:07:14.127 --> 00:07:17.450
+once someone's trying to access
+API I could be who are you?
+
+126
+00:07:17.450 --> 00:07:22.525
+You're user ID whatever,
+you're user with the username whatever.
+
+127
+00:07:22.525 --> 00:07:26.742
+So whatever I put on a token needs to be
+useful for me identifying them later.
+
+128
+00:07:26.742 --> 00:07:29.742
+Sometimes if you have role
+based access Arbok or
+
+129
+00:07:29.742 --> 00:07:34.017
+something you would put the role of
+the user in the JSON Web Token to so
+
+130
+00:07:34.017 --> 00:07:38.901
+you can quickly check to see if they have
+the right role to do something right?
+
+131
+00:07:38.901 --> 00:07:40.996
+We don't have that so
+we're not doing that.
+
+132
+00:07:40.996 --> 00:07:45.488
+But typically you want to keep the JWT
+light the more that's up the more that's
+
+133
+00:07:45.488 --> 00:07:49.180
+on the payload the longer the string
+gets so try to keep it light.
+
+134
+00:07:49.180 --> 00:07:54.210
+Cool create JWT it's gonna take a user and
+
+135
+00:07:54.210 --> 00:07:57.515
+then we're gonna say JWT or
+
+136
+00:07:57.515 --> 00:08:02.700
+we gonna say token=jwt.sign like that.
+
+137
+00:08:02.700 --> 00:08:04.382
+It's gonna take two arguments
+is gonna take an object.
+
+138
+00:08:04.382 --> 00:08:08.747
+So the payload in this case
+a ID with a user ID, and
+
+139
+00:08:08.747 --> 00:08:13.553
+then a user name, but
+a user.username, like that.
+
+140
+00:08:13.553 --> 00:08:18.094
+And then a second argument is
+a secret you cannot sign or
+
+141
+00:08:18.094 --> 00:08:22.550
+verify JWT without having
+that sprinkled in secret.
+
+142
+00:08:22.550 --> 00:08:26.918
+So what we're gonna do is we're gonna go
+to our EMB file under our database we're
+
+143
+00:08:26.918 --> 00:08:31.751
+going to make JWT_SECRET, and you can put
+whatever string you want, doesn't matter.
+
+144
+00:08:31.751 --> 00:08:35.038
+You can call it whatever you want,
+I'm gonna put cookies,
+
+145
+00:08:35.038 --> 00:08:37.030
+I ate a bunch of cookies last night.
+
+146
+00:08:38.320 --> 00:08:42.680
+I ordered some insomnia cookies, they came
+late, and then they sent me another one.
+
+147
+00:08:42.680 --> 00:08:44.600
+So I had 12 cookies and I ate them all.
+
+148
+00:08:44.600 --> 00:08:51.532
+So I'm not ashamed, I'm gonna put cookies
+by default anything in the environment,
+
+149
+00:08:51.532 --> 00:08:56.364
+variable file does not get
+loaded up into our environment.
+
+150
+00:08:56.364 --> 00:08:58.660
+We have to load it up
+whenever our server starts.
+
+151
+00:08:58.660 --> 00:09:01.761
+The only reason Prisma was able to get
+it because somewhere in their code,
+
+152
+00:09:01.761 --> 00:09:03.180
+they're doing just that.
+
+153
+00:09:03.180 --> 00:09:05.802
+They're looking in this file and
+they're grabbing the database URL.
+
+154
+00:09:05.802 --> 00:09:10.498
+But JWT_SECRET will not be loaded up into
+our code we have to do that that's why we
+
+155
+00:09:10.498 --> 00:09:11.685
+installed dotenv.
+
+156
+00:09:11.685 --> 00:09:16.791
+So if we go into index it's
+gonna look like this so
+
+157
+00:09:16.791 --> 00:09:21.647
+we can just import dotenv star so
+everything as
+
+158
+00:09:21.647 --> 00:09:26.513
+dotenv from dotenv And then dotenv.config.
+
+159
+00:09:26.513 --> 00:09:29.160
+This is what looks at the dotenv file,
+
+160
+00:09:29.160 --> 00:09:32.719
+gets every single environment
+variable in there,
+
+161
+00:09:32.719 --> 00:09:38.443
+loads them up into your environment and
+now you can access them on process dotenv.
+
+162
+00:09:38.443 --> 00:09:41.647
+And we're the reason we're doing this an
+index file because this is the entry point
+
+163
+00:09:41.647 --> 00:09:42.250
+to our server.
+
+164
+00:09:42.250 --> 00:09:45.139
+So we want these end to be
+loaded up immediately so
+
+165
+00:09:45.139 --> 00:09:48.180
+the rest of the app can actually use them.
+
+166
+00:09:48.180 --> 00:09:53.212
+So you want to do it in the entry file to
+your server which in our case is index.ts.
+
+167
+00:09:53.212 --> 00:09:57.501
+You don't want to load this up on like
+some handler file somewhere because if
+
+168
+00:09:57.501 --> 00:10:01.990
+anything else that got loaded before
+the handler file executed needed dotenv it
+
+169
+00:10:01.990 --> 00:10:03.213
+would never have it.
+
+170
+00:10:03.213 --> 00:10:05.763
+It would say that doesn't exist,
+you like, yeah, it is,
+
+171
+00:10:05.763 --> 00:10:08.325
+it's there because I logged in
+my handler file I did see it?
+
+172
+00:10:08.325 --> 00:10:10.932
+Well, yeah,
+because that loaded after the dotenv file.
+
+173
+00:10:10.932 --> 00:10:14.180
+So let's put this in an entry file.
+
+174
+00:10:14.180 --> 00:10:16.610
+Okay, so we got that.
+
+175
+00:10:16.610 --> 00:10:22.724
+Now, we should be able
+to say our secret is
+
+176
+00:10:22.724 --> 00:10:30.427
+going to be
+processed.env.JWT_SECRET like so.
+
+177
+00:10:30.427 --> 00:10:38.153
+Here we go, fix this, I don't want my
+prettier not working, it's all good.
+
+178
+00:10:38.153 --> 00:10:43.404
+Cool, so this is going to give us
+back a string token is now a string.
+
+179
+00:10:45.770 --> 00:10:49.200
+And then we could just return that token,
+like that.
+
+180
+00:10:53.879 --> 00:10:56.632
+Yeah, question.
+
+181
+00:10:56.632 --> 00:11:01.922
+&gt;&gt; Which is preferable for
+storing JWT tokens local storage,
+
+182
+00:11:01.922 --> 00:11:05.317
+or secure HTTPS server only cookies?
+
+183
+00:11:05.317 --> 00:11:09.470
+&gt;&gt; The preferred method for storing
+a JWT on a client site for a browser.
+
+184
+00:11:10.480 --> 00:11:14.470
+I've tried like all many different places
+what I've landed on eventually was just
+
+185
+00:11:14.470 --> 00:11:15.613
+storing it in a cookie.
+
+186
+00:11:15.613 --> 00:11:18.439
+We're not gonna be storing
+it in a cookie here, but
+
+187
+00:11:18.439 --> 00:11:22.320
+because you need like interaction
+from the front end and whatnot, but
+
+188
+00:11:22.320 --> 00:11:27.016
+I think starting out with cookies Ideal
+because cookies are automatically sent up.
+
+189
+00:11:27.016 --> 00:11:28.996
+So it just saves you time on
+the front end cuz, I mean,
+
+190
+00:11:28.996 --> 00:11:31.380
+I guess you don't have to write
+the code at once on the front end.
+
+191
+00:11:31.380 --> 00:11:36.234
+But I guess it gets kind of tedious like
+having to grab local storage every single
+
+192
+00:11:36.234 --> 00:11:38.117
+time you wanna make a request,
+
+193
+00:11:38.117 --> 00:11:41.461
+to grab your JSONWeb Token and
+attach it to the header.
+
+194
+00:11:41.461 --> 00:11:44.400
+Or like come up with some interceptor
+on the front end that does it for
+
+195
+00:11:44.400 --> 00:11:45.810
+you automatically.
+
+196
+00:11:45.810 --> 00:11:49.408
+Whereas it knows it's a cookie, it gets
+all cookies gets sent automatically to
+
+197
+00:11:49.408 --> 00:11:52.160
+the server, so then the server
+will just check for cookies.
+
+198
+00:11:52.160 --> 00:11:53.493
+But on the server side,
+
+199
+00:11:53.493 --> 00:11:57.038
+I actually prefer the token to
+be on the authorization header.
+
+200
+00:11:57.038 --> 00:12:01.546
+I think that's more appropriate and
+it makes more sense.
+
+201
+00:12:01.546 --> 00:12:05.046
+So although from a client perspective,
+I like having it in the cookies, I don't
+
+202
+00:12:05.046 --> 00:12:08.301
+have to write it from a server perspective
+I prefer to have it in the header.
+
+203
+00:12:08.301 --> 00:12:11.826
+So I guess it depends on what side
+of the project I'm working on.
+
+204
+00:12:11.826 --> 00:12:17.144
+But today, we're on the server side so
+it's gonna an authorization header.
+
+205
+00:12:20.240 --> 00:12:21.880
+Which means it'll probably
+be in local stores.
+

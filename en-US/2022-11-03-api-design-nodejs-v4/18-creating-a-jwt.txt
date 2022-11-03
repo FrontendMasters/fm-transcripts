@@ -1,0 +1,113 @@
+[00:00:00]
+>> We're gonna talk about authentication and it's gonna be the first time we interact with the database as well. So we don't just want anyone using our API. Like yes calls is cool because it doesn't think about cores that like it allows you to prevent different IP addresses or different requests that have specific headers or different type of methods from interacting.
+
+[00:00:24]
+But it doesn't tell you who the person is, what role they might have, if their account is in good standing like it doesn't tell you that. It's just saying if this request is even able to make a request that's what calls is. It's typically called a pre-flight check.
+
+[00:00:38]
+It's like the browser sends off a API calls to your server ahead of time. Let's say you wanna make a post request to Stripe's API. The browser will go to Stripe's API first and be like, is this client allowed to even talk to you Stripe? And then Stripe will respond back, what a chorus option saying like, these are the things that I allow.
+
+[00:00:58]
+When the browser says like yeah this client fits that then the browser will send off your request so they actually makes two requests when it does that in the browser. Okay that isn't the same as authentication, authentication is like okay now that your request actually got accepted and you can go forward, who are you again like that's authentication, who are you?
+
+[00:01:16]
+Are you allowed? What do you allowed to do? What is your information what is your ID? So, we want to add authentication, because our database is multi tenant, what is multi tenant mean? It just means that we don't have one database for every user, there's one database and it's got every user is on that database and every users information is on that database.
+
+[00:01:38]
+So we have to be very careful that we don't let some users see some other users data. So how do we do that? How do we make sure that user one only sees user one's data and not user two's data? Because they're in the same database. So it's like, well, we needed a way to identify what users make an API call, so we can scope all their queries and rights, to the user.
+
+[00:02:03]
+How do we do that? Well, that's where authentication comes in. We can, now identify and authenticate someone, based off something. So the pros are we're gonna do, its called a JWT, or JSON Web Token or some people pronounce it jot. I'm never gonna say that, I refuse to call it a jot.
+
+[00:02:21]
+It's a JWT, or it's a JSON Web Token in my book. But if you want to call it jot, you can call it that. What is a JSON Web Token? Well, you don't need to be a crypto expert, and I'm not talking blockchain crypto talking cryptography. [LAUGH] You don't need to be a cryptologist to understand a JSON Web Token.
+
+[00:02:38]
+It's basically TLDR, take a JavaScript object or whatever you want on it and that JavaScript object, given a secret, which is a string, can deterministically be converted to some random string. And that string can be converted back to the same object given the same secret. It's almost like hashing but not quite I'm not a scientist so don't quote me on it.
+
+[00:03:04]
+But I can deterministically always get the same result to and from that string in that object if I use the same secret and that's what a JSON Web Token is. The reason we do that is because we don't have to store anything on a server. The alternative would be something like a session where you have to keep track of who's logged in and your API right now, which just eats up resources and then you got to do session management and I don't wanna do it.
+
+[00:03:29]
+JSON web token, the client stores the token on their own client and then he's got to sit with every single request because the service is going to check it. Every single request is like, yeah, we got to check, if you are the same person every time and that's annoying, but it's better than storing whether or not you're logged in or not.
+
+[00:03:47]
+So it's a trade off, we'll be using JSON Web Tokens. So let's create some JSON Web Tokens. First, we need to download some things. So we're going to npm install all of these goodies. So npm install we go here and do this here. Npm install jsonwebtokens, all lowercase plural bcrypt and dotenv.
+
+[00:04:10]
+If bcrypt doesn't install on your computer cuz sometimes it doesn't why don't mind just I think it's jsonwebtoken, sorry not tokens if bcrypt doesn't install on your computer. For some reason it like there's issues with like, older Intel's or newer in ones like there's sometimes issues that that doesn't work.
+
+[00:04:30]
+There's an alternative that has the same API that usually works let me know, we can find it. But yeah, install those jsonwebtoken, singular, bcrypt and dotenv. We're gonna create a new file a new folder and a file we're gonna create a new folder called modules and we're gonna make a new file in there called auth.
+
+[00:04:50]
+So I'm gonna go inside of source we're going to folder we'll call it modules inside of modules I'm gonna get a file called auth.ts. So this is just kind of my approach I typically create like a utils folder or I don't always give it some random name I've been using utils for awhile I recently switched over the modules cuz I like the icon.
+
+[00:05:14]
+So [LAUGH] yeah they're called modules now, so, there you go. But yeah, I like to put my auth stuff in one file versus like having it sprinkled all across the app. Because they typically rely on each other, like all things rely on each other anyway, so I put them in one file, even though they're like functional, they do different things.
+
+[00:05:35]
+One might be a middleware, one might be a handler, one might be some utility function, but they're all off. So I'll put them in one file that might not be your flow. You might wanna put all middleware in one file, all handlers in one file, all whatever in one file.
+
+[00:05:49]
+I like to do I don't like to box myself into one thing I just do what feels right and from my experience, I hate having ten files open to deal with all changes. I just rather have one file open and it's usually off that has all those changes all the time.
+
+[00:06:04]
+Like for Jacob's computer, make sure you turn off the auth and like okay, then it's like, I just want this one file. Like I don't feel like doing all this. Okay, so we're gonna do this stuff on one file. So a couple things we're gonna do is first we're gonna create a function to create a JSON Web Token.
+
+[00:06:20]
+So let's do just that auth.js, we're gonna import JSON, I'm gonna call it jwt from JSON Web Token. I gonna export const createJWT, and remember JWT is basically converting an object to a string. So we need an object, we want this object to be something that is unique about a user.
+
+[00:06:50]
+So when we undo the string and turn it back to an object, outcomes, that unique thing about the user that we can use to identify user. So what is something unique about a user that we can use to identify a user? ID? Yeah, it will be an ID and also any other unique thing on the user which will be a username.
+
+[00:07:08]
+So I'm gonna put a username and an id in the JSON Web Token. So later on when I get back to user, once someone's trying to access API I could be who are you? You're user ID whatever, you're user with the username whatever. So whatever I put on a token needs to be useful for me identifying them later.
+
+[00:07:26]
+Sometimes if you have role based access Arbok or something you would put the role of the user in the JSON Web Token to so you can quickly check to see if they have the right role to do something right? We don't have that so we're not doing that.
+
+[00:07:40]
+But typically you want to keep the JWT light the more that's up the more that's on the payload the longer the string gets so try to keep it light. Cool create JWT it's gonna take a user and then we're gonna say JWT or we gonna say token=jwt.sign like that.
+
+[00:08:02]
+It's gonna take two arguments is gonna take an object. So the payload in this case a ID with a user ID, and then a user name, but a user.username, like that. And then a second argument is a secret you cannot sign or verify JWT without having that sprinkled in secret.
+
+[00:08:22]
+So what we're gonna do is we're gonna go to our EMB file under our database we're going to make JWT_SECRET, and you can put whatever string you want, doesn't matter. You can call it whatever you want, I'm gonna put cookies, I ate a bunch of cookies last night.
+
+[00:08:38]
+I ordered some insomnia cookies, they came late, and then they sent me another one. So I had 12 cookies and I ate them all. So I'm not ashamed, I'm gonna put cookies by default anything in the environment, variable file does not get loaded up into our environment. We have to load it up whenever our server starts.
+
+[00:08:58]
+The only reason Prisma was able to get it because somewhere in their code, they're doing just that. They're looking in this file and they're grabbing the database URL. But JWT_SECRET will not be loaded up into our code we have to do that that's why we installed dotenv. So if we go into index it's gonna look like this so we can just import dotenv star so everything as dotenv from dotenv And then dotenv.config.
+
+[00:09:26]
+This is what looks at the dotenv file, gets every single environment variable in there, loads them up into your environment and now you can access them on process dotenv. And we're the reason we're doing this an index file because this is the entry point to our server. So we want these end to be loaded up immediately so the rest of the app can actually use them.
+
+[00:09:48]
+So you want to do it in the entry file to your server which in our case is index.ts. You don't want to load this up on like some handler file somewhere because if anything else that got loaded before the handler file executed needed dotenv it would never have it.
+
+[00:10:03]
+It would say that doesn't exist, you like, yeah, it is, it's there because I logged in my handler file I did see it? Well, yeah, because that loaded after the dotenv file. So let's put this in an entry file. Okay, so we got that. Now, we should be able to say our secret is going to be processed.env.JWT_SECRET like so.
+
+[00:10:30]
+Here we go, fix this, I don't want my prettier not working, it's all good. Cool, so this is going to give us back a string token is now a string. And then we could just return that token, like that. Yeah, question.
+>> Which is preferable for storing JWT tokens local storage, or secure HTTPS server only cookies?
+
+[00:11:05]
+
+>> The preferred method for storing a JWT on a client site for a browser. I've tried like all many different places what I've landed on eventually was just storing it in a cookie. We're not gonna be storing it in a cookie here, but because you need like interaction from the front end and whatnot, but I think starting out with cookies Ideal because cookies are automatically sent up.
+
+[00:11:27]
+So it just saves you time on the front end cuz, I mean, I guess you don't have to write the code at once on the front end. But I guess it gets kind of tedious like having to grab local storage every single time you wanna make a request, to grab your JSONWeb Token and attach it to the header.
+
+[00:11:41]
+Or like come up with some interceptor on the front end that does it for you automatically. Whereas it knows it's a cookie, it gets all cookies gets sent automatically to the server, so then the server will just check for cookies. But on the server side, I actually prefer the token to be on the authorization header.
+
+[00:11:57]
+I think that's more appropriate and it makes more sense. So although from a client perspective, I like having it in the cookies, I don't have to write it from a server perspective I prefer to have it in the header. So I guess it depends on what side of the project I'm working on.
+
+[00:12:11]
+But today, we're on the server side so it's gonna an authorization header. Which means it'll probably be in local stores.
+
