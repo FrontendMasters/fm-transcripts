@@ -1,0 +1,468 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:04.742
+What's important to understand
+is when the observer executes,
+
+2
+00:00:04.742 --> 00:00:08.361
+it actually pushes itself
+onto the stack again and
+
+3
+00:00:08.361 --> 00:00:12.859
+calls the function, and
+does the whole thing all over again.
+
+4
+00:00:12.859 --> 00:00:16.458
+And we're using a set, so
+maybe it's not too bad,
+
+5
+00:00:16.458 --> 00:00:21.500
+because we're deduping cuz you can
+only have one of each entry in a set.
+
+6
+00:00:21.500 --> 00:00:26.883
+But, this implementation on its own isn't
+
+7
+00:00:26.883 --> 00:00:33.141
+quite good enough because,
+well, if we created,
+
+8
+00:00:33.141 --> 00:00:37.666
+let's go a little bit further here.
+
+9
+00:00:37.666 --> 00:00:41.839
+We've done the basic stuff here, but,
+
+10
+00:00:41.839 --> 00:00:48.343
+what if we wanted to do something
+like that last dynamic thing,
+
+11
+00:00:48.343 --> 00:00:56.340
+where the values actually change what's
+subscribed based on what changes.
+
+12
+00:00:56.340 --> 00:01:02.220
+And this is, I'm gonna add, fortunately,
+
+13
+00:01:02.220 --> 00:01:10.594
+I have to create three signals
+to actually create this example.
+
+14
+00:01:10.594 --> 00:01:15.759
+And count starts looking a lot worse
+[LAUGH] when the count doesn't not matter,
+
+15
+00:01:15.759 --> 00:01:19.985
+but essentially,
+we aren't cleaning up after ourselves, and
+
+16
+00:01:19.985 --> 00:01:22.741
+the cleanup part is actually important.
+
+17
+00:01:24.536 --> 00:01:29.877
+So, let's see here,
+I'm gonna make show setShow, okay?
+
+18
+00:01:32.484 --> 00:01:36.064
+Well, this reactive system we
+created is already fairly complete.
+
+19
+00:01:36.064 --> 00:01:42.910
+The reason I say there's 50 lines, not 30
+lines, so to speak, is that sometimes,
+
+20
+00:01:42.910 --> 00:01:48.368
+made this example a little bit more
+complicated here, but right now,
+
+21
+00:01:48.368 --> 00:01:54.132
+because show is true, it's just
+always gonna console, log(count).
+
+22
+00:01:54.132 --> 00:02:02.735
+However, if we do something
+like setShow(false).
+
+23
+00:02:06.670 --> 00:02:12.536
+In theory, you might expect updating
+count not to trigger this again,
+
+24
+00:02:12.536 --> 00:02:18.225
+because you've changed the logical path,
+you're now going to 2.
+
+25
+00:02:18.225 --> 00:02:21.954
+But because of the way that
+we aren't cleaning up,
+
+26
+00:02:21.954 --> 00:02:24.914
+setting count is still a subscription.
+
+27
+00:02:24.914 --> 00:02:27.334
+So, we have a little bit more work to do.
+
+28
+00:02:27.334 --> 00:02:30.970
+I'm hoping this is clear, but essentially,
+
+29
+00:02:30.970 --> 00:02:34.989
+the first time it runs,
+it sees show, sees count.
+
+30
+00:02:34.989 --> 00:02:39.997
+The second time it runs, sees show, sees
+count2, this is when I set show to false.
+
+31
+00:02:39.997 --> 00:02:42.341
+When I set count at this point,
+
+32
+00:02:42.341 --> 00:02:47.220
+you won't expect it to run again
+coz nothing is listening to it.
+
+33
+00:02:47.220 --> 00:02:51.465
+However, we did not clean that up,
+which is why it is running again.
+
+34
+00:02:51.465 --> 00:02:54.159
+So, we're gonna fix that right now,
+essentially.
+
+35
+00:02:54.159 --> 00:02:56.824
+It is console logging the right stuff,
+
+36
+00:02:56.824 --> 00:03:00.959
+it is console logging count2 here,
+which started with 2.
+
+37
+00:03:00.959 --> 00:03:05.622
+But, this 2 here is the console indicating
+to us that it actually ran twice.
+
+38
+00:03:05.622 --> 00:03:08.730
+So, let's see if we can fix that up.
+
+39
+00:03:08.730 --> 00:03:13.100
+And, the way to fix that up is
+a little bit more complicated,
+
+40
+00:03:13.100 --> 00:03:17.215
+but, it's important that
+every time we run our effect,
+
+41
+00:03:17.215 --> 00:03:20.581
+it actually has to clean up the effect,
+okay?
+
+42
+00:03:20.581 --> 00:03:23.445
+So, we're gonna implement
+a cleanup function and
+
+43
+00:03:23.445 --> 00:03:25.515
+I'm gonna create it up here, okay?
+
+44
+00:03:31.931 --> 00:03:37.485
+Well, we actually have a problem when we
+try and go into our cleanup function,
+
+45
+00:03:37.485 --> 00:03:42.196
+because in order to clean up,
+the effect has to know what signals it
+
+46
+00:03:42.196 --> 00:03:46.932
+actually is subscribed to, and
+it doesn't actually track that.
+
+47
+00:03:46.932 --> 00:03:51.611
+Right now,
+the signal knows about the effects, but
+
+48
+00:03:51.611 --> 00:03:55.450
+the effects do not know about the signals.
+
+49
+00:03:55.450 --> 00:04:01.463
+So, the actual very first thing we have to
+do is inside our effect data structure,
+
+50
+00:04:01.463 --> 00:04:06.083
+we have to actually add,
+I'm gonna call it dependencies, but
+
+51
+00:04:06.083 --> 00:04:11.772
+we're gonna add something to this object,
+and it's also gonna be a new set.
+
+52
+00:04:11.772 --> 00:04:15.082
+I keep on using sets,
+a lot of these can be arrays, but
+
+53
+00:04:15.082 --> 00:04:19.865
+I use sets because they dedupe, which
+just makes things a little bit easier,
+
+54
+00:04:19.865 --> 00:04:22.312
+but now, we have a place to store this.
+
+55
+00:04:22.312 --> 00:04:25.969
+And, it's important to understand
+that it's track both ways.
+
+56
+00:04:25.969 --> 00:04:30.825
+This is why the observer pattern
+that we use here is classically what
+
+57
+00:04:30.825 --> 00:04:31.940
+we call leaky.
+
+58
+00:04:31.940 --> 00:04:34.193
+If things are not cleaned up properly,
+
+59
+00:04:34.193 --> 00:04:37.752
+you get references because they
+are circularly referenced.
+
+60
+00:04:37.752 --> 00:04:40.982
+And this is important to reactivity, and
+
+61
+00:04:40.982 --> 00:04:45.606
+it'll influence part of solid's design,
+essentially.
+
+62
+00:04:45.606 --> 00:04:52.601
+So, what I'm gonna do here is,
+okay, effect.execute, beautiful.
+
+63
+00:04:52.601 --> 00:04:58.668
+And, we have to change what
+happens when we subscribe.
+
+64
+00:04:58.668 --> 00:05:05.836
+Before, we were just adding the observer,
+which is a little easier,
+
+65
+00:05:05.836 --> 00:05:10.940
+but we're gonna implement
+subscribe function,
+
+66
+00:05:10.940 --> 00:05:14.827
+and we're gonna pass the observer and
+
+67
+00:05:14.827 --> 00:05:19.587
+let's say, the subscriptions list, okay?
+
+68
+00:05:19.587 --> 00:05:23.489
+So, function subscribe, and
+
+69
+00:05:23.489 --> 00:05:29.045
+what do I say, observer, subscriptions.
+
+70
+00:05:33.247 --> 00:05:34.059
+Okay.
+
+71
+00:05:37.057 --> 00:05:45.244
+And, we do this because we're gonna still
+add the observer to the subscription list,
+
+72
+00:05:45.244 --> 00:05:50.515
+but we're also at this point
+going to reverse link it and
+
+73
+00:05:50.515 --> 00:05:55.339
+take that observer and
+take its dependencies, and
+
+74
+00:05:55.339 --> 00:06:00.631
+we're going to add
+the subscriptions object set to it.
+
+75
+00:06:00.631 --> 00:06:03.833
+So, you see it's linked both ways.
+
+76
+00:06:03.833 --> 00:06:07.381
+So, now it's time we can
+implement the cleanup function.
+
+77
+00:06:07.381 --> 00:06:10.245
+Of course, we have to be a little cautious
+right now cuz it links both ways,
+
+78
+00:06:10.245 --> 00:06:11.526
+this can cause an infinite loop.
+
+79
+00:06:11.526 --> 00:06:16.374
+So, we actually have to take a snapshot
+of the subscriptions when we notify them,
+
+80
+00:06:16.374 --> 00:06:20.543
+because it's gonna keep on pushing
+the subscriptions onto the list.
+
+81
+00:06:20.543 --> 00:06:25.754
+So, what we're gonna do here is
+we're actually gonna do a little
+
+82
+00:06:25.754 --> 00:06:31.060
+trick to clone this array,
+which is by using the spread operator,
+
+83
+00:06:31.060 --> 00:06:35.731
+we can basically turn any set
+into an array and we are good.
+
+84
+00:06:35.731 --> 00:06:38.230
+Okay, so, looks like we're still running,
+perfect, okay.
+
+85
+00:06:38.230 --> 00:06:40.433
+Now, let's implement our cleanup function.
+
+86
+00:06:40.433 --> 00:06:43.073
+Our cleanup function,
+
+87
+00:06:43.073 --> 00:06:49.013
+which gets called at the top
+of our execute function.
+
+88
+00:06:50.342 --> 00:06:51.836
+Needs our effect, okay?
+
+89
+00:06:54.289 --> 00:06:54.904
+And then.
+
+90
+00:06:57.677 --> 00:07:02.397
+What we're gonna do here
+is we're gonna iterate
+
+91
+00:07:02.397 --> 00:07:07.009
+through all the dependencies
+of our observer.
+
+92
+00:07:07.009 --> 00:07:12.118
+So, let's say depth of
+observer.dependencies,
+
+93
+00:07:12.118 --> 00:07:19.082
+which are actually the subscription
+lists for each signal that it has,
+
+94
+00:07:19.082 --> 00:07:24.554
+and then we're gonna just
+delete the observer from it.
+
+95
+00:07:24.554 --> 00:07:30.819
+And when we're done,
+we can just clear that list,
+
+96
+00:07:30.819 --> 00:07:35.489
+dependencies.clear, beautiful.
+
+97
+00:07:35.489 --> 00:07:42.033
+And, if you've noticed now,
+the 2 is not logging twice.
+
+98
+00:07:42.033 --> 00:07:48.013
+Essentially, it only tracks
+what it does for the last run,
+
+99
+00:07:48.013 --> 00:07:53.528
+and before we run it again,
+it cleans up after itself.
+

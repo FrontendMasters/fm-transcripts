@@ -1,0 +1,48 @@
+[00:00:00]
+>> What's important to understand is when the observer executes, it actually pushes itself onto the stack again and calls the function, and does the whole thing all over again. And we're using a set, so maybe it's not too bad, because we're deduping cuz you can only have one of each entry in a set.
+
+[00:00:21]
+But, this implementation on its own isn't quite good enough because, well, if we created, let's go a little bit further here. We've done the basic stuff here, but, what if we wanted to do something like that last dynamic thing, where the values actually change what's subscribed based on what changes.
+
+[00:00:56]
+And this is, I'm gonna add, fortunately, I have to create three signals to actually create this example. And count starts looking a lot worse [LAUGH] when the count doesn't not matter, but essentially, we aren't cleaning up after ourselves, and the cleanup part is actually important. So, let's see here, I'm gonna make show setShow, okay?
+
+[00:01:32]
+Well, this reactive system we created is already fairly complete. The reason I say there's 50 lines, not 30 lines, so to speak, is that sometimes, made this example a little bit more complicated here, but right now, because show is true, it's just always gonna console, log(count). However, if we do something like setShow(false).
+
+[00:02:06]
+In theory, you might expect updating count not to trigger this again, because you've changed the logical path, you're now going to 2. But because of the way that we aren't cleaning up, setting count is still a subscription. So, we have a little bit more work to do. I'm hoping this is clear, but essentially, the first time it runs, it sees show, sees count.
+
+[00:02:34]
+The second time it runs, sees show, sees count2, this is when I set show to false. When I set count at this point, you won't expect it to run again coz nothing is listening to it. However, we did not clean that up, which is why it is running again.
+
+[00:02:51]
+So, we're gonna fix that right now, essentially. It is console logging the right stuff, it is console logging count2 here, which started with 2. But, this 2 here is the console indicating to us that it actually ran twice. So, let's see if we can fix that up. And, the way to fix that up is a little bit more complicated, but, it's important that every time we run our effect, it actually has to clean up the effect, okay?
+
+[00:03:20]
+So, we're gonna implement a cleanup function and I'm gonna create it up here, okay? Well, we actually have a problem when we try and go into our cleanup function, because in order to clean up, the effect has to know what signals it actually is subscribed to, and it doesn't actually track that.
+
+[00:03:46]
+Right now, the signal knows about the effects, but the effects do not know about the signals. So, the actual very first thing we have to do is inside our effect data structure, we have to actually add, I'm gonna call it dependencies, but we're gonna add something to this object, and it's also gonna be a new set.
+
+[00:04:11]
+I keep on using sets, a lot of these can be arrays, but I use sets because they dedupe, which just makes things a little bit easier, but now, we have a place to store this. And, it's important to understand that it's track both ways. This is why the observer pattern that we use here is classically what we call leaky.
+
+[00:04:31]
+If things are not cleaned up properly, you get references because they are circularly referenced. And this is important to reactivity, and it'll influence part of solid's design, essentially. So, what I'm gonna do here is, okay, effect.execute, beautiful. And, we have to change what happens when we subscribe. Before, we were just adding the observer, which is a little easier, but we're gonna implement subscribe function, and we're gonna pass the observer and let's say, the subscriptions list, okay?
+
+[00:05:19]
+So, function subscribe, and what do I say, observer, subscriptions. Okay. And, we do this because we're gonna still add the observer to the subscription list, but we're also at this point going to reverse link it and take that observer and take its dependencies, and we're going to add the subscriptions object set to it.
+
+[00:06:00]
+So, you see it's linked both ways. So, now it's time we can implement the cleanup function. Of course, we have to be a little cautious right now cuz it links both ways, this can cause an infinite loop. So, we actually have to take a snapshot of the subscriptions when we notify them, because it's gonna keep on pushing the subscriptions onto the list.
+
+[00:06:20]
+So, what we're gonna do here is we're actually gonna do a little trick to clone this array, which is by using the spread operator, we can basically turn any set into an array and we are good. Okay, so, looks like we're still running, perfect, okay. Now, let's implement our cleanup function.
+
+[00:06:40]
+Our cleanup function, which gets called at the top of our execute function. Needs our effect, okay? And then. What we're gonna do here is we're gonna iterate through all the dependencies of our observer. So, let's say depth of observer.dependencies, which are actually the subscription lists for each signal that it has, and then we're gonna just delete the observer from it.
+
+[00:07:24]
+And when we're done, we can just clear that list, dependencies.clear, beautiful. And, if you've noticed now, the 2 is not logging twice. Essentially, it only tracks what it does for the last run, and before we run it again, it cleans up after itself.
+
