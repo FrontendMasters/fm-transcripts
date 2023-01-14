@@ -1,0 +1,84 @@
+[00:00:00]
+>> It's then time just started talking about the, let's say the dessert of the background execution, the sweetness of this. That is, how can we wait cap? Charles could code client side while the app is in the background, okay? Or continue the execution of some code, even if the user is leaving the web app, closing the PWA, is closing the browser, is closing the tab, okay?
+
+[00:00:36]
+And for that, we're going to go over background sync, periodic background sync and background fetch, okay? Those are the three API's that are close together different API's but they were pretty similar. So, remember that execution happens in the background, maybe there is no PWA or web page currently loaded.
+
+[00:00:58]
+So if we wanna message the user, we have to use web notifications. What if the user didn't grant you permission? Send the user an email, a WhatsApp message. I don't know, an SMS but you won't have any other option. Because you're in a Service Worker, there is no client, no UI, there is nothing you can do about notifying the user, okay?
+
+[00:01:23]
+Web notifications is your only chance. And by the way, you cannot request permission in the Service Workers of scope, because of course you don't have UI. So you have to request permission while the user is using the app, not when you wanna notify for the first time, okay?
+
+[00:01:45]
+So background sync, officially known as the web synchronization background API. The idea is to defer a synchronization operation until the device has a stable connection to the server. Maybe that until is now, so maybe I mark a sync operation and now we have an unstable connection. So it will be fire now, okay?
+
+[00:02:15]
+Immediately, so that's okay. So the idea is that a client, a website, a web app, a PWA needs to sync data to the server or from the server. So I need to send data, receive data or both. Instead of doing that, we understand our fetch handler within my window, within my my app, I'm going to just specify to the browser, we're going to say to the browser that I need to sync data, okay?
+
+[00:02:48]
+That's how it works. Then, a sync event will be fired in the Service Worker. So, we can handle that pending sync in the Service Worker that we know that has a separate life cycle and can continue executing, [INAUDIBLE] in the background. If the network is stable right now and the browser is making that decision, it will execute that immediately, right now.
+
+[00:03:15]
+In a separate thread, but now, but if not, because then we are offline. We are on a Wi-Fi on a plane and it's not working properly or the server is down, wherever, it will come back later. When? We don't know, okay? Because also, the battery should be in good level.
+
+[00:03:41]
+It's up to the browser to make that decision. So, that means that I'm trying to sync some data, the browser thinks that this is not the right time. Okay, the user will close the app, will close the browser, maybe the user has the phone in her pocket, his pocket.
+
+[00:04:05]
+And after 20 minutes the browser says, it seems like the internet is where it's working fine now let's try pending sync operation. It will wake up only your Service Worker and it will fire your sync event, your sync event handler. And you will make that operation. So then we access the network at that point, and we can fulfill the sync.
+
+[00:04:29]
+In that case, it will be removed from pending sync operations. Or we can leave it pending. Like, you know what? I couldn't do that. So it's so working, the server is down, wherever. So you leave that as a depending sync operation, and it will try again later, okay?
+
+[00:04:49]
+That's how it works. Right now 5% of mobile web apps with a Service Worker are using the API. So, for the web apps that had the habit Service Worker register 5% of them are using the API, which is not so bad compared with a couple of years ago, okay?
+
+[00:05:13]
+The API is actually pretty simple. [COUGH] So your only thing you need is to get the Service Worker registration. One simple way to do that it is through the ready promise. This is like a property, a getter in JavaScript that returns a promise. So, I'm going to await for that and then you go and sync, you use the sync manager and you register a tag.
+
+[00:05:44]
+What's a tag name? A string Identifier for that sync operation. What about the data? So maybe I wanna sync data, an objects that they wanna send. It's not up to the API. So typically, what you're going to do is, you're going to use index dv to store the data.
+
+[00:06:07]
+And then the tag name, it may contain or not the ID or the name of the data storage or something. So then server side you know where to find that information. The Service Worker can access IndexedDB databases, not local storage, the Service Worker cannot access local storage. So you must use IndexedDB In case you need to store data while it's been synced, okay?
+
+[00:06:38]
+So that's step one, step two is in the Service Worker. You listen for the sync event, and then you check for the event.tag. If it's the one that you were looking for, you try to do the sync operation. That can be a fetch to a server, and that's all.
+
+[00:07:04]
+Which is good and bad, because it's very simple API, okay? So, let's try to do this in our code. So, in the background js file, I have already a button that is trying to get the sync operation. That event handler is already async. So we are ready to use async await here.
+
+[00:07:29]
+So from here, what I need first is the registration, the Service Worker registration. And for that we use navigator.serviceWorker.ready and we need to await for it, okay? When we have the registration, we have to talk to the sync manager as we saw here in this one. And then we register a tag name.
+
+[00:08:03]
+What's the tag name? A String. I don't know, I wanna sync like, whatever. Actually, typically we don't use the sync prefix or suffix because we are already in the sync. And that's all The only thing that the PWA or the web app is doing, is registering a pending operation.
+
+[00:08:25]
+It's saying, hey, I need to sync this. That's all. From the Service Worker, what we need is a new event listener for the sync event. And typically what we do here is we check the tag. So if it's the tag that we were looking for like the like, then we're going to do something, okay?
+
+[00:08:59]
+Make sense? I have a typo Let's say this a sync. Let's make a default here cuz I will show you how to debug this, Unknown sync operation for event.tag. So it's actually pretty simple API. So remember that in the Service Worker here we can access fetch, the fetch API.
+
+[00:09:44]
+So we can make her like what I did here I can do a fetch, for example, to the log, the same log that we use in the beacon on my server. And I can send some properties, I can send the body, wherever you need. And you can access IndexedDB or cache storage API's from here Make sense?
+
+[00:10:15]
+So if the connection is stable after you register the sync operation, it will immediately, maybe a couple of milliseconds later, in its own thread, it will execute the sync event handler with the time that we set. If the connection is not good enough at that moment, it will do it later.
+
+[00:10:38]
+By the way how can a website like the main client know If, depending on whether the pending operation finishes or not, if it's still active. So now, I'm not like doing the fetch from the main thread, from the main window. I'm setting the flag as a pending operation, then the Service Worker in a different thread goes to the network and confirms the operation.
+
+[00:11:07]
+How can we know here that it's finally done if the user didn't close the browser? So I'm still able to notify the user. Well, we can communicate workers and service workers with its clients, so we can send a message from the Service Worker to the page saying, hey, this is done, if you want to inform the user, does it make sense?
+
+[00:11:33]
+When you see this in action, if I register a sync, I don't see anything. Because the only thing that we are doing is registering a sync. And the only way that we have to see this in action is going for example here to background sync, remember I'm inside the application tab.
+
+[00:11:57]
+So in the application tab in background services. And then I could start recording what's going on here. And this is the background sync activity, okay? And it will record all activity for up to three days even when closed. So you can come back tomorrow and see everything that happened with this origin, okay?
+
+[00:12:23]
+With this website for background sync. For example, if it tried to sync the data and it didn't work for a day and maybe tried ten times, you will see timestamps and every attempt, okay? Make sense? You can see that the Service Worker actually sent a message to the console saying that it worked.
+

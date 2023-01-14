@@ -1,0 +1,100 @@
+[00:00:00]
+>> But there is one more, that has nothing to do with service workers and all the rest will be service worker based. Why do we want to execute go in the background? We have already gone over some use cases. But for example network requests. We have already mentioned, what happens if the network requests it's in the middle of the user go into the background.
+
+[00:00:23]
+To sync data, to notify the user that something has changed, or something important is happening there or to continue pending tasks in the background. I'm downloading a file, I'm still sending data to the server and I want to continue doing that stuff even if the user is not using my app anymore.
+
+[00:00:47]
+But talking about network requests. I want to take a minute to talk about this before getting into the service worker additional API's. If your web app goes to the background, why the network requests in process, it may be a border. It depends on the browser. It depends on the OS.
+
+[00:01:07]
+So solutions, The Beacon API, that's one solution if suitable. I will explain what that is a minute and what is the Beacon API? The Web Background Synchronization API, also known as the Background Sync API. Because then, you may continue, not continue, you may initiate the request directly in the service worker's scope.
+
+[00:01:36]
+That we know has nothing to do with the window. So, if you need to send or receive data to the server, you do that in a separate thread that is detached from the window. So you may close the window that the service worker is still there with execution rights and it will make the network request for you.
+
+[00:01:59]
+The problem, the Background Synchronization API is not available in every browser, so you always need a fallback for Safari and Firefox, okay? Also, you have the Background Fetch API for some specific use cases and that's actually to download, not uploading, downloading files. And it's prepared for large files.
+
+[00:02:26]
+We will see an example of each of these options. Talking about the Beacon API, have you heard about this API, the Beacon API? It's available on every browser. So the beacon API is for request where we don't care about the response. In fact we will ignore the response.
+
+[00:02:48]
+So it's a beacon, we're sending a beacon. So this is for analytics. For sending data, for saving a like on a post. And because we don't care about the response, the browser is going to do that not matter if you close the window. It goes to a queue of beacons to be sent.
+
+[00:03:15]
+There has nothing to do with a webpage. So it's not giving you a promise in return. So it's not giving you a data, it's just give you a Boolean. If it's registered or not, and you don't know when it actually hits the server. You don't know, you don't care because it's a Beacon.
+
+[00:03:34]
+For example, on visibility change you could send a beacon and the API is actually pretty simple, navigator dot set Beacon, URL, data that's all. So it's a very simple API but it has a tricky part. That you cannot set your own http headers, it's it's kind of weird.
+
+[00:03:58]
+So what if you want to send JSON, for example. So you need to set the content type and we don't have the header so we can't set it so there is a trick, so let me show you how that works. So for example here in my background.js I have a section for Beacons.
+
+[00:04:16]
+I already have a btn, so when you click on that btn we will send a beacon to the server, okay. So, it's navigator.sendBeacon. So, pretty simple. You see, URL, data. That's all. So, for the URL, my server, the server, the Node.js server that we are using here already has an endpoint/log.
+
+[00:04:40]
+That receives something from a JSON and renders that in the console. It's body in it or undefined. What's body in it? It can be a string or it can be blob. So, if I have a message to send, Let's say data, and its a JSON with a message and we can have more properties.
+
+[00:05:06]
+Hello from frontend So if I want to send this to log I should use something like JSON.stringify my old friend message. Okay. The problem with this is that I'm not setting the right headers. So server side, that might not work. So if I try this, It works in Safari, it works in Chrome.
+
+[00:05:38]
+So if I'm going back, I have here a Send a Beacon. So if I click here, client side. I don't know what happens. In Chrome, at least you can actually see that in the network. Tab, so if I'm in the network tab. If I send a Beacon, where first I think I have a type or something, message is not defined.
+
+[00:06:10]
+Yeah, you're right, because I called it data. And there are plenty of people here and no one said a word. So it's data, that's the name of my variable. So let's try again, so I'm going to send a Beacon from the network you can see at the bottom there is a log call.
+
+[00:06:33]
+I can actually see the message so it went through. The thing is that if I click, send the Beacon and close the window immediately, it will work anyway. And even if I kill the browser's process, it will still be in a queue. So next time I open the browser, the browser will know there is a pending Beacon to be sent to the server, okay, that's how we works.
+
+[00:06:59]
+It's detached from the window that generates the fetch, it's not really a fetch, okay? But what about the server? I'm getting the value, if I open the terminal, here it says data log received, empty string. Empty JSON, so empty option. So I'm not getting the JSON. Why? Because I'm not setting the headers.
+
+[00:07:21]
+That's the tricky part. Anyway, it's not so difficult to solve, but yeah, there is something that we need to make here. So instead of doing this, what we need to create is a Blob. When you create a Blob, the Blob receives an array of parts. And we can actually send the JSON stringify as one part, as the only part actually.
+
+[00:07:47]
+And the second argument is property bag. So bag with properties, and here we can set the type. So we can say that we are, that blob represents a JSON, okay? So then we are going to send to the Beacon the Blob that actually makes the trick. Again, this is not for every request of course, because we are now receiving the data back.
+
+[00:08:19]
+It's just for when you're sending the data and you actually don't care if it gets there or not, it's just a Beacon. Analytics, okay? Likes, and so on. Yeah.
+>> I've following along and I clicked the button about a dozen or so times and the first six went through, but all you know, 12 or 15 of them are noted as pending in the, in the status in the network tab.
+
+[00:08:46]
+What are the kind of heuristics that
+>> Well, the browser is managing heuristic of that and beacons are low priority. So if for some reason the browser thinks that, there are many of these, let's do something else, and later I will complete my queue. So you don't manage that, and even I think on the spec there is no algorithm, so it's up to the browser.
+
+[00:09:15]
+But something that might be happening there is that you're sending exactly the same Beacon with the same data, so the browser will probably say, hey, we're going to discard a couple because it's just the same Beacon.
+>> I just now tried to refresh the page and it's stuck.
+
+[00:09:33]
+So is it waiting for some acknowledgement from the server or anything?
+>> Nope. Nope, the thing is that you're still sending the same beacon, you probably should try sending random data so each beacon will be different. So as a unit, the Beacon, in that case will be different so we should do in that.
+
+[00:09:55]
+Remember you use this only when you don't care about the response. So now you can see my server is getting the message, the Beacon from the client. Yep.
+>> There's a couple of questions on picture in picture when you're done with.
+>> Yeah. Well, I'm done. [LAUGH]
+>> For YouTube's mini player, does that use picture and picture?
+
+[00:10:21]
+It looks similar but it's visible on other apps.
+>> YouTube has on the web on the website, it has the mini player. It's actually a floating div or floating DOM element so it's not actually picture and picture, they have their own picture and picture implementation. But if you get out of the top, you won't see that picture in picture element.
+
+[00:10:44]
+And they have another solution for the mobile website. And on the mobile website, they're using the picture and picture API. So meaning that the mini player as far as I know it's on YouTube is not using the picture in picture. API they have their own internal picture and picture solution, but it's within the boundaries of the YouTube DOM website
+
+[00:11:10]
+
+>> And can you inspect picture and picture content?
+>> So the picture in picture canvas, so the layer where you're rendering is not DOM based, so you cannot inspect it. What you have is the video element. So what you can do is divide the video element or the video layer.
+
+[00:11:32]
+So using dev tools, you could inspect the video element. And the layers that that video elements are rendering are actually your inspection But remember that you don't have a full DOM. So when you request full screen, full screen has a DOM. So you can have your own buttons and everything on full screen, but not on picture in picture.
+
+[00:11:56]
+On picture in picture you only have a video layer that is just frames over frames. Remember, Beacon is for some special cases, probably less than one percent of the requests that we make, okay. But analytics and that sort of things, it's okay.
+

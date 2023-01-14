@@ -1,0 +1,116 @@
+[00:00:00]
+>> It's time to talk a little bit about service workers. Again, this is not a workshop on service workers, you have Frontend Masters in the library, many workshops covering the service workers part. But because it has to do with a lot of APIs that we will see later today, we have to create our own service worker and actually cover the basics, okay?
+
+[00:00:22]
+Of what a service worker is. Before getting into the details, maybe I will ask you. Does anyone have a definition for a service worker? What's a service worker, yeah?
+>> It's a separate thread of JavaScript that runs in the background and can be registered to access additional APIs and are required for a PWA to be a full PWA.
+
+[00:00:47]
+
+>> Okay, so you mentioned, it's a thread that runs in the background. We come back to the background definition. So it's a thread that runs in the background and has some APIs. So let me change that word to, they have some abilities, okay? To do some things that are necessary for PWAs.
+
+[00:01:08]
+That's what you said, right? Well, it's true, everything is true what you said. The last one is changing for next year. Not sure if you know that. So a PWA won't require a service worker for Chrome later next year. They are already experimenting with that, and if you are not providing a service worker, the PWA will have a default offline page saying that, yeah, you're offline, this app is not working, something like that.
+
+[00:01:38]
+But it will trigger the installation of your PWA even if you don't have a service worker, okay? That's something new that they announced a month ago. So a service worker is a thread, and I think that the most important part is runs in the background. I will change that runs in the background with it has its own lifecycle that I will show you in a minute.
+
+[00:02:00]
+And it has abilities, okay? And that's the part that it's different from a web worker. Because a web worker is also a thread, we can say that it also runs in the background, okay? It doesn't have its own lifecycle, it's attached to the top. I'm talking about the thread.
+
+[00:02:18]
+But it has no abilities, the web worker. A worker you have to thread for it's a worker thread. So it just has to do some heavy work, but the service worker has abilities. The most common abilities, the one that we won't cover today, is the one that will serve files when we are offline.
+
+[00:02:38]
+And that's what makes the PWA offline capable, okay? So it acts like a web server, but installed on user's device. So that's kind of a definition. So it's a JavaScript file running in its own thread that will act as a middleware offering a local installed web server or web proxy for your PWA, including resources and API calls.
+
+[00:03:05]
+That's a definition. So, anyway, what is important for service worker is that it runs client-side in the browser's engine. HTTPS is required. It's installed by a web page. Any HTML, any navigation context can install service worker. It has its own thread and its own lifecycle, and we will probably today cover the lifecycle.
+
+[00:03:31]
+We care about that because we care about background execution. And after it's installed, it will act as a network proxy or local web server in the name of the real server. That's the part that we will skip today, okay? If you wanna learn more about that, there are plenty of content in the Frontend Masters library.
+
+[00:03:53]
+And it has ability to run in the background. That's the other part that we care today. The abilities of a service worker to run code in the background in the name of our web app, okay? And there is no need for user's permission. You have never seen a dialog asking you for permission to install a service worker.
+
+[00:04:20]
+It's being installed silently by the browser. Just visiting the website that is complying with, at least, HTTPS, the browser will install the service worker, okay? That's how we work. We are going to code the service worker in a minute. This is kind of how diagram looks like. We have our PWA, our website.
+
+[00:04:44]
+Remember, PWA is just another name for a web app, okay? A website, the web app, a PWA, I need some middleware. Middleware means that it's a piece of software that it can be there or not, and the rest should work anyway, okay? So if we remove the service worker the rest should work.
+
+[00:05:05]
+Yeah, it won't have those enhanced abilities, but it should work anyway, okay? So everything that we're going to do in our service worker should work, okay? Yeah, it won't work in the background, but the rest of the actual work that's kind of idea, okay? And it's a proxy, so it's actually can see everything that happens between your PWA and the cloud, being your server or cross-domain servers, okay?
+
+[00:05:37]
+That's kind of the idea. But what we care most about service workers is the lifecycle. So the service worker is installed and it goes through an install event, okay? That probably we won't use today. After it's installed, it's waiting. Waiting for what? It's waiting for being the active service worker.
+
+[00:06:05]
+Only one service worker can be active in one scope. What's a scope? A folder within your server. So that means that you can have several service workers, if they have several folders as scopes. It's not a common scenario. The most common scenario is you have one service worker in the root folder of your domain, of your host.
+
+[00:06:33]
+So then you have one service worker for your whole origin. That's the most common scenario, but that's not mandatory. You can have more than one service worker, but each service worker will have its own sub-folder, okay? That's how it works. That's tricky when we are doing background execution.
+
+[00:06:57]
+Because in that case sometimes, for example, who is going to receive the push message? We'll talk about that later, if we have several service workers, okay? So that's kind of tricky. But anyway, I was saying that, after it's installed, it's waiting. Waiting for what? For being the active one.
+
+[00:07:15]
+And why it's not the active one immediately? Because, maybe, there was another one installed before. And the browser is not killing the one that is loaded and replacing it immediately with a new one. So it's waiting for being in the background, probably, or it's waiting for that page to disappear.
+
+[00:07:38]
+Or the page that was having that the previous service worker it's waiting for it to disappear and then it's replacing the new one, okay? But that's not what I care the most today, about the lifecycle, I care about the execution. Immediately after a service worker is installed and activated, it go to an idle state.
+
+[00:08:02]
+So it's in memory, doing nothing, okay? But then some events can happen in the page, or in any page from that origin. Like a fetch, like a push, a message, and there are more events that we will see later. When some of these events happen, or they are triggered by the browser, now your service worker is running.
+
+[00:08:33]
+So it has execution rights in it's own thread, okay? After a while, then you finished, you stop your tasks, you're doing nothing, you're idle again. And after a while, the browser will stop you, because you're doing nothing. Nothing needs to be done, okay? So, okay, goodbye. Even if the user is using your web app, okay?
+
+[00:09:02]
+You have the web app on the screen. So the service worker has its own lifecycle, and I will show you in a second a demo. If another event happens, a fetch, a push, events that we will see later, the service worker is back to running. And that second execution might not be the same instance as before.
+
+[00:09:28]
+So it's the same service worker file, but it's creating a new context. So if you have saved a variable, a global variable, in the previous instance, it's not there now. Make sense? So let me show you this in action before actually writing our own service worker. So if you have never seen this, I encourage you to go to chrome://serviceworker-internals, serviceworker-internals, okay?
+
+[00:10:02]
+That's the URL I'm using right now, chrome://serviceworker-internals. So here you will see right now all the service workers that are actually installed in your device, in your computer or mobile device. And I have, probably, I don't wanna say thousands, but for sure, hundreds. For example here, I have a service worker for Brazil city JS conference.
+
+[00:10:35]
+So I spoke at that conference and it seems like I went to the website and that website installed a service worker. Is it running? Is it executing go in the background? Well, here we can see it's installed, it's activated, but the running styles is stopped. So it's not executing code, and it will be like that until something happens on that website that triggers the service worker again.
+
+[00:11:08]
+What may happen? One, a network request, so I'm going to the website again. But the other things that might happen are all the background operations that I mentioned before. Sync, pending sync, a periodic background sync, a fetch, a payment handler for pre-authorization, or a push, okay? Let me show you the simplest one.
+
+[00:11:35]
+What happens if I open now a new window on the same browser, and I go to the website? Even if I'm going to any URL, so that's Brazil, I'm from Argentina. We are kind of enemies in soccer, football, and many other things. So I can say Argentina is better.
+
+[00:11:56]
+That's a URL I'm trying, okay? By the way, I didn't plan this, it's just live. Of course that should give me a 404, I guess, right? But even a 404, it doesn't matter, Now my service worker is running, okay? Seems like there isn't. But 404 it's a blank screen.
+
+[00:12:19]
+Anyway, it doesn't matter. It seems like they don't agree with Argentina is better. Now it's running. So, what happens if I close my window, okay? So I'm going to close my tab or my window. Some of you will expect running to go to stop. But that's not the case, it's still running.
+
+[00:12:43]
+It has its own lifecycle. So it's running in the background. Because, technically, I don't have any window now Pointing to that Brazil city JS conference website. After a couple of seconds, now it goes to stop. Because it was idle, it was doing nothing. After a while, the browser says, okay, you know what?
+
+[00:13:05]
+We're done, and maybe we will be done for a month, or years, or forever, who knows? If I never came back to that URL, or there is no pending background operation, I don't know what the tool is. Anyway, so that's a proof that the service worker has its own lifecycle, okay?
+
+[00:13:35]
+And, in fact, here I can also start it from there. Can you see that, there is a Start? If I hit Start, the tool appears, but there is no window, it's running. Where is it running? In the background. So a service worker can be executing code in the background with no window, with no client, that's the actual term within the service worker respect, that actually needs it.
+
+[00:14:06]
+So the service worker it's our agent that can actually execute code in the background even if the browser is closed. And here, I need to use closed in quotes. What happens if I close Chrome, the last window? Well, this is the last window, I think, yeah. Am I closing Chrome?
+
+[00:14:30]
+So I closed all the windows, but the Chrome process is still in memory. In fact, in MacOS, I can actually see it there, even if there are no windows. On Windows, the OS, it happens something similar. You can close it, you don't see any windows, it doesn't appear in the.
+
+[00:14:51]
+But anyway, the process is still there. And you can see the process in the task manager. A service worker can execute code, can wake up and execute code, even if the user is not even seen the browser has opened. And the same happens on Android. It can be completely in the background.
+
+[00:15:14]
+Again, I cannot do whatever I want. It needs to be under the browser's API's umbrella, whatever the browser is offering to me to execute code. And for now we have five specific use cases. The APIs that I mentioned, background sync, periodic background sync, background fledge, Web Push, and payment handler.
+
+[00:15:39]
+Those are the use cases where my service worker can wake up in the background, no matter what, and execute some code.
+

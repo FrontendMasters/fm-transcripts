@@ -1,0 +1,121 @@
+[00:00:00]
+>> So, the last chapter is push notifications, okay? So, web push notifications or push notifications or Web Push notifications apart it depends on the case it's just the same an umbrella of API's and abilities that we have today, to notify the user from the server asking first permission.
+
+[00:00:28]
+Okay, we will see this in a minute. So, we need to ask the user permission if granted, now the service worker can create notification from the background, and that's not push yet. It's just notification. But also, the PWA can subscribe the user to push. I will show you a diagram in a second.
+
+[00:00:51]
+About how this works. And then a push event will be fired in the service worker, to handle the push. So, in this case the server can send the message to that user and then on that user's device the browser will wake up the service worker and it will fire the push event handler.
+
+[00:01:16]
+Today is working on Firefox, Chrome, Edge, Samsung Internet, and Safari from macOS 13, macOS Ventura. Even if you have the latest Safari on previous versions of macOS is not going to work. The reason is that macOS Ventura has a new demon. At the OS level for web push, okay?
+
+[00:01:42]
+And iOS and iPadOS was promised for 2023 at some point, not sure if it's going to be for iOS 17. Or who knows? So today it appears as an experiment, but it's not working yet. So even if you enable the experiment in safari settings on IOS, the code doesn't work.
+
+[00:02:05]
+So the first step is a step that we have already seen before, because it's the same step that we see for the old classic desktop notification API is to ask for permission. It's exactly the same code, okay? So, the first step is to request permission for notification. This is a, I think, the most challenging part of this API from a new UX perspective.
+
+[00:02:34]
+So, we are not covering that the user experience part today we're more on the technical side, but there are a lot of articles and books on the topic on when to ask for notification permission to increase the opportunity. For a yes from the user, okay? So that's the challenging part.
+
+[00:02:59]
+
+>> Is there when you ask the user for permission, part of the UX best practices is to explain yourself and why the permission is necessary. Is that built into the Request API
+>> Must you do that? No, that's a very good question. Unfortunately, the permission API and this permission API in particular don't have a way to express, why are you requesting this?
+
+[00:03:23]
+So the answer has to do with your user interface. So before By asking the API permission, you should present a window or something explaining the user the advantages of saying yes. And then typically what you see is an escape for now, or a yes. And the yes will trigger the real dialog.
+
+[00:03:48]
+If the user already say yes. It's there is a good chance that it will say yes to the real dialog after that so something like that but unfortunately the API does not include that as the native API's. So native Android and iOS API's, they include in a string description for the permission that you see.
+
+[00:04:10]
+I mean, what the geo location permission appears. It explains why it needs that, but not on the web. So, we're going to go this in a minute, but let's go over the steps first. So far, we have permission for sending notifications. Okay, but this is not push yet.
+
+[00:04:27]
+For push, we are going to see the push subscription architecture. So, we have a web server that's our back end our web server and there is a push server the push server is owned by the browser so it's not on our side okay, and then we have client by inside the service worker and the runtime, also known as the browser, but it can be also a PWA standalone window, so the runtime that is rendering our website.
+
+[00:04:59]
+Okay, so the runtime request push to the push server, so actually request to the browser and the browser. Ask the push server, the push server this is after we have permission. Okay, so after the user has granted permission, the push server will give us subscription details. And we have to send those details.
+
+[00:05:25]
+Joe, we're back in. Okay. So that's the flow. You will understand this at the end. Believe me, trust me. So, again, we ask Safari or Chrome or Firefox for subscription details and they will give us an object and we need to save that object in our web service, and you will understand why in a minute.
+
+[00:05:47]
+So, to actually request this, we also need to get the service worker registration object, and over that we talk to the push manager, and we register a push. The push, we subscribe a push, needs two mandatory properties. A user visible only, that the only acceptable value is true.
+
+[00:06:17]
+This is something that we discussed before today. So, on native applications, you can send silent notification. A silent notification will wake up the app. The data that we're sending is received by the app but the app doesn't need to notify the user. On the web, this is forbidden.
+
+[00:06:42]
+We can only subscribe to user visible notification. So, that means every message that the server is sending will notify something to the user. So, if we are abusing this, the user will notice that it will be annoying, and he will remove the permission it will revoke the permission from the notification itself.
+
+[00:07:06]
+Even Chrome right now in case of Chrome When there is, there are many notifications from the same origin is giving you a man another notification says, hey, you're receiving too many notifications from this origin Do you want to revoke permission? Okay, and then we need to send an application server key.
+
+[00:07:26]
+So, today at least the Web Push system is working on top of something known as BAP ID. It doesn't matter how to do with security but a few years ago initially we didn't have that, but now we have that on every browser. That's actually a pair of public and private keys.
+
+[00:07:46]
+Okay, so for our server, we need to create those keys, and I will show you how to do that in a couple of minutes. And we need to put our public key there in the application server key. The key is a string, so we put the string there.
+
+[00:08:03]
+We copy and paste to the public key, okay? So, that key will actually travel to the push server. Okay and the server so Safari or Chrome will actually store our public key with our origin. So, you will start understanding why this is needed, okay? This is for security.
+
+[00:08:29]
+So, no one can actually impersonate us, and sending push messages with our name. So, that's why we also have a private key That we need to store safely, and no one needs to know about our private key, okay? Make sense? And so, this is a promise, so we wait for it.
+
+[00:08:53]
+And when we have the data, we need to save the data in our server. That's the idea. So, we do a fetch to our server, and we send the data, and the server needs to store that somewhere in a database, okay, wherever you want. You will need that data to send messages to that user in the future, okay?
+
+[00:09:19]
+Makes sense? The data looks like this. Because I think you were thinking about this. So, what's the data, what subscription details. You receive an endpoint. The endpoint is actually a URL that typically has a unique ID for that user on that device You won't get the username, the user email, nothing that will actually point to the real user.
+
+[00:09:43]
+It's a unique ID that represents that user in that device. So, if the user is on an iPhone, and it's on Safari on the Mac, let's say that iPhone supports the API. You will get, if the user is subscribing and on the same website to push, you will get two different unique ideas.
+
+[00:10:04]
+And you'll know if it's the same user or not, even if it's the same iCloud account, okay? And also, you receive keys. And those keys, are actually public keys from the push server. Okay, and we just say this, all that data in our server. Yes.
+>> When you say that the push server is owned by the browser, do you mean that it's owned and operated by the browser vendor?
+
+[00:10:34]
+Yeah.
+>> So like.
+>> Apple multilane Google, yes.
+>> Like have to operate push servers to provide this as an intermediary essentially.
+>> That's correct, yeah
+>> Okay, they have their own cloud, and they have their services there and we are going to talk to those servers in the future to send messages to.
+
+[00:11:00]
+Okay, make sense, so this is the data that we will get from every user, and we need to send that data. To our server. In fact, before coding this, let me run this on any website, because we can actually see this on every website. For example, I can, let's go and request permission for notification on any website, which website do you want?
+
+[00:11:31]
+Good. How can we do that? Yes, so can I request notification? There you have it. GitHub wants to notify me just because I pasted deadline, okay. I say okay, yeah, granted. So now I have notifications on this origin on this. In this origin, in this browser. This is per browser, per origin, okay?
+
+[00:12:00]
+So, it's granted. So, that means that now I can request a push. So, without all the data here, I need this code. The problem that I have despite that character although I don't know what that is, is that I need the key. Also I need service worker registration.
+
+[00:12:24]
+I don't if it has service worker actually. lets see application, no it doesn't. So without service worker. No push but I don't have permission because you can still create local notifications. Remember it's the same permission. Okay, so let's go to skoosh. They do have a service worker because it's a PWA.
+
+[00:12:54]
+So requesting permission, granted permission. Now I need to, Say that registration is await navigator. Service worker ready and over data registration I'm going to talk to the push manager but hey my key is not valid because I need the public key. So, how can you create keys? The simplest way, we will do that with our code in a minute.
+
+[00:13:28]
+But I want to show you first that I can run this over any website, actually, even if I don't know the website. It's weird. So, I open a terminal. And I will run a magic code, not really a magic code, but it's something on NPM. I'm going to execute over a Web Push library it generates VAP ID keys.
+
+[00:13:55]
+I have a pair of keys, the public key and the private key, every time you run this you get another pair When you pick one, you need to safely store that, okay? So, now I can take that public key, for example, and try to use that one as the key here.
+
+[00:14:16]
+Let's see, I still think it's fine. I didn't get any response yet, so it's still waiting for some reason. I'm here, counsel. It's working.
+>> Could just be returning nothing.
+>> No, there we are. It just took a lot of time. I'm not sure why. Yeah, not normal.
+
+[00:14:42]
+Anyway, this is the object that I have in return. I have an endpoint and look at the endpoint fcm. That's five Cloud messaging. Google apis.com, blah, blah, blah, blah, blah. And this is the my id. And then, options with another key that's an array buffer so now with that information I can send a message to myself as skoosh .app, Okay?
+
+[00:15:23]
+At at least it will work. So now we will do that process with our app, okay? But at first I wanna show you that you can actually get that information pretty quickly, okay, on any website if it has a service worker. Because without service worker we don't have the API.
+
