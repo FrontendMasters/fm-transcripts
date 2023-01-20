@@ -1,0 +1,126 @@
+[00:00:00]
+>> Now, we're kinda entering the final advanced kinda section for using Solid. And a lot of this comes from the progress we've made in the last couple years. I started Solid back in 2016 and most of the mechanics that I've showed you so far, existed at that time.
+
+[00:00:15]
+But since 2019 there's been a lot of movement, a lot of things like SSR and new rendering modes. And Solid has grown in the last three years to kinda anticipate and work with those. And a big part of that comes down to kinda overarching application architecture. So the last piece I really wanna talk about today and show off is routing and async data patterns.
+
+[00:00:45]
+Because these are things you need in pretty much every app, and there's something that are more emphasized when you think of your framework as a full stack framework rather than just a client side rendered thing like we've been doing so far. So, yeah, I mean, I'm not giving the full history here, but I'm gonna say that client side routing, arguably has been like contributing to the biggest, I guess, evolution in modern web development for the last 15 years.
+
+[00:01:13]
+Like it's not a new thing but it's a reason why we have single page apps, right? This idea that you don't have to go all the way full page to the server to get the next page. You can just request some JSON and basically keep everything in the client.
+
+[00:01:29]
+This has allowed us, not requiring these full page reloads, allows us to kinda navigate to new pages and make it feel more native like with things like animations and transitions, giving better immersive experiences. And so client side routing is the main way we do routing in Solid. Big part of our routing it's always been something called nested routing.
+
+[00:01:51]
+And again, I'm not gonna give a full history here, nested routing existed back in like the rails days. It got into JavaScript I think, around 2011-ish ember.js had nested routing. And then very shortly after around 2013-14 period React Router 1 came out with nested routing. And vue has nested routing and Solid has nested routing, literally everybody has nested routing, all the way up to I think next.js got rested nested routing more recently.
+
+[00:02:21]
+But the idea here is that instead of re-rendering the whole page on navigation, we kind of view it almost like a series of layers that are tied to sections of the URL. So if you had to say, a list of shapes, that would be responsible for, say, an outer layer and then the specific shape could be that inner content area.
+
+[00:02:44]
+And that way if we just change part of the URL, we only change part of the UI. And this was very important to Solid right from the beginning, we never considered anything but nested routing because our rendering renders once and uses real dom notes. So it's very awkward if we were going to like re-render the whole page, we'd be recreating all the dom notes.
+
+[00:03:03]
+So nested routing has been there with Solid since the beginning and it's kinda very core to what we do. But, it also serves as a really logical place to break your code apart, right? You can view each section of your route as a separate JavaScript bundle, and then we can do smart things like look at, okay, if you're navigating to this URL, we know exactly what JavaScript bundles you're gonna need.
+
+[00:03:30]
+And this lets us like ,load it incrementally in pieces, much smaller pieces because of this nesting. So if you end up swapping all the sections, then we can go we're gonna need these three pieces and we're gonna load them all in parallel up front. But then if you just switch one after that, then we get the next piece.
+
+[00:03:47]
+So this is all kind of part of the mechanism, but lazy loading is still async and it still takes time. So kinda gonna start building the case here why we need to be concerned with asynchronously when working with our routing solutions. Because we both have to load the code and we have to load the data.
+
+[00:04:05]
+Speaking of which, because this was very key to us, right from the early days, Solid came up with this kind of idea of what we call data functions. And it's similar, if you've seen some other frameworks they have like concept of, like get server side props or loaders.
+
+[00:04:29]
+But the difference is we build this as a client solution before we even considered SSR. So our data functions are built into the router and not into the framework, and they've always been. And essentially the idea is that this function runs both on the client and the server.
+
+[00:04:46]
+But the idea is you just set up, you can create some signals or stores in here, and you kind of just pass them in. And if you do data fetching what we'll do is we'll actually trigger the data fetching for each segment of the route even the nested ones in parallel to kinda prevent waterfalls.
+
+[00:05:02]
+So essentially you're loading all the code and all the data in parallel on any navigation. And you might be looking at this and go, okay, this is fine but what is this createResource thing in front of us? I'm trying to get ahead of it and said, I kinda hint to that earlier, but in Solid, one of our primitives that are built in is this idea of a resource.
+
+[00:05:23]
+And what a resource is, is it's basically a promise to signal converter. It's the easiest way I can put it. It handles lots of things like loadings or gives indicators or things like loading state and error states and whatnot. And essentially, it takes in a source, which in this case, the user ID, it could be a query could be whatever, something reactive.
+
+[00:05:46]
+And then it feeds it into an async function, that way you can do your fetching. And then whenever the source changes the async function updates and you have this primitive that gives you the data and you can use inside your views. And the thing is there is one important detail to understand about resources and make them a little bit special.
+
+[00:06:16]
+Resources are basically their source of truth isn't where they're created, but where the red. This is why we have a special primitive for this, and we're not just using an effect that writes a signal or something. It's because we care about where you use them in your user interface.
+
+[00:06:39]
+And what I mean by this, let's pretend our fetch fails and we throw an error. It doesn't error where we created the resource, it actually throws where you read the resource. So this is important because it allows it to be co-located where the UI is. So we understand like what UI is affected by the resource failing.
+
+[00:07:05]
+And. There's a reason for this, we care about ace and consistency. Almost as much as Dan Abram often react here about consistency. That's really the goal of ACE and handling in Solid.js. We want to ensure that our UIs stay in sync. That's the whole thing with reactivity, everything stays in sync.
+
+[00:07:28]
+And we wanna ensure that we don't get tearing, ie showing inconsistent state between what it has resolved and what has not. Have you ever been on a site where you navigated between tabs and the tab updates, but the content hasn't? So you might be like looking at a list of movies you click on like a filter or like, show me my movies and the tab proceeds the content loading, that's the tearing I'm talking about.
+
+[00:07:57]
+And the reason we're trying to avoid it is because if there's this inconsistency between what we show the end user and like what the internal state of the app is, it can lead to bad things. Mostly because we trust the end user when they perform an action, we trust their intent and they trust what they see.
+
+[00:08:16]
+So if you break that trust you have a problem because they think they're seeing something and they interact with it when it's really something else. Let's pretend you could, heart, let's say you have a list of users and you're scrolling through them, and you can say like them.
+
+[00:08:32]
+If you switch to the next user, but they're still showing the old users info because you haven't showed them yet. But you've conceptually made the move because you've updated the ID, and then click heart in that gap. Which user are they liking? Are they liking the user that you're showing them or the user for the ID that's updated?
+
+[00:08:51]
+This is very important to us as kinda consistency. And the truth of the matter is, there's different ways we handle this in UI. But to handle it, we have this mechanism called suspense. And the idea is just like I was talking about throwing the errors when there's an error.
+
+[00:09:13]
+Well, similar to error boundaries we detect when you read a resource and it's out of date, like it's in the process of fetching. And we use a slightly different mechanism than some other libraries that influence suspense. Instead of focusing on like throwing promises, because that would cause a lot of re-rendering.
+
+[00:09:31]
+What we do is we use context and we look up the tree, and instead of halting execution, because whole thing execution caused a lot of rerunning and a lot of waterfalls. We just tell the parent that would be doing the conditional, kinda like the show component, conceptually. Hey, don't show this content yet.
+
+[00:09:54]
+Show the loading indicator, right? The whole point of this is to keep our UIs consistent and I guess to show loading indicators, but that's secondary. And the very last concept that I'm gonna talk about today is, Showing loading indicators are great, and especially using something suspense we can kinda consolidate all those loading indicators.
+
+[00:10:25]
+But there is one kind of gotcha with it, so to speak. It's that sometimes it's really jarring. I already talked about the experience when you change the tabs and you see the old data. But changing the tabs and always falling back to this kinda loading thing is also very jarring.
+
+[00:10:44]
+What we kind of ideally want is show the current state, show that current tabs like you haven't changed the navigation. Show everything the way it was except maybe give some kinda indication that it's changed. And then when you complete loading the new page, then show it all finished, essentially.
+
+[00:11:05]
+Of course, that's a little hard to do because how do you have an interactive page being showed to the user and at the same time be already rendering the next page that they're about to go to? And for that, we needed to do something called concurrent rendering. And to do concurrent rendering, you kind of we've already seen reactivity today, but we had to actually fork the reactive graph.
+
+[00:11:33]
+That's the best way I can explain it. It's kinda like doing merges on GitHub, where we basically forked what we have at any point where we recognize this is a change, this is a transition, this is something that we want to do kinda in the background. We just set that signal and every downstream change that happens after that, we just do in a separate graph.
+
+[00:11:56]
+The current UI stays interactive and updates. And then as those changes come in we merge them at the end and give you the new state once everything async is finished. This is very technical, I'm not gonna show you how that works to be fair but I want you to be aware of it because it does have user interface considerations.
+
+[00:12:16]
+And I have one last tutorial example to show you. Where is it? Before we move on to actually seeing this in a real life situation. And that, I wanna show this because I wanna emphasize the difference here between the different user interface experiences, okay? I have some tabs, all right?
+
+[00:12:45]
+And when I click between those tabs, I see a loading state immediately and this isn't bad. But I wanted to show this because this is what I'm talking about. I mean, this might be Twitter essentially, but it doesn't feel app like and it's somewhat jarring to have this UI.
+
+[00:13:08]
+If you like this UI, it's fine, you can do this. But what we can do essentially is, we can use transitions as a mechanism to control this a little bit more granularly and basically change it so that we don't do this. And I'm gonna again, jump a little bit ahead here.
+
+[00:13:33]
+But by getting our use transition API here, we can now return something that indicates that the transitions running and the function to start our transition. And by wrapping our signal right in a transition, we're basically isolating that change from the rest of the system. And so for RUI, this simple change of just saying, hey, wrap, this one setter with our start for our transition, allows us to indicate to Solid that, hey, any existing suspense boundaries on the page, we want those to, actually stay in the past, rather than go to the fallback.
+
+[00:14:16]
+And then, we can use our class lists here, to just give some kinda pending indicator while it's working. And what this does is when we switch, notice that this won't change right away. Instead, it's slightly dimmed before we actually switched. And honestly, you can use different effects if you want, this might not be the most convincing version of this.
+
+[00:14:36]
+But the idea is we're staying in the past until the data is loaded and then giving, I used a CSS kinda transition for that, like slow blue ring. But gives the end user an indicator that something has changed. And actually what I'm gonna do here is inside our component, which has our data, we're just faking a delay with a resource essentially.
+
+[00:14:56]
+Resources trigger this automatically, we can just make this delay a little bit more emphasized. So maybe 800 milliseconds on a random thing, and actually maybe I should actually emphasize the fixed amount. You could still see that loading when we initially load the page, but now when we switch between the routes we get this kind of smoother transition thing.
+
+[00:15:24]
+People might debate whether this is better UI or not, but we think it is and the reason I'm talking about this right now is because Solid's router transitions are baked in. You don't you don't hit the transitions yourself, it's just how it works, okay? So that's the story, first party support for suspense transitions and data fetching all built into the framework.
+
+[00:15:47]
+We're pretty happy where we've gotten to it, we've had these features for about three years now. And we've been playing with them and testing them and kind of evolving them over that time.
+

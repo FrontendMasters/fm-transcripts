@@ -1,0 +1,113 @@
+[00:00:00]
+>> There are two kind of new hooks. They're hooks even though the first one says startTransition, it comes out the useTransition hook. Using the metaphor of use callback and use memo is a great way to think about this, right? One of these is like, this function I'm about to run is not urgent.
+
+[00:00:23]
+The other one is like, well, you would put a dependency array for something else. Which is like, if you depend on that value, know that it's expensive, and you should hold off, right? If there's nothing going on, yeah, go for it, do it, right? Cuz an expensive function that's running while the user's not doing anything, it's fine, [LAUGH], right?
+
+[00:00:46]
+There's set auto callback in the browser, right? Doing expensive stuff is not the problem. It's doing expensive stuff at the expense of having a performing UI, right? And so waiting until some downtime to then do the expensive things is the way forward. So I'm gonna spin up the, and we're gonna do both, and I'll show you.
+
+[00:01:07]
+But it's basically a way to then say, hey, immediately update the input field. But wait until some downtime to do the expensive thing, right? And this one's so bad that if you catch it at the wrong moment you can still recreate something alike. But you will still become noticeably better.
+
+[00:01:28]
+So let's kinda take a look at that. Spin it up. All right, it's got ten thousand items. So let's see, It can get a little bit, yeah, I just hit Delete a bunch of times. You have to believe me that I've slammed on a keyboard, especially if you throttle the CPU a little bit.
+
+[00:02:00]
+Again, they bought me a nice one, right? But if you throttle the CPU, you can definitely. But even if you try hard enough, you can, yeah. [SOUND] I'm gonna regret that. So I should talk while that happens. It is going through this big list and is trying to sort it, or filter it.
+
+[00:02:18]
+I almost added sorting, too, and I thought enough was enough, right? And so, yeah, the experience isn't great, right? And yeah, maybe we don't have 10,000 rows, of course, right? But there have been, I think I alluded to this before. I worked on an email editor where the initial version, a decade or more ago, used jQuery to just manipulate the HTML and saved all the HTML to a server, right?
+
+[00:02:49]
+And each version had to be backwards-compatible with the last, right? And had all this legacy stuff in it. And so you couldn't just break and do any of the modern parsers. You just break into an AST, move this stuff around as you're dragging and dropping, sew it all back together.
+
+[00:03:02]
+So, what we had to do is, take the HTML, which had Outlook is based on Word's HTML engine, not Microsoft Internet explorers. Yeah, yeah, yeah, it's like hold my beer, I-
+>> [LAUGH]
+>> And has these weird HTML comments that mean things only in Outlook that don't get parsed.
+
+[00:03:22]
+And so, because of this in a modern React app where you can't just manipulate the DOM and resave it. And the fact that that worked, at all, it didn't, hence the rewrite. But we had to work with each version. So we had to parse these emails and do all this crazy stuff.
+
+[00:03:38]
+And depending on what was in the email, it was the core functionality of the app, I couldn't not do it. I couldn't be like, well, performance, [COUGH], it's like, yo, the business value here. And I didn't have this at the time, so we did all sorts of wild stuff.
+
+[00:03:52]
+But there are times where you have these, they're like, no, there's not memorize it away, yet do it as little as possible here for it. But there are some times you have to do a computationally-intensive thing on somebody else's computer, right? Yes, when was the backend team supposed to, yes, yes, yes, yes, it never happened.
+
+[00:04:13]
+So there I was. And so this is kind of inspired by that. That's why you got the war story all of a sudden. So let's talk about how to use this API. And now, there is a fundamental thing that we have to think about here, which is, I think, One of the more, not mind-bending parser, think about.
+
+[00:04:36]
+And here's a simple implementation. The fact of the matter is, we can argue about a useMemo versus a useEffect, it doesn't matter. The function, it's computationally-intensive JavaScript. I don't even know if the useMemo does anything important at this point. It was for due diligence. But if you think about the concept, we set the filter like we would on a normal input element, like we always do every time, right?
+
+[00:05:01]
+And if either the filters or the list of task changes, right? Go get me a new filter list of tasks and show them, right? And that is what we seek to do. But it's obviously not working out well for us, right? I'm sure it pegs the CPU, if we pulled out the profiler tools.
+
+[00:05:22]
+And so what we wanna say is, hey, responding to the user feedback, setting that filter that's powering that input field, super important. Do that, absolutely. Filtering the list, if you gotta wait a second before you do that, have at it, right? Okay and so this is a kind of a new API that gives us the ability to do that, that we didn't have previously.
+
+[00:05:51]
+And so, as I said before, we have two new hooks. One of them is this useTransition. And the transition is something saying, do this when you can, right? You can even see, it's got great documentation in it already, right? Allows components to avoid undesirable loading states. That's what I had, by waiting for content to load before transitioning to the next screen.
+
+[00:06:14]
+Also allows components to defer slower, data fetching updates until subsequent renders so that more critical can be rendered immediately. The latter one is like the use case that we have here. But it's basically, yes, the ability to kind of put this thing off, and get it ready and do it.
+
+[00:06:29]
+And so, how this works, if we pull out the useTransition hook, it's like it has the same two values every time. Right, useTransition and we get two things. IsPending, that's a boolean value. And you know why it's great? That means your thing is happening, or your thing is at least cued, and you can show a loading indicator, right?
+
+[00:07:01]
+This is when we're talking about, with suspense data fetching, that we seek to have these things. You can see, these are some of the parameters. Yes, your thing is happening and it will automatically turn that boolean to false when you are done, right? And then when you say startTransition, Awesome.
+
+[00:07:25]
+And so now it is like, this one is the one I said, one was kinda like useCallback, one was kinda like useMemo. This one is more like the useCallback, which is like, hey, I'm gonna give you a function to run, when it is a good time to do that.
+
+[00:07:41]
+So we have this handle change, right? Here, we don't necessarily need to trigger this all I did. So, what I might do is begin to separate this out. I wanna separate the, right now, updating the filter input and kicking off the getting the visible tasks are intrinsically related.
+
+[00:08:02]
+And there's probably different ways I can go about this. Yeah, I think it's at the same points, the half does at 16 here. I'm gonna completely separate them out. So we'll have, Filter, there we go. Because if they make them happen at the same time, they're bound together, right?
+
+[00:08:34]
+So if I wanna say one is important and one is not, they have to be different concepts. So we've got these filters. This is just like, it's a little thing that handles, it's a reducer because I like reducers. Leave me alone. That has, because it's got the drop downs and there's three different fields, it manages it all to one thing.
+
+[00:08:59]
+But you can look at the hook. It's just an abstraction over use reducer. Cool, so we've got that in place. So we've got this idea of the filter inputs, and we can kinda use that, as well. And we will put those in there at one point. Cool, cool, cool, so we'll put the filter inputs.
+
+[00:09:18]
+The filter inputs, that's what is in this. If we click in here, it's just inputs that are styled with all the things that I need. So we'll keep that, these will be based on that. So it'll still trigger the handle change, right? But the input itself is now very quickly, we're gonna set some strings and we're gonna call it a day, right?
+
+[00:09:38]
+The one that is gonna kick off this beast, right? We're gonna separate out into the transition. So we're saying, set the filter inputs immediately. That is important. Do it, right? Maybe I should pluralize this, FilterInputs. Do it immediately. So right now, if I save this and flip over, super responsive again.
+
+[00:10:14]
+But mostly because we're not doing anything. [LAUGH] Again, to really highlight the fact that not doing stuff is faster than doing stuff, breaking your app and removing the functionality is an incredibly way to make the inputs more responsive. So we never trigger the setting of the filters that triggers this entirely expensive thing.
+
+[00:10:33]
+So we're saying, immediately do this. But we talked about automatic batching in the beginning. So it was like, it's not like doing this and doing Yeah, well, first we'll set the inputs and we'll get all the feedback we wanted, and then we'll do the expensive thing, right? No, we talked about this.
+
+[00:10:55]
+We talked about this in the beginning. It always batches in event handlers, right? I guess maybe previously you could have tried to do some tomfoolery with a set timeout and a dance with loading, and hope that they weren't typing when your timeout came due, right? And could you get 20% of the way there with a set timeout, and then have the other 80% of complexity of canceling, and throwing away updates, and having race conditions?
+
+[00:11:25]
+You totally could. So this won't work because they batch, you've now just have a more complicated version of the same thing you originally had. What we wanna say is, yo, put this on your list, do it. But responding to our user, that's the most important thing. So we go ahead and we say startTransition.
+
+[00:11:53]
+Give it an anonymous function, cuz if we don't, we saw how that bit us, right? It's all coming together. And we'll go ahead and we will kick that off when it chooses to. And then we have one final thing, which is, we got our new friend here, right?
+
+[00:12:10]
+And I did not make a pretty loading opponent like I did last time. So we'll just do a simple one here. That should do. That feels appropriate. So I'll say this, and again, these APIs are, I posted this once but there was a conceptual weight to it, right?
+
+[00:12:48]
+But the actual, the typity typity part, unlike some of the other stuff with some weird how threading dispatch through tedious annoying, get lazy loading for a component. It's not so bad. There's a conceptual way to this, but the actual API is, I think, shockingly elegant, right? So yeah, state updates caused inside the callback are allowed to be deferred, absolutely.
+
+[00:13:12]
+If some state update causes a component to suspend, as you can see, this is kind of related to some of the other suspend stuff. The state should be wrapped in a transition, right? Cool, all right, so now we try it out. I mean, nothing matches that, but you can see typing is great.
+
+[00:13:35]
+The expensive thing is still happening. I get that loading indicator when it's running. And it automatically pulls it up and tears it down for me, which is incredible, right? And it's all kind of baked into React 18. Now you do have to be using a create route and all the rest of that kind of stuff.
+
+[00:13:52]
+But the idea that you kinda get these primitives for those cases where no amount of tweaking and cache memory is working. I have an expensive thing, it needs to happen, but I still also need to prioritize user inputs. These are things that did not exist prior to this, and they are things that exist now.
+

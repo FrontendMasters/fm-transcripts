@@ -1,0 +1,158 @@
+[00:00:00]
+>> So now, let's talk about how does React do, what it does, right? Because it's really hard to triage and think about what could be the cause of the issue if you're like something in virtual DOM, life is good, right? And so let's talk about when something changes, what exactly goes on under the hood?
+
+[00:00:19]
+So React's rendering cycle has effectively three phases. And I think we mostly know about them, right? And so we have the render phase. I think that the whole, it's not necessarily true. There is a virtual dom, and that was definitely true in 2013. It is increasingly less true at this point.
+
+[00:00:40]
+But the process still, and we'll see this in another slide to see actually how it plays out, which is the rendering phase. Our components at the end of the day are a bunch of functions, or possibly, JavaScript classes. And so when something changes, cuz once we render the page, if the user never clicks on a single thing ever, you don't have performance issues.
+
+[00:01:02]
+They took some kind of action, or you're polling for the API every 30 seconds, something has to happen to trigger rerender. React does not choose to rerender on its own, something occurred either through your code, or most likely cuz the user did a thing, right? They tend to do that on applications, right?
+
+[00:01:26]
+And if they never do a thing ever, I wonder why this is a React app and not either a, a server side rendered app, or b, just an HTML page. Those are super performance, right? You wanna solve your React performance problems, that's the way to do it right there.
+
+[00:01:39]
+So when something changes, we go through the render phase, which is it invokes all the classes, it calls all the functions, it looks at the output, and goes, what's different from last time, right? And it gathers up all of those things. And then with the array of things, array is probably an overloaded word.
+
+[00:01:59]
+With the list of things that have changed since the last time it rendered, it goes and figures out what the most heuristic set of changes. Post performance data changes to the DOM are to make and it makes us, right? It is one of those things where, yes, if you were gonna sit there and handcraft every change on the page, you can probably beat React.
+
+[00:02:23]
+But as a general heuristic, it has a set of rules that it applies, or what the right thing is to do most of the time, and it works. And that's when it enters the commit phase, it takes this list of changes it needs to make to the DOM, and it does them, it updates the DOM, right?
+
+[00:02:40]
+And if you ever use a ref in React, it also needs to then update those refs, right? Refs are basically references to exact DOM nodes. If it has changed the DOM, it does need to do one more sweep to make sure like, are all those refs still pointing to objects that exist and wiring them all back up?
+
+[00:02:57]
+And then we have the clean up phase. Implicitly, in between commit and clean up, there is this passive effects phase. That's where stuff like use effect happens, right? And as we know, a use effect could call a set state, and we're back, right? And that's why the dependency list matters and stuff along those lines, Mark.
+
+[00:03:16]
+
+>> Where do animations happen, and how does that affect rendering?
+>> Animations depend, right? If it is an animation, that is done through CSS, right? Then those actually will a lot of times not happen on the main thread. If you are on the other hand taking a DOM node and changing a value on it, those are synchronous, and they happen during a lot of times you'll be modifying the DOM.
+
+[00:03:41]
+It'll either happen to a series of renders. It really depends, if you're doing it on ref, then it will happen in the commit phase. If you're doing it by changing the state every second, you're just gonna go on this Ferris wheel, is spinning very fast through this entire process.
+
+[00:03:53]
+But if it's a CSS class, then it will happen on a different process altogether. Cool? All right, so let's look at this render phase and how it actually works. Basically, the kind of high level is we've got this idea of something happened. Usually, almost always, that is some kind of state change.
+
+[00:04:19]
+It's either a state change or a prop change, but what's changed in something's props. Eventually, there was a state change somewhere, right? The context could change, but a lot of times, there's a use state hiding in that context, right? And as I've talked about before and we will talk about later, use state is just an abstraction over use reducer.
+
+[00:04:44]
+So if it happens in use state, then it happens in use reducer. So we start out with our state change, that triggers a render. And then the heuristic that React uses for whether it should render a child component is, did the parent change, right? There's no like, let me guess, there's no other heuristic of the state change will trigger on some parent node, right?
+
+[00:05:13]
+And then all of its children will be asked to rerender, right? And then at the end of that render phase, React will gather them all up before them the guy who is different now, right? But every single one regardless.
+>> There's a question around, do these changes batch if there's two separate components?
+
+[00:05:38]
+
+>> I love questions that I have slides for. I will answer now, then I'll answer it again because I'm not gonna be rude and not answer now. So the question was, what happens if we took a two state changes, three, five, ten at the same time? And do I go through this rigmarole x number of times?
+
+[00:05:57]
+And that question somewhat depends on what version of React you are using. If you're using React 17 and earlier, which is a very real possibility for a lot of people. React 18 has not been out that long, and sometimes trying to get that upgrade prioritized on the old list isn't the easiest thing to do in the world.
+
+[00:06:19]
+There's no shame about that. So in React 17 and earlier, sometimes they were batched, they were batched in an event handler, right? So in and on change, in and on submit, they were batched. There's a giant asterisk and seven other disclaimers on that only in that function. If that event handler had a set timeout, or I don't know, a promise and an async function, no longer were they batched, right?
+
+[00:06:54]
+So in a very small subset of cases, they were batched in React 17 and earlier. In React 18 and later, which I guess is just React 18 and whatever. Minor version's on at this point, you get automatic batch. And now, they are batched across the board. In React 18, they will basically run through the code or collect up all of the state changes.
+
+[00:07:21]
+And then when it's got through that entire process, then it will go and do the next round of state changes. So the answer is it depends. It depends on whether you're using 18 or 17. If you're using 18, yes, if you're using 17, it depends, right, in a probably the most common case, yeah, right?
+
+[00:07:43]
+But also awaiting promises is relatively common as well. Yeah, the heuristic is a state change can happen anywhere in the tree, and at that point, it tells all of its children to rerender. Now, really, this graph is 90% of what we're focusing on today. So there's a bunch of strategies here.
+
+[00:08:10]
+One, right now, it's happening at the top of this very simple tree. If you moved it down to one of those, that second row, right, whatever, if you can make that state change happen lower, fewer things have to rerender. It doesn't make everything rerender whenever something happens, it says from the point that the state change on down, right?
+
+[00:08:32]
+So the further you can push down that state change, which is sometimes antithetical to what we're told when we first learning React. It's like you lift everything up and you pass everything down, but don't lift it too high is what this chart is saying, right? You lift it too high, you're gonna trigger a lot of rerenders and stuff along those lines.
+
+[00:08:50]
+So pushing it down as much as possible, right, is the first and best, and arguably not always attainable, but step one, the first thing that you should try, right? There's a step two, which is kind of equally as good, but we'll talk about that one in a second.
+
+[00:09:06]
+Then if that one doesn't work and the tree is worthy of this, then it is worth saying, somewhere in the middle. Can one of you step in and see if this really needs to continue, right, just cuz that one up there started it. For me and my family, nothing's changed for us.
+
+[00:09:30]
+Especially, let's imagine this one down, okay, we have a node that ends, right, right there. Memorizing that one, pointless. The act of doing it is not cuz we render. But let's say on the right side of the screen, that goes down 47 more levels. Stopping that at level two or three is probably worth it, right?
+
+[00:09:56]
+Again, React does not try to figure it out, it does not care, it's just gonna go, right. So where the cost benefit for any of these techniques come to is how expensive if we kept going down this path at the place that we could have stopped it, right?
+
+[00:10:11]
+How expensive would have been? And it isn't worth it, and that's the point where like, yeah, at that point. You've done the cost-benefit analysis, it makes total sense. But doing it on a trade that's about to end, probably not even worth it, right? Even if it's worth re-rendering, okay, it's fine, relax.
+
+[00:10:28]
+But yeah, they trigger down, they keep going down. So part of it is to push that state change down as far as you possibly can. And the second one is to stop it, if you can.
+>> If I recall correctly at some point in Reddit, there was something, like if props didn't really change, the component won't rerender.
+
+[00:10:45]
+
+>> Yep.
+>> So that does not necessarily fit. And I remember I was confused when profiling myself why it wasn't holding true, would you describe how true? But I clearly remember until, as soon as props remain the same, the child will not rerender, how does that fit here?
+
+[00:11:00]
+
+>> Yeah, so there's a bunch of ways, one of it we'll do today. So in class based components, it was should component update, right? That was a method that you can put in a class one, and that method got two arguments, old props and new props, right? And you could theoretically look at them, right?
+
+[00:11:19]
+That was a manual way, and we're doing manually with hooks. I believe you could have a class that inherited from pure component. And pure component was basically a subclass of component that had a should component update that said, just do even a triple equal sign on these two things, right?
+
+[00:11:39]
+Or just shallowly compare them, and then it would stop it. And I believe for the functional components, there was maybe React or functional component, or maybe it was a pure component version. But yeah, there was a functional component version as well that did the very shallow should component update out of the box, right?
+
+[00:12:06]
+The tricky part to that is, one of the things you always have to think about with performance is that if it was you should always do this, right, then they would have just built it into the framework, right? And so what happens is a lot of those quality checks were completely unnecessary, right?
+
+[00:12:24]
+Again, it is useful because failing one of those should component updates or react dot memo or one of the other ones very high on a tree that has a great, great, great to the 100th power grandchild, totally worth it. But also calling on every almost dead end, right, would slow your app down more than it would help.
+
+[00:12:46]
+And so what happened was you'll use those components just as by default, right? Without thinking about it like, well, that one's better cuz it checks, right? And then all of a sudden, they're doing a thousand of these memoization checks for gains that were less than the cost of doing the memoization check.
+
+[00:13:04]
+So those, I believe, they might even still be in there, I don't know. Sugar component obviously react at memo which are the manual ones. But yeah, there are ways to do it, but I will still, even if they are still in there, warn against them because doing it everywhere all the time.
+
+[00:13:23]
+Now, I think there was a talk about a year ago about someone working on React kinda working on a heuristic where they could actually do it when necessary and not do it when not necessary, right? We've seen that sometimes, not doing it all the time can be problematic.
+
+[00:13:41]
+That's our jobs today. We've also seen from the example we're pointing out, doing it all the time no matter what also problematic. But if we could have a computer figure out when to do it, when not to do, and get it right 98% of the time, again, the gains will probably outweigh the 2% of the time that it calls a memo when it shouldn't, right?
+
+[00:14:03]
+So that's kind of the name of the game. So it's work on this, and you think about it. The question that came up before about batching, right? There was a little bit of batching in certain cases, and then there was automatic fashion and it worked. So it'd be interesting a year from now, two years from now, the answer might be like the heuristic has shift, right, there's work being done on it.
+
+[00:14:26]
+But at this moment, It falls under things that, the tricky parts that are left on us with the knowledge of our application, right? In the same way, we start to put keys in there cuz it's like React doesn't totally know what makes that thing unique, it just needs one piece of information to know if it's roughly the same thing.
+
+[00:14:48]
+There's still a few things left on us to do to kind of inform React about what our intentions are. And so that's where it comes out here, but so you're using what, if your component for the class-based ones, but yeah class based ones. But yeah, using those consistently can be more problematic than not.
+
+[00:15:05]
+And so I think an important thing to think about. We won't spend too much time on this, but this is kind of an overall, like, how everything goes down, which is you start out with a component mounting, which is run the function, call the class, right? Figure out what that original output is, that's the kind of purple section, right?
+
+[00:15:25]
+You'll get back some JSX, whether it's the render method on a class based component, or the output on a functional one. And that will kind of be there. And then cool, with the first one, you don't even need to do any diffing, right? It's like this thing doesn't exist, go put it on the page right on.
+
+[00:15:42]
+And that's when it happens in the commit phase. And then after that, which is sometimes why using use effect for AJAX requests, network requests, is somewhat problematic or tricky because you wait until you've done everything. And then you're like let's go fetch the data for this component, right?
+
+[00:16:01]
+And there's various tricks, I think maybe the libraries like React query, use SWR, and stuff along those lines. Yeah, I think user WR will make a ref that can cache between cycles. It doesn't like trickery, right? But yeah, the use effect will happen after you've already committed to the DOM.
+
+[00:16:21]
+And then we'll clean up effects, which might trigger some stuff. Then like we said before, and that much, much simpler version of this, right, a use state or use reducer will go ahead and be the thing that the catalyst for the updating phase, right? We'll figure out what all the changes are, we'll trigger that tree, we'll update the DOM again, and the things kinda continue and go forward like that.
+
+[00:16:44]
+But that is a simplified version of the relatively involved process of figuring everything out, but is like we mount that first time, then what changed? .Cool, the other interesting ones cuz we will use them today is use memo, gets set that very first time, and then use call backs are kind of pulled in to make sure we're not redefining the function.
+
+[00:17:08]
+So if you've never used those hooks before, we'll use a whole lot today, don't worry, you will you ever use them by the end, how about that? That is the kind of situation we find ourselves in that we are going to be able to deal with.
+
