@@ -1,0 +1,96 @@
+[00:00:00]
+>> All right, auth is looking good. So we got our all form, we got our auth pages. Now we just need to make the API functions that are gonna use these auth libraries, so our auth form on our auth pages can make an API request to register and sign in, and then they can finally get into our app.
+
+[00:00:22]
+So let's do that next. So for the API routes, we're gonna make one for /register, which is exactly what it sounds like. It's for registering. And we're gonna make one for sign in. So let's start with register first. So we're gonna head over to the pages directory, pages/API.
+
+[00:00:43]
+We're gonna make them for register. And hence, we're gonna exports default async function, so I'll call it register, like that, request, response. There we go. So we've kind of distinct about the strategy of register, and like what is the purpose, what is it going to do? Well, first it's just gonna check to see if we're in a POST request, just to make sure that we're only handling that.
+
+[00:01:21]
+And then it's just going to attempt to create a user here. So you might ask yourself, well, why would we try to create a user without verifying if the user's in the database already? Well, that's because we're juts gonna leave that to our schema constraints to do that for us.
+
+[00:01:38]
+Our schema has a constraint on unique email, so if you try to create a user with the same email, it won't let you. So we don't have to do that check first. That's the whole point of a unique constraint. So this will fail if there's already user of this email.
+
+[00:01:49]
+So that's done. So we'll try to create a user with a hashed password, and with the first name and the last name. And then from there, if that's successful, we'll create a JSON Web Token from that user and set it as a cookie, and send back a response of nothing pretty much, just 201 success.
+
+[00:02:08]
+And that's the strategy of the register. So let's do that. If you want to be able to use some of the hints for the type checking, you can import the next API request the next API response interfaces from Next. If you wanna get some of that nice type checking, which is actually kinda useful for these objects, so I'm actually gonna import those.
+
+[00:02:31]
+So let's say, was it next/server, or no? No, it's just next now, like consolidated. So nextAPiRequest, nextAPiResponse, and you get to put them there. There we go. So we'll say, if req.method, and now we got that type check stuff there, POST, make sure it's all caps. If you put lowercase post, that's never gonna be true.
+
+[00:03:03]
+It's always all caps. So if it's a POST, we're going to create a user, awaits, we're gonna bring in our db.user.create, like that. Where our data, email, it's gonna be req.body.email, like that. Password is gonna be req.body.password. No, we can't put a plain text password on database. That's right, we made a hashing function to do that.
+
+[00:03:35]
+So let's bring that in. So we'll say, await hashPassword, like that. And then we can say req.body.password. So if you're looking at me like, why did I, or how did I put in await on a field like that? Yeah, you could do that. You could put in await pretty much wherever you want.
+
+[00:03:54]
+This works. The only problem with this is like, how do you properly handle that specific error? You can't put a try catch right here. So you won't be able to get down to just handling that granular error. You can handle this whole statement by putting a try catch here, but not just this specific one.
+
+[00:04:13]
+But yeah, you could totally do this. This works. That's the beauty of async await, is you can pretty much use it anywhere you would use synchronous code, it works the same. So, all right, so we got that, first name, req.body.first name, And last name. And you can see we're getting the autocomplete for the property still because Prisma knows that a user has a first name, last name, password, email, they're all required.
+
+[00:04:40]
+So it's it's doing that for me. There we go. And then from there, what we wanna do is create a JSON Web Token using that utility method that we made. So let's do that. We'll say, jwt =await, it's async, createJWT, pass in user. Now we have a jwt.
+
+[00:05:13]
+And then what are we gonna do with that jwt? Do you remember where I said we're gonna save it? That's the type of food.
+>> Cookie.
+>> Cookie, yeah, we're gonna save it in a cookie. That's right. So let's do that. So we have this, yes?
+>> Why not local storage?
+
+[00:05:33]
+
+>> Good question. The question is, why not local storage? The reason we're not gonna do it in local storage is two reasons. One, if it's in local storage, then you, on the client side, are responsible for writing the code that goes into local storage, attaching it to a header, and sending it on every single request.
+
+[00:05:52]
+So I didn't feel like doing that. That's one reason. [LAUGH] Two, we're actually gonna use Next.js middleware, which runs on the Edge. So before our server to verify JSON Web Tokens. And that environment on the Edge, which is outside of your computer, does not have access to local storage.
+
+[00:06:14]
+So there's no way that it could look in local storage to grab something and check it, which, yes, you could just attach it yourself to the headers and stuff. But going back to Reason 1, I didn't feel like doing that. So that's why we're gonna use cookies because it is less work.
+
+[00:06:30]
+It's pretty much automatic cuz cookies get sent at every single request, and because of middleware. So all those things. But local storage is a viable option. I use local storage all the time when I'm just doing client side apps with some separate API somewhere. So totally fine. All right, so we just wanna do, there's a set header method on the response object.
+
+[00:06:55]
+So we'll just do that. So you setHeader. And when you pass the set cookie header, you're telling the browser when it gets the response back to set these cookies. So that's what we're gonna do. So we're gonna say setHeader, Set-Cookie, like that. And then we're gonna use this serialized method from cookie.
+
+[00:07:23]
+I don't know if it should automatically import it. Let's see, I would imagine a serializer is such a proper name in all the stuff here. Yeah, I'm just gonna have to, it's not gonna be that far away. So we'll import it from cookie, serialize, Like that. And these things, forget about them.
+
+[00:07:47]
+Probably I don't have it installed. I'm gonna install cookie. You might not have it installed either.
+>> What's the types again?
+>> Is it a types again? It is the types. I don't know why, I thought it was automatic. Cool, all right, got our types. So we got to serialize here.
+
+[00:08:13]
+And serialize basically just takes from the name of the cookie, which for us is gonna be process.env.COOKIE_NAME like that. And then the options for the cookie that you wanna set. I couldn't spell process right. So for us, our options are gonna be, One, this is the cookie value itself.
+
+[00:08:35]
+So I guess we got to pass it as a second argument, but the third argument is the options. So I'll just copy those, cuz it's not easy to do that. So pass the jwt as a second argument. And then for these options, we're going to, one, set the expiration dates.
+
+[00:08:53]
+Make sure it's HTTP only, which basically means you can't access the cookies using JavaScript. They're only processed through the network on HTTP. You cannot touch them. We're basically saying, for this path, this URL, not some other URL. And then how long does it live? Which is basically a week.
+
+[00:09:14]
+I gave it the same time as the expiration date of the JSON Web Token so they are kinda in at the same time. And this thing's just freaking out because it doesn't know if it's a string or not. Any questions on that? Okay, so once we do that, we can set a status here.
+
+[00:09:41]
+I have 201, which specifically means successful post. Good job. And then I'm just gonna end it. I don't need to see any thing back, at least not in the app that I have made. You could have just send the user back here after they sign up and give them the user updates, so they don't have to eventually come back and make a round trip and get the user object anyway.
+
+[00:09:58]
+That's totally fine. But I think in this world where we're moving towards, only making the request that that specific component needs and not trying to make a request. Like you know back in the day, [LAUGH] I'm saying back in the day like this is a long time ago, this was not that long ago.
+
+[00:10:15]
+But you would anticipate the data that you were gonna need and you would grab it, and then you would store it in Redux. Or you would store it in some like local cache, and then by time that page got there, you already had the data. And that was an optimization.
+
+[00:10:27]
+Okay, we're moving away from that because getting data is becoming free now. Because as you see with the server component, we don't even need to cross the network to get the data, it's just there. So we don't need to make up these waterfall optimizations, like getting this data, and then getting this and then getting this.
+
+[00:10:43]
+We can just get it when we need it, and only when we need it, because it's becoming free, as in, not such a burden. So I'm moving towards that direction. So I'm not sending the user back because the off form doesn't need the user object. So I'm not sending it back.
+

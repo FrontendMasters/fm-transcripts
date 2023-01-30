@@ -1,0 +1,107 @@
+[00:00:00]
+>> In this one, we're going to create a new project. So we're gonna talk about mutations. And we're gonna soon discover some of the shortcomings right now for working with beta features like Next.js 13 and server components. And then we'll discuss different ways of how we can approach some of those shortcomings and what the plan is going forward as far as like what the team at Next.js and React are doing to address some of those.
+
+[00:00:25]
+But we'll get there when we get there. So, let's create a new project. So let's think about all the things we need to be able to do a mutation, a post, or put or delete. First, we need to be able to have an API route to hit, so we have to make an API route which allows us to interact with the database.
+
+[00:00:44]
+And we have to do API route, because we have to go over the network to do it because we can only make a project once the client has already loaded up and there's some interaction, so it's inside of a client component. So we can't do this in a server component because how would we tell the server component when to do the mutation?
+
+[00:01:01]
+It wouldn't know. Server components load data before they render. So we don't have the appropriate information. I mean, I guess there's probably a way for you to make a URL with a query string on it that you can hit that passes that query string information to a server component and the server component does the mutation there.
+
+[00:01:18]
+But I wouldn't be surprised if somebody figures out a framework around that. But we're not gonna do that. We're gonna keep it classic. And we're just gonna do a post request on a client. So we need an API route. We need the function on the front end that calls the API.
+
+[00:01:32]
+And then we need the interaction with the form that allows you to create the project. So we're gonna make all three of those and we're gonna tie them together. So the first thing we're gonna do is let's just create the function that calls the API that we haven't made yet.
+
+[00:01:43]
+So in our API file in the lib folder, we'll go there. And we'll make a new function. And we'll call this, we'll call here createNewProject. And all it really needs is a name. And I know that because if I go to my schema project, let's look at what's required here.
+
+[00:02:10]
+A name is required so as the owner ID. But we're not gonna ask the user for their ID, we're gonna get the ID from the cookie. So we don't need to ask them for that. Description is not required, due date is not required, delete is required what's got a default, task is not required it'll be empty array, all these have defaults.
+
+[00:02:29]
+So really, we don't have to give it a name at very minimal. So that's what we're gonna do. So a good name. That's why I put name there as the only arguments. Let's go back to API and we're just gonna use our fetcher. We're gonna say url. Let's say our url is gonna be for /api/projects.
+
+[00:03:16]
+All right. Creating a project, pretty simple. Nothing crazy there. The next thing we wanna do is we're gonna make our API handler in the API folder to be able to handle the requests from that function that we just made. So let's do that. So we'll go to pages api, make a project.
+
+[00:03:37]
+So that way it's going to be slash api slash project exactly what it says here or export a handler. Like that. We'll get our db in here, we're gonna need some stuff for validating, so we'll get our validation stuff in here. Because remember in our middleware, anything that goes to api, our middleware doesn't touch it.
+
+[00:04:11]
+So we have to check for a user in here. And the reason I did that is because we're rather check anyway cuz we need to know who the user is to scope our queries to. This is a multi-tenant database, as in this database has many different users and we don't want one user touching someone else's data.
+
+[00:04:30]
+So we have to pretty much make sure all of our queries are scoped with an ID, a owner or something like that to make sure that person A isn't looking at person B data. So because of that, we were gonna have to look in the database anyway for the user and get their ID.
+
+[00:04:46]
+So I might as well just check the auth while I'm there as well. So I just did that. But if you wanted the middleware to also check for authentication so you don't have to do it in your api handler, you can just comment this out right here. And you don't have to worry about checking for auth in your handler.
+
+[00:05:05]
+It'll just happen on the middleware, but I'm not gonna do it. Okay, so first we're gonna get the user with the validate, jwt using rec.cookies with the cookie name. So we'll say user, await, validateJWT with req.cookies. And using process.env.cookie name. Need our req and our response there, there we go.
+
+[00:05:44]
+What we need to do now is basically go ahead and create the project with the name and the owner ID, and then we'll talk about why we may or may not send it back. So I'm just gonna say, awaits db.project.create data with a name.body.name, And then owner ID is user.id.
+
+[00:06:22]
+So right now if we think about how this is gonna work, we're gonna put the create projects on the last open spot of this projects grid. So, it's always gonna be here. But let's think about where these projects come from. Where do these projects come from? How do they get on this page, right?
+
+[00:06:42]
+If we go back to the page inside the home. This look familiar? So where does that come from, that come in client side or server side? Where is that?
+>> Server side. Server side, right? The projects get fetch server side. Okay, so let's walk through this. Just have a thought experiment with me.
+
+[00:07:06]
+If they're coming server side as in when this page which is slash home loads up, that's when the projects are fetched. And then on the same page there's a button here that says, make a new project and you make a new project. Where do you put the new project.
+
+[00:07:26]
+Because those old projects were. What are you saying?
+>> Reaload them.
+>> Exactly you got to reload. Because that's what's fetching the projects. You're not fetching the projects on the client. This is client side, you would just push it to the array like I have an array of projects right here in the state or something.
+
+[00:07:42]
+I'm just gonna push it in here or if you use react query or stvr, it will just update the cache or just say, update the cache of the projects that already have, it's all client side. These projects didn't come client side, they get fetched on server side which only happens on a render.
+
+[00:07:59]
+So we don't have that ability. And because we're not using fetch to actually get this data we can I put it on an interval, we can't change its revalidation strategy because Next.js doesn't know anything about Prisma so it hasn't tapped into that. I think they're going to be working with popular sdk creators to allow them to tie into the caching and revalidation strategies that fetch does.
+
+[00:08:28]
+So all of these products in the future will support Next.js or I'm sorry, they'll support react eight teens caching mechanism out the gate but right now that's not a possibility. So the only caching we get is on the route segment based caching. So basically what I'm saying is we're gonna create that project and it's not gonna show up on the page.
+
+[00:08:47]
+And there's really no good way to do it other than reloading. And in fact, if you go look at Next.js's beta documentation, it tells you to do just that. So you can see here, they're fetching, they're creating like a new to do or updating it or whatever. And then they have to refresh the router here because all the other to does are coming from server side.
+
+[00:09:21]
+But in order to do that, you have to turn your page into a client page or whatever component you're in. I'm not doing that. I'm not using a client page just to do that. So we can talk about different ways you might wanna do it but really, at the end of the day, the only way to do it is to refresh.
+
+[00:09:42]
+There's probably some hacky ways around it using the url because if you think about it, the only thing the server's gonna have access to is the only state that I can have access to the url are a cookie. So I'm not gonna put it in a cookie that seems weird.
+
+[00:09:55]
+So you could probably do some url hacking with crazy strings to get this to work. But for now, that's not the case. So basically the rule of thumb would be if there's some data on a page which needs to be updated because a mutation can happen to it, that data needs to be fetched client side, it can't be fetched server side.
+
+[00:10:24]
+Right? That usually includes lists that can be added to or removed from because those things needs to be updated immediately. So if I have a list of tasks and I click done and it needs to go away, that probably needs to happen client-side. If I have a list of tasks where I want to create a new one and I got to add a new one to the list, that probably has to happen client-side.
+
+[00:10:44]
+Otherwise, you got to do what they're recommending, which is just refresh the router. But the page still has to be client-side for that to happen. So pretty much client-side for anything that needs to have instant updates for mutations.
+>> The only other thing I can think of is if you have some kind of reactive front end using probably some of the library or sockets or something they just tell the front end.
+
+[00:11:09]
+
+>> Yeah, so socket is another one. So frameworks like elixirs, live view I think that's what it's called. That's what it does. It uses sockets to pipe the data over. So maybe somebody might do something like that with Next.js but that also is because they have stayed on the on the server side but maybe someone can use that mechanism not just for state but just for updates.
+
+[00:11:32]
+Because I can definitely see that that being a thing where you just feed in the updates there. But I don't know how that would work. There would still have to be some type of client because none of the JavaScript for this because like the subscription code that you would write for those WebSockets would have to be on the client.
+
+[00:11:52]
+And none of this code gets sent to the client. So at the end of day, you got to put something on the client, whether it's a web socket or your data fetching, so I don't know. Curiously what that is they're working on it. According to the docs, they are working on this, they acknowledge it.
+
+[00:12:09]
+Or the team is working on a new RFC For mutating data in Next.js. This rfc has not been published yet. For now, we recommend following this pattern. So, just remember that. We're not gonna be thinking about it, just wanted to bring that up. Back to our api, we just need to make sure we respond here otherwise it's just gonna hang.
+
+[00:12:31]
+And because we're not gonna use anything from this response, we can just put whatever we want. Cool.
+

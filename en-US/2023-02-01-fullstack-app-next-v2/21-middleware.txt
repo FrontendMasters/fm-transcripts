@@ -1,0 +1,129 @@
+[00:00:00]
+>> So we left off with creating our API handlers for authentication. We have our all form that we already completed, we put the offer on the pages. We have our utility functions that we made. The last thing we need is that mechanism that checks the JSON Web Token and enforces it across any protected resources that we want.
+
+[00:00:23]
+So let's figure out what resources we wanna protect. So as of right now, there's really only two types of resources that we wanna protect. That's gonna be access to a certain page, and then obviously access to certain data. So a page, is a route, so basically we wanna block routes off based off what JSON Web Token you have or not and then for data that's either gonna be blocking access to an API route.
+
+[00:00:51]
+And we'll make some of those today or it's also gonna be blocking access to, like a database query inside of a server component. Since you don't need an API route for server components, you can just go straight to the database. So those are three different places in which we want to block access to.
+
+[00:01:05]
+So for the pages, we're gonna use something called middleware, that's probably the best approach in NextJS to block access to pages. For blocking access to an API handler you can also use middleware for that that works too, if you want something a little more granular, you can just block the access yourself inside the API handler function.
+
+[00:01:27]
+But then blocking access to like a database query inside of a server component, you would not use middleware for that and you have to do that on the code level, which we will also do today. But let's do middleware. So next section here, what is middleware? Middleware is just like a common term that's used in programming it means, it's like the word API, it means everything and nothing at the same time.
+
+[00:01:54]
+But really, middleware is just something that kind of just, you could think of as like an interceptor or something that sits in the middle of your final destination when you're trying to make a request when you're trying to go somewhere. It's usually used in the terms of making requests, you're trying to make a request somewhere, whether that's a front-end router or a back-end router, and there's something in the middle in between where you're making the request to and where you started, that's middleware.
+
+[00:02:18]
+And express middleware would be like exactly what it sounds like you would use middleware for like parsing the JSON and the body for adding logs and checking JSON Web Tokens and things like that. NextJS has built in use cases for middleware, but it's not the same as like Express that's because NextJS actually allows you to have two different run times when it comes to node.
+
+[00:02:44]
+You have the edge run time, which is, it's almost like a service function, but a service function it can actually compute things and it runs and it has full environment of node. It's not as restricted as a edge run time and edge run time is basically, imagine a network of CDN.
+
+[00:03:03]
+So you have a CDN and all the nodes on the CDN, a while ago, you can only put read only assets on that CDN we're talking like files images. If you've ever got an image off the internet, it was probably on a CDN and that's how it got there so fast.
+
+[00:03:19]
+But for the longest you can only put read only things on that CDN. Well, up until the last five years, we can now actually compute on the edge. So it's not only read only things, we can actually run code on that edge, on that node, and that's what the edge run time is.
+
+[00:03:35]
+It allows us to run JavaScript on the CDN node closest to where you made the request. So that means whatever code you put up on the edge run time is going to be duplicated across the entire CDN in which you are deploying to, and the user that makes the request is going to have that code to get executed from the node closest to them.
+
+[00:03:55]
+So it's just a really great way to, I mean, there's so many use cases for edge run times it's kind of ridiculous. I've seen people do AB testing, I've seen people do personalized dynamic websites It's for people based off the IP address, like, go to the edge function, take this IP address, do a lookup to see what companies this IP address belongs to change the header on the website to specifically call that company out.
+
+[00:04:23]
+And it's still SEO friendly, right? So like you can do things like that on the edge without ever touching your origin. So it's just instant. So it's a lot of crazy stuff you can do. What we're gonna do, is prevent people from accessing different pages that's what we're gonna do.
+
+[00:04:37]
+So let's do that. In order to make a middleware, it's actually quite simple, we just go to the root of our project and make a new file, we say middleware.cs. So middleware is kind of like a handler, it's just a function that runs. And then we can proceed and say, hey, cool, go next or we can stop it and redirect, we can throw errors.
+
+[00:05:03]
+But basically you can think of as like the bodyguard for our pages in this case. Or in the case of NextJS, any route ever, middleware can sit in front of any route, even if it's a route to a public image, even if it's a route to the favicon, like it can sit in front of any route.
+
+[00:05:19]
+And you'll see, we'll actually have to tell it not to do that because by default, it does sit in front of every route and we don't want our middleware function running every time someone requests an image, that's kind of redundant. So we have to be very explicit about that and there's many ways you can do it.
+
+[00:05:35]
+But basically the strategy for this middleware is to one, determine if the requests coming in is to a resource on which we want to protect. If it is what we wanna do is check to see if there's a JSON Web Token in the cookie header our specific token, if it is we want to verify that token and if you are verified then we'll let you proceed to whatever you are gonna do we'll let you in the gate to whatever resource you're trying to access.
+
+[00:06:06]
+If any one of those things fail, we will redirect you back to sign in, that's what the middleware is gonna do, right? But there's a lot of stuff we have to do in between to make sure that happens, so let's get started. The first thing is, as I import some of these things, and this is gonna seem kind of redundant.
+
+[00:06:29]
+We're gonna have to make the same function that we already made in the auth file called, I think we even call it the same verified JSON Web Token. So I'm just gonna paste it in, I'm gonna talk about why we have to make this again. In that API file and I did this intentionally we could fix this another way, but I want it to run into this I can have it as a talking point.
+
+[00:06:51]
+I'm sorry, but in that auth file, there is a package up here called bcrypt. Okay bcrypt runs on node, it's totally fine, it works in node even runs in our server components cuz we tell it next day, yes about it in the next config. Down here somewhere, there we go right but it will not run in the edge environment.
+
+[00:07:13]
+And edge environment, although it's JavaScript, it is not the same JavaScript as node it is not fully fleshed out that way. It uses something very similar to like a web worker's environment, it's very limited in how it operates because it's not a full environment you have these restrictions where you can't use code that's like doing dynamic things.
+
+[00:07:35]
+Most of the code has to be static bcript does a lot of dynamic things, so not all MPM packages will run in an edge run time. So inside this middle word file, you probably won't be able to run every single MPM package that you can find and put it in here that typically works on node because that code was written dynamically, not statically.
+
+[00:07:56]
+And this is actually why I had to find another package for JSON Web Tokens, this new one called jose. I actually never used this one before until this course because the one that I actually use doesn't work in edge runtimes because of the way that it was written whereas this one does.
+
+[00:08:07]
+So remember that you can't use every package in here and so to avoid it obviously we would have just took the verify part or this whole JSON Web Token part and put in its own file like JWT.ts and then we could import it in both places and I won't have to write it twice but I wanted to talk about that.
+
+[00:08:28]
+I want to show you why that is. So we're just going to write it again. Okay, cool so we have that now let's make our middleware function. All you have to do for the middleware function here is just export a function that has a request in response very similar to a handler that's really it.
+
+[00:08:45]
+So let's do that. There we go, so we have a request and response and if you want to type this I believe there's a Next, let me see. It might just be the request one. It might be I thought it was slightly different. You could probably use that one but I think it is slightly different, I'm not gonna use it, I don't trust it.
+
+[00:09:18]
+So what we have to do is be very like I said before, very explicit about when we want this middleware to run and there's, so many ways we can do that. The way that I'm going to do it is in the middleware function itself with my own conditional so I'm just going to check to see if the path name that's being requested.
+
+[00:09:38]
+Look at req.nextUrl, if that starts with any one of these, you're free to go, this is all public resources you can go. And so this includes like the API folder because I'm probably gonna do checking in the API handlers themselves, if you are signed in or not. So I don't want to do that here on the middleware layer.
+
+[00:09:58]
+So Imma let you go if you want to talk to API, static files, signin and register, I don't want to block you from accessing the sign in or register page if you aren't signed in, then you wouldn't ever be able to sign in or register and it'll just be it will just infinitely redirect until it crashed.
+
+[00:10:13]
+So we want to do that too. And then this next one is just like this is like mostly for development next builds to this folder. So this is just saying, like, yeah, you can go here if you want to go to those resources, we're not gonna block you this last one here is just the public it's just the regist I made for, like, public files.
+
+[00:10:32]
+They typically have like, that slash in front of them. So, yeah, this is like any public file, like an image or something you all get the green card, you get to go, right? So that's what we wanna do, so let's do that we're gonna say const pathname= req.nextUrl.
+
+[00:10:55]
+And then from there, cognitive statements are lots of writes, like that. You can also do this outside of the middleware function. You can export, forgot the exact syntax, so let's go look at it, you can export a configuration object called a matcher here like this and you can tell NextJS which routes you want to match on.
+
+[00:11:27]
+So any of these will trigger the middleware, but you can also do like regex's as well, which have like negative look ahead. So you can say anything that's not this so there's many ways to do it. I chose to do it in a code because I didn't want to write a lot of regex's.
+
+[00:11:44]
+So and I also had problems with this syntax because it's like regex to paths syntax I'm not familiar with it so I had a lot of problems actually trying to figure out the paths that I want. It was triggering when I didn't want it to trigger and vice versa so I decided to just do it this way which is they also recommend this way as well just know that if you did the matcher way where you export a config with a matcher this function won't even run if it doesn't match.
+
+[00:12:12]
+Whereas in our case, the function will run every single time it just won't get past this line if it falls here, so, but it's basically free, it's a function running on a CDN. So you're not and it's usually so inexpensive that it's not like you're losing money, I mean these things are fractions of a fraction of a penny to run so Cool, okay.
+
+[00:12:40]
+Now we want to do is we want to get the cookies from req.cookies. So we can say JWT, or get a JWT from cookies, req.cookies.get and we can access the environment variables here like that. Grab our cookie and then if you don't have a JSON Web Token, then what we want to do is we want to set the pathname.
+
+[00:13:09]
+The pathname is where you were trying to go before this middleware stopped you. So we wanna change that, we don't care what it was, it's sign in now, that's the path name, and then we wanna redirect you to it, right? So that's what we're gonna do, so we're gonna say, if you don't have a JSON web token, okay, then req.nextUrl.pathname whatever it was before, it doesn't matter because it's signed in now that's where you're going.
+
+[00:13:37]
+And then we just want to return this NextResponse.redirect so we'll say return NextResponse.redirect and you have to give it a req.nextUrl. And next response comes from next server mine is auto imported. Okay and then from there we'll just do a try catch just to try to verify this thing we don't need to get the user here.
+
+[00:14:22]
+In fact, we wouldn't do anything with it because we can't pull in Prisma, we can't run Prisma here on the middleware that's the next evolution of edge runtimes. It's like how do we store data and things like that, and there are some solutions out there, but it's not a Postgres database using Prisma that's not gonna work here.
+
+[00:14:38]
+So there's no need to get the results of this token and look it up like we did inside of our sign in where we got the token, we checked the ID to see if your real, like, we don't need to do that, because we can't do it. And that's not the purpose of this middleware, this middleware was just making sure that there is a JSON Web Token that was created by us and that's it.
+
+[00:14:58]
+The identifying of that is, wherever you're going next, and not the job of this middleware, at least in this case, given our resources, so let's do that. And make sure we use the one that we created and not the one that is in the other file so we'll do that.
+
+[00:15:17]
+And then from there, you just called next, just like most middleware, there's usually a next function that you call because there's like multiple middleware. So it's like, just go to the next function that you're trying to run and we have catch, we have an error, trying to verify you can't go wherever you're trying to go.
+
+[00:15:36]
+So what we're gonna do is we're gonna do the same thing we did above, we're gonna redirect you to sign in. We're gonna change the path name to sign in, and we're gonna redirect you there.
+

@@ -1,0 +1,54 @@
+[00:00:00]
+>> So what we can do now is head over back to our course site and kinda see what's next. So the next thing we wanna do is we have to sync our schema with our database. When you use a relational database like Postgres, the database has to know what the schema is, so that way it actually knows how to interpret the reads and the rights and different things like that, the rules of the database.
+
+[00:00:24]
+If you come from something like Mongo, you don't really have to sync any of that stuff. You don't even really need a schema although you can use them, so it's a little different. But for a relational database, you need to sync them. So that's what we're gonna do.
+
+[00:00:35]
+And luckily for us, we get that for free with Prisma. We also need to generate that type safe ORM or that SDK for our database so we can actually use it in our Next.js app so we can query the user table, create new projects, update tasks, things like that.
+
+[00:00:52]
+So we need that SDK to talk to the database cuz the database is not in JavaScript, right, we need that translation layer. So we kinda get that for free with Prisma. So what we can do is you can just run npx prisma migrate, like that, or sorry, npx prisma migrate dev And if you're using Railway or some hosted database, it might take a minute cuz it's going to the Internet and it's doing stuff, so we'll see how long this takes.
+
+[00:01:28]
+If we run it locally, it will probably happen almost immediately. So it's gonna ask for a migration name. I'm just gonna call this init for the initial migration. And then you can see what it says here, it applied that migration, it put a timestamp on it, it saved it to this migrations folder that it created with that folder.
+
+[00:01:50]
+And then in migration SQL, we'll go take a look at that to see what Prisma did for you, if you're curious. And then it says your database is now in sync with your schema. And then the last thing it said is it generate Prisma Client, and it saved it here.
+
+[00:02:04]
+So if you wanna import it, you'll just import @prisma/client, and this is gonna be the SDK that's unique to your schema, which is probably the same as mine. That way you can get that TypeScript in your editor. So as you start typing out the ORM, it'll know about a user, and a user has an email.
+
+[00:02:23]
+It'll know that a task has a name and a status. It'll know those things. So it has to get generated every single time you change your schema. So that might be a new concept, whereas most npm packages we download are already created and we just consume them. This is the npm package that gets created every single time you make a change to your schema, so it's a little weird, but kinda cool.
+
+[00:02:47]
+Anyway, let's go look at what happened. So if we go look at migrations, here it is, here's the SQL file that it created for us. It's a lot of SQL. If you don't know SQL, if you look at this compared to Prisma, then you're like, I'm so glad Prisma did that, but this is what you would have had to written yourself if you were to do the migration yourself, basically.
+
+[00:03:09]
+So we got that for free. So we'll get there and now we are ready to do some stuff with it. So let's keep it moving. So one thing we wanna do is we wanna create a little wrapper around the Prisma Client. And that's just because of the environment in which Next.js runs in.
+
+[00:03:32]
+Next.js, at least for the backend, is gonna run in a service architecture. And if you don't know how service works compared to a server environment, a server environment is always running, it's always on. So databases were designed to connect with them, with a URL that states those connections are long-lived, cuz our server is always on.
+
+[00:03:53]
+If your server is off, then no one can use your app, so your server is always on. So databases were designed to be connected with them. Most databases have a connection limit where you can pull those connections and try to switch them back and forth. Eventually with a service environment, you will run into a limit on that database really soon.
+
+[00:04:10]
+Each database has different limits and you're gonna have problems. So to get around that, you can cache the connection that you already had to share it across different service executions. Because all those Serverless functions are stateless and they spin up and shut down, the actual container that hosts them stay alive for quite a while.
+
+[00:04:33]
+And the RAM, the memory that your code is accessing while those containers are alive, we can tap into that and store these database connections into that cache. So therefore, we're not making new connections every time we spin up a service function. So it's a little deep, nut basically we're gonna do this.
+
+[00:04:53]
+This is gonna create a Prisma Client instance for us. It's gonna check to see if we already did one. If it did, we're gonna get that one, if it didn't, it's gonna save it in the global and return that one instead. Right, so we wanna do this in our lib folder, cuz it's where we put all our library stuff, and we're just gonna call it db.ts, Like that, there we go.
+
+[00:05:27]
+So db.ts here, And again, if we look at this, all it's doing is it's importing our generated client, just some TypeScript stuff. TypeScript is gonna freak out if you try to use something in the global space that's not actually there. And then we're checking to see if we're in production, cuz we kinda really only wanna make a new one here if we're in production.
+
+[00:05:50]
+Else, if there isn't one in cache, go ahead and get it, and then just export that one out. That's basically it. This also helps with the way Next.js does hot module reloading. It keeps reloading and it keeps making a new connection you'll run into a Prisma error. This prevents that as well.
+
+[00:06:14]
+Okay, any questions on that? There's things on the database level that fix this, so using a service database like FaunaDB, PlanetScale, which is one of my favorites right now, really cool database, and Firebase or any HTTP-based database really can solve this problem.
+

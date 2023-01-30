@@ -1,0 +1,159 @@
+[00:00:00]
+>> The next thing we wanna talk about is JSON Web Tokens. So for JSON Web Tokens, that's gonna be our preferred strategy of authentication. Cuz it's just easy to deal with, especially with service environments where you don't typically have a long running task, where you can keep track of state on a session.
+
+[00:00:17]
+So we'll just use JSON Web Tokens and put them in a cookie. And the reason we're gonna put them in a cookie, is so that we can access them pretty much anywhere on our network layer, whether that's on the server, whether that's in middleware, on the edge, and things like that.
+
+[00:00:32]
+So kinda getting the best of both worlds there. So we need to make some utility functions to create some JSON Web Tokens, and to verify some JSON Web Tokens, and then to grab a JSON Web Token from a cookie and turn that back into whatever the payload was.
+
+[00:00:54]
+If you don't know what a JSON Web Token is, without getting into all the details of it, you can think of it as taking a object, some payload, and converting it to some globally standard string that you can use that's gonna be unique. And when you get that string on your server, you can undo that operation and get back that object.
+
+[00:01:19]
+So it's basically a stateless way to do authentication. You just have to send that JSON Web Token to any protected resource every time you wanna access it, so the server can verify that JSON Web Token to determine if you have access, if you're allowed, who you are, things like that.
+
+[00:01:35]
+Versus a session where you don't really need to do anything cuz the server's keeping track of you. In this case, the server won't keep track of our users, the users are responsible for sending a JSON Web Token on every single request. But because it's gonna be in a cookie, it's gonna be sent on every request automatically, by default, so we don't have to look it up.
+
+[00:01:53]
+So that's what we're doing there. All right, so let's do that. So in the same file, which was auth, we're going to import a few things here at the top, From this package called Jose. So one is called, what is it? JWTValidate, [INAUDIBLE].
+We're gonna do Sign.JWT and we're gonna do jwtVerify.
+
+[00:02:27]
+So let's get those in here. SignJWT and jwtVerify. Then we'll make two functions. The first one is gonna be, createJWT, takes in a user object, and it just creates a JSON Web Token. So we'll do that, export const createJWT, takes in the user, And it does this. So I'm gonna walk through this to explain kinda what's going on.
+
+[00:03:03]
+Also noted in production, I probably wouldn't set up my own authentication. Not because I don't want to, I just think it's so hard to get it right. And I also would rather just work on the application code, and not have to reinvent authentication every single time. Once you get authentication done, and it works, you should probably use it that way for most of the apps going forward.
+
+[00:03:26]
+So there's tons of services out there, and things like that. But for this course, I want to limit how many dependencies we use to make sure that this course is somewhat kind of last in the future. I don't wanna bring in some app and then, a month later, the app shuts down, and then the authentication broke.
+
+[00:03:44]
+So we're writing authentication from scratch. But in production, if you don't have a team dedicated to authentication at your company, you should probably do authentication with a service, or some open source package that does most of it for you, versus creating it from scratch yourself. But this is how you would do it, yes.
+
+[00:04:00]
+
+>> Just a shout out to Maximiliano Firtman just launched a Full Stack authentication course on Frontend Masters that kinda gets into federated log, federated authentication, WebAuthn, pass keys, and a lot of those options.
+>> Beautiful, I might take that course that sounds amazing. [LAUGH] There's so much to learn in authentication.
+
+[00:04:24]
+It seems simple on the surface, and then the more you dig, you're like, wait, hold on. And it just goes like onions, there's layers to it, it never stops. And then you get to the center, there's another onion. [LAUGH] And it just doesn't stop. But yeah, yeah.
+>> And one more question, do you have any services that you've worked with that you recommend, or like, for doing auth?
+
+[00:04:49]
+
+>> Yeah, there's so many, but I'm only gonna recommend the ones that I've used, because I don't like recommending things I don't use. The one I've been using lately has been called Clerk. This was actually really cool, kinda reminds me of Auth0 back in the day, when Auth0 was really dope.
+
+[00:05:04]
+And now it's kind of just like, they don't care about you unless you're a huge company. This is actually super easy, I've been liking that one. There's another one that's really cool, called SuperTokens. It's a little different to use, but once you get it set up, it's also really cool.
+
+[00:05:20]
+So check those out. And then if you want something a little more low level, where it's like you still kind of manage the authentication, and it's not some service you pay for, NextAuth. I believe I've talked about this one in a V1 version of this course. So you can check out NextAuth.
+
+[00:05:37]
+It's kinda like, if you ever use Express and Passport, it's kind of like Passport for Next.js, basically. It's a little complicated to set up. It's mostly useful when you wanna do things like Social Auth, OAuth, and stuff like that. It makes it very easy to set that up.
+
+[00:05:52]
+If you're just only doing email and password, it's kind of overkill to really have. So I would say those three, cuz these are the only three that I've used lately, but there's definitely more out there. In fact, if you go to the Next.js docs, They have a section here just for auth.
+
+[00:06:12]
+And they have a list of providers down here that you can check out, with examples. Each one of these links to an example app, for instance, Magic. Magic is a good one, I just haven't tried it in a while. But you can look at the example code of how they use it.
+
+[00:06:26]
+And for the most part, it should work the same as far as how you make the authentication. Because I know these example apps will be in version 12 Next.js, but how you do the authentication probably work the same. The only thing that's probably different is how you validate the authentication.
+
+[00:06:42]
+That would probably be different. But, yeah, take a look at that list of resources, if you want, see what's going on there. Any other questions? No, okay, all righty, so createJWT. Like I said, it takes a user object, and then we're just going to create an expiration date here.
+
+[00:07:04]
+That's the thing about JSON Web Tokens, they have to expire. Or you should make them expire, otherwise, that's a security threat. So this is just an expiration date that's basically expiring a week from today. That's basically what this is saying. And then we're gonna sign it. So to sign a JSON Web Token is to do this, right?
+
+[00:07:22]
+So take an object, so in this case, the user payload that has the user's ID and the email. You can put whatever you want on here. I decided to put the ID and the email, because those are two unique fields that identify your user easily. So when I verify this JSON Web Token and I get the payload back, I wanna be able to quickly determine who this user is.
+
+[00:07:44]
+So email and ID make sense for me, because I'm probably gonna do some unique database query after that, on the ID or the email, to determine some things. If your app had RBAC, which stands for role-based access control, where users can have different roles and different permissions for different things, you might wanna put that in a JSON Web Token, as well.
+
+[00:08:05]
+So you can quickly check if a user has the right permission to make this query, to hit this API, to do things like that. So put whatever is useful in this payload, but keep it minimal, because the string gets bigger and stuff like that. So, yeah, payload, crypto stuff, the algorithm that you're gonna use to sign this.
+
+[00:08:25]
+There's many different algorithms. You don't need to concern yourself with this, at all. This is why I say, look into other authentication stuff, or become some authentication expert with that course. But, yeah, this is just an algorithm that's going to use expiration. When it was issued and not before.
+
+[00:08:42]
+And then the last thing is to actually sign it. So, I have to use this thing called a TextEncoder, which basically just turns this to a buffer. And then, we have to sign it with a secret. The reason you have to sign a JSON Web Token with a secret is because anybody could sign a JSON Web Token, and we wanna make sure it's coming from our server and not someone else's server.
+
+[00:09:02]
+So the secret is just to make, cuz you could take a JSON Web Token from some other app, send it to this app. And I could just verify it, I'm like, yeah, you have a JSON Web Token, cool. And it'll verify, and maybe I'll do a check after that to determine, you're not allowed here.
+
+[00:09:18]
+But I don't even want you to be verified, in the first place, so, a secret helps with that. Cool, any questions on that? No, all right, and for the next one is to validate a JSON Web Token. This one's a lot more simpler. The way this works is, it takes in the JSON Web Token, which, again, is gonna be a string, because the result of signing a JSON Web Token is sending back a string.
+
+[00:09:51]
+We're gonna take that string, and then we're gonna verify it. So we passed a string in here, and the same secret we used to sign it, we have to use to verify it. And then once we do that, we can get back to payload. And in this case, for me it's payload.payload.
+
+[00:10:09]
+Because it's called payload from this library, but I also put a key called payload. So it's payload.payload. It happens sometimes. I was thinking about changing it and I was like, no, I kinda want that to say payload. I really do, I don't know. So, I guess, I could have called this user, but, whatever.
+
+[00:10:35]
+So once you have all that, you also, have you noticed we have a new environment variable here, process.env.JWT_SECRET? So you need to go into your env, and you need to make that. So let's do it. You could just copy it, JWT_SECRET. And it can be anything, just put any string you want.
+
+[00:10:56]
+It literally doesn't matter, just don't add any spaces. Actually I think spaces work, too, but I just don't use them. I can't verify that. But you can put whatever you want. I'll just put JWT_SECRET=shhh_my_precious. All right, cuz this is just local, you'll probably change it in production, or you should change it in production.
+
+[00:11:18]
+You should use something to generate this for you, versus writing it in. Cool, and whenever you change environment variable in Next.js, if you want it to pick up the environment variable, you have to restart the server. It's not gonna pick it up live, so, you have to restart the server eventually to get this to run.
+
+[00:11:45]
+Cool, any questions on that? All right, and you guys understand why we gotta put that JWT in an environment variable and not just hard-code it, right? Cuz if someone had access to that secret, then now they can have their server issue out JSON Web Tokens that could be used to access our server.
+
+[00:12:07]
+So it has to be secret, yes.
+>> Does the length and complexity of the secret affect how secure the password is, or the token is?
+>> I have no idea. Yeah, it might. I think it really depends on the algorithm and things like that. But, yeah, that's some low level cryptography that I do not know about.
+
+[00:12:30]
+It could, I do know the payload affects the length of the JSON Web Token. So bigger the payload, the bigger the the JSON Web Token. Cool, yes.
+>> I see that Scott is doing a type assertion for payload.payload to turn it into the type any. Will that generally be some kind of object, or can it really be anything?
+
+[00:13:03]
+
+>> It's gonna be whatever you put here, on Sign. Typically it's an object, but, yeah, it literally can be whatever you put here. In this case, for me, it's an object that has an ID and an email. And I just put any because TypeScript was screaming at me and I didn't like it.
+
+[00:13:23]
+So I just ended it. But realistically, what you would do is you would, probably, make some interface, or something, and share it here, and then also share it here. I think with Prisma, because this is gonna be a user object, we actually have the Prisma types given to us, so we can use that.
+
+[00:13:42]
+I'm pretty sure we could say something like this, User, and let's see if it's from Prisma somewhere. I know it's in here. Or actually if I type Project, I might find it. Maybe not, Prisma does allow you to get the types that it generates for your schema and you can use them in your application.
+
+[00:14:04]
+I think we have an example here somewhere where we're actually gonna do that, and it'll get pretty involved. So you could do that, but yeah, this is just me coercing TypeScript to stop screaming at me. Cool, any other questions? All right, almost done with these utility functions. So one of the last ones we need to do is get the JSON Web Token from the cookies, and then from there, validate that JSON Web Token, and then from there check to see if the ID from that JSON Web Token is indeed a user in our database.
+
+[00:14:44]
+Because, maybe, this is a JSON Web Token from us, maybe it does have an ID. But, maybe, since when we issued the ID until when you try to use our application, you deleted your account. So this extra check of like, I'm gonna take this ID and check to see if this user is actually in a database, is just verifying that there's a user in a database with this ID, and that they didn't leave, or they don't no longer exist, or anything like that.
+
+[00:15:10]
+So it's just an extra step of guarantees. So let's do that. We'll say, exports const, these are from cookie. And this property right here, this cookie argument that it's taking, or cookies, it's gonna come from Next.js has a cookies library that we're gonna use, that's gonna allow us to get access to the cookies.
+
+[00:15:38]
+So that's why I'm passing it in here, versus just importing the cookies library myself. I'll talk about that error, why I didn't do that, in a minute. But it has something to do with, I think I said this earlier, Next.js being confused about API functions being client components at this time.
+
+[00:15:58]
+It thinks API functions are client components. And whenever I try to import some server only code in here, and then this file ends up getting imported into a API function, it breaks. Because that code, that package, in case the cookies package, was only meant for server components and not client components, which it thinks the API handlers are at this time.
+
+[00:16:18]
+So you had to do this whole workaround, passing the cookies in. All right, so we got that. And then what we need to do is just get the cookies using this new environment variable. So we're gonna do that. So we're gonna say, jwt = cookies.get, and we're gonna say process, or is it targeted?
+
+[00:16:39]
+Yes, process.env, and we're gonna use COOKIE_NAME. And that means you need to go make a new environment variable in your env file, so we're gonna go do that. And just like the secret, I mean, you can kind of just call it whatever you want. I'm just gonna call it project_app_, whatever.
+
+[00:17:02]
+In production, I don't know how teams come up with cookie names, but somebody has to kinda come up with one, I don't know. So you got that environment variable. And then from there, we just need to call our validate function, which is async. So we wanna validate that.
+
+[00:17:24]
+So we'll say, {id} = await jwtVerify. Let me make this an async function. Then we can pass in jwt. I'm sorry validate, not that one. There we go. So now we have our id. We're validating it in jwt, given this jwt string. And then from there, like I said, the last thing we wanna do is just query the database to find a user with that id and return it.
+
+[00:17:57]
+So let's do that. So first we need to bring in our db helper, that we created right here. Which, if you remember, is just Prisma, just a cache instance of Prisma. So now we can say user = await db.user.findUnique, where id is id. And we're just gonna return user.
+
