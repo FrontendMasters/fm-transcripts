@@ -1,0 +1,172 @@
+[00:00:00]
+>> Okay, so we've now talked about cross-modal reducers, we have TypeScript support, we have the beginnings of a robust and beautiful test suite. It's got one test. It's the beginnings, right? Good things start small. I think the one thing in just regular Redux that we want to talk about a little bit is, yeah I saw some questions in the chat in the very beginning about the book promises, right?
+
+[00:00:27]
+And one of the things I'm gonna say is we'll also look at RTK query which is kind of a little bit separate from the state management piece, but does have a, it's if Redux toolkit is the batteries included version of Redux and RTK query, which you don't actually even need to be using Redux for.
+
+[00:00:48]
+Is for a lot more of the data fetching pieces and caching and invalidating, and I'll kind of like mostly just give like a high level tour of that cuz that's probably a long conversation ended up itself that is adjacent but like maybe not the exact same topic. But I'll show both of them to you cuz one is like, you can get start with both of them pretty easily but we'll take a look about them, you can figure out which one is appropriate for you and to navigate around that.
+
+[00:01:16]
+So previously on Redux, Redux was completely unaware of the idea that asynchrony could exist, right? It's simply, like I said before, function, currency of the world, action, new thing comes out. That's it. Middleware, maybe, right? And middleware just gave you the ability to fire off more stuff based on the first thing that came in.
+
+[00:01:38]
+And do side effects. One of those side effects could be wait for the, get this thing action to come in, get the thing, and then fire off the second one, right? And like there was a library cold Redux thunk, which some of this might be my ageing memory but I remember correctly Dami went off wrote it and like at first it was just kind of a demo to show how middleware worked.
+
+[00:01:58]
+I don't know that he fully expected it become like the de facto way that everyone did a think, there was like Redux promise there are some very Sophisticated libraries out there. I think some of the previous versions of the state mandatorys they've done, we talk about like Redux observable and I think in earlier one, Redux saga.
+
+[00:02:17]
+And Redux observable uses like Rx js and there's a crazy stuff that you can do in the middleware as well and some interesting libraries built on that. And if you know that you need the stuff in redux observable, absolutely go ahead, drop that in as a middleware, do it but generally speaking, you probably have a very sophisticated use case that you need to do that.
+
+[00:02:40]
+And it lets you start and pause and do all sorts of, use all of xjs and all of the observables in this flow which is definitely necessary sometimes but maybe slightly overkill most of the time. I say that somebody who worked on a very large app that did it like it was useful for us but like we were doing lots of stuff with it, I don't reach for it every time.
+
+[00:03:04]
+Cool. But, so let's talk about what is built in and ready to go in the case that you're not gonna reach for something fully, large with an entire, learning curve investment. Let's say you have a situation where you would like to call an API. So I heard you'd like to call an API, and let's do it for in this case creating a new task.
+
+[00:03:30]
+I don't know if we wired that up yet. We have add task but we'll show how this works cuz a lot of times you'll say there's a difference between firing off the request and hearing that it came back. Those are actions. Right, or at least hearing the state that it came back, put in your store is still as it always was, right?
+
+[00:03:47]
+You'll be like this thing came back, I might choose to put in the store so on and so forth, there might be other ways. And you could do things optimistic updates, which is, they hit the button, add it to the list, right, immediately if the promise comes back rejected, take it back out and put an error, right?
+
+[00:04:07]
+To simulate, especially for things that are pretty reliable. As somebody who works on an application where the development version is running locally on their machine, and I'm not going over a network sometimes in our cloud offering I am. But when it's running the machine, I'm not, I can be highly confident in those cases, that is gonna work, right, especially cuz I have literally an environment variable that tells me.
+
+[00:04:32]
+So yeah, there's stuff that you can do in that case. But I'm gonna show you the primitives how you choose to strategize around it is obviously gonna matter for your particular situation and your app. So let's look at how it works. It does happen kind of outside of this object here.
+
+[00:04:53]
+But the good thing is anything that happens outside of this object can be handled in here. And I should note we saw create action at the very beginning of this workshop. You can make actions don't belong to any reducer. And then add them in on extra reducers. Do I have an example of one you would do?
+
+[00:05:14]
+I don't. [LAUGH] If you had something that happens in your application, and it doesn't actually belong, it's not just reducer to or slice to slice. It can be just any action anywhere that's defined, all right? So with all that preamble, we've got create async thunk and if the signature looks a lot like create action to you.
+
+[00:05:43]
+Yes. Right, so here we can say, it says tasks, tasks, tasks/fetch or create task or what did I wanna do. I want to fetch a skim from the API. So instead of loading if that data source, like Warren farmer this JSON, and we actually hit the fake API that I have running alongside this application, awesome.
+
+[00:06:13]
+And so really in this case, we give it an async function. In the same way that we get give arguments here, you can pass in arguments to this case, I just want to hit the basic API. So response. I will say that this is going to await fetch API/tasks.
+
+[00:06:41]
+Could I just get that and then call responses to JSON? I could. I just don't want to. I like promise chains. So we've got that in place and then with that, I might just return the, I know that the API is not just the array. It's tasks, a task key on there.
+
+[00:07:04]
+
+>> Where does createAsyncThunk come from?
+>> Yeah, it is part of Redux toolkit here so you get it for free. And like I said, I will repeat it again. Anything you see, you can have it all, you can just sample pieces from this-
+>> Sir, everytime people talk about redux-thunk is that-
+
+[00:07:24]
+
+>> There is also a library called redux-thunk.
+>> Okay,
+>> This is like imagine you took the goodness to resign create action. And also imagine you took redux-thunk, And you package them up. What?
+>> But we haven't gone over yet.
+>> We're going through this, that's actually we're going to look at now
+
+[00:07:44]
+
+>> Redux-thunk.
+>> Yep, it is. The middleware is pre wired in like Redux toolkit for us. When we did configure store, it already took the middleware, the redux-thunk middleware, put it in there. The reason we had to do that use app dispatch is because regular use dispatch is not aware of thunks.
+
+[00:08:04]
+So the use app dispatch is ready for thunks. The store is configured with the middleware. This is literally just now a syntactic sugar utility function for like creating an action that knows when it when it's called to initiate the promise, right? Or in this case or get a promise that we're returning and our async function.
+
+[00:08:25]
+It will then kick off is pending action that will go through any reducer that cares, right, if it goes well, it will figure out like the same name of the function with fulfilled, and then if it goes poorly rejected. So it is all of the wiring of promise.then, promise.catch before one of those two things happen.
+
+[00:08:50]
+Those actions, as soon as this thing is kicked off, as soon as the like function this creates, is kicked off and dispatched, those will fire as appropriate. And you do not have to think about it or even really know write anything about it other than the fact that all those things that use some kind of wire by hand are done for you.
+
+[00:09:11]
+And as we do, if I type this correctly, not type like finger type, but type is in TypeScript. If I type it correctly, it will be fully typed. So I will get all that for free without feeling like I have to figure all that stuff out. Cuz fetch is pretty like fast and loose with what it gives you, even at the response at JSON.
+
+[00:09:37]
+So it's a promise at any, but if you say here, or even the return output of the function. So I can, let's try it both ways. Well, let's finish writing the function first. I'll just say return, response.tasks and like, it doesn't know what that is. But if I say that this function returns a promise, and there's a little bit you have to know what you're doing but it's gonna say, okay, I'm gonna assume that there are tasks coming out.
+
+[00:10:13]
+So first of all you need to store it in a variable so we'll call it const fetchTasks, Let's look at it real quick, Right? You can see that is assuming that tasks come outta here. Now, there's a little belief system in here, but like there's really no way, no way is a strong word.
+
+[00:10:38]
+Let's go with it, with an asterisk. There's no way for telescript to know what an API is gonna give you from an external system. It can't scan that, could you turn protobufs into types. Yes, but that's just the same way of, yeah, you can generate types from a API spec but truly, that's always the honor system.
+
+[00:10:58]
+There's some bound to your system where you have to deal with your trust issues, right? This is saying like I expect what I expect to come back from this API is an array of tasks, right? Cool. It's like my thing where it's like when they say that, there's the front-end went down and like the front end didn't go down.
+
+[00:11:19]
+The backend went down and that took the front-end down with it. When they report uptimes that a company used to work at, OK. So we've got that in place. And now we need to deal with what do we wanna do when this stuff happens? And so that lives in extra reducer land.
+
+[00:11:37]
+And we just say, hey, builder, just add a case for you. And we're gonna say something along the lines of like I don't know like this case, I don't have to really think about it at all I don't even want to know why so I don't know fetch tasks and we've got fulfilled rejected.
+
+[00:11:58]
+It's also got all the methods that our function has unfortunately, so we got to deal with that too. It's there hiding that you can see pending, you can see fulfilled, you can see rejected, but also it is a function so it has prototype and the rest of that fun stuff.
+
+[00:12:15]
+Awesome, so say that hey, when it's fulfilled, what I wanted to do is update the entire state of the entities at this point. And so we just say state, Action. We'll peek at those in a second. It's gonna be the same thing we saw last time. It knows that this is gonna be a set of tasks.
+
+[00:12:38]
+There is also a second thing that I will talk about in a second but let's put this in place first.
+>> Can you use instead of fulfilled, success?
+>> The ones that it's gonna give me for free are fulfilled, rejected, and pending. You can see that this was given to me by it automatically.
+
+[00:13:02]
+
+>> So you no longer need to catch the errors in the action itself.
+>> Not in the action itself, I would probably, guess you notice this is some very optimistic code up here, right, I just assumed my network requests is gonna go well, right? You can also there's a second argument in here we'll talk about a second I'll show it to you real quick.
+
+[00:13:28]
+And this object. I'm about to take a look at in a second. But there are ways to show like, what you want the projected value to be and cuz promises. The fetch API and other promises the fetch API only catches or throws if there's no network, right? If the fetch API comes back, and it's got a 500 error or a 404.
+
+[00:13:59]
+That's technically a resolved promise. Not what data that you wanted, right, or were expecting, but it is technically a resolved promise. And so you have to deal with those things. And there are ways to kind of deal with those cases as well. If the response status is greater than or equal to 400 or something like that, you can do various things in there.
+
+[00:14:24]
+Let's finish this part up first. So we got that. And we say, hey, it's fulfilled. You can see the action on there. You will see the request status that's populated there as well. And that all kind of fits in there. And what we'll do is we'll say when that happens, we'll just say, State.entities, I think I'm just returning the array of tasks.
+
+[00:14:54]
+At that point, that's why I pulled the, I said response.tasks, right? Yeah, it's just an array of tasks, state.entities Equals action.payload. It knows that that's an array of tasks because I said that that's what the promise function returns. And so I just can swap out that initial empty array with the loaded ones in this case, right?
+
+[00:15:20]
+Let's go ahead and get rid of preloading the data to see if that works now. This action was never kicked off. So immediately it's not gonna work. But ideally, so say this is an empty array just don't get yelled at by various maps later. So we do need to kick this off somewhere.
+
+[00:15:41]
+This is again, one of the things that I think is cool about Redux overuse reducer. And user reducer is great to be clear. That's not a slag on user reducer, but user reducer is a hook, which means what has to happen before user reducer gets called. A component needs to be mounted, which means you have gone and you have rendered the entire UI.
+
+[00:16:03]
+Use effects are the last thing, last-ish thing that happens in the component lifecycle or like we've got a UI, let's go get some data. I usually like it in the other direction or at the very least, do them at the same time, right?
+>> Is it layout effect?
+
+[00:16:23]
+
+>> You still, use layout effect is pretty late in the game too. It is before use effect, but at the end. Yeah, it's like second to last place. I think it's, yeah, I forget the exact order. I used to like have it completely memorized. Those all work and because they're simple and again, it's one of those things which is like, for some things, it doesn't really matter.
+
+[00:16:45]
+Do the simple thing sometimes, you don't need to bring in the big guns for everything. But generally speaking, so the cool thing about this is since it's just an action, you get to choose when it gets fired. You can choose, to have it fired, when a certain button is clicked, right?
+
+[00:17:04]
+There are bindings in react router, right? So you can choose to do it, right? You can have actions fire based on route changes and do stuff, right, you can choose to do it. When a mouse hovers over a button and you want to preload data into your store, right?
+
+[00:17:22]
+You fire this action when you deem fit. And you don't have a lot of things telling you what to do. In fact, one of the things that we can do is make sure I export this function cuz that seems to be my theme lately. We can go ahead and for instance, when the app cuz the tasks in my task management app, that seems like a relatively core feature, right?
+
+[00:17:50]
+So what I can do is like cool. We're getting ready to start up the app. I've got the store here. I could theoretically say while we're getting the app all like bootstrapped up, why don't you go ahead And fetch the tasks. Right, so this is happening as much as anything happens concurrently in the browser with the initial rendering of the app.
+
+[00:18:21]
+Now let's go see And I'm gonna pull up cuz I don't see tasks that, so it's currently not firing. Did I save that file? So if you got, if you don't call functions, they don't dispatch anything. So it is a function. It's not just, you call it that is what, it's an action creator just like anything else.
+
+[00:18:44]
+So you can see it goes pending, and it goes to field. And those are unique actions that are added that are fired. So pending, What's really cool about this is I can set a loading indicator, right? And when fulfilled happens, I go ahead set loading to false, right?
+
+[00:19:03]
+And it's not like setting. I can just do that as actions that flow through the system, and what's really cool about this is let's say we are waiting for the current user to load. Maybe multiple parts of my UI care about that. And what probably would have been either prop drilling or some other stuff before, maybe other reducers, other pieces of state management care about that.
+
+[00:19:26]
+User reducer is awesome, right? But it is bound to exactly that reducer, this idea that they go through all of your state everywhere. And it's like, okay, multiple things might wanna get kicked off. The current user and their auth token, it just landed. Go and get all the data, right?
+
+[00:19:41]
+And multiple things can kick off or update things based on that and care. And I think it becomes a really powerful abstraction.
+

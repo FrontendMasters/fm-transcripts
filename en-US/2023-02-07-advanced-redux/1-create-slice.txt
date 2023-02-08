@@ -1,0 +1,119 @@
+[00:00:00]
+>> We are going to look at this idea of a slice, and the reason I bring up in the beginning, this is the only kind of brand new concept that we're talking about. Everything else is, I guess the RTK query stuff at the end is also a brand new concept, but this is the true brand new concept, which is an amalgamation of other concepts.
+
+[00:00:19]
+That I like this abstraction because I have previously tried to build my own form of this abstraction that I have not liked nearly as much. But it starts to show some of the nice things that we get and some of the thought process around how you can create stuff with the patterns in Redux that don't necessarily always involve setting up five different files to do the simplest thing every single time, right?
+
+[00:00:46]
+And I think that is where Redux got something of a bad rap. And so these are patterns that you could use today in your regular Redux app or in Redux Toolkit app. You can pick, this is like a buffet, it's not like I have to go all in.
+
+[00:00:57]
+You can pick whatever you want from this buffet and it will work at whatever level of granularity makes sense to you, right? And that's why we're kinda looking in this sense cuz it's all pick and choose, you do not have to go all in at any point. But let's look at what a slice is and let's look at some of the practices around that, cuz it's gonna give me a chance to talk about mistakes that I have made in the past and how you cannot be like me.
+
+[00:01:18]
+Or you can be like current me and not like past me. Nobody wants to be like past me. Awesome, so, we normally need something like, we don't wanna write this in Gitkeep, that's not a place to write things. That's just a place to make sure you have the folder already.
+
+[00:01:34]
+We'll make a new file called task, tasks plural, slice, which I'm just gonna love saying repeatedly all day today. I could have picked any other euphemism to do something like that, but here we are already. And we're gonna make it happen. And we need some data structure to hold on to our tasks.
+
+[00:01:54]
+And this is one of the first places where I tend to get bitten and yeah, this is just a how do we structure our state question more than it is a how do I even Redux the question? Briefly, we will look at just the shape of a task, a task is basically has id, has a title.
+
+[00:02:13]
+If we choose to go full Kanban board with this, that will become important, but otherwise it belongs to a user. A user has many tasks. So a basic relationship model that is a little bit more than what we see in the kind of basics, but definitely something we often have to deal with in our real code bases.
+
+[00:02:32]
+So, it is very tempting when coming up with the shape of the initial state, to be like, yooh, it's an array of tasks. I got this, right, it'd be something like, const initialState is an array. Now there's a number of problems with this, some of these will be easily solved, all of them are easily solvable.
+
+[00:02:59]
+Which is TypeScript out of the box does not know what an empty array is in any way, shape or form, right? It's this could be anything and worse, if we solve our second problem, we make the first problem worse. So, right now it thinks it's absolutely anything, if we put it in an object, it'll think it's absolutely nothing.
+
+[00:03:22]
+Lemme show you what I mean by that. So if we said something like entities, and that'll be an array. Then it becomes an array of never, because it's like, hey, this is initially set as an array of nothing, which means this object must just hold on to an array of nothing forever and ever and ever, right?
+
+[00:03:43]
+And that's not particularly great. And it gets a little harder to dynamically type it here. So it makes sense if we're gonna use TypeScript 2, and this is probably a good thing to do in general, what is the shape of our state? And we want something we can add to over time.
+
+[00:03:58]
+So I always have this inclination of, why should I just start with an array? And that's problematic for a number of reasons. If I need to hold on to anything else like, is this list currently loading? Is it pulling from the server at this moment? Do I wanna keep the actual fundamental objects separate from the IDs so I can iterate over an array of strings to populate things versus have an indexable object to get the different objects?
+
+[00:04:26]
+Starting out with just the kind of, I only need this, a lot of times gets you to a place where as soon as you need the second thing, you have to rework almost all of your kind of, for this at least part of your application. And if you make it repeatedly more than one place, part of your application you have to rework this over and over and over again.
+
+[00:04:46]
+So, one of the things that I would implore you to do especially in a larger and real code base, is to kind of start out with an object that you can add keys to. And there's a bunch of ways you could do this, but we'll say our type of our TaskState, Will have this idea of entities, which will be an array of, in my case, those tasks, right?
+
+[00:05:12]
+And the nice part about doing it in a type is that I can say what the array is, so now when I just use the array in an initial state and if I say that the whole object is of this type, TypeScript will figure all the rest of it out.
+
+[00:05:24]
+And again, this means that later I can add additional keys. The other reason for this is, the other thing that is a lot of times really tricky about state management in Redux is if you have deeply nested objects that immutability involves a lot of spread operators. That a lot of the tooling that comes with Redux Toolkit has this library called immer, right?
+
+[00:05:45]
+And immer lets you just pretend that your state is mutable. You push things onto arrays, pop them off, right? Just flip boolean values, reassign strings, it's cool. The only thing that you cannot do, really, is flat out replace that object you were given at the very beginning, right?
+
+[00:06:02]
+Cuz it's just gonna use this, right, try to look at the changes to that object and it just won't work. So if you only gave yourself an array and you ever come to the situation of I had this array, I've made a new network request of blog posts, tweets, items, I wanna just swap it out.
+
+[00:06:20]
+If the array is your base level object, you can't. And by the time you're at that level of working on whatever feature, you are already several hours or several days in, right? And so, I know that it seems a little much now, but future you will thank you.
+
+[00:06:39]
+Could you call it tasks? You absolutely could. When you use combined reducer, it's gonna be tasks.tasks, so, whatever. The important part is, I'm not here to argue about naming things, the important part is that you have something called out, right? And you can switch what that data structure looks like and how it's shaped later, but having some way that you have an object that you can add or remove keys to, to store additional information.
+
+[00:07:05]
+Cuz otherwise you'll end up finding yourself making other reducers and other slices and stuff along those lines, and there's no reason to start out in that general direction. So starting out with a shape for your state that makes sense will serve you in the future. But now we have that.
+
+[00:07:23]
+And so, now we can say that our initialState, Which is a form of TasksState, plural? Plural, even though that means I have to say it more, it's still the right choice. And that can start out as simply, And now, if you look at the type of this one, other than the fact that it's not used, right, you can see that it has the right type.
+
+[00:07:51]
+So now we can push task on it and nothing else, so we get all the type safety. Type safety is totally worth it as long as you don't accidentally opt yourself out of it. And I will probably need this shape for unit tests later, so I'll export it now.
+
+[00:08:04]
+So we've got that shape there, now what we wanna do is just create a slice, so we can kinda see the pieces in here. And so with that, we can say createSlice and pull that off of Redux Toolkit. If you have Redux Toolkit, you have Redux. This is a thing in Redux Toolkit, but you can use them, you can migrate them together, it works out really great.
+
+[00:08:26]
+So we'll say that this is a tasksSlice. And this takes an object. And what this will do is we give it a name, and this is just what it prefixes all the actions with, so that when you see in the dev tooling, cuz you be like, I'm gonna call this action add.
+
+[00:08:47]
+And then later, two weeks now, you're like, what is it even adding? I don't even know. So this gives you the ability to namespace that right now. We pass in the initialState and then finally, it needs some level of reducers. And reducers look a little bit different, but I don't think I can repeat this enough in the very beginning.
+
+[00:09:07]
+This will just basically spit out stuff you can normally use in a regular Redux setup. None of this, I will say it one more time, this is all like a buffet, take the parts that interests you, take the parts that you can use today or tomorrow. Keep your existing infrastructure, you do not have to rewrite anything, right?
+
+[00:09:25]
+But you will get some niceties and some conveniences, if you're like, hey, new features moving forward, awesome, right? Existing stuff we keep, especially if it's working, sometimes rewriting stuff that works is fraught with peril. So we'll keep that in place here. And then we create some actions, but we don't have to make 17 other files.
+
+[00:09:47]
+Everything will live, everything about this concept of a task, I'll even lowercase the l like a normal person. And everything can live inside this file and have one encapsulated place, but it's all the same stuff that we'll get under the hood no matter what, again, with better TypeScript support.
+
+[00:10:04]
+So we will also then say stuff like addTask and we'll just start out by saying, And it looks like these are almost like mini reducers. Right, well, they'll take the state, you can guess that the second argument is an action. But instead of writing a series of conditionals or, I still don't know the syntax for a switch statement, and I at this point don't care to learn it.
+
+[00:10:32]
+But instead of worrying about these things and all those pieces you can basically say, have a bunch of methods for the tasks that you expect to have. And what's really cool about this is that not only is this setting up your reducer, but it's also creating the actions that you can hand to dispatch as well as the action creators and wiring up all of the types in TypeScript for you.
+
+[00:11:04]
+So you will get it all for free. Now, if you're like, you turn out you don't like this abstraction, you can actually take the two pieces of createReducer and createActions. I use createAction even when I'm not using Redux, and it will still wire up a lot of this for you.
+
+[00:11:17]
+Let's look at it all together first. So we have this in place, and let's just grab one of these for a second and just kinda look at what we get at the end of the day here. So we'll say test slice, and this got a bunch of things.
+
+[00:11:31]
+Plural, And we'll say actions. And you can see that for every property that I put on the reducer, you can see add and remove task. Well, do you see add and remove task here? For every action I put on the reducer, it automatically creates an action in the reducer for me.
+
+[00:11:49]
+And I can just have these, and these are things I can pass into the reducer now and it will all just work.
+>> Is that with or without TypeScript?
+>> Normally if you're using VS Code, if you're writing JavaScript and under the hood it's got types, VS Code will be like, yooh, here are the options for you, right?
+
+[00:12:08]
+It's not gonna yell at you when you mess it up, but the hints will be there for you. So yeah, it's one of those things, even if you're not a TypeScript shop-it-all, having stuff with great TypeScript support still benefits you in your day to day, right? And also, VS Code, if you have really great JSDoc notation written above your functions, you'll also get that.
+
+[00:12:32]
+However, I think that especially for non libraries like in internal code, most people do not do meticulous JSDocs for their internal code. So you tend not to have it as much. So having some of the stuff kind of ready to go is incredibly important. And out of the box you saw they had the autocomplete there, it is automatically going to create a task with the action type tasks/addTask, right?
+
+[00:12:59]
+So you automatically get those three or four different files that you would have made previously already wired up for you and ready to go. And that's, again, incredibly kind of powerful piece in here.
+

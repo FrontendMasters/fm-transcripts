@@ -1,0 +1,80 @@
+[00:00:00]
+>> Hi, my name is Steve Kinney, and I am the head of front end engineering at Temporal. We're going to talk about Redux. But we did a little chat a while back on Redux fundamentals, where we talked about the bare bones of Redux, right? And that we started out with, could you write your own Redux?
+
+[00:00:21]
+And I think the elegance of Redux, both the elegance and I think the tricky part of using it in production that a lot of people have found out over the years is, hey, it's just a function that takes the current state of the world and action gives you a new one.
+
+[00:00:33]
+Great, awesome, right? It's got some nice little things like it supports middleware and it's got this idea of, the developer tools that are available to you and stuff along those lines, and that's all great. However, setting up that middleware with developer tool involves something that you have to Google every single time.
+
+[00:00:52]
+Then you go to, I would love to have TypeScript support. And you're like, well, either it's very tedious and manual like a lot of things are in Redux or you have to write some arcane types. And then it's kind of that like, there's a lot of power to the idea that you can have.
+
+[00:01:10]
+Its simplicity makes it so the fact that it's 100% unit testable, for even your promises happen outside of the actual Redux flow. So as long as you dispatch an action that says request, whatever, fulfilled, you can say, this is how my state would update. And it's really powerful, but there became so much ceremony and so much tedium.
+
+[00:01:32]
+And what actually is the best practice around setting up Redux that after one blows through, kind of the introduction, you are left with a whole new set of questions with sometimes unclear answers, right? So our goal today is to do a series of meditations on what are the answers to those questions that you commonly run into when you're like, and now I'm gonna use this in production, right?
+
+[00:02:01]
+And we'll kind of look at some of those things. Now, people turns out have used Redux in production before. So there are answers and like most things, particularly with a tool that is both simplicity and flexibility are usually bound together in this idea of simplicity, flexibility, and you have to make a bunch of choices, are usually kind of part and parcel with each other.
+
+[00:02:29]
+So but over the last however many years, there have been a set of best practices that have kind of formulated and emerged. Some of those we will talk about just in the way, like restructure state and stuff that, as we go through our own implementation. Some of those we will kind of learn by both using and then pulling apart our Redux Toolkit.
+
+[00:02:50]
+Which is basically the Redux community over the last several years compiling and putting together a lot of the commonly used tools that get used across. There was create flux standard actions, cool, could we bring those in as built-in action creators. You probably in development almost always wanna wire up the Redux dev tools, and like I joked earlier, the way that you hook into those in the browser is unmemorizable and needs to be Googled for every single project.
+
+[00:03:24]
+The setting up the constants to hold actions and then these various things that we had to do that were not helping us build our feature, they're now kind of somewhat formalized. In a lot of ways, we have some tooling around it to make our lives easier. And so I think this workshop is really for two sets of people, right?
+
+[00:03:46]
+I work in an app, I'm all into redux but however, whether it's not spiritual, I'm either forced or happy about it. But I am using Redux or I've heard about this Redux thing before. I tried it out, the amount of things that I had to do was just too tedious.
+
+[00:04:07]
+I would like to see what the current modern Redux stack is like. I think both of those are the target thing that we are looking at here. Now, we will start a little bit with Redux toolkit to just see what that means and what it looks like, and how the TypeScript support looks in its fullest and most glorious form.
+
+[00:04:26]
+But then the nice part about everything in Redux toolkit, in so far that it is just a amalgamation of tooling and best practices, is you can take any given smaller piece of that and begin to use parts of it in your existing application, if you have one. Yes, Mark.
+
+[00:04:45]
+
+>> If you have some Redux experience, do you still recommend going through the Redux fundamentals?
+>> If you've used it before, I would say that even if you are like, I have used it a little bit before, I mostly grok the basic idea. It is not a completely foreign concept to me.
+
+[00:05:03]
+You're good to go. If you've used Reducer in React, you're probably good to go. Cuz the nice part, not only, I think it's actually and accidentally really good point that I made, if I may. For some of this stuff, not only could you use some of the pieces of Redux toolkit in a legacy Redux application.
+
+[00:05:23]
+It's not really a legacy, it's still Redux. You can actually, if you used Reducer in a React app, still use a bunch of these tools. They still work just as well, like some of the component pieces that make up a slice. And so if you've got the general kind of understanding of a Reducer and the idea that we dispatch actions, and that is not a completely foreign concept to you, then I think you are well suited to join us for the next little bit on this exploration.
+
+[00:05:55]
+All right, so we have three major applications that we are working with today. We've got this app called Super Tasker. And that is, it's a to-do list, but it has statuses and superhero names, so it's not like a to-do list. The interesting part about this application is that it's not just check a box.
+
+[00:06:17]
+This is the idea of having two related models, this idea that a user has many tasks and that a task belongs to a user, right? And so, how do you have an action that maybe works through to reducers? One of the things, and we'll talk about this in the workshop, one of the things that I have seen a lot of teams, including my own teams, over the years do is, I have to fire six different actions because I got to change the user and I got to change the task, and I gotta change these three other things.
+
+[00:06:49]
+And you don't, right? So we have a way that we can kinda see what that looks like and some of the concepts in Redux like that. Along the way we will then also kind of just look at a stupid counter to see what it looks like, to just try in a very simple app to see what it looks like to migrate stuff from.
+
+[00:07:08]
+Maybe either use reducer or regular vanilla Redux to something in Redux toolkit and Typescript and stuff along those lines. And then lastly, we will do a little bit of explorations with RTK query, which is a set of features that come with React toolkit, but you could do it separately.
+
+[00:07:26]
+You actually don't even need to use Redux to use it. A set of tools that deal with the fact that these days it's not only just managing a bunch of state in our applications, but usually there's a lot of talking back and forth with the server. So if you don't have these cloned, the first one is called Super Tasker cuz it's got superheroes.
+
+[00:07:46]
+You should clone it and then begin to install it. Give it a nice fresh pull down from main. We've got a little counter. We want the one with RTK at the end cuz it's really right now it's got nothing set up in it. It's just a tabula rasa, but that way we know it's set up with TypeScript.
+
+[00:08:02]
+It's got all the right NPM stuff installed. And then we have the one that we will use with Arti Query at the end of the day. Which is to kind of just say another packing list application that we can use, that has a mock API built, so we can see all of the fun stuff stuff of mutations and queries and stuff along those lines.
+
+[00:08:20]
+So like I said before, we are gonna start the day in this task tracking app with a few little just like, hey, let's get our head wrapped around some of the stuff, RTK with the counter and stuff like that. But half this stuff you can probably just do in a code sandbox with anything.
+
+[00:08:36]
+We'll start on the Super Tasker app. For most of, I would say the first 70% of our time together, and then do a few things in the packing list, jetsetter app towards the very end. So if you don't have those now, just make sure that you clone them down and NPM install because who doesn't love a good NPM install?
+
+[00:08:53]
+Awesome.
+
