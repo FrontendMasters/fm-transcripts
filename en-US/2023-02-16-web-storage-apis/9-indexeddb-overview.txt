@@ -1,0 +1,84 @@
+[00:00:00]
+>> IndexedDB, we mention IndexedDB a lot. Sometimes we call the API IDB, okay? It's like Maximiliano, that's a long name, Max, okay?. So we have IDB for IndexedDB. So IndexedDB is a NoSQL data store or database if you want. We are going to be using IndexedDB 2.0 that is the one available on every browser and as I mentioned before, it's just a difference in the API, not actually in the data itself.
+
+[00:00:30]
+In fact, this is an implementation agnostic as many web specs. So the spec that actually say how the browser needs to store the data. The spec just mentions best practices and the public interface that we use. But how it's implemented behind the scenes, we don't know. Is the browser using SQLite?
+
+[00:00:52]
+I don't know. Is the browser using them fine? I don't know. We don't know and we don't care which exact implementation the browser has for the data. IndexedDB stores JavaScript objects, bytes. It can also store simple data like strings or numbers or booleans. It's not common that we do that but it's possible.
+
+[00:01:18]
+And every entry typically has a key, typically. There is one option I will explain in a second where it's not necessary. So every entries, every object, every value that we say should have a primary key so we can identify that element within the store, okay? The API is asynchronous, so that's good for performance.
+
+[00:01:40]
+That's the main reason why we are replacing web storage with IndexedDB. There is no permission from the user as web storage, okay? It's available on Windows, Workers and Service Workers, so you can use these databases from threads and also you can use them from service workers. So it's a simple way to send and receive or store data that every thread in your web app can actually use and access.
+
+[00:02:11]
+When storing objects, this is a warning, IndexedDB clones them. In fact what you can store in IndexedDB, everything that can be cloned in JavaScript, okay? Cloning happens synchronously. So the API is synchronously, so it's asynchronous, but the part where we are cloning the object, no. Meaning that you may still have performance penalties if you're storing very large objects because those objects will be cloned in the same thread.
+
+[00:02:46]
+The solution to that is to use IndexedDB in a worker. Make sense? A worker is a thread. So then in that case, the cloning will happen in a thread as well. But that's for some special niche situations where you have really large objects, okay? Make sense? Cool, the original API so the API in the browser is event-based.
+
+[00:03:11]
+So on error, on success, on upgrade, or add event listener, so it's not promise base. So it's like an old API, okay? But we are going to use a thin wrapper that everyone uses these days that converts it's very thin that compressed it's around 1k. So it's really a small library.
+
+[00:03:32]
+So we can convert IndexedDB into promise-based API. So we can use async await ,our code looks better, nicer, cleaner, okay? And we use everything we know from promises. IndexDB support transactions. The original API is only transaction based. So I'm not sure if all of you are into databases.
+
+[00:03:54]
+But a transaction means that you open a transaction, you can do a lot of operations and then you commit the transaction. And if any of the operational or the queries that you were executing fails, the whole transaction rolls back to its original position. That's the idea of a transaction.
+
+[00:04:11]
+Everything or nothing, okay? Well it supports transactions and that was actually really painful for us for web developers because if you just want one query to get data or you want to save data, you always need a transaction, okay? But the thin wrapper that we will use has automatic transactions for the most common situations.
+
+[00:04:36]
+So then we may we forget about transactions if we actually don't need them because it's a single operation, make sense? It also supports DB versioning. I will explain what that means in a minute. But yeah, we are a web app, right? The user is accessing our web app today, okay?
+
+[00:04:56]
+And then five years later, it comes back. The data is still there. Am I using the same database, the same schema, the same data stores? Am I expecting the same kind of data as five years ago? Well every time we are changing the schema of our database, so the kind of objects that we store, we can change the version, okay?
+
+[00:05:21]
+And we have a system that let us or it's helping us into migrate the data between versions. Make sense? On top of IndexedDB, there are many libraries for example, SQL on IndexedDB, JsStore, sqlite worker. These are libraries that you can use within your project that they are sitting on top of IndexedDB and they're offering you a different interface for example SQL base.
+
+[00:05:52]
+Do you want select star from clients? Yeah, go ahead. You can still do that using one of these libraries. You have web storage on IndexedDB. There are actually two libraries, one on libraries idb-localstorage and localforage. Localforage was created by the Mozilla team, that they offer you a very simple API similar to local storage like set item, get item but as with promises, that's the only difference.
+
+[00:06:19]
+And they're using IndexedDB behind the scenes, okay? And there are other APIs as well that will offer you other like public interface like dexie, ORMs. So where you just save objects and those objects will go automatically to IndexedDB. So then if you use these libraries, you forget about IndexedDB.
+
+[00:06:44]
+You just learn how to use the library, okay? Anyway here we are going to use not the very low level API, we're going to use the promise based wrapper at least, okay? So we have an origin, so a domain kind of. That origin can have different databases. What's the database?
+
+[00:07:06]
+A name, so we provide a name, that's all. Every database that you create can contain different object stores. This is kind of the table on classic databases, okay? So instead of tables, here we have object stores. And instead of records, here we have objects. And every object store should actually contain objects of different types, okay?
+
+[00:07:36]
+That's the hierarchy of elements that we have in IndexedDB. Actually on every object store, you even don't need to have objects of the same kind. It's a good practice, a good pattern, okay? But not a need. In fact, IndexedDB has nothing known as a schema. You don't define the schema.
+
+[00:08:02]
+The schema is kind of okay, which properties the object will have? Hey, which type should be? Well we don't have that. We just store objects. We have a primary key and we also have indexes. And we're going to talk about that in a minute. Do you have any question on this structure?
+
+[00:08:20]
+So database, object stores and then options. So we open an IndexedDB database with the name and the version number such as my menu, the coffee menu, the coffee masters menu and the version number. This is version one, okay? Then the browser checks if first, if that database exists so there is no create database.
+
+[00:08:47]
+We just open the database, okay? So but first it checks if it's there or not. If it's not there, okay? It would trigger an event known as upgrade. This is the first part where you say upgrade? But it didn't exist so why am I upgrading? Well that's how the API works.
+
+[00:09:07]
+So there is an event with the name upgrade. In that event, we will see in a minute how we use that event. In that event, we create the data stores, okay? So we create the data store in that event. That means like okay, initialize your database because it doesn't exist, okay?
+
+[00:09:25]
+That's kind of the idea. It's a place where we're going to initialize the database. And after that, it's success. So it's open. It's ready to use. Makes sense? Well what happens if the database that I wanna open already exists. In that case, we check the version number. Is the version number that you wanna open this one greater than the one in the browser?
+
+[00:09:54]
+So I'm opening version three. The browser checks that in the browser, we have version one, okay? Makes sense? If it's yes, it also triggers the same upgrade event. You have some arguments there and you will know that you are coming from version one. And it's up to you what do you want to do?
+
+[00:10:16]
+Like the user is on version one, it has data. With the schema in version one, what do you want to do? Do you want to migrate the data to a new schema? You make the decision. And if it's no, so it's not greater than, so it can be equals or less than, it checks if it's equal.
+
+[00:10:35]
+If it's equal to the browser, it's success, okay? So you want version two? I have version two, okay. You can use the database. But what if it's not? So I'm opening version two, and you have version 15. The browser triggers an error. So it's an embedded situation. It doesn't make sense that the current web app it's opening version two and the browser has version 15 already saved.
+
+[00:11:05]
+Make sense? So that's how IndexedDB versioning works.
+
