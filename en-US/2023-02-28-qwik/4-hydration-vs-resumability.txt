@@ -1,0 +1,133 @@
+[00:00:00]
+>> So we talked about hydration is being workaround, and I wanna really just kind of deep dive down on what kind of a crazy workaround it is. So, at the beginning we had HTML and we literally rendered a white page. There was nothing on it, right? And then we downloaded JavaScript, and then JavaScript would then execute the application, and the application would cause the rendering of the page, and then we would actually have the page.
+
+[00:00:24]
+And it's at this point that the page would become interactive, right? And this was kind of ten years ago, if you look at how all of these frameworks worked before we had server-side rendering, right, this was the story. And so people said this is great but it is a horrible user experience that I have to look at a blank screen.
+
+[00:00:48]
+So, let's do server-side pre-rendering. Once you do server-side pre-rendering, the HTML your shipping is actually bigger, right? And so now you get to see the page, but you can't interact with it. This is basically a picture of what you want, not the actual thing that you want, so it appears faster.
+
+[00:01:10]
+So that's a win, but you still have to download the JavaScript. You have to execute the JavaScript. And now we are gonna use a fancy term reconcile, but it's really just a render, right? We literally did everything we had, and now at this point, we have the same exact thing.
+
+[00:01:27]
+So if you think about what had just happened here, we threw this away and we replaced it with the same exact thing. And the reason why, you use the fancy word reconcile is because instead of throwing it away, we try to reuse DOM elements. Try being the operative word because if the DOM doesn't really fit what we want, we just rearrange things.
+
+[00:01:45]
+And this actually happens. It turns out a lot of things that frameworks do will put, for example, a div inside of a button or a div inside of a paragraph turns out that's not allowed in HTML, and HTML will rearrange things on you. And then when the framework wakes up it just puts it back the way it was.
+
+[00:02:04]
+So really this is a best case effort here. Anyways, so the fact that we are reusing the DOM elements is basically what the reconciliation comes in. But notice what happened this is the point where we can be interactive. And so we actually got slower. And this is kind of strange, don't you think?
+
+[00:02:20]
+We wanted to be faster so we server-side pre-render, but we actually ended up being slower. And the reason for this is because there's duplication. We are sending the same information twice, once in the form of HTML. And then again, the same exact information form of JavaScript. And I really wanna stress this because if I was to delete this, HTML here or send a completely wrong HTML at this point.
+
+[00:02:47]
+I would still end up in here, right? And so the JavaScript contains all of the information to render the page even though we already have it rendered, right? And that's because historically this is how we got here. We got here from this world of, hey, we do everything on the client and server-side rendering or the pre-rendering as it's called, right, is just a horrible workaround that it's kind of what it is.
+
+[00:03:17]
+And this is why hydration is so slow because hydration doesn't do anything, right, it assumes blank page and does everything and yet it tries to reuse DOM elements. And some frameworks are better at it than others, so for example, SolidJS tries to remove a lot of the duplication.
+
+[00:03:34]
+And so in the case of something like SolidJS, it's actually not possible to have a completely wrong HTML here it relies on many bits here. But fundamentally, that's the kind of mental model that we have. And that results in basically slow websites, right? Pick a website you want, and you'll basically discover that the performance is not as good as you want.
+
+[00:03:58]
+So let's look at reasonability, how reasonability is different. So the above is basically what's happening today. We kind of talked about it in the previous slide. So we also start with HTML and it's about the same size because, well, we have to render the same exact page and so we get over here.
+
+[00:04:14]
+What's different here is that this HTML includes a tiny bootstrap, which is about a kilobyte in size, piece of JavaScript, that's actually inlined in the HTML. And that one kilobyte is fixed, it doesn't get bigger no matter how complicated your website gets, it's like it's a fixed amount of cost that you pay.
+
+[00:04:30]
+And because it's one kilobyte, we actually inline it into the HTML because we don't think it's worth making another stupid request for. And what it means is that the page is interactive at this point. If I click at this point, I am guaranteed that the click will be processed.
+
+[00:04:47]
+Now, if I click over here, the click won't be processed it will just be dropped, right? So here you click on something and you're, well, what's going on here? Did I click too early or is the code not ready or what's going on? And you might have to click multiple times.
+
+[00:05:00]
+Whereas here, the moment you click, you're guaranteed that eventually will be processed, yes?
+>> There's kind of an assumption built into when you say interactive and that's that it's JavaScript listener-
+>> Yes.
+>> That's processing the click. Your semantic anchors, your CSS only hover states things like that, that still would be active theoretically.
+
+[00:05:24]
+And so I guess the differentiation here is still, I guess you're talking about JavaScript only.
+>> Yes, JavaScript interactivity. I'm talking about that in here when I click on a button, I am guaranteed that that button will be processed, now-
+>> But anchors, you could click on a link.
+
+[00:05:43]
+
+>> Those things that do not require JavaScript, they would work obviously immediately, yes.
+>> Cool just wanted to clarify
+>> Yeah, no, that's a good clarification. Now when I say is that it's guaranteed to be processed, now at this point we haven't yet downloaded the JavaScript. So, depending whether JavaScript is in the cache or not, and we can go much deeper into that whole prefetching business, it is definitely faster.
+
+[00:06:07]
+And then the next thing we have to do is we have to download the JavaScript. And if you click before the JavaScript is downloaded, then you may have to wait for JavaScript to download. If you click after the JavaScript is downloaded, your interaction is instant, right? But notice you couldn't even click at this point.
+
+[00:06:24]
+You had to wait all the way over here, right? Whereas here, if you click here, you might have to wait a little bit, but if you click over here which would be equivalent to here, you're already way ahead. And so you say, Misko, but you're cheating. What happened to this box over here, right?
+
+[00:06:39]
+Well, that box is the duplication that I removed, right? So here the thing we did, the reason why the amount of JavaScript we're downloading is so much smaller is because all of the bits that got duplicated when we generate the HTML is unneeded. And so worst case scenario is that the amount of JavaScript here is equal to JavaScript over here.
+
+[00:07:02]
+That's the worst case scenario, right? But in practice that never happens and the amount of JavaScript you have is way, way smaller. The worst case scenario of being the same amount of JavaScript means that it is at this point where you are fully interactive with zero delay, right?
+
+[00:07:21]
+This is the worst case scenario for us, probably will be even better than that. And even before the Java screen shows up, you already are guaranteed that if you click on something, the event will eventually be processed. So even in the worst case scenario, which is right here, we are way better than what you can possibly do with hydration, because we skip execution and reconciliation.
+
+[00:07:42]
+And you say, well what happened to these two parts? And so these two parts are skipped because of something called resumability. And if you think about it, we cannot even do hydration at this point, even if we wanted to. Because hydration requires that we start at the root component and we go and visit all the components and collect information about the system.
+
+[00:08:03]
+But guess what, huge amount of these components were never downloaded to the client. So even if we wanted to do hydration, we cannot, because the actual code is not present. We don't have the JavaScript to be able to even do hydration even if we wanted to. Okay, and removing this duplication is really the biggest win that we can have, yes.
+
+[00:08:28]
+
+>> If quick adds listeners and state to the JSON. Would it have a problem with the kind of JSON bloating up kind of next? What happens with next?
+>> Yes, the question is because we serialize the state, right, to the JSON, will there become a problem for the start up of the application?
+
+[00:08:51]
+Yes, the more complicated the page is, the more JSON you're gonna have, right, there's no way around it. But, couple of things, first of all you will never have more JSON than you would have in the case of Next.js, right? So Next.js would be the worst case scenario for us, right?
+
+[00:09:06]
+So the industry standard for us is a worst case scenario. There are many times when the data would never actually have to be shipped, which as I kind of pointed out earlier. If we discover that a particular data is not editable, then we know it, don't even ship it.
+
+[00:09:22]
+So for example, one demo I have is we do hack and use, and hack and use has all the data that shows all the comments that people make. None of those comments actually gets serialized into the JSON, because they're not editable. There's nothing you can do as a user in the UI that would cause you to rerender any of these components.
+
+[00:09:43]
+And because the components cannot rerender, why are you shipping the data for something that can't possibly rerender, right? So in most cases, we can actually throw away most of the data. The second point to make is that this data is at the bottom of the HTML. So as soon as the HTML shows up, you see everything, right?
+
+[00:10:03]
+Now, you might have to wait if you click on something before you see you might still have to wait for the HTML to finish downloading because there's bits below it. But you would have to wait for that anyways in the other cases, right? So basically the worst case of quick is the normal case for the other systems is what it comes down to.
+
+[00:10:25]
+And in many cases we can do a lot better, so hopefully that answers the question.
+>> Yeah, so in other words, next we'll ship the state for things that can't be edited in [INAUDIBLE]
+>> Correct and the other thing to kind of point out is, when your app gets super large, we do have this idea of the microfonance where you can break your application into multiple containers.
+
+[00:10:52]
+And these containers would allow you to kind of break the problem into smaller chunks. But those are super advanced use cases. In most cases, you just won't even have to get there. I'm wanna show you what this actually looks like in practice. So on the right-hand side, this is our homepage and we redid this homepage.
+
+[00:11:12]
+Originally, it was in Next.js. And then when we did it in Quick, the right hand side, and the thing to kind of notice is just how quickly the page goes gray, right? The moment the HTML shows up, we render everything and it immediately goes gray. And then the other side shows up later and you say, well, wait a minute, they're both server side rendered.
+
+[00:11:32]
+How come we're faster on the Quick side? Well because Quick can do an interesting trick. Quick can not ship the HTML below the fold. So the reason why the right hand side is actually even faster for the HTML is because we don't actually even ship the HTML below the fold.
+
+[00:11:51]
+Is only when you start scrolling actually the HTML show up. And these are kind of the users cases that become trivial to do once you have resumeability. Because if something isn't interacted with, we don't even care whether the HTML's present or not. I mean, if you later put the HTML there because HTML is the source of the truth, we can just resume it later on when it shows up ,right?
+
+[00:12:14]
+Something that you can't even do with existing frameworks, once hydration happens, everything has to be present. You can't just have part of the page. And so that's kind of the reason why that's faster, yes?
+>> So you said you don't even ship the HTML is below the fold.
+
+[00:12:30]
+My question is, my tendency would be wanting to eagerly prefetch
+>> Yes
+>> Things that are one click away or one scroll action away. Can you decide?
+>> Yes, so this all comes to the business of how do you make sure you eagerly start fetching data? And there's a whole separate deep dive we can do it with it.
+
+[00:12:51]
+Yes, obviously we prefetch all these things, right? So what's actually happening is that HTML shows up, the page is kind of finished, and in the background there's a service worker that starts doing all of these things.
+

@@ -1,0 +1,84 @@
+[00:00:00]
+>> Can you clarify where the border between server and client code is? Are there any best practices around separating out the logic or is it a single file component recommended?
+>> Yeah, so where are the borders? This is kind of the, let's see, let's go to the index file right here.
+
+[00:00:21]
+So, this is, this page right here that we're looking at over here. [COUGH] So, the onget will for sure execute only on a server. There's no question about that because of the way it is. And we actually make sure that even if you try to import and refer to this file from somewhere else, the optimizer will prevent that from happening.
+
+[00:00:43]
+So, you are guaranteed that onget will never get to the client because it's never gets to the client. The component on the other hand, this component can run both on the client and on a server. In this particular case, it runs only on a server, but part of it runs both on a server, on a client, for example, the filtering part and this input causes the component to initially run on a server when it's initially rendered.
+
+[00:01:13]
+And then run again on the client when I start typing into the search box. So, it's a very kind of a mixed mode, right? So, I can't say that this component is purely server, or it's purely client. It starts its life on a server, but then it transitions to the client execution.
+
+[00:01:31]
+And so, by the way, let's show you something. Let's go to Layout. And just for fun, in the Layout, it says made by us. And so let's print out, let's say, timestamp that value. So, we have to create a const timestamp. Timestamp is use signal and start with empty think and then say use client effect.
+
+[00:02:15]
+And then we want to do that but we want to do this function update. And then we want to say set interval every one second, and of course, initially we have to do update as well. Okay, so timestamp value equals. Okay, I need this. Timestamp, molly, why are you complaining?
+
+[00:02:45]
+Timestamp is a signal, yeah?
+>> You no longer have to access stuff.
+>> Sorry, I imported timestamp that was not what I wanted, and it's okay, I did not put the same casing. There we go, okay. So, now you can see that there is a clock here on the bottom that updates, so maybe instead of two string, what is it?
+
+[00:03:14]
+There's a shorter version to it. It's two ISO string. Is it to locale, what is it? localeTimestream, let's do that.
+>> Here we go. That sounds good. And I'm just going to wrap it in div because why not? There we go. So, now we have a time over there that updates every one second, right?
+
+[00:03:46]
+So, now this component. This code right here, has to download it eagerly all the time, right? And so if I go to the network tab and I show just the JavaScript, no matter how I refresh, I immediately have that code showing up because, well, you said that you wanted to update every one second, and so I have no choice but doing this.
+
+[00:04:10]
+But let me show you something else, which I think is let me zoom this in. I like this level and refresh all because it's a top level component, okay, that's not going to work sorry let me refractor this slightly to make it work so the problem is this whole component is always visible, and so I am going to make a new component here.
+
+[00:04:32]
+Export const clock equals, okay? And I'm going to move all this code here. Here and then return div. Turn this bit right here. And I am going to put the clock here. So, I just refactor to a separate component and you can see that still works as before.
+
+[00:05:07]
+But now something strange will happen, when I zoom in and I refresh the page, no JavaScript. Scroll it down, JavaScript shows up. And I find this fascinating because I wasn't trying to do that, it's just how the system works. Like what's happening here is that when you have used client effect normally the answer is, well, when should this run?
+
+[00:05:32]
+And the answer is, well, like during hydration. All right, well, where else would it run then during hydration? But there's no hydration in quick. So, when should it run? And then the answer becomes like, well, when should we run it? And so there are two obvious answers to that.
+
+[00:05:48]
+One is you just run it eagerly when the page loads. The other answer is just run it when the component becomes visible. And so that's the default behavior. We can set the other behavior as well if you want, but the default behavior is only run this code when the component is visible.
+
+[00:06:04]
+And so out of the box, without even trying, you get this fascinating behavior that if the clock doesn't show up, you're not paying for it. But when it shows up, you start paying for it. Yes.
+>> That effect is relying on the browser flag is visible, not a projection of the event stream from advancing the page, correct?
+
+[00:06:25]
+
+>> Correct. So, what happens actually is that the quick loader, piece of code, we will talk about it more tomorrow, has a lot, let's see what's going on here. If I refresh, where is our clock? So, that if I go here, oops, It's on a footer. So, in the footer we have a clock somewhere, where's the clock?
+
+[00:06:52]
+Here we go, here's our div. There's nothing inside of div right now. Notice there is a synthetic event on q visible. So, the system fires a synthetic event when the components become visible. And I'm just going to change this to clock. Sorry, click. And then if I scroll, nothing happens.
+
+[00:07:12]
+Except I can't click on it now because there's nothing in there. Okay, hold on. Let's just change it on a server. So, the default would be dot, dot, dot. Okay, so now let me do the same exact thing. Refresh, change this to Click. Now you have loading, right?
+
+[00:07:35]
+And so it's waiting for an event. Normally it's the visible event. That's not. If I click on it. [LAUGH] Okay, so [LAUGH], it's not working for a funny reason. Because the system needs to know what are the events. And so somewhere in here we basically said, the only possible events currently in the system are visible and input.
+
+[00:07:58]
+And so, we created a new event and so we have to tell it about it so we have to say, click Loader, click Events, push click and if I click on it, bam. It runs. But normally, you don't think about this is auto generated, right? So, we look at all the possible things that exist in the system, and we know what are all the possible events that we care about.
+
+[00:08:26]
+And this is what's causing the global listener registration. But you don't have to think about any of that stuff. So, that gives you kind of an idea about the original question was how do we know what runs on a server and what runs on the client, and this is a very convoluted way of saying it's very nebulous, right?
+
+[00:08:46]
+Because clearly this component only ever executed on a server and there is no action that I can do on the client to ever get this component to re-execute. So, this is a purely server component. And then this component right here, well, the effect is the only thing that executes on the client.
+
+[00:09:03]
+If you go to the Network tab, right? This effect has downloaded eagerly and is executed on the client. But the component itself, this part is not downloaded, which is also kind of strange, right? If you think about it, right? We are re-rendering component without actually having the component present on the client.
+
+[00:09:23]
+And so, it's a very mixed world of what is on a server, what is on the client? it the only thing that you really know for a fact is that the onget methods are always on the server. And you know that the use client effect, because it has the word client, is always on the client.
+
+[00:09:44]
+There are other methods like use server mount, which you know, I will always be on a server. So, unless a method specifically says the word client or a server, it is in this strange land that it could be both. And it takes a little bit to get used to it.
+
+[00:10:03]
+But it is exactly what you want. You want a code that starts its life on a server and then transitions to executing on a client. And as a developer, I shouldn't have to think about it, I shouldn't be making any decisions about where the bits and pieces are.
+

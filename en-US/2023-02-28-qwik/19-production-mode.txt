@@ -1,0 +1,109 @@
+[00:00:00]
+>> Currently, we're running in dev mode. And in dev mode, basically, Vite is running. And what Vite is doing is, well, there are two parts running. First of all, there is this thing we call optimizer, optimizer is written in Rust, and it takes your code base and breaks it up.
+
+[00:00:19]
+So it looks for the dollar signs, and wherever it sees a dollar sign, it says, that's a potential lazy loading thing, and I'm gonna break this up and allow you to lazy load that piece of code. And so the optimizer is the thing that allows you to break everything into pieces.
+
+[00:00:34]
+Now in dev mode, we run everything through Vite, and Vite will serve all of those pieces independently. So in this situation in Vite, you could easily get to waterfall events. Let me show you what I mean by that. So let's say we have our search. Let's run this.
+
+[00:00:55]
+Okay, it's running. Let's go to our Search and, Just for fun, just to be complicated, I am going to pull this out. So let's see. What I wanna do is I want to say set Filter, I'm gonna pull this out. So now we have a method called set filter, and so now I'm gonna say const setFilter which will get a value which is a string and it will do filter.value = value.
+
+[00:01:45]
+Okay, I just pulled it out into a kind of a helper function, right? This doesn't change anything. But a few things that are happening right now, first of all, it's complaining about the setFilter. And so if you hover over it, what it saying is, look, you are referring to setFilter, but I am going to refactor this.
+
+[00:02:05]
+Because this is in a dollar sign, I'm gonna refactor this to a top level thing and I won't be able to reach the setFilter. So the rules are, if you're gonna do something like this, setFilter either has to be importable, so I need to be able to write an import statement to kind of get it to it.
+
+[00:02:20]
+In this case, I can't import that or I need to be able to serialize it, and this is a closure, and I don't know how to serialize this. So you need to do something. And so in the world of Quake, what you do is you import, you wrap it in a dollar sign.
+
+[00:02:38]
+And for some reason, I have to manually add this thing here. Okay, so we've wrapped it in a dollar sign, and what that basically means is that it says optimizer, please take this function and turn it into a lazy loadable, importable think. And when I did this, now this particular code is happy, it's perfectly happy to call the set value because it's serializable, right?
+
+[00:03:03]
+Now notice what's happening here. This closure is capturing setFilter and then setFilter internally is capturing the filter, right? And so if we go here, it should still work, so if I type an a, everything's working as you expect. But notice what happens in terms of our code that we download.
+
+[00:03:25]
+So the first piece we download [COUGH] is we downloaded the handler for our code base, right? And right after that, we downloaded the set value which then in turn downloaded the JSX and everything else, right? And so if you look at from the point of view of, refresh this again, the waterfall that's on the left-hand side here, if I enter a, there's a bit of a waterfall happening, it's kind of hard to see.
+
+[00:03:57]
+Let me see if I can do it immediately. There's a bit of a waterfall happening in here, right, and [COUGH] it's downloading a whole bunch of code, and all of this thing is not good for performance when production. So what happens in production? So in production, we don't do Vite, instead we have to build this thing.
+
+[00:04:17]
+So let me see. Instead of npm run dev, we say build. And so this goes and builds for us a whole bunch of things, and it complains that this is imported but not used. And this is imported and not used, okay? Let's build it. Okay, so now it broke up our application into lots of individual pieces.
+
+[00:04:46]
+You see all of these chunks are broken up, and then everything is made available. So let's go and try to run this in production mode. So in production mode, you do preview, I think. There's a different command for whether you're doing production of Netlify, or Cloudflare, or whatever.
+
+[00:05:08]
+So this is just a Node.js version. And so let's grab this URL /contacts. And let's go to Network. And let's do JavaScript and refresh. So, notice what's happening here. We still are downloading the first chunk and the second chunk cuz the clock is happening immediately, right? But notice that the service worker responded, we never made a request.
+
+[00:05:42]
+Let me show this to you in a slightly different way. Let's refresh this. Actually, let me now disable cache. And let me clear the Service Worker cache, Delete Service Worker, Local Host, Unregister. Okay, so we are now navigating to the page first time, so we do an empty cache and a hard reload.
+
+[00:06:10]
+The service worker immediately started fetching the code, right, so this is the prefetching that happens automatically. And in this particular case, the service worker kind of recognized that these are the only pieces that we need, and so it downloaded all those pieces ahead of time. And so now if I flip over to JavaScript mode and I start searching, notice my code was from the service worker, right?
+
+[00:06:32]
+It responded from the service worker. And so as a result, the downloads didn't happen. That's the first difference. There is a service worker and this service worker if I go into it, if I go here. This service worker if you look at it, knows about all of the bundles ahead of time.
+
+[00:06:53]
+Not only does it know about all the bundles, it also understands how these bundles import from other bundles. And because it understands this, it knows like, if you request bundle A, I am gonna need to also download bundle B. And so the service worker immediately on hitting the URL, starts fetching all of the things.
+
+[00:07:16]
+Now, how does it know what it can possibly fetch? Well, the reason it knows that is because when we render a page, let's go back to this page, [COUGH] one of the things we do. Yes, so in here is a tiny JavaScript. That's one, there's I think more of them here.
+
+[00:07:41]
+[COUGH] This tiny piece of JavaScript sets up a global listener called QPrefetch. And then anywhere in the system, you can just dispatch an event, the custom event called Qprefetch, and you specify which bundles do you want right here. And so at the beginning when the system wakes up, when we were running on a server, we looked at all the possible entry points.
+
+[00:08:06]
+In other words, what can you do? You can click on stuff, you can interact with the page, you can hover over things, whatever, we collected all the possible things. And we saw that, the only possible ways you can interact with the system means that you may need this, this, this, or this bundle.
+
+[00:08:22]
+And so we fire this event off, and now the service worker says, okay, let me go fetch this. But I now know that if you ask for this bundle, I'm also gonna need this other bundle, so it does it transitively. And the reason why this is important is because you can very easily create things like unhover.
+
+[00:08:43]
+So for example, when something becomes visible or when you hover over something, you immediately can see, now you are likely to click on this, let me go tell the service worker to start fetching. Or better yet, you are on the particular page and that page doesn't have a particular button, so therefore, you cannot execute some bundle, right?
+
+[00:09:05]
+So we don't fetch that bundle. But then you open up a model dialogue box and that model has a whole bunch of new buttons, and so it's very easy to just do query selector all and find all of the possible things you can click on. And now you issue another event that says, okay, now that we have transitioned, I now know about new set of bundles that I might need.
+
+[00:09:24]
+And so you fire this Qprefetch event, the service worker picks it up and make sure that the data is available. So as you're navigating through your application, as you go from page A to page B, or to modal, or you open things or unhide things, etc, a new possible links become visible or new possible buttons become visible.
+
+[00:09:45]
+The system automatically tells the service worker, like, go get me this stuff, I may need this. And over time, the service worker basically fills in all the items in the cache. So basically, the moment a button comes on a page that has a click listener, the service worker immediately proactively starts fetching the code associated for the button, whether or not you actually click on it.
+
+[00:10:10]
+And so in this way, the service worker will stay as a step ahead of you, and you should never get to the situation where you click on something and the code is not available for you, yes?
+>> So to clarify, the service worker is proactively doing this based on visibility?
+
+[00:10:28]
+Or is there something that you have to do in your code in order to make it proactive? The service worker is doing this automatically not because of visibility, it's doing it because on a server, when it renders a page, the server tells it what are the possible things.
+
+[00:10:48]
+And then when the code runs on the client to render new things, the rendering process now tells it that, as I was rendering, I've discovered these other possible paths. By the way, we call those QRLs, so it says I discovered these new QRLs, go fetch them. And so in practice even if you're in a slow connection or whatever, you should never be in a situation where you click on something and the code is not available, right?
+
+[00:11:20]
+And you can also see that we can do all kinds of optimizations that normal systems cannot do. So normal systems typically have this problem that you end up with the one humongous chunk, and there's no way to break this chunk up, or no easy way to break this chunk up, right?
+
+[00:11:34]
+Here because we already broken this up into thousands of pieces, it's easy to put those pieces together. And so we now have choices to put these pieces first or those pieces? So we give you one chunk or ten chunks? All of those things are essentially a configuration information into the bundling system and none of them require you to change any kind of source code.
+
+[00:11:56]
+So the idea is you first build an app, and at the beginning, you don't have much information about how people use your app, and so some default heuristics happen. And then as people start using the app, you start collecting information. And by the way, the symbols are intentionally made such that the hash of the symbol is stable across the builds.
+
+[00:12:15]
+And so you get to collect and find out, these symbols are together, and this button is more likely to be clicked than this other button, right? And so as a result, you really end up with the absolute optimal bundle size. I cannot imagine what else could we do to make this even more optimal, every trick that I could think of is in here, right?
+
+[00:12:38]
+We know how to break it up, we do it into pieces, we put it in the correct order. You solve one problem with having a single large bundle is that you cannot execute anything good until the whole bundle is downloaded, right? So for this reason, you should have fewer smaller bundles, so that as the first bundle shows up, you can start executing it, right?
+
+[00:12:57]
+Of course, we don't need to execute anything because we're resumable, but let's say it's a clock, like situation in here, right? In this case, the system should be smart enough to basically say, the symbol associated with the clock is the first one that we need, and so please put it inside of the first bundle.
+
+[00:13:12]
+And then the second bundle needs to have this code over here. And then the other bundles for login and logout, those are low priority because you can't reach them from here. You have to navigate somewhere else before you can get reach that particular piece of code.
+
