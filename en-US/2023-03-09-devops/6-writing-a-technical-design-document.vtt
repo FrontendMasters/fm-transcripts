@@ -1,0 +1,940 @@
+WEBVTT
+
+1
+00:00:00.180 --> 00:00:04.540
+I am actually gonna go through an example,
+technical document with you, and
+
+2
+00:00:04.540 --> 00:00:08.027
+we're gonna kind of do a thought
+experiment here on this, and
+
+3
+00:00:08.027 --> 00:00:10.189
+we'll kinda go through it together.
+
+4
+00:00:10.189 --> 00:00:15.586
+So as our first technical document,
+I'm going to give you guys the problem.
+
+5
+00:00:15.586 --> 00:00:19.316
+We currently have no way to monitor
+stream output logs from services and
+
+6
+00:00:19.316 --> 00:00:21.936
+other things running in
+our Kubernetes cluster.
+
+7
+00:00:21.936 --> 00:00:25.064
+So basically,
+we have no logging, all right?
+
+8
+00:00:25.064 --> 00:00:30.829
+Just before I jump into this,
+what do you think?
+
+9
+00:00:30.829 --> 00:00:35.753
+And I'm curious to you guys, where do
+you think we would start with this?
+
+10
+00:00:35.753 --> 00:00:37.643
+What would be your next prompt or
+
+11
+00:00:37.643 --> 00:00:41.435
+your next header that you would
+say after we wrote this problem?
+
+12
+00:00:41.435 --> 00:00:46.375
+What would you feel, we don't have logs,
+where would you start?
+
+13
+00:00:46.375 --> 00:00:47.922
+&gt;&gt; How do we log?
+
+14
+00:00:47.922 --> 00:00:49.109
+&gt;&gt; Yeah, that's a good one.
+
+15
+00:00:49.109 --> 00:00:50.456
+How do we do logging currently?
+
+16
+00:00:50.456 --> 00:00:51.391
+That's a great one.
+
+17
+00:00:51.391 --> 00:00:52.107
+&gt;&gt; Anyways.
+
+18
+00:00:52.107 --> 00:00:54.009
+&gt;&gt; Yeah, that's that's a good one,
+absolutely.
+
+19
+00:00:54.009 --> 00:00:57.475
+That's actually a very, very good one.
+
+20
+00:00:57.475 --> 00:01:00.499
+I mean,
+it could be a lot of different things, but
+
+21
+00:01:00.499 --> 00:01:04.683
+I definitely think starting with
+what exists is a great way to start.
+
+22
+00:01:04.683 --> 00:01:07.334
+So I actually started with requirements.
+
+23
+00:01:07.334 --> 00:01:12.815
+And I did that mostly because I knew
+what existed already, which was nothing.
+
+24
+00:01:12.815 --> 00:01:15.736
+[LAUGH] And
+that's why we don't have it here.
+
+25
+00:01:15.736 --> 00:01:18.604
+But it's in the circumstances,
+if something did exist,
+
+26
+00:01:18.604 --> 00:01:21.073
+you would definitely wanna
+work with that first.
+
+27
+00:01:21.073 --> 00:01:25.350
+So let's set some requirements for
+our technical document.
+
+28
+00:01:25.350 --> 00:01:29.495
+We only care about stdio,
+or stdin, stdout.
+
+29
+00:01:29.495 --> 00:01:33.303
+We have no use for fields or
+advanced indexing or anything like that.
+
+30
+00:01:33.303 --> 00:01:36.736
+If you've ever worked with logging,
+you know that that second
+
+31
+00:01:36.736 --> 00:01:40.968
+part literally throws out most of
+the advanced logging solutions out there.
+
+32
+00:01:40.968 --> 00:01:45.331
+Because all we care about is
+just simple stdin, stdout, or
+
+33
+00:01:45.331 --> 00:01:49.883
+what is coming from our application raw,
+straight out of it.
+
+34
+00:01:49.883 --> 00:01:55.744
+The second thing, we don't wanna
+manage infrastructure [LAUGH], right?
+
+35
+00:01:55.744 --> 00:01:59.520
+Second requirement,
+I don't want to manage this [LAUGH].
+
+36
+00:01:59.520 --> 00:02:00.807
+You know what I mean?
+
+37
+00:02:00.807 --> 00:02:05.298
+Just writing that down alone
+can help you guide your
+
+38
+00:02:05.298 --> 00:02:09.692
+decision making quite a bit
+with regards to that.
+
+39
+00:02:09.692 --> 00:02:14.396
+Another one, we only want to solve simple
+logging for all of our services in
+
+40
+00:02:14.396 --> 00:02:18.592
+Kubernetes, to unblock when we
+have errors and need to find them.
+
+41
+00:02:18.592 --> 00:02:23.909
+This one simply tells us what
+we actually care about, right?
+
+42
+00:02:23.909 --> 00:02:28.949
+A lot of monitoring and logging solutions
+out there will, say, well, you can
+
+43
+00:02:28.949 --> 00:02:34.069
+implement tracing, and you can do real
+time error handling, and all those things.
+
+44
+00:02:34.069 --> 00:02:37.127
+Okay, sure, we totally could
+do that at some point, but
+
+45
+00:02:37.127 --> 00:02:41.796
+that's gonna require a lot of code change,
+it's gonna require a lot of other things.
+
+46
+00:02:41.796 --> 00:02:46.786
+And so this is that scoping that I was
+talking about before where we say,
+
+47
+00:02:46.786 --> 00:02:50.126
+we only want simple logging,
+we have nothing.
+
+48
+00:02:50.126 --> 00:02:51.343
+How about we not try and
+
+49
+00:02:51.343 --> 00:02:54.754
+go to the moon when we don't even
+know how to build rockets yet.
+
+50
+00:02:54.754 --> 00:02:57.238
+And so that's really what this is here.
+
+51
+00:02:57.238 --> 00:03:01.333
+It's is simply saying, hey,
+I know this sounds fun, but first,
+
+52
+00:03:01.333 --> 00:03:04.490
+let's focus on just to
+solving the basic problem.
+
+53
+00:03:04.490 --> 00:03:07.405
+Last one is also massively important,
+
+54
+00:03:07.405 --> 00:03:13.054
+because I think if you go to most places,
+they want a couple of these things,
+
+55
+00:03:13.054 --> 00:03:17.499
+which is, we don't care about
+metrics right now, right?
+
+56
+00:03:17.499 --> 00:03:21.825
+Most monitoring stocks and things like
+that will say, cool, you want logs,
+
+57
+00:03:21.825 --> 00:03:22.524
+guess what?
+
+58
+00:03:22.524 --> 00:03:25.194
+We'll give metrics too.
+
+59
+00:03:25.194 --> 00:03:30.202
+That little person on your shoulder
+telling you that, is enough to distract
+
+60
+00:03:30.202 --> 00:03:34.909
+you and take you down a whole other
+path that you didn't need to go down.
+
+61
+00:03:34.909 --> 00:03:39.226
+And I've seen this tons of times where
+we started solving one problem and
+
+62
+00:03:39.226 --> 00:03:42.422
+then we were like, yeah,
+but it's free [LAUGH].
+
+63
+00:03:42.422 --> 00:03:46.188
+Cool, [LAUGH] whatever.
+
+64
+00:03:46.188 --> 00:03:49.406
+It's not free in the sense of
+engineering resource time.
+
+65
+00:03:49.406 --> 00:03:52.038
+It's not free in the sense of
+having to learn these new things.
+
+66
+00:03:52.038 --> 00:03:56.058
+It's also not free in the sense of,
+now we're gonna have to support it, right?
+
+67
+00:03:56.058 --> 00:04:00.367
+And we might not be aware of how free
+actually it is later on when we're dealing
+
+68
+00:04:00.367 --> 00:04:02.174
+with a bunch of other problems.
+
+69
+00:04:06.063 --> 00:04:10.407
+So I'm gonna take a look at
+this from my perspective.
+
+70
+00:04:10.407 --> 00:04:14.334
+And this is where we start applying
+a little bit of what you were saying,
+
+71
+00:04:14.334 --> 00:04:15.719
+what do we already have?
+
+72
+00:04:15.719 --> 00:04:18.001
+And we're gonna look at this
+from two separate angles.
+
+73
+00:04:18.001 --> 00:04:21.046
+The first angle we're gonna look
+at this is from self host, and
+
+74
+00:04:21.046 --> 00:04:23.122
+we're gonna look at real solutions here.
+
+75
+00:04:23.122 --> 00:04:27.545
+So you guys hopefully should be able
+to recognize some of these terms and
+
+76
+00:04:27.545 --> 00:04:28.733
+things like that.
+
+77
+00:04:28.733 --> 00:04:32.392
+First off,
+we're gonna look at self hosted, right?
+
+78
+00:04:32.392 --> 00:04:38.882
+Well, we have Loki with Grafana,
+and it's free basically.
+
+79
+00:04:38.882 --> 00:04:43.009
+We discovered that,
+it includes most features, right?
+
+80
+00:04:43.009 --> 00:04:46.544
+However, the query
+language is adoptable and
+
+81
+00:04:46.544 --> 00:04:51.537
+simple, it's not massively extensive
+in what we can do with it.
+
+82
+00:04:51.537 --> 00:04:56.438
+But if we're talking about we
+just wanna get something up and
+
+83
+00:04:56.438 --> 00:05:01.928
+running, sure, this Grafana and
+Loki might not be a bad solution.
+
+84
+00:05:01.928 --> 00:05:05.456
+So whenever you compare something,
+you normally want something to compare it
+
+85
+00:05:05.456 --> 00:05:07.974
+against, which is something
+I also highly recommend.
+
+86
+00:05:07.974 --> 00:05:11.588
+Don't just look at one solution,
+look at multiple solutions.
+
+87
+00:05:11.588 --> 00:05:13.968
+And so what else do we have out there?
+
+88
+00:05:13.968 --> 00:05:20.523
+Well, we also have Elastic with Kibana,
+right, the good old fashion ELK stack.
+
+89
+00:05:20.523 --> 00:05:25.259
+Because it's self hosted just like with
+Loki, it's free, but limited, right?
+
+90
+00:05:25.259 --> 00:05:29.855
+Limited because it's licensed, right?
+
+91
+00:05:29.855 --> 00:05:33.587
+So if we automatically start
+comparing Loki to Elastic,
+
+92
+00:05:33.587 --> 00:05:38.404
+we kind of start seeing, okay, well,
+we get most of the stuff with Loki,
+
+93
+00:05:38.404 --> 00:05:43.484
+we can get a lot more with Elastic, but
+it's licensed, we have to pay for it.
+
+94
+00:05:43.484 --> 00:05:47.272
+And the last thing with ELK is that it
+provides a lot of extensibility, right?
+
+95
+00:05:47.272 --> 00:05:52.409
+It has a lot more functionality and
+things like that with regards to search,
+
+96
+00:05:52.409 --> 00:05:58.202
+and we like those things, right, but it is
+unfortunately still behind the license.
+
+97
+00:05:58.202 --> 00:06:00.898
+So now we start talking
+about cloud hosted, right?
+
+98
+00:06:00.898 --> 00:06:05.562
+We wrote in our requirements that
+we don't wanna have to manage this.
+
+99
+00:06:05.562 --> 00:06:09.308
+So why did we start looking at
+it with a self hosted solution?
+
+100
+00:06:09.308 --> 00:06:13.499
+Can anyone give me a potential reason
+why we looked at it from a self-hosting
+
+101
+00:06:13.499 --> 00:06:14.161
+solution?
+
+102
+00:06:14.161 --> 00:06:16.229
+First, okay, the reason for
+
+103
+00:06:16.229 --> 00:06:21.207
+it is because cloud-hosting can
+sometimes just be way too expensive.
+
+104
+00:06:21.207 --> 00:06:25.741
+[LAUGH] And we kind of wanna
+rule out the things we know
+
+105
+00:06:25.741 --> 00:06:29.747
+we're not gonna wanna do first, right, and
+
+106
+00:06:29.747 --> 00:06:34.080
+potentially even have them as backups,
+right?
+
+107
+00:06:34.080 --> 00:06:37.931
+If we go to a cloud product and we say,
+okay, cool, we wanna try this out.
+
+108
+00:06:37.931 --> 00:06:42.224
+And then we literally just
+explode our credit card [LAUGH].
+
+109
+00:06:42.224 --> 00:06:46.909
+We just made a whole other problem and
+we are stuck now.
+
+110
+00:06:46.909 --> 00:06:51.136
+So it's really important to look at
+it from, even if you're saying, okay,
+
+111
+00:06:51.136 --> 00:06:53.229
+I'm not gonna do that, consider it.
+
+112
+00:06:53.229 --> 00:06:56.480
+Maybe there's something
+there you might be missing.
+
+113
+00:06:56.480 --> 00:07:00.320
+And you'll notice that with the cloud
+hosted it's obviously there's much more
+
+114
+00:07:00.320 --> 00:07:01.457
+options here, right?
+
+115
+00:07:01.457 --> 00:07:04.885
+But when we look at it,
+what are we mostly paying attention to?
+
+116
+00:07:04.885 --> 00:07:07.073
+Costs, right?
+
+117
+00:07:07.073 --> 00:07:11.275
+Grafana cloud, we already said we
+like Loki, we said that it's nice,
+
+118
+00:07:11.275 --> 00:07:14.583
+it's got an easier user interface and
+stuff like that.
+
+119
+00:07:14.583 --> 00:07:17.428
+How does that apply in the cloud solution,
+right?
+
+120
+00:07:17.428 --> 00:07:21.556
+Well, there's a base free of 50 gigs,
+and then you pay on top of that.
+
+121
+00:07:21.556 --> 00:07:25.550
+Okay, cool,
+we know that Grafana is something we like,
+
+122
+00:07:25.550 --> 00:07:27.393
+we know that we like Loki.
+
+123
+00:07:27.393 --> 00:07:32.301
+This isn't a bad solution still,
+whether it'd be on cloud or on prem.
+
+124
+00:07:32.301 --> 00:07:33.918
+And then we say, okay,
+let's look at some other ones.
+
+125
+00:07:33.918 --> 00:07:38.910
+We look at Papertrail, right,
+another very common the one where we say,
+
+126
+00:07:38.910 --> 00:07:42.387
+okay, well, base is $7 a month for
+a gig of data.
+
+127
+00:07:42.387 --> 00:07:46.539
+Compare that to even Grafana,
+you kinda go, okay, cool,
+
+128
+00:07:46.539 --> 00:07:49.292
+Grafana is still looking pretty good.
+
+129
+00:07:49.292 --> 00:07:52.247
+[LAUGH] And then we slowly
+start taking steps away, right,
+
+130
+00:07:52.247 --> 00:07:55.213
+where we say, okay, well,
+what about Elastic, right?
+
+131
+00:07:55.213 --> 00:07:59.070
+We said we like the ELK stack,
+they have a cloud hosted solution.
+
+132
+00:07:59.070 --> 00:07:59.868
+What does that look like?
+
+133
+00:07:59.868 --> 00:08:05.484
+Well, that's base of $95, and
+maybe we're still really small.
+
+134
+00:08:05.484 --> 00:08:10.399
+Maybe we don't necessarily need to start
+just dropping money into places that
+
+135
+00:08:10.399 --> 00:08:12.117
+we don't have to, right?
+
+136
+00:08:12.117 --> 00:08:17.818
+And so in this case, what we're really
+exemplifying here is the difference
+
+137
+00:08:17.818 --> 00:08:22.806
+between what base looks like versus
+jumping into something that,
+
+138
+00:08:22.806 --> 00:08:27.099
+we may be not aware of could
+cost us a lot of money, right?
+
+139
+00:08:27.099 --> 00:08:30.051
+Same thing with like Solarwinds Loggly,
+right?
+
+140
+00:08:30.051 --> 00:08:34.927
+We've got the Papertrail option which
+starts off cheaper, but Loggly being more
+
+141
+00:08:34.927 --> 00:08:39.533
+of like an enterprise product, it's got
+a higher price tag because of that.
+
+142
+00:08:39.533 --> 00:08:41.549
+AWS OpenSearch, right?
+
+143
+00:08:41.549 --> 00:08:43.996
+Same thing,
+it's much more of an advanced product.
+
+144
+00:08:43.996 --> 00:08:51.509
+It gives you the ELK stack stuff,
+but not top and search now.
+
+145
+00:08:51.509 --> 00:08:55.917
+Base $80, 50 gigs, and
+then you've also gotta pay for cluster and
+
+146
+00:08:55.917 --> 00:08:57.227
+instances, right?
+
+147
+00:08:57.227 --> 00:09:03.155
+And then finally, New Relic,
+base free, and then 100 gigs.
+
+148
+00:09:03.155 --> 00:09:04.911
+So how do we pick, right?
+
+149
+00:09:04.911 --> 00:09:06.427
+How do we pick, right?
+
+150
+00:09:06.427 --> 00:09:09.493
+We've looked at a bunch
+of different options and
+
+151
+00:09:09.493 --> 00:09:12.424
+how do we know which is the best for
+us, right?
+
+152
+00:09:12.424 --> 00:09:14.334
+Well, you're gonna go back here,
+
+153
+00:09:14.334 --> 00:09:17.333
+[LAUGH] you're gonna look at
+what you previously wrote.
+
+154
+00:09:17.333 --> 00:09:22.136
+You're gonna say, okay, well, I liked
+Loki, I liked what we could do with it.
+
+155
+00:09:22.136 --> 00:09:25.535
+I liked the process or
+the potential that is there.
+
+156
+00:09:25.535 --> 00:09:30.220
+And I do like Elastic with Kibana,
+but it's licensed, it's limited.
+
+157
+00:09:30.220 --> 00:09:35.270
+We're gonna have to pay money and
+we may not want to yet.
+
+158
+00:09:35.270 --> 00:09:37.360
+We also said if we go
+further backwards then,
+
+159
+00:09:37.360 --> 00:09:40.666
+our requirements that we don't wanna
+have to manage infrastructure.
+
+160
+00:09:40.666 --> 00:09:44.143
+Well, we've kind of seen that cloud
+hosted is actually very possible.
+
+161
+00:09:44.143 --> 00:09:48.833
+So we can get self hosted completely out
+of here, we don't have to worry about it.
+
+162
+00:09:48.833 --> 00:09:53.812
+We know now that we have
+a solution that's potentially
+
+163
+00:09:53.812 --> 00:09:58.585
+a decent price, and
+also technically what we like.
+
+164
+00:09:58.585 --> 00:09:59.535
+Cool, okay.
+
+165
+00:09:59.535 --> 00:10:04.225
+So basically, after you've kind of looked
+at everything, you've sauced it, and
+
+166
+00:10:04.225 --> 00:10:05.554
+you say, okay, cool.
+
+167
+00:10:05.554 --> 00:10:08.727
+There's gonna be a point where you're
+gonna start feeling like, okay,
+
+168
+00:10:08.727 --> 00:10:10.321
+I need to write my solution, right?
+
+169
+00:10:10.321 --> 00:10:13.483
+And this is hands down the scariest
+part about writing a technical document
+
+170
+00:10:13.483 --> 00:10:16.052
+because this is where you put
+your money where your mouth is.
+
+171
+00:10:16.052 --> 00:10:22.090
+[LAUGH] And the best thing I can say
+with this is, lean on your gut, right?
+
+172
+00:10:22.090 --> 00:10:24.723
+Lean on your experience, your knowledge.
+
+173
+00:10:24.723 --> 00:10:27.166
+And just try and
+find the best solution possible,
+
+174
+00:10:27.166 --> 00:10:28.979
+even if it's not the one you wanted.
+
+175
+00:10:28.979 --> 00:10:32.664
+Because honestly,
+AWS OpenSearch seems pretty cool, right?
+
+176
+00:10:32.664 --> 00:10:36.850
+So just maybe Elastic cloud, you might
+even be excited about the solution you're
+
+177
+00:10:36.850 --> 00:10:40.142
+not gonna use [LAUGH] and
+you have to be prepared for that, right?
+
+178
+00:10:40.142 --> 00:10:43.780
+As a DevOps engineer,
+you have to be prepared for
+
+179
+00:10:43.780 --> 00:10:47.432
+giving the company the best solution,
+not you.
+
+180
+00:10:47.432 --> 00:10:48.431
+So what do we do?
+
+181
+00:10:48.431 --> 00:10:51.005
+We write a proposed solution, right?
+
+182
+00:10:51.005 --> 00:10:54.077
+And we say looking at the list above,
+there's only one solution that really
+
+183
+00:10:54.077 --> 00:10:57.060
+stands out to solving our problem,
+the quickest with the best accuracy.
+
+184
+00:10:57.060 --> 00:10:59.402
+And that's Grafana cloud, right?
+
+185
+00:10:59.402 --> 00:11:00.955
+Why is that Grafana cloud?
+
+186
+00:11:00.955 --> 00:11:05.805
+Well, as we just said, we liked the user
+interface, we like how it works.
+
+187
+00:11:05.805 --> 00:11:09.944
+We don't mind the costs and
+we know that if we wanna get out of it and
+
+188
+00:11:09.944 --> 00:11:13.125
+something else into the future,
+we can, right?
+
+189
+00:11:13.125 --> 00:11:15.008
+This is the best of
+pretty much all worlds.
+
+190
+00:11:15.008 --> 00:11:18.902
+We have very easy move out,
+easy move in, and
+
+191
+00:11:18.902 --> 00:11:22.496
+not really that big of a vendor lock-in.
+
+192
+00:11:22.496 --> 00:11:27.796
+And so actually what's funny about this
+is, this is a real technical document.
+
+193
+00:11:27.796 --> 00:11:32.451
+I actually took this document as something
+that I was trying to do because I
+
+194
+00:11:32.451 --> 00:11:36.443
+didn't have any logging for
+an on-prem solution that we had.
+
+195
+00:11:36.443 --> 00:11:43.478
+And as a new smaller company,
+as the term goes, buying on a budget.
+
+196
+00:11:43.478 --> 00:11:48.907
+[LAUGH] We don't have a lot of money and
+we want to be able to do a lot of things.
+
+197
+00:11:48.907 --> 00:11:53.620
+And so for us,
+that's the best scenario here.
+
