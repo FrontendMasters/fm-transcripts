@@ -1,0 +1,159 @@
+[00:00:00]
+>> To use this library, you need to construct an instance of the pool. So you're allowed to have as many pool instances as you want. You would want one pool instance for each type of value that you were pooling. In other words, don't put arrays and objects in the same pool.
+
+[00:00:14]
+If you're doing array pooling, have one pool for the arrays, if you're doing object pooling, have another one, if you're doing class instance pool. They should all be identical is the point. That's one of the concepts of this sort of data structure. So we'll create ourselves an array pool.
+
+[00:00:33]
+It's the create function. And what you pass to it is a function that constructs instances of the value that you care about. So in our case, we just need something that creates empty arrays. I'll pass it an error function that creates an empty array. DeePool will automatically invoke that function anytime it needs to make new instances of your value, anytime it needs to grow itself.
+
+[00:00:58]
+So that can be as complex as you want. That could be like constructing a class instance or calling out your data. Whatever you need it to be goes in that function. Ideally, usually, it's just returning an empty array or an empty object, but can be more sophisticated. You can start using that pool just as is, and it defaults because the documentation discloses this.
+
+[00:01:23]
+It defaults to starting out with five entries in your pool. It lazily does that, when you ask for the first one it goes ahead and creates a pool of five, and then it doubles from there. That five doubling might be good for many of your small usages. In this particular case, I've already done some pre-work on this exercise, which is that I first went through and benchmarked how many arrays was I creating and throwing away in my average case when I was typing in, say, a 10 or 11 character word?
+
+[00:01:53]
+And it turns out that number was in the multi thousands of arrays that I was creating and throwing away as it recursively went through and made all of its matches of several hundred words to return to me, okay? So several thousand arrays are what is being created, and then I went through and using some console logging and some counters and stuff, tried to get an approximation for how many do I need at any given time.
+
+[00:02:20]
+What's the most that I'm ever using concurrently when we're 8, 10, 12 levels deep of recursion? And that number was around, it was somewhere between 20 and 25. So I set it at 25 and then I fine-tuned it a little lower and a little higher. And I arrived at, for my testing, that if I picked 23 as the size of the pool, that the pool never needed to grow.
+
+[00:02:48]
+But I didn't end up with any unused items in my pool. Now, your mileage may vary if you're trying out different dictionary lengths or trying out different lengths of input. You might end up needing 25 or 24. But we're just gonna go ahead and pre-grow our pool to size 23 since I already did some of that pre fine-tuning work, and I think that's a pretty close number for most cases.
+
+[00:03:19]
+So how do we use this pool? That's where the real big game is. The first thing that we're gonna do is we are still gonna have that same function here, but I'm gonna make another function that will be the findWords function that takes our input. And then we're gonna rename this function to findAllWords, just cuz I'm uncreative and I can't come up with another name for it.
+
+[00:03:43]
+I will explain in a little bit why we need two functions, but it's because I need to do a little bit of cleanup work after the final call. All right, so in the findWords function, I'm going to, Call my findAllWords with my input. Actually, I should have probably left this as the same.
+
+[00:04:11]
+We could leave this or not. You don't technically. Whether you use this or not, it would be fine, but we'll leave it there since that's what I did in the Git repo. Okay, so findAllWords is our sub function, the one that doesn't get called publicly, and it's the one that's gonna do all of its recursion for us.
+
+[00:04:33]
+We're gonna go ahead and call that and you might think, well, all we need to do is just return all words. Why do we even create this adaptor function? Well, before we get into the internals of what findAllWords is gonna do, it is going to return us an array, and the array that it returns us will have come from the object pool.
+
+[00:04:55]
+And we don't wanna lose that object. We want to reset and recycle that object. So we wanna pass out to the calling code a new array that's not part of our pool that the calling code can do whatever it wants with. But we are internally managing our set of pooled arrays, and we don't wanna lose one of those.
+
+[00:05:16]
+We need to keep all of them and reset all of them and make sure the pool gets back to its initial state. So we are going to use something that has become much less common to see these days, but we're gonna use a version of the try construct called try finally.
+
+[00:05:33]
+I don't know if anybody out there has used the finally block before, you don't see that too often. But what the purpose of the finally block, notice I don't even need a catch clause here. If I put a finally block, it will happen every time no matter what, even if an exception occurred.
+
+[00:05:51]
+So the purpose of finally blocks is to do cleanup, which is exactly what we're doing here. We are cleaning up our memory. This is exactly what try finally exists for, is this kind of work. So we need to take the allWords and set its length = 0, that's resetting the array back to an empty array.
+
+[00:06:19]
+And we need to do pool.recycle and recycle all the words. Recycle that back into our pool. That's our cleanup. Does anybody spot the problem with this code? Before we even look at how findAllWords does what it does, does anybody spot the problem with this? Somebody in the chat?
+
+[00:06:47]
+
+>> We are not taking the words from the pool.
+>> We are gonna do that inside of this findAllWords function. Like I said, we're assuming that this thing is gonna return us an array that came from the pool, which is why we need to recycle it back.
+>> You are returning and the function exits.
+
+[00:07:06]
+
+>> We are returning and the function exits, but it always guarantees to do the finally block after it exits.
+>> AllWords is not a new array.
+>> There you go. We are returning allWords, and then immediately emptying out allWords. So the calling code is gonna be like, what?
+
+[00:07:24]
+You gave me an empty array. We need to return a copy of allWords, and then clean out the allWords in recycler. Little nuances that when you start doing stuff like working with an object pool, you gotta pay attention to very little nuances like this. It's easy to get tripped up.
+
+[00:07:48]
+Okay, this next set of work that we're going to do, we're going to wire up the findAllWords function in as many places as we possibly can. When it goes to create a new array, instead of creating a new array, we wanna get an array from the pool and add values into that array rather than constructing a new array, that's the task.
+
+[00:08:10]
+And whenever we're done with an array, we want to reset the array and recycle it back into the pool. So that's what I meant by saying it's a little bit intrusive here, so it makes the code a little bit uglier, but it's not too bad, I don't think.
+
+[00:08:25]
+We just need to look for places like this where we construct the new array. And so instead of constructing this new array, we are going to check an array out from the pool. So we will, instead of saying that, we will say pool.use, that gets us another instance from our pool.
+
+[00:08:56]
+Let's look for other places that we create arrays. Here's a place that we create an array. When we're creating remaining letters, we create an array. So let's do, Pool.use, and instead of being able to kind of nicely declare this, we're gonna actually have to push into the array that we got out of the pool.
+
+[00:09:20]
+So it's slightly less ergonomic, but we'll push in, These values. We'll still spread them out. One note is that the slice method here built in to JavaScript is in fact returning arrays, and we can't do anything about that cuz that's a built-in method. So this is an example of an array that we just have to get the array and it just has to get garbage collected.
+
+[00:09:49]
+This is not a perfect solution, but in so far as any arrays that we can control, we wanna use those from the pool. And any of the other ones that we don't have control over, we just shrug and say it's just part of using JavaScript. So we can't do anything about those slices, but we did take care of the array that we had been creating for remaining letters.
+
+[00:10:14]
+Now we wanna take the array that is coming back from findWords. We know that findWords, I'm sorry, this is gonna be findAllWords, I mess this up every time I do this workshop, we have renamed that, that's our recursive call, findAllWords, but we need to take that function and call it.
+
+[00:10:35]
+And we know that that thing returns us a pooled array, right? Because look, that thing is gonna be this, and that's a pooled array. We know findAllWords is giving us a pooled array, just like we know it up here. It's a pooled array. So we need to get that array.
+
+[00:10:56]
+So I'll call moreWords. We need to get that array. We need to push those values into our existing levels words array. So we need to say words.push(...moreWords). And now we have this moreWords array, which is a pooled array. What do we do when we're done with an array?
+
+[00:11:29]
+We reset it. Which for JavaScript arrays is as easy as setting its length = 0. And then what's the last thing that we do? Recycle. In fact, we are also done with remaining letters because we've made this call. So we can also set remainingLetters, .length = 0. And we can also recycle remaining letters.
+
+[00:12:19]
+We pulled two different arrays out of the pool, and now we're resetting both of them and putting them back. The discipline here is any time you take something out of the pool, make sure you know where you're done with it, and reset it and recycle it. Otherwise, you've completely shot yourself in the foot because the pools are gonna grow infinitely and you're not gonna get that reuse that you want.
+
+[00:12:49]
+One last little nuance that we have to handle is this code down here, which is calling our uniquing. You see that we're creating an array here, and we don't wanna do that with an array. So what we're gonna do is say wordsSet is a new set with the words.
+
+[00:13:12]
+That's a new set instance, and because we're only doing this once, we don't really need to worry about pooling. We're only doing this on that last call, if you will, so we don't really need to worry about pooling. But you could also do a pool of set instances or a pool of map instances or whatever.
+
+[00:13:29]
+Here there's only one, so it's not that big a deal. I've constructed the set, so I've now copied the words over into a unique set. And so now I can do my resetting. I can say words.length = 0, cuz I no longer need that array. And I can, Then push into words, What comes out of wordsSet.
+
+[00:14:03]
+So we'll dot dot dot of wordsSet. So I reset it to 0 because I don't wanna reconstruct an instance of it. I'm reusing the same pooled instance. I set it's length to 0, pulled it back out of the set, and that's now what I'm going to end up returning.
+
+[00:14:28]
+So if you follow through the logic here, we have a pool.use and a pool.use, and we have a pool.recycle and a pool.recycle. Yes?
+>> Why doesn't recycling method make an array empty itself?
+>> Why do you have to do your own resetting? That's basically the question. Because the pool is generalized.
+
+[00:14:57]
+It says I can handle any kinds of values. You might be handing me instances of some complex custom class that you've defined. It has no way of knowing how to reset a value. It technically could have done some special casing and said, I know how to reset arrays and I know how to reset objects or whatever.
+
+[00:15:15]
+But because it doesn't do any frills and doesn't have any performance overheads that it doesn't need, it's your job to do the resetting before you pass it back to recycle. Another question?
+>> If we do this recycling manually, does the JS recycling engine check all these steps again after the function gets removed from the stack call?
+
+[00:15:39]
+
+>> The way that you should think about this is that we are not actually growing the JavaScript memory stack very much as we go down. That's by design, what we're trying to do is not grow the stack. We grew the stack by all the arrays that we needed when we did pool.use23.
+
+[00:15:59]
+So as we walk our way down into all of these recursive levels, we are in fact having JavaScript construct new function call frames on the call stack, and there is a little bit of value creation on the stack because of the input.slice that we don't control. And so some of that is getting cleaned up as it goes back after the call stack frame goes away, that has to get cleaned up.
+
+[00:16:25]
+But the big thing that we're focused on here is that all of these thousands of intermediary arrays that we were creating before in the previous solution, were no longer creating thousands and thousands of arrays that JavaScript needs to garbage collect. We pre-created the 23 that we knew that we would need, we checked them out, used them, reset them, and recycled them.
+
+[00:16:49]
+So I guess the real answer to the question being posed is, JavaScript is still needing to do its own memory cleanup, and yes, there might be some garbage collection that happens. We have significantly reduced the pressure on the garbage collector by simply putting out thousands fewer bags of trash down at the curb.
+
+[00:17:12]
+
+>> How many arrays did you manage to get rid of using the object pool in this particular case?
+>> Based on my estimate, I went from, in my testing, from using several thousand arrays, to using 23 arrays. All right, we didn't change any of the functionality of the code, and we haven't really impacted any of the performance.
+
+[00:17:34]
+We could rerun it to show that, as long as I didn't make a mistake here, it should still work, and we should still be getting roughly, uh-oh, do we have a JavaScript error? I know what happens, I didn't pull over the deePool implementation, so I can't actually run this code.
+
+[00:17:56]
+Just to save the time though, the timings, you can run it yourself, the timings are gonna be roughly the same, so we're not really paying hardly any performance penalty for this. We're just simply reducing the memory pressure on it. It's just a technique to have in your bag.
+
+[00:18:11]
+Do I use object pools all the time? No, but I would say maybe 1 out of 100 cases where I'm implementing an application like this. I see a place where the algorithm that I've designed or that I'm using is particularly wasteful in creating and throwing away lots of intermediary instances of an array or an object.
+
+[00:18:35]
+And then my brain kicks in and I'm like, I should probably use object pooling, okay? Another example of places where people have used object pools, somebody took my library and used it in, at least for a while, in one of the semi-popular libraries that was, I think it was Redux or something like Redux.
+
+[00:18:53]
+Because they were creating all these objects for the state dispatches, and they were creating and throwing away thousands and millions of these objects. And then they ended up using deePool as a way to manage those objects. And I don't know whether they're still using it, I think they're probably not.
+
+[00:19:08]
+But for a while, it was being used by one of those libraries. So that's just an example in a place where you're creating and throwing away a lot of those intermediate data structure instances, object pooling can be useful.
+

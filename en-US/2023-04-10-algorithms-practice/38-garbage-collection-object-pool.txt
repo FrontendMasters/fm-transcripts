@@ -1,0 +1,101 @@
+[00:00:00]
+>> Okay, back in our slides, I want us to talk about garbage collection. And while I got these slides projected, I just want you to look back at the code that we've just worked on. And I want you to see just how many places that we are just treating for free that we can create an array and return it back and spread it into another array and throw it into a set and create another array.
+
+[00:00:25]
+This is one of those cases where JavaScript makes that super ergonomic and quite honestly, it's pretty performant in doing it, we don't see a big penalty for doing it. So it ends up creating some pretty reasonably nice code for us to write. The C programmers of the world are cringing because they're like that dot-dot-dot is like 6,000 lines of its own complexity and all the memory implications, and all that other stuff.
+
+[00:00:51]
+At our layer of abstraction, we just sort of treat it as almost a free operation. And one of the things that you need to get good at as an algorithmist is, even though you do play in some particular layer of abstraction, you shouldn't be completely ignorant of the layer below.
+
+[00:01:07]
+You should be at least competent at understanding the layer below. For us, that's what JavaScript is managing memory-wise underneath the covers. So I want us to talk about the creation and throwing away of a whole bunch of arrays as temporary transport values, that's basically what we're doing here.
+
+[00:01:25]
+And I wanna talk about an approach that you sometimes might employ to reduce the pressure on the garbage collector in our programs. Why is that important? Because it is always the case that in the small, we test things out and everything works. And then in production, we end up starting to see people complain that our animations start to just randomly be janky or there's a delay when somebody clicks something or whatever.
+
+[00:01:52]
+And it seems very unpredictable. And that's because we can't really predict or control when the JavaScript engine is gonna say, you've put out too many bags of trash at the curb. I gotta come by and pick them all up and I gotta collect all the garbage. We don't really control that.
+
+[00:02:07]
+We're not suppose to control it, but we don't control it. And yet, it is actually an important factor that plays into the real experienced performance that our users have. It may not end up showing up in your test week, but real users will experience the effects of us being lazy about garbage collection.
+
+[00:02:29]
+So as a little bit of a detour here, I wanted us to spend just a brief moment talking about minimizing our garbage collection. And there's a technique for doing this. Obviously, if there's a way for you to say, I don't need an array here, I could return something else, just don't do the array.
+
+[00:02:46]
+But the way we wrote our algorithm, we kinda based it on the ability to like make arrays and return partial arrays and concatenate them together. The algorithm kind of just assumes all of these arrays, so it would be difficult to avoid returning them. But there is a technique that we can use to cut down drastically on just how many arrays that we need.
+
+[00:03:05]
+And that technique is referred to as an object pool. So put simply an object pool front loads the creation of some number of instances of some value, usually a data structure like an array or an object. It could be an instance of a class or something but, If I know for example, that at any given time, I only need 25 of this thing, whatever this thing is.
+
+[00:03:36]
+I could pre-create all 25 of them and then, not that much unlike a library when I need one of them, I could check one of them out, use it, reset it, and then check it back into the library. And if 25 was the most that I ever need concurrently, then I might end up putting back and checking out hundreds or thousands or millions of times.
+
+[00:04:04]
+But notice that I only ever created 25. If they were arrays in our case, I only ever created 25 arrays. Even though at any given time, I might have 13 checked out and then put a few back and then get 12 more and put a few back. But I never go above 25, then I've drastically reduced it from the thousands or millions of arrays down to 25.
+
+[00:04:28]
+Does that make sense?
+>> This is analogous to the process that databases use for repeated queries and essentially caching correct that we know that there's so much information in the set. We know what our maximum overhead is, so we materialize that, which makes it readily available for lookup.
+
+[00:04:47]
+Instead of sitting somewhere, we have to compute it, we compute it, dump it, and make it available. Is that the same loop that we're describing here?
+>> Possibly, I will say that I'm certainly not sufficiently well-versed in the internals of database implementation to speak to what they do.
+
+[00:05:07]
+But I can say that as a correlated relationship, yes, the concept of resource pooling as a broader version of object pooling. Resource pooling is extremely common when we're dealing with fixed, finite, and expensive resources, like network interface connections and database connections, and things like that. It is extremely common that you might create three or four database connection in a pool because you know, you don't really need all of them.
+
+[00:05:36]
+But you don't wanna create and throw away and create and throw away that's very expensive, performance-wise and memory-wise. So, yes, the broader idea of resource pooling is very common. Whether you're dealing with garbage collection or not, you just simply don't wanna create and destroy a whole bunch of memory cuz it fragments your memory and it wastes CPU performance and so forth.
+
+[00:05:56]
+So this use, reset, recycle loop, that's the conceptual thing to think about. Now another extension to this pool is, sometimes you don't know how many unique. So you might start the pool at five and then just let it run, and what happens if you try to check out the sixth array when you started out your pool at five?
+
+[00:06:21]
+You might think, I guess that fails or there's no more array. Well, the general response is, you just grow the size of the pool according to how many you asked for. So if I started it at five, I could grow the size to six and give you the sixth one.
+
+[00:06:39]
+But we have this general principle of what's called exponential backoff in timings. And we use this a very similar principle here, which is to say, if I asked for the sixth one, you start out with five and I've now asked for the sixth one. There's a pretty good chance, I'm probably gonna ask for a seventh, eighth, and ninth one.
+
+[00:07:01]
+So rather than just give you six and then grow it to seven and then grow at eight and grow, how about if just every time you ask for one more than I have. I'll just double the size of my pool. So I'll go from 5 to 10, because there's statistically a pretty good chance that you're gonna want 7, 8, 9, and 10.
+
+[00:07:18]
+And then if you ask for the 11th one, I'll just add another 10 to the pool, 10 that are out and another 10 that creates a total pool size would have been 20 or total capacity would have been 20. And I'll give you the 11th one. And then after you go past the 20th one, I'll make the capacity 40 and give you the 21st one.
+
+[00:07:36]
+So that's the general idea of a data structure like this object pool, is that you just ask it to give you a new value and you don't really worry about it too much. But you do want to sometimes kind of fine tune the pool size. If you started out too small, you end up with too many doublings.
+
+[00:07:55]
+If you started out too large, you end up with wasted arrays or wasted instances that you never use. Do you follow me? So you could just use the object pool right out of the box. However, it's been implemented and not worry about it. It'll take care of its own doubling and giving you new values.
+
+[00:08:12]
+But in the end, if you're gonna go to the trouble of using an object pool. You'd probably eventually wanna try to fine tune it down to a number closer to what you probably need. Because there's no real reason to let it double and have to pay that penalty in the runtime.
+
+[00:08:28]
+If you know up front, I need 23, just go ahead and set it to like 23 or 25 and then you're good. You follow where I'm coming from? If you know that you need 10,000, I might not set it to 10,000, cuz that's an awful lot of upfront allocation.
+
+[00:08:44]
+I might let that grow as my application goes, cuz maybe I need 10,000, but maybe only 1% of the time do I ever need 10,000. So that one might be a case where I'd set it to like 500 and let it grow itself to those bigger numbers in the rare cases where we really need is.
+
+[00:09:03]
+There's a lot of little fine tuning and subjective judgment that you make and you wanna benchmark, but that's the general concept of an object pool as a data structure. So how does that apply to our code? This is going to be a little bit more intrusive on our coding style, it's a little bit annoying to work with, but we get this big payoff in terms of how many fewer objects we're just throwing down at the curb to be garbage collected.
+
+[00:09:31]
+Far less chances that we're gonna have animations or other things that become janky because of garbage collection. So we'll switch back over to our code editor. And we are now on the option three branch or we are now finished with option two, that's the starting point. But you'll notice in the option three branch, I've included a library that does an object pool for us rather than us implementing our own.
+
+[00:09:57]
+That library I happen to have authored. I wrote this like seven or eight years ago, it's called deePool, D-E-E-P-O-O-L. So it's just in there in the option three branch, you can switch to option three and grab it and copy it out if you want, get it off of the GitHub repo.
+
+[00:10:16]
+However you wanna grab that, or you can get it off of NPM again D-E-E-P-O-O-L. So deePool is my attempt at writing the most stripped down least feature rich, but most performant object pool that I could possibly imagine. And I spent a considerable amount of effort tuning and benchmarking the performance, but big disclaimer here, I'm not a performance engineer.
+
+[00:10:48]
+I'm not one of those ones who went and looked at the internal guts of VA aid and like tried to figure out all the nuanced quirks. I just did my best to take out all the frills and give a very, very stripped down version of an object pool.
+
+[00:11:02]
+It uses a very simple Round Robin strategy to prevent the memory from getting over clustered and it Round Robins through an array and all that stuff. All of those details are in that tool. You can completely ignore this library from here on. I'm not trying to sell anybody on using it, but I wanted us to have an object pool to use, so I pulled out this whole project that I've written.
+
+[00:11:22]
+So how are we gonna use deePool. If you've gone and gotten it and you have it, you can just import it. So we're gonna import deePool and I put it in the external directory.
+
