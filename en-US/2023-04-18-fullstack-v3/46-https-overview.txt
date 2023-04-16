@@ -1,0 +1,82 @@
+[00:00:00]
+>> Next, let's talk about HTTP. And during this we're gonna implement HTTPS, which you really need. You can't run your website, you can't run Web Bluetooth, you can't run service workers, you can't run a lot of things, it can only be run over HTTPS. And then we're gonna set up HTTP2, which is even better version of HTTP.
+
+[00:00:20]
+The good news is, this will go a lot smoother because we don't have to do that much. There are tools in place that do all this for us. And that's the good thing about using Nginx is it's a default. So, there's a lot of tools that support that.
+
+[00:00:33]
+So, we talked about HCP. The thing we all use, the thing we all code in, the thing that is broadcasting my signal today to everybody. Let's just the hypertext transport protocol. HTTP is made up of two distinct parts the request and the response, the request what's going to the server, the response, what's being responded to.
+
+[00:00:53]
+And here's what a request actually looks like. It's got get, it's got the path. It's got the connection protocol type. So in this case, it's HTTP1. The hosts is me. And the rest are just headers. We talked a little bit about headers earlier, but headers are just these little bits of information that tell the request and the response what's actually happening.
+
+[00:01:15]
+And these are really important. What are cookies?
+>> Baked goods.
+>> Yes, cookies are baked goods, but a cookie is just another header. Nothing fancy about it. But these are all really powerful. For example, the accept encoding gzip in br broadly. That just says, that's just the browser saying like, hey, Nginx, if you want to send me back some gzip, I can deal with it.
+
+[00:01:39]
+If you want to send me back some Brotli, I can deal with that too. And Brotli is just a different type of compression. We didn't implement it today because it's still not baked into Nginx, and we're not going to rebuild the binaries. It's a whole thing. It's a whole thing we don't want to go into.
+
+[00:01:57]
+And the request has the header, it's a key value. So it's the key and the value. The host is the key. The value is jemyoung.com. User agent. We could have a whole course on user agents and why they look like this today. We won't go into it, but we just read the last part, which is Chrome, which is supposedly equivalent to Safari, which is supposedly equivalent to WebKit.
+
+[00:02:19]
+It's a whole thing. It's a whole thing we won't go into either. Some common headers that you've seen and dealt with is user agent, who's requesting me. This is important because certain browsers don't support certain features. So we write the header or we read the header and we say like, okay, you can support native ES6 or ES7.
+
+[00:02:42]
+That's fine. We won't have to run through Babel or anything like that. Except what the device will handle, it accepts certain types of files. The languages are really important, we talked about scale. That's how we translate all our strings. So, we don't assume everybody speaks English. So, we read their browser language to understand what strings we need to translate back for them.
+
+[00:03:05]
+The content type, set cookie, is the header we talked about, but it sets cookies which are really useful. And then if we want a custom header that we don't want to interfere step on the toes of any other known headers, we use the x, x dash whatever is just a custom header, you can set whatever you want there.
+
+[00:03:23]
+The response looks a lot like the request, usually a little bit shorter because we don't need to send back as much information as many headers. So, the browser is going to send all these headers because it wants us to know exactly who we are, who it is and what what it accepts.
+
+[00:03:36]
+The response is usually much simpler, it sends back a 200 which is a status code and then the server type just for us to know, so in this case we're running Nginx on Ubuntu. Some common status codes that you all know is 200, which is okay, 301 is moved permanently.
+
+[00:03:56]
+302 is a temporary redirect, as in it's redirecting now, but you come back later, it might be back to normal. 401 is not authorized. 500 you're probably all seen probably too many times, which is like something's gone wrong, and we don't really know. But all these are actually different categories of status codes.
+
+[00:04:15]
+So, if I see a five anything I know it's a server error for sure. If I see a 40 thing I know it's a client error. I don't actually have to know the specifics of the definition of 401 and a 403. I just know that four is the client error.
+
+[00:04:27]
+Two is always going to be success, just different flavors of success. And then one is information. I'd say of all the status codes, probably people are less familiar with the one. But that's also a useful status code too. It has things like continue. That's usually about it. Like 101 is like a continue, as in you've got this header.
+
+[00:04:48]
+There's actually more data to come. And we actually use that to send back data a little bit faster. I won't go into that. That's one performance tuning, but the one is information. So, this one's an interesting one. This one's more philosophical. So, knowing what you know about status codes, what's the proper status code for successful POST requests?
+
+[00:05:07]
+Anybody? Take a guess to one.
+>> A 201?
+>> Yeah, good job 201 is probably the proper status code for a successful POST request. Remember, a POST request is the equivalent to a right or an insert, so 201 just means created successfully. However, most people just use 200, and that just means, okay.
+
+[00:05:30]
+But I like getting specific with status codes because they mean very specific things. There's a difference between a 200 and a 201. But generally you see the same kind. Just like if someone's not authorized, you can send a 401 or 403, but they mean different things. Why we use status codes and why they're so important?
+
+[00:05:47]
+It tells us a lot of information about what's going on the server. For instance, if we see a 500 error, that doesn't really mean a whole lot. If we see something like a 501, that's telling me more specific information about what's happening. That way, if the server is down, it'll always respond with a 500.
+
+[00:06:02]
+Like we saw in that example where we connected to Nginx, my application wasn't running, we got a 502. Which told me my server is up and running or it told me my Ubuntu server, my droplet is up and running and Nginx is up and running. But my application wasn't up and running, and we got all that from just the status code.
+
+[00:06:21]
+That's why status codes are really powerful because they tell us all this information with very little overhead. So, we understand request and response. Let's talk about securing our HTTP connection. So, right now our servers are running wide in the open. Remember the traceroute exercise where we saw all the different hops along the way it takes to get to the server.
+
+[00:06:46]
+Well, what if there is a bad actor somewhere in the middle there just reading all of our data. What can we do about that? Well, we can encrypt the connection because right now it's not encrypted, and in the early days of the internet nothing was encrypted, which when you think about it it's kind of wild.
+
+[00:07:03]
+We're sending our credit cards, and our passwords and all that and it's really, really easy for an actor in the middle, called a man in the middle attack, just to sniff out all that information. And all it takes is just a misconfigured server somewhere, and they got your credit card.
+
+[00:07:18]
+Really kind of basic stuff, which is why all modern browsers will require you to be on HTTPS. And if you're not, they'll send you up that nasty warning like, hey, warning, you're not on a secure connection. It didn't used to be that way. That's actually probably a new invention.
+
+[00:07:35]
+But it's good. We want all of our connections to be encrypted all the time. So, with the HTTPS, we learned about encryption a little bit earlier, or hashing, if you will. This one is just encryption. Anybody that's in the middle, it's just going to see gibberish because they don't have the keys.
+
+[00:07:50]
+So, your server has a key and your browser has a key, and they negotiate somewhere along the way and they encrypt all that data moving back and forth. So, now let's make a modern website with HTTPS because you got to have it for a modern website. You get that nice lock icon, that means you're official.
+
