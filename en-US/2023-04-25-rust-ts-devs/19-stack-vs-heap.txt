@@ -1,0 +1,163 @@
+[00:00:00]
+>> Hopefully you see kind of some of the selling point of rust coming up here. That's why I think a lot of people love it is, this is one of the foundational pieces for why people love it. There is something else that is coming, which is the borrow checker.
+
+[00:00:13]
+This is the reason why Rust gets most of its actually bad rap from, my personal belief is that it's the combination of not knowing what an iterator an enum is. Mixed in with trying to figure out the borrow checker at the same time, and people are just like, what, I don't even know what's happening.
+
+[00:00:26]
+There's like this pattern matching going on, I have no idea what's happening. So that's why I wanted to build that foundation first, so when I say result, or I say option, I say enum, you kinda have a clearer picture in your head, and so then the borrow checking part becomes pretty easy.
+
+[00:00:41]
+It'll also make iterators a bit more sensible. So first, I'm gonna have to teach you some rust fundamentals that there's just really not a typescript side by side. And so we just kind of have to do this. So we're gonna have to talk a little bit about the stack versus the heap.
+
+[00:00:59]
+So I'm gonna create a kind of a small little example. So let's jump back here. And let's go to our Rust, 1, and I'm gonna create a function. And we've probably all seen this at some point. I'm just gonna call it foo, and inside of here, I'm just gonna call it foo.
+
+[00:01:14]
+It's gonna warn me about it, but whatever. And right here, I'm gonna call foo. Now, what's gonna happen when I run this program?
+>> Choke.
+>> Something's bad's gonna happen as well, what's gonna happen? In fact, what's gonna happen is what is referred to as a stack overflow.
+
+[00:01:34]
+And there's a reason why this is called a stack overflow. And I'm gonna give you a somewhat lying version of what's happening. This is not perfectly technically accurate but it's accurate enough. So whenever you call a function, something has to be loaded into memory. So if you think about it, you have a pointer somewhere in your program walking through your code, it's going line by line executing every last instruction, but at some point we need to jump into a function.
+
+[00:02:02]
+And so you have two memory regions. Effectively you have a stack. I'm drawing it upside down, Intel way. And then you have a place called the heap. You can think of the heap as just like a giant memory place. You can think of the stack as like a smaller memory place, but super fast.
+
+[00:02:17]
+And so what happens is, you have something called a stack pointer. It's pointed somewhere. And when we call a function, well, we probably need to know like, say what the return address is. Where do we go back after we finished your function? Cuz your function can't be called anywhere within the program.
+
+[00:02:34]
+So this happens, this happens in JavaScript, you just don't experience it because you that's not how we do stuff. There's also parameters, right? Every function has some list of parameters that you pass into it. So it now has to have these parameters. It has to be able to access them.
+
+[00:02:49]
+They may be references, they may be the literal values, what are they? And then you're gonna have some sort of return value at the end. This is why we have options. I need to know what am I returning, what is the shape of the thing I'm returning? And so that's kind of what happened so when we called foo over and over again, we call a foo, we had to have a good return address, we had to load up any parameters with a load of any return value, and then we called foo again.
+
+[00:03:13]
+Well, we better have a return address, then we better and then we have this and then it just went on ad infinitum until we ran out of memory. We ran out of memory, Stack Overflow, kaboom, we can no longer operate. So hopefully that makes general sense of what's happening when you do function calls, and so this happens in every language, it's fantastic.
+
+[00:03:32]
+So now that we kinda covered that, so you can see how a stack or a stack overflow happens, let's talk about a struct for a second. So I'm gonna go in here, I'm gonna create struct, let's call it, let's get away from that, I'll call it MyStruct, and it has an age of usize, so 8 bytes.
+
+[00:03:49]
+So when I create, I let foo equals MyStruct, and I say age is 0, what's going on here? Well, what's happening deep down inside of here is, let's say our stack pointer's right here. Well, we're gonna need to create a little bit of memory right here for MyStruct.
+
+[00:04:08]
+MyStruct contains what? A single age usize, so you can imagine that there's a pointer some address in here, whatever it's gonna be 69 4 20, whatever the address is inside of here fantastic. And we're gonna have to put MyStruct in here which is gonna be 8 bytes, it's gonna have the 8 bytes for the usize, and probably nothing else because there's nothing else we have specified.
+
+[00:04:31]
+It's very easy to do that on the stack, right, cuz all you do is you take your stack pointer and you add 8, and boom you just got yourself 8 bytes of memory region. And now you can just store your stack right there so if you need to refer to your stack, it's right, or my foo, or MyStruct, it can just jump right there, it's super fast, very easy to do, all right?
+
+[00:04:52]
+But now, what happen if I do something like this? What happen if age is a vector of usize? Again, I say this a bunch, vectors can grow, so they can't just be stored on the stack. So you'll see something like this, right? We'll just go like that. Hopefully this makes sense, we'll jump over here so instead of being 8 bytes with just an age, we need to store something else.
+
+[00:05:13]
+So I'm just gonna just back up a little bit. You could imagine that it could store a pointer, which points somewhere over into the heap. This is my place I can grow my memory. This is the place I can store all my usizes at. Then, it's gonna store a length, so that way I know how many items I have, then it can store a capacity.
+
+[00:05:35]
+So that way it knows when it needs to resize. So if I keep on adding items, at some point it's gonna run out of memory that it has allocated over here. I think normally it starts off with like 5 as the default one when you create an empty warning, it has some low amount.
+
+[00:05:49]
+And then it has to grow as you add more. And so as we add more and more of these little 8 byte units, eventually we may have to resize. And so that means, we now have, there's something going on here, I'm trying to make it very clear what's happening.
+
+[00:06:01]
+So that means, we have a MyStruct, which takes up this amount of room, and MyStruct has a vector, which is this part right here, and points off. So if we had another property, say a usize itself, we'd have the usize right here, little 8, little bytes, it'll just be on the stack.
+
+[00:06:19]
+So if we refer to that one, it will just be on the stack, but if we refer to something the vector, we'd have to go to our property, we'd have to go to our struct offset into the pointer, the pointer had to be followed. We'd have to then offset until whatever this is, and boom, we have ourselves that item out of the vector.
+
+[00:06:35]
+So it's kind of good to have this notion but there's a there's a reason why I'm saying all these things which is, notice what's happening in this thing right here. For every single thing that's stored on the heap, there was something on the stack, so it's kinda good to know something from the stack is pointing to the heap.
+
+[00:07:01]
+And so this is kind of how the magic of rust happens, is that as we clean up memory on the stack, anything that has heap related memory can also be cleaned up at the same time for free. This is why we have so many rules around the borrow checker.
+
+[00:07:17]
+Because if you just had references everywhere and things were happening, you wouldn't know if something was still pointing to a memory region that could be cleaned up. So that is why I've kind of explained it, that there's all safe programs and then there's programs that rust can identify as safe programs, and this is part of it.
+
+[00:07:35]
+So this is one of the key takeaways is to remember that everything is allocated both on, or anything that's allocated just on the stack can be on the stack. Anything that's allocated on the heap has something else on the stack. And so what is the lifecycle of these items?
+
+[00:07:48]
+How long do they live? Well, probably the simplest way to think about it is that if you know any C or anything like that, is that when the function returns, that stack pointer goes all the way back to the beginning. So everything after the stack pointer, even though it may have stuff still in memory, is just it's not considered valid, it's out because the next time we call a function we may overwrite it.
+
+[00:08:11]
+And so therefore, boom, it's gone so you can't refer to it anymore. So that if you've ever used C and you tried to return a pointer to like something you created within that function, it usually warns you saying hey, by the way, you're returning a pointer onto the stack and this thing's gonna be gone shortly.
+
+[00:08:26]
+It's probably a bad plan. All right, we have a question over here.
+>> Why can't objects on heap point to other objects on heap without having any stack item pointing to it?
+>> I mean, technically it still does. What I mean by that is, what he's saying is, can you just have a veck avec have usize?
+
+[00:08:44]
+You certainly can. You absolutely can. We're just still playing the exact same thing. So let's just do it again. That means you'd have this vector, what's in each one of these lines in this vector, a pointer, a length, a capacity, and that's pointing to another place within the heap.
+
+[00:08:58]
+This is pointing to another place within the heap. This is pointing to another place within the heap. It's still, if you trace it all back, it's still right here. Something is still on the stack at some point. And so someone owns the value. Someone has it so this is where the ownership model comes in.
+
+[00:09:16]
+One place owns the value, and other places have references to those values. And so in this case, our little struct that's on the stack is the owner of those values. No matter how many layers deep you have vectors, there still can always be drawn back to one place having ownership.
+
+[00:09:34]
+And so this is kind of like just a, it's a unique concept, you probably haven't thought a lot about when you're programming in loosey-goosey languages. Is there any other questions about this? Now I'm obviously, I'm not a master, I haven't written much for compilers and done that I did it way back in the day.
+
+[00:09:48]
+So even my knowledge is limited in this area, but this is just like the general paradigm. If you can have it in your head, it'll make things easy. And you can also understand why the heap is slow, cuz where do you allocate memory at? Well, you gonna ask the operating system, the operating system's gonna hand you back like 4K worth of memory or whatever the page size is.
+
+[00:10:08]
+Then you're gonna have to, the underlying allocator's gonna have to divvy out that memory. Well, how does it know what to reclaim back? A lot of math is involved, where the stacks just like at 8, at 8 remove 16, right? It's like super fast. It's just simple addition and subtraction.
+
+[00:10:22]
+That's why you get all the speed. This is where a lot of the speed comes from, is keeping things on the stack, super fast.
+>> When you move a value to a function, does the value move inside the stack too?
+>> So that's what I don't know, I don't know that answer but it's something I've been actually curious about, I'm sure if you watch John on YouTube, I mean, I guarantee he could probably give you an answer.
+
+[00:10:42]
+But what they're saying is say you have a stack pointer that's pointing here, and you create MyStruct. So it takes up some amount of memory, whatever that is, then you call a function in which you pass in that struct, you don't pass a reference to it, you don't pass a mutable reference to it, you actually give the function the value.
+
+[00:11:00]
+This is called moving. And we're gonna we're about to go over this. Who, where does that go? Does that go into the parameter section? I actually don't know. Does this, do we mem copy it over to here? That I don't know exactly what happens. My assumption is that we do mem copy it, because when we return from the function, this could technically still be valid memory or whatever.
+
+[00:11:20]
+Maybe it stays, I don't know. I can't tell you the specifics of how it works under the hood.
+>> If a vec is not mutable and contains a stack variable, is it still allocated on the heap?
+>> So a vector cannot contain the stack variable, when you put something into a vector, it's allocated on the heap, it's not allocated on the stack.
+
+[00:11:42]
+Now this may be a bit confusing cuz you can technically create a vector of references to something on the stack. The thing is is that a reference is just a system wide number that's all it is, so 64 bit, it's just a 64 bit number that represents some place in memory so those are stored on the heap.
+
+[00:12:02]
+They're just followed through back to wherever, so you could imagine you could create something like that where you actually had MyStruck usize. And you have a let item = MyStruct, Let items = a vec of MyStruct, a reference. So it's only references that I'm storing. So those references will be stored on the heap, but the structs won't be.
+
+[00:12:27]
+So I could have back item. So there you go, I am storing things but it's the references that live so now we're getting into what is called lifetimes, that means, there's a bunch of rules when you start getting into this world because at this world you're trying to have like maximum efficiency.
+
+[00:12:46]
+You're trying to keep as many things as you can on the stack, but still, it can be a little bit, that's where the trickiest part of Rust comes in. And during all my application development that rarely happens, it's usually like library or more fundamental stuff that you start getting into these more trickier situations.
+
+[00:13:04]
+
+>> If a vector contains a reference to stack variable, then which stack variable owns the vector?
+>> Well, so you might be thinking of it a little bit wrong. So this item right here, this item owns a vector that contains a series of references. It owns the reference which is 64 bit number in my case.
+
+[00:13:28]
+This thing owns the struct. So you can see this, I will literally go over a way in which this airs very soon, but the simplest way to show it and I'll just show it right now, is I can go like this. We're gonna go like that. So there we go.
+
+[00:13:43]
+And I'm gonna do this, paste this in here. So this is a scope. So that means once we leave this, every variable created inside there will be dropped. And I'm like this, items.push(item). So notice that we added a reference right here. Everything is fine until outside of that, we try to go, we do the that guy, whatever that thing's called, and we try to print it.
+
+[00:14:10]
+And, my goodness, here, I'm gonna go like this. What a, just a letdown ending. I'm gonna derive debug, that just says, hey, you can be pretty printed. So look what happens here. Rust has identified that this thing does not live as long as that thing, it makes sense because this thing lives all the way to here but what it holds on to only lives right here.
+
+[00:14:34]
+And so let's say whoa, whoa, whoa, whoa, you can't do that. But that's why also if I just simply will say, take out this line, it's like, hey, it's good. Because right now, item's lifetime last till right here. The things it's holding onto last till right here. So it's the same thing.
+
+[00:14:51]
+And we're kind of jumping ahead a little bit. So I'm just gonna keep on going. It's kind of exciting. So it's time to do the borrow checker. We've kind of gone over a lot of this stuff. You've heard me talk about value references and mutable references and this last one.
+
+[00:15:07]
+This is the value, item owns the value, the vector is the value, items owns a vector. Items is getting pushed in a reference. Okay, so you kind of have to have these like little things inside of your head setup, which is the value, a reference to the value and a mutable reference to the value, the right to mutate.
+
+[00:15:29]
+So it's sometimes a little bit confusing, but let's kind of, let's start seeing it. I think this will hopefully help you a lot.
+
