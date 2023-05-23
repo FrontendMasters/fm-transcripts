@@ -1,0 +1,977 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:03.328
+Most people have a passing
+familiarity with ESlint and
+
+2
+00:00:03.328 --> 00:00:05.869
+have dealt with it or have it, whatever.
+
+3
+00:00:05.869 --> 00:00:10.223
+In this case,
+we're dealing with large code bases,
+
+4
+00:00:10.223 --> 00:00:13.622
+you probably already have it installed.
+
+5
+00:00:13.622 --> 00:00:19.200
+What I wanna do is just kind of like plant
+a little bit of a flag on two things,
+
+6
+00:00:19.200 --> 00:00:24.353
+which is one, what would it look
+like to create your own ESLint rule?
+
+7
+00:00:24.353 --> 00:00:28.574
+And it's gonna be a very high level of
+what are some of the things you could do
+
+8
+00:00:28.574 --> 00:00:29.517
+if you chose to.
+
+9
+00:00:29.517 --> 00:00:33.125
+And then we'll do one more little thing
+where we'll look at, failing builds
+
+10
+00:00:33.125 --> 00:00:37.029
+are great except that they're not, and so
+can you cache the stuff on pre-commit?
+
+11
+00:00:37.029 --> 00:00:41.760
+And then that's kind of how we'll pull
+this into the station with two more little
+
+12
+00:00:41.760 --> 00:00:46.075
+areas of exploration that I think
+are gonna be wildly helpful for you, but
+
+13
+00:00:46.075 --> 00:00:49.221
+kind of things that are kind
+of deeper dives later on.
+
+14
+00:00:49.221 --> 00:00:54.234
+And so ESLint, for
+those of you don't know how it works,
+
+15
+00:00:54.234 --> 00:00:58.623
+it breaks your code into
+an abstract syntax tree,
+
+16
+00:00:58.623 --> 00:01:02.393
+kind of what we saw
+with the code coverage.
+
+17
+00:01:02.393 --> 00:01:06.974
+Breaks into a giant tree kind of
+a DOM that you can traverse up and
+
+18
+00:01:06.974 --> 00:01:11.989
+down and look at things and
+labels on that's a function expression,
+
+19
+00:01:11.989 --> 00:01:17.793
+that's an argument, that's a the variable
+declaration, so on and so forth.
+
+20
+00:01:17.793 --> 00:01:23.151
+And a great way to get a sense of this
+is you can go to astexplorer.net, and
+
+21
+00:01:23.151 --> 00:01:28.781
+you can say, last time I was doing this,
+let's jack up the font a little bit.
+
+22
+00:01:28.781 --> 00:01:30.965
+Where I wrote some code, and
+
+23
+00:01:30.965 --> 00:01:36.440
+it will show you the tree that is built
+from that, so you have a program.
+
+24
+00:01:36.440 --> 00:01:39.592
+In this case I have three
+expression statements,
+
+25
+00:01:39.592 --> 00:01:42.828
+we get more fun highlighting
+as I hover over stuff.
+
+26
+00:01:42.828 --> 00:01:47.796
+Because again, if you look, this is how
+even the code coverage stuff works.
+
+27
+00:01:47.796 --> 00:01:50.613
+It's expression statement we're
+calling something, that makes sense.
+
+28
+00:01:50.613 --> 00:01:54.434
+It's got a callee, it has an argument,
+I hid location data.
+
+29
+00:01:54.434 --> 00:01:59.624
+You can see its keeping track of where
+the start was cuz it looks there are new
+
+30
+00:01:59.624 --> 00:02:04.500
+lines, it's just a string of text
+with new line characters, right?
+
+31
+00:02:04.500 --> 00:02:09.840
+As it's parsing through and making sense
+of stuff, it can see all that stuff.
+
+32
+00:02:09.840 --> 00:02:13.764
+I don't necessarily care, I care about
+the meaning of my program, right,
+
+33
+00:02:13.764 --> 00:02:16.540
+we can minify stuff,
+it's how all this stuff works.
+
+34
+00:02:18.020 --> 00:02:22.836
+What is super powerful here,
+I realized that it has
+
+35
+00:02:22.836 --> 00:02:27.656
+local storage, so
+some of the surprise is ruined.
+
+36
+00:02:27.656 --> 00:02:31.322
+But if I wanted to change this console
+error, it'll cross my code base,
+
+37
+00:02:31.322 --> 00:02:32.776
+auto fix ' to a log error.
+
+38
+00:02:32.776 --> 00:02:36.618
+I can literally write my own ESN rules and
+
+39
+00:02:36.618 --> 00:02:42.268
+either yell at you, not preferred,
+or kinda go through and
+
+40
+00:02:42.268 --> 00:02:47.930
+get a sense of the structure
+of your code and can auto-fix.
+
+41
+00:02:47.930 --> 00:02:52.911
+So let's say, and this is a little naive,
+there's import statements you'd
+
+42
+00:02:52.911 --> 00:02:57.677
+have to deal with, right, and
+stuff like that, but the concept is there.
+
+43
+00:02:57.677 --> 00:03:03.617
+Which is, I want to change console errors,
+I want to fetch the request from API.
+
+44
+00:03:03.617 --> 00:03:05.668
+I will actually do that once,
+
+45
+00:03:05.668 --> 00:03:10.355
+you can watch me live code instead
+of me pointing at a bunch of stuff.
+
+46
+00:03:10.355 --> 00:03:13.189
+So let's start this over a little bit.
+
+47
+00:03:13.189 --> 00:03:18.481
+But one of the great things is you can
+take whatever the questionable code is.
+
+48
+00:03:18.481 --> 00:03:23.123
+So in this case,
+we wanna change fetch to request from API.
+
+49
+00:03:23.123 --> 00:03:27.252
+So, cool, if I hover over that,
+you can see me move around, and
+
+50
+00:03:27.252 --> 00:03:30.172
+I'm different things like string literal.
+
+51
+00:03:30.172 --> 00:03:35.008
+So looks like this is an identifier,
+right,
+
+52
+00:03:35.008 --> 00:03:38.200
+with the name fetch, great.
+
+53
+00:03:38.200 --> 00:03:44.508
+So let's go ahead and let's just delete
+this, and we can say identifier.
+
+54
+00:03:44.508 --> 00:03:50.446
+Cuz as it goes to the triggers just
+you setting up a bunch of rules for
+
+55
+00:03:50.446 --> 00:03:53.427
+what you want to happen, right?
+
+56
+00:03:53.427 --> 00:03:58.388
+In this case, the ESLint rule was not
+fired because nothing triggered it,
+
+57
+00:03:58.388 --> 00:04:00.052
+that makes total sense.
+
+58
+00:04:00.052 --> 00:04:04.285
+What am I choose to do here
+the actual node is passive,
+
+59
+00:04:04.285 --> 00:04:09.567
+not Node.js, node as in node tree,
+DOM node, that kind of node.
+
+60
+00:04:09.567 --> 00:04:13.074
+Where I have it,
+I can ask things about it,
+
+61
+00:04:13.074 --> 00:04:18.053
+so I could say literally I know
+some things about it, right?
+
+62
+00:04:18.053 --> 00:04:23.251
+I can see that it's got some
+arguments in TypeScript,
+
+63
+00:04:23.251 --> 00:04:29.809
+you can do string, you can do
+a certain amount of template literals.
+
+64
+00:04:29.809 --> 00:04:34.760
+But you could theoretically be like,
+hey that's, so you can do also, you can
+
+65
+00:04:34.760 --> 00:04:40.170
+basically do anything you want with static
+analysis to your code using this, right?
+
+66
+00:04:40.170 --> 00:04:43.718
+So, once you have the test, once you know
+the plan of action of what your particular
+
+67
+00:04:43.718 --> 00:04:45.910
+code base needs,
+you can say all right, go there.
+
+68
+00:04:45.910 --> 00:04:50.210
+If I find an identifier,
+which is basically a function name or
+
+69
+00:04:50.210 --> 00:04:54.346
+something like that,
+you can do something if node.name,
+
+70
+00:04:54.346 --> 00:04:56.842
+this is fetch in this case, right?
+
+71
+00:04:59.038 --> 00:05:02.909
+Then we can start by just saying,
+we'll take this context here.
+
+72
+00:05:02.909 --> 00:05:06.400
+We'll say context.report.
+
+73
+00:05:08.872 --> 00:05:11.023
+And in this case, we'll say,
+
+74
+00:05:13.295 --> 00:05:17.953
+The message is,
+
+75
+00:05:27.215 --> 00:05:29.785
+Whatever, right, making it up.
+
+76
+00:05:29.785 --> 00:05:36.153
+And so we can do that,
+cool in pass in the node.
+
+77
+00:05:39.855 --> 00:05:41.999
+What is my issue here?
+
+78
+00:05:41.999 --> 00:05:45.077
+Put a comma in there.
+
+79
+00:05:45.077 --> 00:05:47.172
+&gt;&gt; Misspelt identifier on line nine.
+
+80
+00:05:47.172 --> 00:05:50.091
+&gt;&gt; That will be my issue.
+
+81
+00:05:50.091 --> 00:05:55.201
+This is why, to Mark's question
+of why I like TypeScript
+
+82
+00:05:55.201 --> 00:06:01.597
+is because you are my TypeScript right
+now in this editor and I clearly.
+
+83
+00:06:01.597 --> 00:06:06.622
+If it looks I can code,
+you take TypeScript away from me,
+
+84
+00:06:06.622 --> 00:06:09.042
+and it's unclear if I can.
+
+85
+00:06:09.042 --> 00:06:10.673
+&gt;&gt; [LAUGH]
+&gt;&gt; So cool,
+
+86
+00:06:10.673 --> 00:06:13.719
+you can say at this point
+it is just yelling at us.
+
+87
+00:06:13.719 --> 00:06:18.485
+It's like, hey, prefer request for
+me, yeah, I over fetch,
+
+88
+00:06:18.485 --> 00:06:22.899
+and it's kinda cool that it will
+yell at you with the line and
+
+89
+00:06:22.899 --> 00:06:26.279
+the character that that shows up on,
+right?
+
+90
+00:06:26.279 --> 00:06:28.019
+And so you could theoretically,
+
+91
+00:06:28.019 --> 00:06:30.952
+now you don't have to be
+pedantic during code reviews.
+
+92
+00:06:30.952 --> 00:06:33.259
+You can set up the rules in this case,
+right?
+
+93
+00:06:33.259 --> 00:06:35.442
+You can just pull it in as ESLint rule,
+
+94
+00:06:35.442 --> 00:06:38.386
+you don't have to build infrastructure for
+this.
+
+95
+00:06:38.386 --> 00:06:40.449
+If you have npm run lint or whatever, and
+
+96
+00:06:40.449 --> 00:06:43.556
+you have the GitHub action we
+talked about earlier, right?
+
+97
+00:06:43.556 --> 00:06:46.050
+You basically just inherit this rule and
+
+98
+00:06:46.050 --> 00:06:48.844
+it will now break the build
+if they use fetch.
+
+99
+00:06:48.844 --> 00:06:53.888
+&gt;&gt; Wait, how does this get
+into your checks in your code?
+
+100
+00:06:53.888 --> 00:06:57.681
+&gt;&gt; Yeah, so if you have ESLint installed
+you can just add it as an extra rule.
+
+101
+00:06:57.681 --> 00:06:59.117
+&gt;&gt; Add what?
+What do you take?
+
+102
+00:06:59.117 --> 00:07:02.019
+&gt;&gt; Effectively this code down
+here that we're writing, right,
+
+103
+00:07:02.019 --> 00:07:03.944
+this is how a rule is structured, right?
+
+104
+00:07:03.944 --> 00:07:10.281
+Then you get in your ESLint, you can also
+pull in additional home written rules.
+
+105
+00:07:10.281 --> 00:07:15.417
+So now this will yell at you,
+I think you can do, yeah,
+
+106
+00:07:15.417 --> 00:07:20.220
+here you can see in the metadata,
+I can do problem or
+
+107
+00:07:20.220 --> 00:07:23.719
+suggestion or something like that.
+
+108
+00:07:23.719 --> 00:07:29.320
+And it depends on what one will break the
+build, one, GitHub has annotations now,
+
+109
+00:07:29.320 --> 00:07:34.842
+one will just automatically, yay, you
+should consider doing this other thing,
+
+110
+00:07:34.842 --> 00:07:39.351
+right and be a lint warning and-
+&gt;&gt; Is there a way where
+
+111
+00:07:39.351 --> 00:07:42.564
+it'll just do it for you?
+
+112
+00:07:42.564 --> 00:07:48.143
+&gt;&gt; I love that segue, is there a way
+where you can have it auto fix it for me?
+
+113
+00:07:48.143 --> 00:07:54.063
+So you see that one of the metadata
+that I do have set is whether or
+
+114
+00:07:54.063 --> 00:08:00.340
+not this is fixable, which I ask
+myself about myself all the time.
+
+115
+00:08:00.340 --> 00:08:03.003
+And there are some nuances to this, but
+
+116
+00:08:03.003 --> 00:08:06.724
+let's do the world's simplest case,
+which is cool.
+
+117
+00:08:06.724 --> 00:08:11.629
+Let's say, all of our little weird helper
+methods are effectively API compliant
+
+118
+00:08:11.629 --> 00:08:14.411
+with the very simplest use case here,
+right?
+
+119
+00:08:14.411 --> 00:08:18.195
+And so cool,
+report that we had a problem absolutely,
+
+120
+00:08:18.195 --> 00:08:22.653
+then what I would like you to do
+is let's apply a fix in this case.
+
+121
+00:08:22.653 --> 00:08:26.181
+So we have one more method,
+we have the message,
+
+122
+00:08:26.181 --> 00:08:31.880
+what node you put in your own location
+data too, but this is good enough for us.
+
+123
+00:08:31.880 --> 00:08:35.684
+We'll say fix, right?
+
+124
+00:08:35.684 --> 00:08:39.550
+And then you have this, fix it,
+sometimes APIs are weird.
+
+125
+00:08:39.550 --> 00:08:43.867
+So we've got this fixer, and
+what it does is returns an array,
+
+126
+00:08:43.867 --> 00:08:48.030
+which is all the weird changes
+you need to make to this thing.
+
+127
+00:08:48.030 --> 00:08:53.544
+And to be clear, fixer, yeah, I'm just I'm
+glancing down at the methods right now.
+
+128
+00:08:53.544 --> 00:08:57.608
+It's insert text after,
+insert text after a range,
+
+129
+00:08:57.608 --> 00:09:02.032
+insert text before,
+remove from the code completely, so
+
+130
+00:09:02.032 --> 00:09:07.293
+you could have it just remove
+the console logs if you want it, right?
+
+131
+00:09:07.293 --> 00:09:09.976
+And you can go up and down the tree,
+you can look at its parent,
+
+132
+00:09:09.976 --> 00:09:11.277
+you can do all sorts of stuff.
+
+133
+00:09:11.277 --> 00:09:13.020
+You can replace some of the text,
+
+134
+00:09:13.020 --> 00:09:17.582
+that seems useful if we wanna just replace
+all fetches with requests from API, right?
+
+135
+00:09:17.582 --> 00:09:20.458
+You can do all sorts of things,
+you can replace a text range.
+
+136
+00:09:20.458 --> 00:09:24.681
+You can do all sorts of interesting stuff,
+remove it completely, break the build.
+
+137
+00:09:24.681 --> 00:09:29.771
+Let's do this array, it's just all
+these changes you wanna apply,
+
+138
+00:09:29.771 --> 00:09:33.469
+so we'll do fixer.replaceText,
+in this case.
+
+139
+00:09:35.130 --> 00:09:38.238
+On this particular node,
+right, cuz you might go up and
+
+140
+00:09:38.238 --> 00:09:40.831
+down the DOM tree and
+find other stuff as well.
+
+141
+00:09:40.831 --> 00:09:42.537
+If you've ever used jQuery,
+
+142
+00:09:42.537 --> 00:09:47.110
+you secretly know how to do this
+better than it looks to you right now.
+
+143
+00:09:47.110 --> 00:09:51.053
+And let's say we'll replace
+that with requests from API
+
+144
+00:09:51.053 --> 00:09:54.045
+&gt;&gt; Is this no the top left window?
+
+145
+00:09:54.045 --> 00:09:54.929
+&gt;&gt; Which one?
+
+146
+00:09:54.929 --> 00:09:57.699
+&gt;&gt; Node,
+is that referring to the top left?
+
+147
+00:09:57.699 --> 00:10:00.824
+&gt;&gt; Node, is what is currently
+highlighted here, right?
+
+148
+00:10:00.824 --> 00:10:04.886
+So each kind of token,
+I'm just taking one word,
+
+149
+00:10:04.886 --> 00:10:08.579
+do you understand with another one, right?
+
+150
+00:10:08.579 --> 00:10:12.493
+The parser goes through, and
+it's analyzing your code, so
+
+151
+00:10:12.493 --> 00:10:14.960
+call expression is a node on the tree.
+
+152
+00:10:14.960 --> 00:10:18.333
+It has some a children
+which are identifier and
+
+153
+00:10:18.333 --> 00:10:22.321
+then the arguments,
+nodes on that tree further down.
+
+154
+00:10:22.321 --> 00:10:24.312
+Think about a DOM node and that tree,
+
+155
+00:10:24.312 --> 00:10:27.211
+that's effectively what is
+turning your code into.
+
+156
+00:10:27.211 --> 00:10:30.728
+And so if you look at the output now,
+
+157
+00:10:30.728 --> 00:10:36.836
+is that it didn't even fire an issue,
+it just auto replaced.
+
+158
+00:10:36.836 --> 00:10:41.636
+So now,
+if you had texts of the word fetch in it,
+
+159
+00:10:41.636 --> 00:10:46.558
+that wouldn't get replaced,
+it has to be a fetch
+
+160
+00:10:46.558 --> 00:10:51.257
+identifier which is a function call,
+right?
+
+161
+00:10:51.257 --> 00:10:54.757
+And it will go and
+only in those explicitly meaningful cases,
+
+162
+00:10:54.757 --> 00:10:56.251
+will it go and swap it out?
+
+163
+00:10:56.251 --> 00:10:59.150
+&gt;&gt; Do you think there's
+a point though that it
+
+164
+00:10:59.150 --> 00:10:59.787
+gets-
+&gt;&gt; Yes.
+
+165
+00:10:59.787 --> 00:11:05.788
+&gt;&gt; Too much in the sense that here you're
+actually changing function because
+
+166
+00:11:05.788 --> 00:11:11.418
+a functional reason versus source order or
+punctuation or whatever.
+
+167
+00:11:11.418 --> 00:11:15.326
+I just feel like here, you'd almost
+want the engineers to really get used to
+
+168
+00:11:15.326 --> 00:11:17.416
+writing requests from API versus-
+&gt;&gt; Yes.
+
+169
+00:11:17.416 --> 00:11:18.938
+&gt;&gt; It'll just fix it for me.
+
+170
+00:11:18.938 --> 00:11:23.229
+&gt;&gt; Yeah, to be clear,
+this was the easiest example to write.
+
+171
+00:11:23.229 --> 00:11:27.015
+Would I have this set to auto-fix?
+
+172
+00:11:27.015 --> 00:11:27.643
+No.
+
+173
+00:11:27.643 --> 00:11:28.187
+&gt;&gt; Cool.
+
+174
+00:11:28.187 --> 00:11:31.019
+&gt;&gt; Right, absolutely not,
+
+175
+00:11:31.019 --> 00:11:37.336
+would I hypothetically want
+to run this one once, right?
+
+176
+00:11:37.336 --> 00:11:42.126
+Look at the diff, eyeball it and
+then maybe have it do a suggestion or
+
+177
+00:11:42.126 --> 00:11:44.909
+warning after that, probably right?
+
+178
+00:11:44.909 --> 00:11:46.852
+&gt;&gt; So-
+&gt;&gt; Cuz if I get this wrong,
+
+179
+00:11:46.852 --> 00:11:51.403
+I have now taken somebody
+else's well-meaning code and
+
+180
+00:11:51.403 --> 00:11:54.359
+shipped a bug to production, yeah.
+
+181
+00:11:54.359 --> 00:11:57.811
+&gt;&gt; If you wanted to, for example,
+just replace console logs,
+
+182
+00:11:57.811 --> 00:12:01.195
+would you just fix it out,
+replace text, console log, and
+
+183
+00:12:01.195 --> 00:12:04.060
+then just an empty string,
+or how does that look?
+
+184
+00:12:04.060 --> 00:12:07.340
+&gt;&gt; If I just wanna say it again,
+I was listening and thinking.
+
+185
+00:12:07.340 --> 00:12:09.560
+&gt;&gt; The one example you mentioned was,
+
+186
+00:12:09.560 --> 00:12:12.598
+you could use it to just
+remove all console logs.
+
+187
+00:12:12.598 --> 00:12:14.099
+&gt;&gt; Yeah, there was remove.
+
+188
+00:12:14.099 --> 00:12:15.971
+I can remove the node completely.
+
+189
+00:12:15.971 --> 00:12:20.832
+Let's see, I don't know with the name,
+I think it will take the entire thing out.
+
+190
+00:12:20.832 --> 00:12:21.764
+Let's find out together.
+
+191
+00:12:21.764 --> 00:12:25.096
+So I want to take all the fetches out,
+I don't know, it's easy to do.
+
+192
+00:12:25.096 --> 00:12:31.328
+So remove,
+I have to do a range on that one,
+
+193
+00:12:31.328 --> 00:12:37.400
+remove node or token I just got passed in.
+
+194
+00:12:37.400 --> 00:12:40.391
+Okay, yeah see I gotta get
+a little more nuanced and
+
+195
+00:12:40.391 --> 00:12:44.844
+traverse the tree a little bit better
+on this one because that's a problem,
+
+196
+00:12:44.844 --> 00:12:48.900
+but the nice part is the arguments
+is the next one down there, right?
+
+197
+00:12:48.900 --> 00:12:55.609
+There was the literal,
+you can see as highlighted on the upper.
+
+198
+00:12:55.609 --> 00:12:57.381
+I know you probably can't see.
+
+199
+00:12:57.381 --> 00:13:00.377
+For those, paying attention at home,
+that is yellow.
+
+200
+00:13:00.377 --> 00:13:04.898
+[LAUGH] Y'all can't see and
+everyone at home can see,
+
+201
+00:13:04.898 --> 00:13:10.035
+I can see that as I'm over here,
+well, back when it worked.
+
+202
+00:13:10.035 --> 00:13:13.053
+Yeah, you can see all right,
+you can see the yellow,
+
+203
+00:13:13.053 --> 00:13:17.034
+I guess I moved the mouse while I
+was talking, then I couldn't see it.
+
+204
+00:13:17.034 --> 00:13:20.783
+But yeah, you can kinda see and
+get a sense of it, so yeah.
+
+205
+00:13:20.783 --> 00:13:24.568
+Yes, what you can live code,
+this kind of stuff is kind of squarely and
+
+206
+00:13:24.568 --> 00:13:25.991
+stuff along those lines.
+

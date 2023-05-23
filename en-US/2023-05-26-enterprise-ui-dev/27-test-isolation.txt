@@ -1,0 +1,76 @@
+[00:00:00]
+>> What is the correct way to wait for an element to be rendered on DOM after a placeholder component for example waiting for the request to be fulfilled?
+>> Cool let's answer that question first and then we'll talk about our big issue because it's a bigger deep dive, so the question was, what if it's not immediately there?
+
+[00:00:16]
+What if there is a network request? What if there's an animation? What if there are something that has to happen, right? You have a bunch of options in this case. Won't to solve my problem now but you do have a bunch of options. So, if you do need to wait for something your best bet is to use something called Wait for and wait for we can even do it here Yeah, we should have that button gone.
+
+[00:01:02]
+Wait for. So ideally we want something like wait for the remove item not to be in the document, all right? Something along those lines which yeah, if there was an animation if I hit the button and then it slowly faded away and then was removed for the DOM or something like that, this test would fail even though spiritually it should pass.
+
+[00:01:32]
+What wait for does is it basically accepts a failure for a certain amount of time, and then if it truly is still there for some reason, then the test would actually fail. I think the timeout by default, I wanna say it' five seconds, right? It will keep trying for about five seconds if it's still there, and you can change the timeout and stuff like that.
+
+[00:01:56]
+But it's a way to be, this is not gonna happen immediately but it should happen soon-ish. And sometimes to add just a little bit of grace to your tests, so that you're able to kind of get them past it without super weird implementation details like, could you do squirrely things like moving the clock forward and all sorts of crazy stuff?
+
+[00:02:18]
+Sure, that seems to be a little much. And then would you be tempted to do really dark stuff like make your code perform differently in tests than in the in reality, which is why are you even testing stuff at that point? Would you likely just delete that test because you're like, I don't know.
+
+[00:02:36]
+And then go on your weekend, that's probably the thing you would do. So wait for it which is again, returning a promise of you had to do other stuff beyond that, you can wait for and then it will basically, all right, this expectation should pass eventually, and then we'll move on.
+
+[00:02:55]
+If one wanted to write this themselves, right, basically resolve the promise when you call that function, you don't throw an error, right? And then reject the promise after a certain amount of time. You could write it yourself, right? You don't have to cuz it's in the library. And again, this came from me just writing the test saying let's remove an item, do one last little bonus lap, and then we'll move on to the next topic, and then I noticed that this test failed.
+
+[00:03:30]
+And I noticed that only when it came down to adding an item, and that there was no test isolation cuz they were both there in this case. Which is weird because you saw me use the app and it wasn't there, right? But if I do, We saw it in the failing test but this is still a great way to choose, to see stuff.
+
+[00:03:58]
+All screen.debug does is it console logs a serialized version of the DOM. So if one, I'll get it here as well, but you could see it at any given point. And if I squint, you can see that I do in fact have two MacBook Pros in there. That's why the test passed with iPad Pro and it failed with a MacBook Pro, right?
+
+[00:04:20]
+So we could say, iPad Pro. That's not the issue, the two remove buttons that are now the issue but some version of that doesn't matter, I still have an issue I have to deal with. And we have to work through it. And so this kind of leads us into a different issue, which is that render does in fact, render a brand new element, right?
+
+[00:04:50]
+The issue is that JavaScript is hard. Spoiler alert, an implementation detail of this app is if we kind of go and look through it, it's that, all right, let's go. Let's say index.tsx is the beginning point. You can see that I am using the store and I am using React Redux.
+
+[00:05:22]
+And so we're re-rendering the component, but the store in Redux at least is defined just like, as part of your code living outside of your React render tree. Which is like the feature of Redux, right, which is this idea that if it lives outside of it, it's a global state that everything can hook into.
+
+[00:05:44]
+The context API, if it was in your component, would re-render and you would not have this issue, right? You state you would not have this issue, it is only the fact that enclosure scope this store exists. Doesn't matter how many times we render or re-render that component, this variable is still in memory, right?
+
+[00:06:08]
+And it has two MacBook Pros in it. And so when we re-render the DOM and it goes to talk to the Redux store, it's like, I got you two MacBook Pros. To which our get selector is like yeah I'm only looking for one I blow up if I find two, right?
+
+[00:06:25]
+And we have an issue unique to our test and this creates a philosophical and moral quandary for us, not really there's a right answer, but we're tired or it's the end of the day or something along those lines, and we don't want to think deep thoughts. We want to just deal with the stuff, we want to get this feature done.
+
+[00:06:44]
+We didn't wanna write tests to begin with, but we're trying not to have an application that falls apart in this course, so, cool. So we have a few options, let's think about this. We could mock out, use selector to make it so that, I don't even like finishing this sentence, right?
+
+[00:07:09]
+Start mocking out the world in order to in service of our test, right? And the more you mock out the further you are divorced from reality. And while that can occasionally be fun, it is probably one of those things where I said before, most code bases start falling apart through a series of relatively reasonable hacks, shortcuts.
+
+[00:07:32]
+Things that are like, yeah, I got to get my job done, ain't no big deal. Over time add up to the point where nothing works and you don't trust anything and you don't wanna update anything. So stepping everything out or mocking out like Redux or something along those lines and try to grab the u selector hook and do dark things to it.
+
+[00:07:53]
+Probably not great, it would work, but over time it just makes your test suit, worthless. Other things that I could do are try to hack at my components in a way that just tries to make it more easily to test, which is not great. The third thing that I could do is use this as a really learning opportunity to realize that my architecture was bad and fix that issue and have a happier code base.
+
+[00:08:31]
+Because my issue right now is I don't have a great way at this moment to separate the idea that Redux is involved from this component itself, right? The idea of the component is that it immediately wraps in a provider that got the store as an import from Clojure scope.
+
+[00:08:53]
+And for my test, that's how it manifested itself, right? And when we talk about patterns towards the end, this is gonna be one I revisit, which is why I'm kinda making a big deal of it now. Which is in a large application, the chances that I might have to reuse a component in some way, like converges on one, right?
+
+[00:09:15]
+It will happen eventually. And if they're tied to each other, I find myself having a folder where it's three or four different versions of the same piece of UI hooked up to different state management library parts of the state. All sorts of weird stuff that you've probably seen in a code base before and maybe you've done them occasionally and felt bad about it but you didn't know what else to do, right?
+
+[00:09:35]
+And so, when things are tightly coupled, I end up in weird situations like this. I'm happy a unit test found it, because if the unit test did not find it, I would have found it six months from now. And this is one of those things where sample apps, you'll never find it in a real code base.
+
+[00:09:52]
+Six months from now you will find it and it will be too late cuz it will have already had like 17 more things applied on top of it.
+

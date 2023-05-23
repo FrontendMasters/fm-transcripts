@@ -1,0 +1,111 @@
+[00:00:00]
+>> Let's look at the challenge mode here. And it's true challenge mode because I didn't even give you any hints. That said, I will open it to the room. If you looked previously they ran sequentially. You saw that the test ran and then the build ran, right? I'm really running the build in this case right now to make sure that it does in fact build.
+
+[00:00:25]
+I'm running the build effectively as a test, right? Does this thing build? That'd be good to know before we merge it in. It happens sequentially. I have no expectations, so they won't have a hypothesis of how I could paralyze these things. I don't expect anyone does, so I'll pause for dramatic effect, yeah.
+
+[00:00:47]
+
+>> Could you make two workflows?
+>> I can make two workflows, and I can do something once. What's that?
+>> I meant two actions.
+>> Two actions. I think what we realized today is two jobs. I could also make two workflows. Two workflows is technically a correct answer.
+
+[00:01:01]
+
+>> That is correct, but it's not right.
+>> From the chat, using the and and, using double ampersands-
+>> The single ampersand-
+>> It'd be sequential still.
+>> Yeah, it still runs, if there is a way, I think it's one ampersand might run them in parallel. I'm definitely not gonna live bash, that's not happening.
+
+[00:01:19]
+The only problem with doing that is, if that command fails, you don't get a great error message, right? So, I spiritually like that answer, we're gonna go with the two jobs. Two workflows will also do it as well. I will talk about the trade-offs because I went from, I'll show you mine in a little bit, just to kind of give you a tour of a production level one, whatever that means.
+
+[00:01:45]
+And I'll show you some of that as well, but I feel like we just need a little bit more understanding before we go look at that one. So, yeah, I originally started out with a workflow for Lint, a workflow for running the unit tests, a workflow for building it, and then I condensed that into one workflow that had many jobs, right?
+
+[00:02:06]
+And let's get that in place and then we can kind of talk a little bit about what that means. So, you can see we have jobs. And then this is kind of, think about this as a JavaScript object, that's the key. The value is everything kind of nested in here, right?
+
+[00:02:21]
+And so we will start with everyone's good friend, copy and paste. And what we will do is now we have two keys that are the same, so we will call this one unit-test. And we'll take out the build part. And we'll call this one build. And we'll take out the test part.
+
+[00:02:50]
+Cool, so, steps run sequentially, which kind of makes sense given the name. Jobs and workflows run in parallel, right? So these two jobs will run in parallel. Unit test and build will run together. Are there questions that jump out at you as you stare at this workflow, yes?
+
+[00:03:14]
+
+>> Can we share the dependencies between the jobs?
+>> The long answer is yes. [LAUGH] The short answer is no, right? Each one of these jobs as it runs in parallel is running in a completely fresh VM, right? And so can you share stuff between workflow runs? Yes, can you share stuff between these two jobs?
+
+[00:03:47]
+Technically yes, right? That said, it's somewhat squirrely and there's slightly better ways to do it. I admire the software engineer ability or desire to kill duplication at all costs, and so I spiritually, I asked this question, does anyone have any questions, because the first thing that jumped out at me was like, I don't like that.
+
+[00:04:11]
+Can I make that go away? Yes ish, yes, but for now, no. Cuz each one on a separate raw virtual machine, which means they do need to check out the repo, means they do need to set up node, they do need to install the dependencies. And you'll notice that I'm being a little squarely with my issues after all those things, but yeah.
+
+[00:04:34]
+Let's verify that this works and then we'll talk a little bit about how to begin the path towards spiritually answering that question.
+>> Where does the .GitHub directory go in a repo where client and server directories exist inside the same repo? Do you use a global .GitHub directory or for one for the client one for the server?
+
+[00:04:55]
+
+>> I am pretty sure you have to use a global. I don't think it'll pick up other .GitHub directories. Yeah, the audience is also shaking their heads. I'm pretty sure if it's one of those things that someone asks you directly on a live stream, you start to get a little more [LAUGH] nuanced in your answer.
+
+[00:05:14]
+I think it has to be in the .GitHub directory. That said, there is an action for, in any given one, you could ignore certain directories completely, right? Then you can also filter on the truthiness. And so you might have a .GitHub directory with workflows in it, and you might say, only if it's something in the server directory that changed.
+
+[00:05:39]
+Only if it's something in the server directory UI directory that changed. Now, unfortunately, the more nuanced answer is, yeah, you can totally do that. The big question is, I understand the nature of that question, because I think about that stuff, too. On the other hand, if the server changes, do you not want to run the UI tests, right?
+
+[00:06:04]
+Maybe if they're completely mocked out no, right? But maybe if you are actually talking to the real server and those tests, you absolutely wanna run the UI tests, right? And so spiritually, the answer is you can ignore entire paths of things or only do it on certain ones, but then there are some philosophical questions like do you actually want to.
+
+[00:06:29]
+And like I was kind of saying in one of the other question answers which is, that really depends on the problem you're trying to solve, right? If your UI tests are completely stubbing out and mocking out the entire back end then you know running is a waste of time.
+
+[00:06:42]
+If they do talk to the real back end, changing something on the server, you might choose to run the UI tests because that's useful. But here they are, [INAUDIBLE] what I should have done when answering a question is push that up, and then answer the question but we'll watch it in real time.
+
+[00:07:00]
+Cool, so you can see I've got that little dot right there, which is saying, cool, they haven't completed yet. And they're queued and they're waiting to run. But if we go into the details now, you'll see that there are two here. If I go, no, I wanted to go to summary, sorry, I lied to you.
+
+[00:07:18]
+We go, yeah, you can see that it doesn't visually look like they're running in parallel cuz it looked like a list, just like the other list. But this list is running in parallel. And if one thing relied on another thing, you would start to see it go this way for the sequential steps, and parallel in this case is straight down.
+
+[00:07:37]
+So you can see build is already finished, unit-test is still running. And we can kind of begin to put that all in place. Now, if you did, to kind of begin to spiritually answer the question, we'll do this a little bit deeper when we look at even one of mine.
+
+[00:07:56]
+If you do have one that depends on another one, you can say, you can get very nuanced with the dependencies, right? And so you could say something along the lines, this could be pseudo code. You could say the build, Needs unit-test, right? And now build won't run until a unit-test is successful, right?
+
+[00:08:25]
+So theoretically, could you have a job that installs the dependencies one place and then everything else like rely on it? You could, you might choose to. With two, it's like you don't even know which one was gonna finish first, right? So now we're saying that one doesn't start without the other one.
+
+[00:08:43]
+There are ways to speed some of this up that are more useful than having to rely. But you'd also say unit-test and, Some-other-action and now both of those need to complete before that one kicks off. Or you can have two different ones that are really relying on the same first one.
+
+[00:09:05]
+So you can play with your dependency manifests in interesting ways and you can get nuance of that, but we're not gonna do that just yet. But, can I ask you a question? Can I turn the tables on you? Well, other than just nobody likes to see duplicate code, what was your concern?
+
+[00:09:28]
+
+>> I mean, we're doing the same thing twice-
+>> Yeah.
+>> Wasting time.
+>> Yeah, we're wasting time doing the same thing twice even if it's in parallel. It's in parallel, right? So we're not wasting time, but we are spiritually. We're wasting something, right? We're wasting, I don't know, it's a free, we're slowly melting a glacier, right, by installing our dependencies twice.
+
+[00:09:54]
+That said, let's say, I change the readme. I also feel like reinstalling the assets is a waste of time. So it's not even, yes, you are totally correct. And also, maybe you're, we're gonna expose anyone in this room who is better than me. Who has never done the thing where you've just pushed up 17 commits called fix stuff, make it work now?
+
+[00:10:26]
+
+>> [LAUGH]
+>> Maybe some exclusives if you weren't working an open-source repo, right? [LAUGH] I hate everything as a commit message, right? And if there are no changes to your package JSON, it seems silly in those cases. Rebundling all those assets every time is silly to begin with, yeah.
+
+[00:10:47]
+
+>> There is also an action for caching.
+>> I love the segue. I could show that was not a plant, [LAUGH] right? There's also an action for caching, that's a segue.
+

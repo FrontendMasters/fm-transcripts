@@ -1,0 +1,162 @@
+[00:00:00]
+>> I'll just call out some of the nuances right now, which is GitHub allows you to store stuff in two ways. We're gonna talk about both of them today. One is caching and the other one is artifacts. Artifacts are things that you might want after the build process.
+
+[00:00:14]
+Caching is more like, hey, multiple things are gonna need this thing, don't redo things. Now, your first gut reaction would be, we should cache node modules. We should cache node modules. Can someone read my own notes to me about what npm ci does again? It deletes node modules.
+
+[00:00:38]
+
+>> Deletes node modules on every run. So we could cache node modules to delete it on every run, as some kind of we hate ourselves kinda thing. The other thing that we can do is I'm using npm as somebody, and this is useful for anyone on the livestream.
+
+[00:00:56]
+Someone mentioned earlier that there were some issues using pnpm. There are alternatives to npm, pnpm I don't even know what the p stands for, which is what I use, yarn, so on and so forth. And for a while, it's one of those cat and mouse games, which is, yarn was better than npm cuz it did a whole bunch of these different things that then npm just did, right?
+
+[00:01:24]
+And so pnpm, which I have never said out loud until now and hate saying, yarn, npm all have this idea of also they have a cache, right? And this is super useful, because let's say you are the kinda person who before they moved all the exercises into one repo, maybe did the thing I do for a lot of the other workshops, which is make 1,000 repos and make you clone an npm install.
+
+[00:01:49]
+Even that's wasteful on your own computer versus if you've already downloaded for one, if it's the same version with the same hash, then you should be able to just use that same one. So all of these have a cache file stored on your machine where they cache the dependencies you've downloaded, right?
+
+[00:02:07]
+What we could do in our build process is cache that, which is we'll still do an npm ci, we'll still set up node modules, but instead of reaching out to the network, we're just gonna run on a local cache. Now, these are fresh machines every time, so we need to do something.
+
+[00:02:20]
+But we have that great segue that says that there's an action for that, as they say. So let's go take a look. [SOUND] Caching, that looks like a good file to open up. Sweet, and so that's the long sheet answer. Let's look at the short version with these little eyeballs, which is we can add an additional step.
+
+[00:02:48]
+And the reason we're gonna do this the long way and then I'll show you the short way, is that there is a shorthand for doing this that is way easier, but it only works in the very specific use case we're talking about. This way will work for everything.
+
+[00:03:04]
+And so it is worth looking at both the one that you could use for other things that are not npm and the one that you can use more generally. So other things, if you just want inspiration of where you can use this, is npm comes free with node, so set up node, it installs npm.
+
+[00:03:22]
+The act of installing pnpm, if that's what you use, is a thing you might wanna hold on to, right? And I don't do this because there's nuances around it, the open source project I work on, we do have a CLI binary that actually has a full version of the server baked into it in beta.
+
+[00:03:44]
+I don't cache it because I'm too lazy to figure out how to check that I have the most recent version, because it's tricky. I could totally do it if I sat down one afternoon to do it, I just haven't. But I might wanna store that version of the CLI because we don't change it that often, we change it once a month or something like that.
+
+[00:04:03]
+And so there's all sorts of things I might want to cache between runs, and so this action will do it. All right, so let's talk about what it is. So uses, which is just like, where is this thing located, which is actions/ cache@v3. Those are kinda like in your package.json on, they're locked so that if somebody like updates an action with malicious code, you have to go and bump your version to opt into that malicious code, or breaking changes, or malicious code.
+
+[00:04:30]
+So actions/cache, that's like the repo name, @v3. An id, that's just some identifier. And then this with, which takes two things, a path, like what are you trying to cache? That .npm directory is where npm puts its cache files, right? So everything you downloaded, you hold on to.
+
+[00:04:52]
+That's the path that we wanna cache and save between runs. And the last one is, what is the key, right? And so this is how to check if we should read from the cache at all. And you can be really nuanced with this. You could have, for instance, this repo, to my knowledge, does not have any compiled assets, right?
+
+[00:05:19]
+I'm looking at you like Node Sass, right? Or if you build an electron app, like something where they're compiled for that operating system and architecture, right, then you might wanna also toss in, and this is obviously the markdown file, you might toss in runner.os, right? So now it'll be, okay, we are storing npm caches for Windows.
+
+[00:05:46]
+And we'll talk about the last part in a second, right? Whatever unique identifiers that you need, you might want it for given, if you have a weird, why'd I say weird? If you have any kind of branching strategy to speak of whatsoever, you might use that somehow in here as well, I don't.
+
+[00:06:03]
+The more important part is this piece right here. So this is how you do string interpolation. This is a function just provided by GitHub Actions for you, which is cool. Go find the package-lock.json, which we know can't change when we're using npm ci, and just create like a checksum hash, right?
+
+[00:06:28]
+If the package-lock has not changed, use the cache. If the package-lock has changed, which means the dependency have changed, don't use the cache, right? But then that will be a new key and we'll just get a new cache, right? So basically, the first job that ever comes across this will check to see, hey, do we have a cache key with npm-, whatever the unique identifier of that exact package-lock.json?
+
+[00:07:00]
+If yes, cool, load up that cache, we'll use that. If no, then go ahead and do the thing and automatically create it at the very end. We'll look at the pre and post to see this all happen. But that's kind of the kinda high-level piece. So we cache it and there it is now.
+
+[00:07:21]
+Fun fact that if you edit your YAML in a markdown file for your notes, that does not necessarily change your code. I know this cuz I used to teach for a living, and you knew it was time to stop when you were editing the markdown file with the code instead of the actual code, and refreshing your browser, and wondering why it didn't work.
+
+[00:07:46]
+
+>> What of the dashes? Is that just a semicolon sorta thing?
+>> These dashes?
+>> Yeah.
+>> These are like separating each. Name and uses, this is two properties on the same object.
+>> Okay.
+>> It's a syntax for YAML.
+>> Yeah.
+>> Okay.
+>> That was also a question in the chat.
+
+[00:08:05]
+There's also the edit. So I noticed name can be the first property, but-
+>> Yeah.
+>> Name is followed the run command, and it's that same thing.
+>> The properties can be in any order.
+>> Yeah.
+>> It's kinda like keys on an object in JavaScript.
+>> Sure, so a dash pretty much is declaring a new object.
+
+[00:08:20]
+
+>> Yeah.
+>> Okay.
+>> It's like a comma. It's basically, Sometimes I'm like, should just be JSON. [LAUGH] YAML seeks to be easier than JSON, sometimes guilty of being a little bit too clever by half. But also I am from the era where I had to write CoffeeScript for a portion of my life and I'm still hurt by that.
+
+[00:08:46]
+So, sweet, sweet, sweet, and you can put this in any order, if you wanna do uses and then name. I can even do like, if you wanna really hate myself. And just so we can see it later. What emojis do we like to use? My new favorite is this one, so.
+
+[00:09:06]
+
+>> [INAUDIBLE]
+>> The melting face, yeah. And I'm mostly putting that so we can see it, some way to be like, cuz we checkout repository, that could be anywhere. Cool, and so we will also, I talked a lot about caching, I didn't put it in. Cool, and we gotta get the indentation is important in YAML, so it's like Python too.
+
+[00:09:29]
+How many languages can I smack talk at the same time? Let's find out. I am a recovering Ruby developer, so I have no right to say anything. And let's actually do this across the two. So the first time, they're both gonna make a run at it, pun unintended that time, which is because the cache will be empty for both of them when they start in parallel, right?
+
+[00:10:04]
+But then the next time, one of them will fail writing to the cache, but that's okay, because the reason it will fail writing to the cache is cuz the other one already did it, right? Which is also, if you mess this up and just do npm-, you're gonna have to go in there and manually fix it, and we'll talk about how.
+
+[00:10:26]
+So we'll add in those two caches, and let's go ahead and we're gonna say, add caching to workflow, and push it up. And I will hit Cmd +Shift + G again to open yet another tab, even though I knew totally that I could have just Cmd-tabbed over. And let's take a look at what we got.
+
+[00:10:53]
+All right, starting the job, setting up the job. You can see, there's my happy, Checkout repository right there with my melty emoji face. Thing that I might be doing when I get back to work next week is putting emojis in all of my steps, cuz no better way to say I'm back from PTO than causing chaos.
+
+[00:11:22]
+And also, it's nice because you can then see where the post is as well. I kinda like it, actually. I put the emoji in there as a joke and I think I'm into it, cuz it makes it very clear where the start and end of each one is.
+
+[00:11:36]
+So pro tip that is hot off the presses, emojis work in your job names and can be useful, cuz you'd see setup node is kinda in the middle there, they do the post in the opposite order that they came in. Cool, cool, cool, and so also, if you look, Set up job is like lowercase, but then post, I don't know how to handle consistent capitalization in these things, so do whatever you want, there are no rules.
+
+[00:12:09]
+Cool, so we run npm ci, we run npm test in this case. We'll do post setup node. Actually, we want to post cache. Failed to save, It did fail to save. Luckily the error message is pretty good on this one, other than the giant hash. Another job may be creating this cache, which is true.
+
+[00:12:30]
+More details, cache already exists. You can actually see that it was pull request number 2, which is also this PR. So the error message is somewhat helpful in this case. So if we go into build, which finished first, we go into cache, and you can see that instead of downloading that 45 megabytes every time, we now have it in place.
+
+[00:12:55]
+And so I'm somewhat curious, which is the npm ci, which is still relatively small for this repo, was 16 seconds. It does mean you can either rerun all jobs, or we could just push a command. Let's do the polite thing. And while that reruns, I'm gonna go back to run unit test.
+
+[00:13:15]
+You'll see that we now have caches here, which is, there's our cache, last used, one minute ago. And this is useful if you forgot to hash, or you messed something up, and now you have a cache that will never be busted. You can manually bust it yourself by hitting this little trash can right here and delete it.
+
+[00:13:40]
+Now, I would love to tell you despite how many times I both read and took notes on the rules around caching, that I remember them while I am live talking to you all. I think it is like, you have a max limit of 10 gigs and anything not accessed in the last 7 days, after 10 gigs, it's gonna start purging stuff.
+
+[00:14:00]
+And I think if you haven't touched a cache in the last seven days, it also purges. Important note about these caches is, and even just the little hand wavy version of these rules is good enough, which is that cache is also uniquely scoped to the target branch and PRs of that target branch and those branches themselves.
+
+[00:14:23]
+That sounds like words, right? Let me explain. When main runs its push, it will also set up a cache with this key, right? And that means main will always have access to this cache. Rerunning this workflow, which is what I'm literally demoing as we let it run, will also use this cache, right?
+
+[00:14:48]
+However, a different PR with a different branch does not have access to that cache unless main has it, right? So if main has it, all PRs against main can also access that cache, right? Reruns and children of those can also access that cache, but siblings can't, right? You can only either it's your cache or the target branch's cache, you cannot go across, right?
+
+[00:15:17]
+And with a unique cache name like that, and there are tricks that you can do, but let's assume that this is true. So yeah, it'll save reruns, but that save's pushing multiple commits and whatever if you haven't changed it since main. You're getting 80% of the benefit for almost no work, and it'll be even less work in a second.
+
+[00:15:38]
+Sweet, so we've got that, and this should have run at this point. Cool, cool, cool, one thing that I notice is, it doesn't seem to be really any faster, but let's see. In my previous testing, it cut down by like 33% or something like that. So, all right, yeah, so before it was 16 seconds and now it's 7 seconds.
+
+[00:16:03]
+Now, you can be like, I don't care. One, this is a small app. Two, something something play right downloading browsers hypothetically, a lot bigger than your npm modules. Three, if you have a lot of throughput, it's not just gonna run every workflow all the time. You will run one and you'll queue up the next run for that one to finish.
+
+[00:16:30]
+So let's say hypothetically, you are more than one person who's talking in between pushes. You're a team, right, and they take longer, right? It does mean that you will get in line behind your coworkers, right? And so every little speed up then multiplies over the number of runs.
+
+[00:16:49]
+And also, like I said, some little node modules for, I don't even know what the dependencies are in here, like three testing frameworks, both Svelte and React, some stuff, 45 megabytes but not a ton, versus much bigger caches, obviously, it pays off a lot more. Luckily, there's no difference between caching big things and caching small things, so we got that going for us.
+
+[00:17:13]
+So yeah, you can see at this point, and if we even go in here, you can see it retrieved the cache, and have it all there as well, cache restored successfully from this key. Great, so we can kinda get some introspection into that process. Like I said before, actually, you can go into the caches, you can delete any cache you want.
+
+[00:17:34]
+If you want as an exercise to yourself, to make yourself happy, npm install literally anything, see if left pad is back or something like that. And go ahead and push it up and watch it bust that cache. You'll still have the old one there, but new caches will get that as well.
+
