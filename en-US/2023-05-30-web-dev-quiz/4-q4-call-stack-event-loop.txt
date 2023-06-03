@@ -1,0 +1,109 @@
+[00:00:00]
+>> Then we have the next question, what gets logged? We have a setTimeout that has a callback with a log. Then we have a Promise.resolve with a then callback, which also logs 2. We have a Promise.resolve with a then callback, which has a setTimeout, which logs 3. Then we have a new Promise that logs 4, and a setTimeout that logs 5.
+
+[00:00:23]
+So what gets logged when we execute the script? So the right answer is D, it's 4, 2, 1, 5, 3. So this is just the first time that we're using the event loop. So just to make sure everyone is on the same level, we have a call stack, which is just a stack that keeps track of the sequence of function calls in their execution context.
+
+[00:00:46]
+So every time we call a function or even just a global context, it creates an execution context for that, which contains the code and any variables, everything it needs to execute, and then it pushes that to a call stack. We've got a web API, which is just a set of features that kind of extend JavaScript's built-in functionality so we can use the web, including DOM manipulation, but also timers, setTimeout and fetch.
+
+[00:01:12]
+Then we have the macrotask queue, or just a task queue, which contains all the setTimeout callbacks, the setInterval callbacks, any UI rendering tasks, user input events, and also network events. Then we have a microtask queue, which contains promise callbacks, queueMicrotask callbacks, any async awaits, and MutationObserver callbacks. And then finally, we have the event loop, which is really just a loop that keeps track of any tasks that are currently in the queue and then pushes those to the call stack.
+
+[00:01:42]
+It's important to remember that first it wants to get all the microtasks out of the queue and then it goes back to the task queue, the normal task queue. So in this case, let's just go through it step by step. So first we have a setTimeout call, that just get pushed to the call stack.
+
+[00:01:57]
+But this setTimeout itself is a web API and the callback that we provided is actually pushed to the web API. Now, we haven't defined any timer here. Normally, you can always setTimeout at maybe 2,000 or 3,000, in the case that we don't provide it, it's 0. But that doesn't mean that it gets executed right away, it still gets pushed to the web API.
+
+[00:02:16]
+But it instantly gets then pushed back to the normal task queue on the next tick cuz the task queue had these set timeout callbacks. So on the second line we have the Promise.resolve which just gets called, and when you call Promise.resolve it just instantly returns a resolved promise.
+
+[00:02:33]
+So it can instantly call the then function, which we provided, or that the Promise.resolve can access. And as we saw before, the microtask queue contains all the callbacks from any promises. So that callback that we provided is scheduled as a microtask queue. Then we have another Promise.resolve, which works the same way.
+
+[00:02:56]
+But this time, when it then gets called, it actually schedules the microtask queue again, but it has the setTimeout in here as well. But that doesn't run yet, it's just scheduled to run in the future. Now, we have a new Promise constructor, but the function that we pass to this new Promise just runs synchronously.
+
+[00:03:14]
+So it actually just runs the callback function and it logs for right away. So that's important to remember is that a new Promise body runs synchronously, it only returns a Promise. So 4 gets logged, as a first value, and then we have another setTimeout, which works the same way as we saw before.
+
+[00:03:32]
+SetTimeout gets pushed to the call stack and it's returned callback gets first pushed to the web API, and then back to the normal task queue. So now it's up to the event loop to see, all right, I've got some tasks queued up, but first let's get rid of those microtasks in the queue.
+
+[00:03:49]
+So first it invokes this callback, which logs 2, get popped out of this call stack. And then we have another callback that returns a setTimeout. So it calls a setTimeout, it's a timeout again returns its callback to the web API, which eventually will log 3. So on the next tick, this also gets pushed to the normal task queue.
+
+[00:04:10]
+Now, again, I list the timeout callback for the first one, which logs 1, so 1 gets logged here, cuz off because there was no microtasks anymore. Sorry, I forgot to mention that. So it just turned back to the normal task queue to get rid of all the tasks there.
+
+[00:04:28]
+Then we have the callback for logging 5, so it just logs 5. And the same happens for 3, callback 3 invokes it, gets called, and eventually 3 gets called. So this is what we ended up with, 4, 2, 1, 5, 3. Make sense? [LAUGH] Any question?
+>> What was the name of the site that you said that stacks could be popped visually?
+
+[00:04:49]
+
+>> I think there's a site called Loop. It was someone, I forgot his name, he did a very famous talk on the event loop and he created a pretty simple website that has the call stack and then, I think the task queue. So you can kind of see where things go, but it doesn't really include the microtask queue or any of that stuff.
+
+[00:05:09]
+It also uses jQuery, so depends on what you like to use, but yeah.
+>> Could you explain how new Promise => console.log(4) gets executed?
+>> Yeah, so I'll just go all the way back. So when we have the new Promise constructor, it's important to remember, I know there's a better name for the function that we pass to the new promise.
+
+[00:05:34]
+I forgot what it was, I think it's called the executor function or something, that function runs synchronously. So if we just had a new Promise and we had a longer function there, it'll run synchronously. And normally you have new Promise resolve reject that you kinda actually pass as arguments there.
+
+[00:05:51]
+Only when we invoke those methods, those methods will return a Promise and that's when it gets scheduled as a task. But the body itself runs synchronously, if that makes sense. So a new Promise instantly executes its own callback executor function. There's a better word for that function, and I'm trying to remember it, and I can't remember it.
+
+[00:06:13]
+But yeah, this is just a common kind of misconception when working with promises, is that a lot of the code actually still runs synchronously, it's only the return values format that are async. So just make sure that you're not running into any unexpected behavior there when you think that the entire callback there is async, cuz it's not.
+
+[00:06:31]
+
+>> Does setTimeout or any web API really pushed to the call stack or is it return the code when time is finished?
+>> So the web API itself doesn't call to the call stack immediately, the timer just defines the time that it can get pushed through the task queue.
+
+[00:06:48]
+So when we set a timer for 1,000 milliseconds, it doesn't mean that it will execute in 1,000 milliseconds if the task queue isn't empty. If that is still full, it might run in 2,000 milliseconds, depends on how busy that task queue is. So that's important to remember. The delay is just when the web API pushes it to the task queue and not when it pushes it to the call stack.
+
+[00:07:12]
+That only happens if it's the first one in the task queue and there's no microtasks queued up. Yeah.
+>> This is a consequence of everything running on one thread, correct?
+>> That's right, yes. So normally or JavaScript only has a single thread, and if we were to run everything synchronously, initially you had these callbacks you could pass everywhere.
+
+[00:07:38]
+In your code looked horrible, it's got like callback hell, you ended up with this kind of C shape of callbacks. So that's kind of why the web had to invent something where some asynchronous behavior was still allowed. So setTimeout isn't part of JavaScript itself, right? It's just the web.
+
+[00:07:58]
+So for example, and I think Node also implements it, but they all have their own implementation cuz they all use different APIs under the hood. But yeah, this was kinda the first asynchronous behavior in JavaScript, even though it's not entirely asynchronous, right? Cuz it's still just happening all there.
+
+[00:08:14]
+
+>> So in order to get to the call stack, does it clear in this order, micro, macro, web, call stack, and then end?
+>> No, so that's kind of half correct, sorry, I just wanted to get through all these steps again. So the event loop doesn't check the web API.
+
+[00:08:34]
+The web API, or in this case, the timer that setTimeout provides, that only just pushes to the task queue, right? The event loop is just to check the task queue and the microtask queue. So the web API's only responsibility, or in setTimeout's particular, or for setTimeout specifically, is to push to the task queue when the timer is done or has timed out.
+
+[00:09:01]
+So yeah, it's not like the event loop first goes to the task queue, then the microtask queue, then the web API, that's false, it doesn't check the web API, if that makes sense. So the web API is just to push to that, or setTimeout, just to push to the task queue when the timer has timed out.
+
+[00:09:21]
+Yeah, it's always fun? Event loops, it's not confusing at all.
+>> And the main difference is between the microtask queue and the macrotask queue are?
+>> So here's just a setTimeout callbacks, not the setTimeout function itself, they're callbacks. The setTimeout callbacks, you write rendering tasks, user input events, and network events.
+
+[00:09:43]
+And then on the microtask, we have those promise callbacks that we saw earlier. The queueMicrotask, which is pretty straightforward, async/await and we'll talk more about that later how that works, and also MutationObserver callbacks. So yeah, it's just kind of like a defined list of things that get scheduled to the regular task queue versus the microtask queue.
+
+[00:10:02]
+And normally microtasks run after every task, kinda like they allow for these smaller updates, which is especially important for these smoother interactions. So it's like task, microtask, microtask, those, I don't know, you can kind of see it in your network inspector or your dev tool sometimes, yeah.
+>> So the microtask is prioritized-
+
+[00:10:25]
+
+>> Yeah.
+>> Over the other tasks? That's the one that if it's full, it will be executed in the next cycle.
+>> That's correct, yeah. And first, make sure that the microtask queue is entirely empty before it turns back to the regular task queue.
+
