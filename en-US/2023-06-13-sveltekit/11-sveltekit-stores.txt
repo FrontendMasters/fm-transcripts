@@ -1,0 +1,64 @@
+[00:00:00]
+>> All right, let's talk about headers and cookies. So, inside your load function, as well as inside form actions and API routes and hooks, which are things that we'll learn about later in the workshop. You have access to a setHeaders function, which does exactly what you would expect.
+
+[00:00:15]
+The most common thing that you would use setHeaders for is to set a cache control header on the response so that data doesn't need to be re-requested. But we can't really demonstrate that in this context, so we're gonna do something a little bit more dramatic. We're gonna change the content type of the response, To text/plain, and we're gonna need to reload the page so that we can see that.
+
+[00:00:42]
+You see that it's no longer giving us an HTML response that the browser can render, it's giving us some plain text instead. Now, one thing you can't use the setHeaders function for is to set cookies. Instead, you should use the cookies API, which is also available in all of the same places that setHeaders is.
+
+[00:01:06]
+So, in page.server.js, we're gonna bring in the cookies API. And we're gonna replace this const visited = false line with something based on the cookies that were sent from the browser to the server when the page was requested. Cookies.get('visited'). And then after the first time the user visits, we're gonna set that cookie to true, so that when they come back, we'll recognize them.
+
+[00:01:40]
+We do that with cookies.set('visited'), give it a value of true. And you should always set a path on your cookies because the browser's default behavior is to set the path on whatever the parent of the path that you're visiting is, which is not very helpful. Most of the time you wanna set your cookies on the root of your application.
+
+[00:02:07]
+And we can now see that when we return visited, if the user has visited the page before, they are no longer a stranger, they are a friend. Now, the reason we use this cookies API instead of interacting with headers is that not only does cookies.set cause a set cookie header to be added to the response, it also updates the internal map.
+
+[00:02:30]
+So that if you call cookies.get inside another load function that is also involved in rendering this page, it will be current with the cookie that was set previously. You have a bunch of options that you can pass here. We're using the cookie package under the hood, which you can find on NPM.
+
+[00:02:49]
+But we're adding some defaults to make the behavior of your application more secure. Specifically, we're making all of your cookies HTTP only by default. We're setting secure to true except when you're on localhost and we're setting sameSite to lax. These defaults will protect your users from their cookies being leaked.
+
+[00:03:08]
+
+>> To clarify about the thing you said with the cookies. So if I set a cookie in a layout, I can reference it? Even though it's not actually in the request cookies, I can reference it as if it was in a page server file?
+>> So there's a potential race condition because the load functions run simultaneously.
+
+[00:03:30]
+And so, if you set the cookie asynchronously after it's been requested in the load function, then that's a bug. And actually, that's probably a bug that we could catch and throw an error in that situation, because that is actually quite a nasty bug. But more typically, the way that you would use that is inside your server hook, which we'll cover later on.
+
+[00:03:57]
+You would do something like event.locals.user = getUser from my cookies, if that doesn't exist, then we set a cookie. And then inside your load function, the cookie has been set because your hook always runs before your load function. But we'll get into all of that stuff later on.
+
+[00:04:18]
+It's also useful when you're dealing with form actions, because if you have a login action, for example, you might set a cookie inside that action. And then when the load function is subsequently called, the cookie will have been set by the time you read it in the load function.
+
+[00:04:35]
+So that's why we use the cookies API as opposed to relying on a fresh request coming in.
+>> When working with input-dependent data, what is the best approach to loading it? For instance, on a search page, should the user's input be handled with a promise on the component or with a data object?
+
+[00:04:54]
+
+>> It depends on the UI that you're trying to achieve. If you want the results to be streamed in as the user is typing, then you would want to have that logic inside the component, and you would have all of the async handling there. The way that I tend to build search inputs is, I'll just use a regular form that causes the data to be loaded inside a load function.
+
+[00:05:20]
+And so, you have to type in the search query and then hit Enter. For me, I just find that to be a preferable user experience. It also happens to be much easier to implement because you don't need to deal with any of the async objects, SvelteKit takes care of it for you.
+
+[00:05:31]
+But it depends, there's no canonically right answer. So because SvelteKit uses directory-based routing, it's easy to place modules and components alongside the routes that use them. I find a good rule of thumb when figuring out where to put code is, put code close to where it's being used.
+
+[00:05:48]
+But sometimes code is being used in multiple places. And when that happens, you don't wanna have to do ../../../../ to get a reference to the module. It's nice to have a place to put that stuff that is common to all your routes. And in SvelteKit, that place is the source/lib directory.
+
+[00:06:07]
+Anything inside this directory can be accessed by any module installs via the lib alias. So both of these page.svelte files are importing a file from source/lib. They're trying to get ahold of this message. And the homepage is doing it right, but if we navigate to this deeply nested route, we get an error from Vite telling us that it's failed to import.
+
+[00:06:32]
+And that's because we've got the wrong number of dot, dot slashes, we got five when we should have four. So we could fix it by fixing the number of dot, dot slashes, but it would be a hell of a lot nicer if you could just use $lib instead.
+
+[00:06:45]
+So get rid of all of that, and do the same in page.svelte. And that will work consistently for all of the modules and components in your lib folder. So that's a nice place to put shared utility components, utils.js file, other things of that nature.
+

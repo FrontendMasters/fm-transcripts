@@ -1,0 +1,81 @@
+[00:00:00]
+>> Okay, so we've finished part three of the tutorial. We've learned all of the basics of SvelteKit, and it's now time to move on to part four, where we're gonna learn some advanced techniques. We're gonna begin with hooks. SvelteKit provides several hooks, which are ways to intercept the framework's default behavior.
+
+[00:00:17]
+The most elementary of these hooks is the handle hook, it lives in a file called hooks.server.js. And it receives an event object along with a resolve function, and it returns a response object. Now, resolve here, this is where the magic happens, this is where SvelteKit will match the incoming request URL to a route of your app.
+
+[00:00:38]
+It'll import the relevant code, which means the page.server.js and the page.svelte files and so on. It loads the data needed by the route, and then it generates the response. And so this is what the default handle hook looks like. If you don't have a hooks.server.js file, this is essentially what SvelteKit is stubbing in on your behalf.
+
+[00:00:58]
+And when you're rendering a page, you can modify the HTML that gets generated. So here, I'm gonna add an option to resolve. I'm gonna use the transformPageChunk method, which is gonna accept some HTML. And it's gonna return the HTML with some modifications. Refresh the page now, the body tag has now been manipulated by transformPageChunk.
+
+[00:01:40]
+So that's useful for things like internationalization, you can specify the lang attribute of your HTML element, for example. But you can also use this hook to create entirely new routes that don't exist in your directory structure. For example, we create a new route called ping. We can return a response, pong.
+
+[00:02:11]
+And now if we navigate to that URL, we're not gonna be able to navigate to it using the client-side router because it doesn't exist as a client-side route. But it will go to the server and return that response from handle. Now, that event object that we were looking at, this thing here, is the same object, which is an instance of something called a RequestEvent, which you can read about in the documentation.
+
+[00:02:38]
+That is passed into API routes in server.js files, form actions in page.server.js files, and also your load functions in page.server.js and layout.server.js. The event object contains a number of useful properties and methods, some of which you've already encountered in this workshop. The cookies API, and an implementation of the fetch API that comes with some additional powers.
+
+[00:03:01]
+The function for getting the user's client address, which is useful for things like geolocation. And isDataRequest object, which is true if we're hitting a load function as a result of a client-side navigation, as opposed to rendering an entire HTML document. Event.locals is a place to put arbitrary data, params is the current route parameters.
+
+[00:03:23]
+Route is an object with an ID property, representing the route that was matched, if any. We've got the setHeaders function that we saw before. And we have that URL object with properties like origin, host name, path, path name, search params, and so on. And so a useful pattern that you'll often use in SvelteKit is to add some data to event.locals inside handle, so that it can be read in subsequent load functions.
+
+[00:03:50]
+So in our hook, we're gonna do event.locals.answer = 42. And then we can read that data inside a load function. Gonna add the event here, and then we're gonna put that data inside this template string. Okay, in a real application, this is the sort of thing that you might use with information about the current user.
+
+[00:04:23]
+You'll do your authentication in the handle hook, grab an object that represents the current user, and put that on event.local so that all of your server load functions can access it. And one of the things that we haven't seen yet is the fetch method that exists on the event object.
+
+[00:04:43]
+So you probably used fetch in the browser. If not, again, MDN has all of the information that you need to know how to use fetch. The fetch that we get on the event object is a little bit different. Because it can be used to make credentialed requests on the server, it inherits the cookies in the authorization header that were passed from the original request from the browser.
+
+[00:05:06]
+That's not something that you get if you're using something like NodeFetch. It can make relative requests on the server, whereas normally in node or server environments, fetch requires a fully qualified URL. And for internal requests, for example, if inside your load function you make a fetch call to one of your own API routes, that doesn't issue an HTTP request, it just calls the function directly, so it's a lot more efficient.
+
+[00:05:32]
+And its behavior can be modified with the handleFetch hook, which, by default, looks like this. It's very similar to the handle hook in that it takes the event object and an implementation of fetch. And by default, all we're doing is fetching the request that was passed in. But we can change that, for example, we could respond to requests for this file with responses from this file instead just by changing the behavior of event.fetch.
+
+[00:06:03]
+So open up hooks.server.js, and then inside here, We're gonna find out what the requested URL is. You'll create a new URL object from request.url. Request.url is a string, it's a fully qualified URL, but when we call new URL, we get that nice object with the path name and the origin and all of that other useful stuff.
+
+[00:06:31]
+So if the path name that's being requested is /a, then we're gonna return a response by fetching b instead. Okay, so in our route page.server.js, we are fetching /a, that isn't being redirected inside handleFetch, and we're getting data from /b instead. Now, according to everything that we've seen so far, that's probably not very useful.
+
+[00:07:13]
+But later we're gonna learn about something called universal load functions. And that's what this feature is really designed for. In that scenario, handleFetch is useful if you are making requests to a public URL, like api.yourapp.com. And from the browser, you wanna go to that public URL. But if you're making the fetch from the server, then you don't wanna go via the public Internet.
+
+[00:07:36]
+You don't wanna go through the load balancers and proxies and whatever are between the server that's rendering the HTML and the server that's serving your API, because they can just talk directly to each other. So you can use handleFetch in that context to change requests for api.yourapp.com to localhost whatever.
+
+[00:08:08]
+The last hook that we're gonna learn about is the handleError hook. And this lets you intercept those unexpected errors that we talked about earlier and trigger some behavior. Maybe you wanna ping a Slack channel, or you wanna send some data to an error logging service. So, to recap, an unexpected error is one that was not created with the error helper from SvelteKit.
+
+[00:08:30]
+And generally, when you see an unexpected error, it means that something in your app needs fixing. Default behavior is just to log the error, so if you haven't defined handleError, then it basically behaves a little bit like this. And so in this app, if we navigate to the bad place, we'll see an internal error message.
+
+[00:08:48]
+But we're not seeing the error that was actually thrown from our load function, which says this is the bad place. But if we open up the terminal, then we will see that error message logged, which will help us diagnose the problem and hopefully fix it. So once again, the reason that we do this is because error messages, by their very nature, can contain unexpected information, you don't control it.
+
+[00:09:13]
+It could be coming from a third party library or something else. And it could contain sensitive information that could reveal information about your setup to people who wish you harm. And so the default behavior in SvelteKit is to redact that information, and just show a generic internal error message instead.
+
+[00:09:30]
+So the error object that is available to your application, whether that's represented as the page.error property in your error.svelte pages or the sveltekit.error property inside your src/error.html. There's just this object here, a plane object with a message that says internal error, or in the case of a 404, it'll say not found.
+
+[00:09:55]
+Now, in some situations you may want to customize this object. So in here, instead of allowing SvelteKit to generate that internal error object, we could return an object of our own, say, everything is fine, refresh the page, and you can see that is now being shown. And we can add a code that goes with it, we can essentially add any serializable data in here.
+
+[00:10:31]
+And so we can now reference properties other than the message inside our custom error page. We'll create a custom error page, click the button here, +error.svelte, and begin by importing the page store again. We'll show the page status, it's gonna be 500. We'll print the error message that was included on that object.
+
+[00:11:11]
+But now we can also add the code property that we added. Why is it that's the sort of thing that might be useful to show to your users so that they can quote that in correspondence with your customer service people or something like that. It's also something that you might use when you're sending details of the error to an error logging service.
+
+[00:11:33]
+So those are the three hooks that we have available, handle, handleFetch, and handleError. And they allow us pretty broad array of customizations of the application.
+
