@@ -1,48 +1,59 @@
 [00:00:00]
->> Stores are a way of storing data that doesn't belong to an individual component. And SvelteKit makes a few read-only stores available to your application via the app/stores module. We have the page store, the navigating store, and the updating store. And the one that you'll use most of the time is the page store.
+>> Now, if you go back to the homepage, you'll see that we've created a problem for ourselves. We've got that footer at the bottom of the screen because we added some CSS that's controlling the height of the main element that contains all of this content. And we can no longer scroll down the page because our main element has a maximum height.
 
-[00:00:20]
-Provides information about the current page, such as the URL, the params object that we've already seen in our load functions and our API route handlers. A route object with an ID property that represents the current route. So for example, inside about/page.svelte, the route ID is /about. The HTTP status code of the current page, the error object of the current page, if there is one, we'll learn about that later.
+[00:00:19]
+And we don't really want that, but we can't not have a height on the main element when we've got an infinite loading page, because otherwise we'll never be able to get that windowing effect. So we need to have some way of controlling the layout based on what type of page we're on.
 
-[00:00:48]
-The data prop and the form prop that combines all of the data from all of the layout functions and the page data. And so just like with any other store in Svelte, you can reference its value inside a component by prefixing its name with the dollar symbol. So for example, we can access the current path name as $page.url.pathname.
+[00:00:35]
+And this is where SvelteKit's data loading as a separate step from page rendering becomes really useful. We're gonna be able to distinguish between two types of pages, pages that have an infinite loading component and those that don't. So I'm gonna open the page.ts that we were looking at before, and I'm gonna add a new value, infinite true.
 
-[00:01:11]
-So in our layout.svelte component here, let's add a script block. And we're gonna import the page store, From $app/stores. And now inside our nav element, we're gonna add an aria-current attribute, to indicate which of these pages is currently active. Just gonna copy that for the about page, and then update this bit.
+[00:01:01]
+And in our layout component, We have access to the entire page data if we import the page store. So let's do that, import {page} from '$app/stores'. If we add a class name to the main element of infinite, Which is gonna be true if any load function that was involved in rendering the current page returned an infinite property.
 
-[00:01:57]
-If we reload the page and navigate between these two links, we'll see that the aria-current attribute is updating when we navigate. And we have some CSS that is targeting that attribute. And the navigating store represents the current navigation. And so when a navigation starts, whether that's because of a link click or a back-forward navigation or a programmatic goto, the value of navigation will become an object with some properties.
+[00:01:37]
+And now the styles that we applied to the main here, we're only gonna apply these if it is an infinite page. Right, so our homepage is now fixed apart from a glitch on the nav that I apparently just introduced. But the infinite loading page works as we would hope.
 
-[00:02:32]
-We have from and to, these are things with a params object, the route object, and the URL. And we'll also have a navigation type, which can be link or popstate or goto. And if you wanna see the complete type information for the navigation object, you can look that up on the SvelteKit documentation site.
+[00:02:05]
+We got a question from the crowd?
+>> Scrolling up and down causes re fetching or is it cached somehow?
+>> So someone just asked a really great question, is the data cached already fetching it a new each time? So we're keeping this stuff in memory as we're scrolling.
 
-[00:02:55]
-We can use this store to show a loading indicator for long-running navigations. So in this exercise, in our page.server.js, and in our about page.server.js, we have these artificial delays. It's gonna take a full second to navigate between these pages. You can see that if we click, it's gonna take a whole second before that updates.
+[00:02:29]
+And so, if we scroll all the way down, we are fetching more data, we're fetching more data, we're fetching more data. But as we scroll back up, we're just rendering the data that we already have in memory. We're only gonna start loading more data once we get to the end of the scroll window.
 
-[00:03:27]
-So inside our layout.svelte, where the navigation is defined, I'm gonna bring in the navigating store. And then we're gonna add some UI indicating what's going on. By the way, this URL object here, this is the web standard URL constructor. It's just a super useful object that you'll interact with a lot when you're building SvelteKit apps.
+[00:02:45]
+And because we've already got all of this data, we're not gonna get to the end of the scroll window until it is in fact time to load more data. But there is a really useful thing that we can do since we're controlling the data loading in a universal load function.
 
-[00:04:11]
-So I recommend getting comfortable with this page of MDN. Okay, so now let me navigate between these pages. We see that we get a little indication on the right-hand side telling us what's happening. So more typically you would use this to have some kind of a progress indicator and so on.
+[00:02:59]
+And that is we can add some client side caching of our own. And that's useful because if you look at this front page here, we're already making a request to the trending API in the now playing API, and the upcoming API endpoint. And it would be nice if we could just reuse that data when we navigate to these pages.
 
-[00:04:33]
-This is actually one of the issues that you get with a single-page app. There is no direct feedback when you navigate between pages. You're kind of relying on the navigation to be fast enough that it doesn't matter. But there is gonna be a brand new navigation API landing in browsers fairly soon, which will allow us to control the refresh icon that starts spinning when you have a traditional navigation between pages.
+[00:03:18]
+So let's go into our API helper. And we'll actually go ahead and implement that. So open lib api.ts, and inside this get function, we can create a cache. This is gonna be a new map, right? Super naive in a real app you would have a little bit more of a sophisticated caching policy than just add everything to a cache map.
+
+[00:03:50]
+But It's perfectly fine for this demo, so we're gonna create a string which is a url, and it's gonna be all of that data there. And I'm gonna replace that with a reference to a url. And now, if we've cached this data already, then we're just gonna return it directly from the cache.
+
+[00:04:14]
+If cach.has url, return cache.get url, otherwise we'll make an API call by calling await fetch get the data const data = await response.json. And then we're gonna add that to the cache. And for good measure, let's add some logging when we get a cache hit versus a cache miss.
 
 [00:05:00]
-We'll be able to use that in single-page apps too. But for now, it's a good practice to have some kind of loading indicator in your single page app UI. Okay, and finally, the data store contains a value of true or false, depending on whether a new version of the app has been deployed since the page was first opened.
+We'll bring up the console. And so when we load this page, we've got a bunch of cache misses. But that's okay because we're using sculpt gets built-in fetch and what's actually happening here is the data is being fetched on the server and then the response is being inlined into the HTML.
 
-[00:05:25]
-And for this to work, you need to add some configuration to your svelte.config.js file. Specifically, you need to add this version object with a name which changes when your application is redeployed. Right now, we're just using Date.now().toString(), which is the default value. But ideally, you should use something like the current commit hash so that your deploys are consistent.
+[00:05:22]
+So that when we fetch it in the client during hydration it's just grabbing the same data that was already fetched on the server. So we don't have a duplicate network request and that allows us to guarantee consistency. Now, if we just clear that and navigate to the trending page, then hopefully, we got a cache miss, so disappointing.
 
-[00:05:48]
-You also need to add a poll interval, I've got five seconds here. This is what SvelteKit is gonna use to check whether the version has changed while the page is open. Now, version changes only happen in production, they don't happen during development. For that reason, updated is always gonna be false in this tutorial.
+[00:05:43]
+That's because we have a default page there. So let's get rid of the page equals one in the case where no page is necessary. Or alternatively, what we could do is in our route page load function, we'll just always default to page equals one. So go to the route page.ts over here.
 
-[00:06:13]
-But we can imagine, for example, that you would have something like a toast that appears when the updated store changes from false to true. You can use this in other ways. For example, if you have a very long running session, and the application is redeployed while the user has the app open, then that can break navigations.
+[00:06:11]
+And in each of these, we're just gonna add page 1, like so. Ryan, let's go to the homepage and navigate to the trending page. All right, we've got a cash hit for the first page and a cash miss for the second page, and then we will continue to get cash misses for the subsequent pages.
 
-[00:06:36]
-Because you might try to fetch the code for a new page, and discover that all of the hashes have changed, and so we're unable to import the relevant modules. And in that case, SvelteKit will fall back to a full page navigation. So usually, we're able to recover without the user noticing that anything went wrong.
+[00:06:43]
+But if we now navigate back to the home page, we are not gonna be fetching any new data we're getting all these lovely cache hits. So we're gonna get instantaneous navigation. And this is something that you can only really do in a framework that has universal load functions, as opposed to making you go back to the server for everything.
 
-[00:06:56]
-But it can be nice to proactively tell the user that the application is updated. Or even to disable the router altogether, so that we don't need to have that error handling logic.
+[00:07:02]
+So obviously, there is a time and a place for loading data from the server. But loading data directly from the client is really good particularly for stuff that involves things like real time and so on. And so SvelteKit gives you both of those options for whatever you need when you're building your app.
+
+[00:07:22]
+That was a great question that segs so nicely into what I was about to cover.
 

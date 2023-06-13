@@ -1,50 +1,92 @@
 [00:00:00]
->> All right, so far we've dealt exclusively with state that is internal to the component, which is to say that the values in the component are only accessible within that .svelte file. But when you're building things out of multiple components, you will need to pass data between them.
+>> One quick question about bindings, are bindings synchronous?
+>> Okay, so there was a question about whether bindings are synchronous or not, and that's a really interesting question. The answer is they update the state synchronously. So when you have a bind value on a text input, it is essentially as if you had an on input event handler, and you are assigning to the value inside that event handler.
 
-[00:00:16]
-And so to do that, we use what are called properties or props. In Svelte, we do that using the export keyword. Let's go over to the Nested.svelte component. And you see that we have a let answer value here, which is currently undefined. We can say that we wanna expose this value to the outside world and allow other components to pass data into this component by using the export keyword.
+[00:00:27]
+So in that sense, it is synchronous. But like all state updates, that will be batched, and it won't update the DOM until we've waited for the current microtask. Now, because you're interacting with the element yourself, the binding isn't gonna need to update the input, if that makes sense.
 
-[00:00:44]
-Now if you've used import and export before in JavaScript, then just like with the dollar sign, you may be a little bit like, hang on, I don't know what's going on here. This is not how JavaScript normally works. And that is totally fine. It's not how JavaScript works, but it's syntax that we can use to express the intent of this component.
+[00:00:53]
+Because if you have an input and you type in some text, the input already has that text. So we don't need to wait for the binding to go all the way around and then get fed back into the input as it were because it's already in the desired end state.
 
-[00:01:05]
-The idea is that everything inside this script tag is valid JavaScript syntax, which makes it easy for you to use things like linters and code formatters and all the rest of it. So if you have some hesitations, it's fine, just roll with it and it'll soon become very natural.
+[00:01:08]
+But the update to anything else in the DOM that references that piece of state, that will happen after the current microtask. Getting super in the weeds here, but hopefully that made sense.
+>> How does using await blocks differ to using onMount as below, and so he's got let data onMount in the brackets async.
 
-[00:01:25]
-And we can specify default values for props that we declare. Again, inside Nested.svelte, let's give the answer a fullback value of a mystery. And now inside App.svelte, if we add a second nested component, You'll see that in the first case, we're passing this answer prop down and it's being faithfully rendered.
+[00:01:34]
+The data equals await get data from backend. I found myself having to do the below to avoid undefined errors before we migrated to SvelteKit and using +page.ts load. So maybe I was using onMount improperly.
+>> So there is a little bit of a gotcha with onMount. If you look at the reference documentations, svelte.dev/docs and look at the onMount area, it will tell you that you should not return a promise from onMount.
 
-[00:01:53]
-In the second case, we're leaving that undefined and the component is using its own fallback value. There's a bug in this exercise, we've forgotten to include the version prop. So this reads the svelte package is blazing fast, download version undefined. Well, that's obviously not good. Now we could fix this by fixing the use of this package info component here.
+[00:02:09]
+And any time you have an async function, that function will return a promise. It's just how async functions work. And the reason for that is that we need to get a reference to the teardown callback for when the component is unmounted, and that needs to happen synchronously for a variety of reasons.
 
-[00:02:23]
-We could add version = {pkg.version}. And you'll see that it now says version 3. That's great. That fixed it. But since the properties of this package object that you can see up here, since they correspond to the values that we're sending into the package info component, we can just send them all in one go as a package, I guess using this spread syntax, ...pkg, it has the exact same effect.
+[00:02:28]
+So your onMount callbacks should be synchronous functions, they should not be async functions. You can use async inside an onMount function by creating, I believe it's called a synchronous immediately invoked function expression or IIFE. So you create an async function, and then you put the parentheses at the end of it, so it will call it.
 
-[00:02:56]
-So this is often the case when you're working with props and that you will have an object that perfectly matches the props that you need to send to another component. And this is just a convenient shorthand that lets you do this. A little bit of an advanced feature, if you need to reference all of the props as an object inside the component, then you can use this special $$props value which is made available to your components.
+[00:02:51]
+And you can use the await keyword inside your IIFE, but you don't want the onMount callback itself to be an async function. Maybe we'll change that in a future version of Svelte, I don't know, but for now, avoid that per the documentation.
+>> How does onMount impact the performance when the components have a waterfall effect or some sort?
 
-[00:03:21]
+[00:03:16]
 
->> How do we handle something like export default or just export const in svelte?
->> So you cannot export default because the default export is the component. You can do an export const, but it doesn't have the meaning that you're probably expecting if you're translating directly from an export LED.
+>> Yes, so if you're doing your asynchronous work inside onMount, by which I mean like fetching data and things like that, then that work doesn't begin until the component gets mounted to the screen. And if you have a component that only becomes visible when the result of some async operation completes inside onMount, then if it has its own async operations.
 
-[00:03:46]
-What an export const means is that you can access the value of what's declared inside the component from outside the component if you have a reference to that component. That's something that we're gonna cover later on in the tutorial when we learn about bindings, you'll be able to get a reference to a component and start interacting with it programmatically.
+[00:03:42]
+Then you'll render the parent component that will eventually render the child component, which will do amazing work. Maybe that eventually renders another child component, and that is what we call a waterfall, and that is something that we very much want to avoid. In general, I do not recommend doing data fetching inside your onMount components.
 
-[00:04:08]
-But in general, you're not gonna be using export const inside your components, and you cannot use export default because the component is the default export.
->> When you create a component file, it's just automatically export defaulted. So you can import it from any other Svelte file.
->> Exactly, yeah.
+[00:03:58]
+There is a way of doing data fetching asynchronously, which we'll learn about in SvelteKit, and that is by far the preferred way to deal with data. Not just because it avoids that waterfall problem, but also because it works with server-side rendering. Server-side rendering does not work with onMount because there is no DOM on the server, you're not mounting anything.
 
-[00:04:25]
+[00:04:21]
+So when you do work inside an onMount handler, that will have no effect on any content that you're server rendering. SSR is a thing that we're gonna cover in this SvelteKit workshop. For now, the takeaway is avoid doing your data fetching in onMount if you can and come back for the SvelteKit workshop to learn about data fetching.
 
->> And then when you export a variable in the script tags, when you import the file, you're also importing that variable
->> You're importing the component, and then the export is just a marker that says you can pass that value into the component that you just imported. Yeah, it's something that like once you've used it a couple of times, it'll start to feel a lot more natural and make sense.
+[00:04:43]
 
-[00:04:53]
+>> If you have lots of await blocks in your HTML, would there be a better way to organize this? Also, is there a way to do something like promise.all for multiple await blocks?
+>> So if you have a promise.all, you would put that inside, I mean, you can have an inline promise.all inside an await function.
 
->> Did you say that it supports TypeScript?
->> It does support TypeScript. Learn.Svelte.dev does not currently support TypeScript. That is something that we would like to add. Unfortunately, TypeScript is, it's kind of a big and complicated package, and in order to use it in here, we would need to load, I think, about a megabit of code, and we would also need to teach the code how to interpret that.
+[00:05:00]
+But you probably want to do any really tricky async logic inside your script block or even in an external module, because as the question suggests, it can start to get a little bit hairy. But this again is the kind of stuff that is better moved into your data fetching layer, which happens before rendering, and that's something that we'll talk about when we learn SvelteKit.
 
-[00:05:16]
-It's like a whole thing. We plan to do that one day, but for now, we're not gonna be using TypeScript. Later on, when we get out of this website and start building something on our own machines, that's the point at which we'll start using TypeScript. We'll get there.
+[00:05:23]
+
+>> Several people in chat are not sure what the tick does, and what does it do? [LAUGH]
+>> [LAUGH] Okay, so the nuts and bolts of what tick does is, all right, so when you assign to a value in a component, the compiler instruments that assignment with a secret internal function called invalidate.
+
+[00:05:51]
+And invalidate has two jobs. It marks that value as dirty inside the component, and it tells a scheduler that is shared by all components that this component has changed. And when that happens, the batching starts. So Svelte will create a promise that will immediately resolve, and then it will wait to see if any other state updates happen before that promise resolves in the next microtask.
+
+[00:06:23]
+If you call tick, you will get a reference to that promise. So at the end of that resolution, the DOM will be updated and the promise returned from your tick function will resolve. If most state updates were happening, then it will just be like calling await promise.resolve. And it will essentially just defer some work until the next microtask.
+
+[00:06:50]
+Again, super in the weeds. Most of the time, you don't really need to worry about how it's working. You just need to know that it's gonna cause anything after the await tick to happen in the next microtask. Which is a fancy way of saying it will happen after the current execution block has happened, but before the DOM is updated.
+
+[00:07:16]
+So you're not gonna see things like flicker. It's not like if you're doing a set timeout or something, and then you potentially see things in the page become out of sync. Everything will happen before the DOM is updated, but after the current execution block. Hopefully that makes sense.
+
+[00:07:29]
+
+>> What does this dot refer to?
+>> It's a great question. Okay, so down here, we have this.selectionStart = selectionEnd, this.selectionEnd = selectionEnd. The this inside an event handler refers to the element that the event handler is bound to. So here, we're calling on:keydown=handleKeydown. Function blah, const textarea = event.currentTarget.
+
+[00:08:10]
+And hopefully, this is gonna work. If I press a key here, then we're gonna see this alert(this === textarea) alert were true. It worked, okay, good. I have remembered how the DOM works. Anytime you have an event handler, this is the event target. Just a convenient way to interact with the DOM imperatively.
+
+[00:08:37]
+Chris, you had a question?
+>> Yeah, going back to the use of tick and how that's used to help resolve promises, is it possible then that you would have to call await tick multiple times in the same code block?
+>> You should not need to, no. Now I can't really imagine a situation in which you'd wanna do that, unless you needed to do something like you change some state, and then you wait further down to update.
+
+[00:09:02]
+So that maybe you can take a measurement like a width and a height measurement of an element so that you can then set some more state, and then that has a knock on effect that you need to await. I guess it's possible to get into a situation where that's the case, but it's not something that you would encounter often is what I mean.
+
+[00:09:22]
+All right, any more questions from the Internet, or should we move on to the final section of part one?
+>> Just a couple of clarifications, so. So basically, a tick is like useEffect or useLayoutEffect in React. Yeah, I guess, so useLayoutEffect is where you declare a function that is gonna happen every time the dependencies of that effect change.
+
+[00:09:53]
+When you call tick, it's happening in some code that is already running, and it will only happen once, of course. But you would use it in much the same context as you would use useLayoutEffect, which is to take some measurement of the DOM or to do something in response to the DOM updating.
+
+[00:10:14]
+Whereas useEffect, you don't have the same guarantees about the callback getting executed immediately after the DOM has been updated. They reserve the right to do that after a period of time.
 

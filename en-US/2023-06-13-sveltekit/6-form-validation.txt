@@ -1,35 +1,53 @@
 [00:00:00]
->> Okay, let's grab the Svelteflix logo from the published site. We'll just open Dev Tools, select that element, Find that image and just open it in a new tab. And I'm gonna save that into my workspace. I'm gonna create it in a lib directory to keep it out of my roots folder.
+>> Now one thing that you've learned very quickly as a web developer is that you cannot trust users, they will cause chaos given the chance. And we need to make sure that they're not gonna submit gibberish data using our phones. The first line of defense is the browser's built in validation, which makes it easy to for example, mark the input as required.
 
-[00:00:36]
-I'm gonna create a new folder called images, I'm just gonna drop it in there, with the name of logo. Right, and you can now see that in our project, source/lib/images/logo. And I'm gonna reference this inside my layout.svelte, By importing it as if it were a module, import logo from $lib/images/logo.svg.
+[00:00:19]
+So let's go to the add to-do input. I'm just gonna add the required attribute. And now if you're try and submit a to-do without any data, we'll see a notification from the browser saying, please fill out this field. This kind of validation, is helpful, and you absolutely should add it, gives you a nice user interface for free, but it's also insufficient.
 
-[00:01:08]
-And this is gonna tell Vite to grab a reference to that SVG file. And treat it as an asset that will get a unique hash name added to it so that it can be cached immutably. So inside that link, we'll create an image with an alt attribute of SvelteFlix and a source of that logo value.
+[00:00:43]
+There are some validation rules that can't be encoded using these attributes, for example, you might have a uniqueness requirement. In any case, if the user knows how to use DevTools, then they might just go in and get rid of the required attribute or something like that. So to guard against people doing malicious things like that, you should always use set aside validation, as well as client side validation.
 
-[00:01:37]
-Right now we can't see it, and I suspect that's because we haven't added a height to the element. Okay, so it looks like we need to add an explicit height on that image element, so let's do that. And we'll just polish this off a little bit by adding some more of a gap between the links on the right.
+[00:01:03]
+If you have a choice, do the set aside validation first. So all right, and in the database JS file we're gonna do the validation when someone calls createTodo. First thing we'll do is if description is empty. We'll throw an error. And the error is gonna be todo must have a description.
 
-[00:02:09]
-Okay, so we have the beginnings of a user interface. We're gonna add a main element for each individual page, just drop a slot in there. And then at the bottom, we'll add a footer, Which is gonna contain this text to data provided by, And we'll have a link to the movie database.
+[00:01:40]
+And then we're gonna get the user's existing todos so that we can do a uniqueness check. If todos.find(todo), Todo.description, Is equal the description that we've just submitted, well, then we're gonna throw an error that says todos must be unique. Right, and so now if we submit a duplicate todo, We get an error page.
+
+[00:02:19]
+It's probably not exactly what we want, but it's a good start. It would be nice if we could stay on the same page where the form was submitted and give the user an opportunity to correct them, their mistake. So inside our page server JS file, we're gonna import a new module, fail from SvelteKit.
 
 [00:02:41]
-So this is where all of this information is coming from, TMDB is an API that you can use in your own applications to build any app that involves data about movies, and also TV shows, and the people who are in them. It has an API with some developer documentation, which, hopefully, I can find down here.
+And inside our create action, once we got the data, we're gonna try to create the Todo. And if it fails, we catch the error. And we're gonna return a fail object. Given an HTTP code of 422, which indicates that there was something wrong with the data that was submitted.
 
-[00:03:07]
-So we'll be referring to this page as we build the application. Yes, I have a question from the crowd.
->> Is there a good way to refer to things like a logo or site CSS so that if the file name changes for cache busting, some external site can still refer to the URL without it changing?
+[00:03:12]
+We'll pass the description back to the page so that we can render it in the UI. We don't just pass all of the data that the user submitted back automatically, because they could include things like passwords and credit card data that we wanna be careful about where we put that.
 
-[00:03:28]
+[00:03:30]
+And finally, the error property of this fail object is gonna be the message that was thrown from the Create todo function. You have a question from the internet?
+>> What's the difference between the fail and error helpers from SveltKit?
+>> Yep, so we're gonna get into the weeds of error handling later on.
 
->> So if you wanted the logo to be at a persistent URL so that it could be used externally, then instead of having it in your source folder, what you could do is put it in your static folder. So let's take this images directory, and put that there, and then just comment out that import.
+[00:03:53]
+But essentially if you just throw new error with some message, then Svelte is gonna throw his hands up say, I don't know what to do with this. I'm just gonna render an error page and I'm gonna tell the user that an internal error happened. If you throw an error that was created with the error helper from SvelteKit, then SvelteKit is like, okay, the user, the developer knows what they're doing, this is an error that they expected.
 
-[00:03:46]
-And instead of using this logo value, we'll just hard code static, sorry, images/logo.svg. And that will look the same, the only difference is that that file will not be cached immutably, it will always be accessible at that URL. And so, that's something that we do typically with things like favicons.
+[00:04:21]
+And so will actually display the message of that error to the user instead of a generic internal error. When you're submitting form data, this isn't an application error. If the data is wrong, it's a validation error. And we wanna be able to distinguish between errors that should result in the error page being shown and errors that should be sent back to the user, so that it can be incorporated into the UI without showing an error page.
 
-[00:04:20]
-But any image that you want to be cached immutably, you should have that in your source directory instead. So we're gonna add a link to movie database cuz they've been kind enough to provide this information. So grab that, drop that in there. And then once again, we're just gonna grab this SVG from the published site, save it into our app as tmdb.svg.
+[00:04:47]
+And that's where this fail helper comes in. So an action can return data, which is made available to the page. And by wrapping it in this fail function, we're telling SvelteKit that the user submitted incorrect data. And that's useful for displaying the correct status code and things like that.
 
-[00:04:59]
-I'm gonna put that logo back where it was. And we'll duplicate this line, And a reference to that other SVG, and we'll drop that inside that link. Add one last little bit of CSS, and then we can start building the page itself.
+[00:05:17]
+Okay, so in our page.svelte, we can now access the data that was returned from the action via the form prop, which sits alongside export lead data. So let's create that export lead form. And below the h1 we'll add an F blog. If form question mark dot error, the question mark is there because if we're on this page and we haven't just submitted some data form won't exist.
+
+[00:05:43]
+But if the form object does exist and it contains an error property, then we know that we need to render some error UI. P class equals error and then we're just gonna display form.error to the user. And finally, we're gonna add the value that was previously submitted in the description to the input so that the user doesn't have to retype it.
+
+[00:06:16]
+So if the form exists, we'll grab the description. If it doesn't, then we'll default to the empty string. Okay, so this time, if we do the same thing, we try and submit a duplicate todo, Learn SvelteKit. Well, that's embarrassing. I must have missed a part here. I must have missed a bar here, I'm gonna open the terminal, see what happened.
+
+[00:06:38]
+Okay, data.get is not a function. So, there's an error in my code. We'll go to page server.js and see where that's happening. Is because you'll notice up here this data object, I called await request form data, but I forgot to add the parentheses somehow. So, I'll fix that.
+
+[00:07:00]
+And now, when I add the duplicate todo, It's gonna display the error that was thrown from the create todo function.
 

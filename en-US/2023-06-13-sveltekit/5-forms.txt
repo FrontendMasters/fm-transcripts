@@ -1,70 +1,57 @@
 [00:00:00]
->> Very often your routes will have dynamic parameters. That means that you'll have a single route that can serve multiple pages. So here for example we have a blog/(slug)/page.svelt. That creates a route that will match blog/1, blog/2, blog/3, and so on. At the moment, that file doesn't exist, so let's create it.
+>> Okay, let's talk about forms, one of my favorite topics. So in the chat on loading, we saw how to get data from the server to the browser, but sometimes you need to send data in the opposite direction. You need to get data from the browser back to the server, and that's where the form element, which is the web platform's way of submitting data comes into play.
 
-[00:00:32]
-For now, we'll just put in some static placeholder content. And if we navigate to any of the pages that are defined by that route, then we'll see that same static content. Now, the way that dynamic parameters are defined is actually very flexible. You can have multiple parameters in a single segment, you can have multiple parameters in a route, and we'll learn more about complex routing patterns later on in the workshop.
+[00:00:19]
+So let's build a little todo app. We've already got an in memory database setup in this lips of a database module, and we're just putting everything in a map. Obviously in a real app, you would use an actual database but we're not gonna do that for this tutorial.
 
-[00:01:07]
-So SveltKit's job boils down to three things. It's routing, and then it's loading some data that's needed by the route, and then ultimately rendering the HTML or the dom that that route defines. And we've seen the routing part, and the rendering part, now we need to learn about data loading.
+[00:00:33]
+And we have a load function in source/routes/page.server.js, that uses the cookies API to get ahold of the current user ID, if the user doesn't yet have an ID, it assigns one. It gets the todos that belong to that user. So this allows us to have a per-user todo list, but we need to add a form so that we can create new todos.
 
-[00:01:25]
-Every page of your app can define a load function in a page.server.js file alongside the page.svelte file. As the file name suggests, this module only ever runs on the server, even for client-side navigations where we get the data using fetch. So we'll add a blog/page.server.js file, so that we can replace those hard-coded links, the 1, 2, 3, with some blog post data that's defined in this module here, data.js.
+[00:00:54]
+So go over to src/route/page.svelte, and below the H1, we're gonna add a form element With a method of post, cuz we're gonna post some data to the server. Inside there, we'll create a label, Add some text, add a todo, Then we'll create an input. Give it a name which is gonna be description.
 
-[00:01:56]
-So, in the blog directory, hit the new file icon and create +page.server.js. And then we're gonna type out the contents of this file. Now, we covered this in the Svelte part of the course, but if you're tempted to just select this and copy and paste it into the editor, it's gonna pop up with a warning saying that you shouldn't do that.
+[00:01:29]
+And I'm gonna disable autocomplete as well. So we can now type into this form and submit some data, but we get a 405 error because no actions exist for this page right now so we can fix that. What we need to do is create an action in our page.server.js file.
 
-[00:02:25]
-And the reason is that you will learn much more effectively if you do in fact type out the code yourself. You'll develop better muscle memory and you'll notice things that you would not notice if you were just copying and pasting. So, I do urge you to resist the temptation to enable copying and pasting.
+[00:01:54]
+This is the counterpart to the load function. So down here, create an actions object. And we're gonna create a default action, Which is gonna be an async function. That's gonna grab the cookies and the request object. And first of all, is gonna grab the description from that input by requesting the form data And getting the description.
 
-[00:02:42]
-So let's do this, input { posts } from ',/data.js'. And then we're gonna export our load function. For now, we don't need all of the post information, we just need the summaries, because the post content isn't important until we visit the blog post itself. So we'll create a summaries property here, posts.map(post), and then we'll return, A slug, so that we know where to navigate to, and a title so that we can populate the list.
+[00:02:33]
+And it's gonna create it todo in the mat that belongs to the current user. So db.createTodo(cookies.get(userid) data.get Description. Okay, this request object here, this is a standard request interface that is part of the web platform. You can learn about the request object on MDN if you're not familiar, it's something that you'll use a lot in web development.
 
-[00:03:27]
-There's a little call out here. For the sake of the tutorial, we're importing data from this data.js module. Obviously, in a real application, you'll be pulling this data from your file system, from some markdown files, or from a content management system or a database. But for the sake of this tutorial, we're gonna keep it simple and import the data directly from a module.
+[00:03:09]
+And SvelteKit uses standard web APIs as far as it can. When we call await request.formData, that returns an instance of the FormData API, which is the same object that you get in the browser if you call new FormData, and then pass in a form element. So now if we type in some data, And hit Enter, post it to the server, you'll see that it reloads the page with the new data.
 
-[00:03:47]
-And we can access this data in page.svelte by exposing a data prop. So go over to that file, and we'll add a script element at the top of the component. And everything that is returned from that load function is gonna be available now on that data property. So we can get rid of all of these and replace them within each block that iterates over the data array and renders a list item.
+[00:03:46]
+And you'll notice that we haven't had to add any fetch code, we haven't had to do error handling and stuff like that. Data updates automatically. And because we're using a form element, this app would continue to work even if JavaScript was disabled. And we can actually demonstrate that by opening this app in a new tab.
 
-[00:04:30]
-Replace the hard coded one with slug, and the hard coded title with title. And we're now seeing some content being rendered. Cuz if you visit these pages, then we still see that hard coded content on the blog slug page.svelte file. So let's fix that. Let's create another file that loads data for an individual blog post.
+[00:04:05]
+I'm gonna open the settings. Scroll down to Disable JavaScript, reload the page. Hit Enter, and the page reloads even though we're not using JavaScript, we see up to date personalized data and close that window now get back to the tutorial. So just now we use a default action but in practice, a page that only has a single action is actually quite rare.
 
-[00:05:02]
-Inside the block slug directory, create a new file again page.server.js. And inside here, we'll import from that module again, import { posts } from '../' this time, because it's one directory higher. And again, we're gonna create a load function. This time, we're gonna use the params object, because that's how we're gonna know which slug we need to load data for.
+[00:04:40]
+Most of the time you will need to have multiple actions on a page. So in the case of our todo app, we wanna be able to delete todos once we've completed them. First thing we're gonna do is get rid of the default action and turn it into a named action, call it create.
 
-[00:05:37]
-So of all the posts in the array, we're gonna find the one, Where the slug matches the current parameter. Then we're simply gonna return that. And now we can create a data prop on the page component, and use that to inject the content. All right, so we have our title, and then we'll create container for the content itself.
+[00:04:58]
+And then we'll create a new one, let's call it delete. And it's gonna be the same deal. It's an async function, uses cookies and request. We're gonna get the data, And we're gonna delete the todo. This time the data that we're gonna get from the form is an ID property.
 
-[00:06:26]
-We're gonna use the HTML tag, and as we discussed in the Svelte course, this is something that you should only use with data that you trust. Never use it with untrusted data that was submitted by users, for example, because it is not sanitized, and you could expose your users to a cross-site scripting vulnerability.
+[00:05:36]
+Now the first thing we wanna do before we implement the delete action inside our page is we need to update the form action that creates the todo. So go back to page.svelte, scroll up to the form, and we're gonna add an action attribute. By default, the action is the same as the current page.
 
-[00:06:47]
-Okay, so we now have some data powering that h1 and the div below it. There is one last detail that we need to take care of here. Someone could visit a non-existent post, and when they do that, they'll get an error because we haven't been able to find the post in order to render it.
+[00:05:56]
+And so if you just have form method equals post without specifying an action, that is gonna call the default action on the page that you're currently on. But in this case, we wanna use a named action. We'll do that by adding a query parameter with a value of create with a slash in front of it.
 
-[00:07:08]
-And we wanna give them a more informative error than a 500, this should in fact be a 404. So we need to take care of that when we load the data. Go back into the blog slug page.server.js file, and after we've declared the post variable, we'll say that if we don't have it, then we need to throw an error, which is gonna be a 404.
+[00:06:18]
+So what this means is we take the current URL and we append a query string with a parameter whose name is /create and which doesn't have a value. And that tells SvelteKit that we're trying to invoke the create action on this page. Now the action doesn't have to be on this page, you can actually have an action that points to a different page entirely, which is very useful when you're building things like login and logout forms that should exist on all pages of your app.
 
-[00:07:31]
-And we need to import the error helper from SvelteKit. And so we now see the appropriate 404 error page. We'll learn more about error handling later on in the workshop.
->> Can you have a loading page that shows with the spinner before the +page.ts load function finishes and +page that Svelt is rendered?
+[00:06:54]
+Okay, so lastly, we wanna create a form for each of the todos in our list. So inside here, instead of just having that description, lead form method = POST, Invoke the delete action. And you'll recall that inside the action, we were referring to an ID property that we need to make available.
 
-[00:08:01]
+[00:07:20]
+So each todo has an ID already. And to add that to the form without showing it to the user, because the user doesn't want a random string of digits, we'll do input type = hidden, give it a name of id so that we can get it with form.getid, and the value is gonna be todo.id.
 
->> Yes, you can, unfortunately because of a technical limitation with web containers, which is the technology that powers this website, I cannot demonstrate streaming in this tutorial. What I can do is show a little demo that has been put together with this, it's called sveltekit-on-the-edge. So, this is a page that is being rendered dynamically in an edge function, is Osseo near here?
+[00:07:52]
+Let a span containing the todo description. And then we're gonna add a button with a label So that people who can't see the icon that is about to appear can also understand what this button is going to do. Okay, you'll see that we have these little trash can icons down here that's coming from the remove.svg which is being controlled down here with some CSS.
 
-[00:08:34]
-I don't know if that's the nearest point of presence that this page is being rendered out. And if I click on the stream link here, then it's actually gonna get some data from the server that is gonna be delayed. So we're actually able to stream promises from the edge function or from the serverless function or from your server.
-
-[00:08:59]
-And they will be rendered in the browser when the promise resolves using streaming. So that's how we approach that problem. We don't have a dedicated loading page or something like that, instead, you return promises from your data. And in that way, you're able to render the UI that is most appropriate for your case.
-
-[00:09:21]
-
->> There was another question that came in around, kind of, there's Svelte native for mobile, but have you seen any traction on that? Not knowing too many people talking about Svelte mobile. Just wondering if that's a good route or if you're thinking about mobile?
->> I haven't personally used Svelte native, some people have.
-
-[00:09:51]
-I believe it is an up to date and functional project. And it's the only one that we have, as far as I'm aware. So if you do wanna build a native app, then I definitely recommend giving Svelte native a look. But it is not an officially supported project, it comes from the community.
-
-[00:10:06]
-It's something that, if we have time and bandwidth to do, we would like to bring into the organization at some point and have that as a first class project. But right now it's a little bit, your manage may vary.
+[00:08:32]
+So if we've wired everything up correctly, then we should now be able to delete todos as well as add them. And indeed it works. And so if we refresh the page, we'll see that those todos stay deleted.
 

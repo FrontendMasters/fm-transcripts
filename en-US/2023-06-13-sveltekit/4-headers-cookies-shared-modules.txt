@@ -1,81 +1,64 @@
 [00:00:00]
->> Okay, so we've finished part three of the tutorial. We've learned all of the basics of SvelteKit, and it's now time to move on to part four, where we're gonna learn some advanced techniques. We're gonna begin with hooks. SvelteKit provides several hooks, which are ways to intercept the framework's default behavior.
+>> All right, let's talk about headers and cookers. So inside your load function, as well as inside form actions and API route and hooks, which are things that we'll learn about later in the workshop. You have access to a set headers function, which does exactly what you would expect.
 
-[00:00:17]
-The most elementary of these hooks is the handle hook, it lives in a file called hooks.server.js. And it receives an event object along with a resolve function, and it returns a response object. Now, resolve here, this is where the magic happens, this is where SvelteKit will match the incoming request URL to a route of your app.
+[00:00:15]
+The most common thing that you would use, set headers for is to set a cache control header on the response so that data doesn't need to be re requested. But we can't really demonstrate that in this context, so we're gonna do something a little bit more dramatic. We're gonna change the content type of the response, To text slash plane and we're gonna need to reload the page so that we can see that.
 
-[00:00:38]
-It'll import the relevant code, which means the page.server.js and the page.svelte files and so on. It loads the data needed by the route, and then it generates the response. And so this is what the default handle hook looks like. If you don't have a hooks.server.js file, this is essentially what SvelteKit is stubbing in on your behalf.
+[00:00:41]
+You see that it's no longer giving us an HTML response that the browser can render, it's giving us some plain text instead. And one thing you can't use the SetHeaders function for is to set cookies. Instead you should use the cookies API which is also available in all of the same places that set headers is.
 
-[00:00:58]
-And when you're rendering a page, you can modify the HTML that gets generated. So here, I'm gonna add an option to resolve. I'm gonna use the transformPageChunk method, which is gonna accept some HTML. And it's gonna return the HTML with some modifications. Refresh the page now, the body tag has now been manipulated by transformPageChunk.
+[00:01:06]
+So in page server Jas we're gonna bring in the cookies API. And we're gonna replace this const visited equals false line with something based on the cookies that were sent from the browser to the server when the page is requested. Cookies get visited. And then after the first time the user visits we're gonna set that cookie to true so that when they come back, we'll recognize them.
 
 [00:01:40]
-So that's useful for things like internationalization, you can specify the lang attribute of your HTML element, for example. But you can also use this hook to create entirely new routes that don't exist in your directory structure. For example, we create a new route called ping. We can return a response, pong.
+We do that with cookies.set visited, give it a value of true. And you should always set a path on your cookies because the browser's default behavior is to set the path. On whatever the parent of the path that you're visiting is which is not very helpful. Most of the time you wanna set your cookies on the root of your application.
 
-[00:02:11]
-And now if we navigate to that URL, we're not gonna be able to navigate to it using the client-side router because it doesn't exist as a client-side route. But it will go to the server and return that response from handle. Now, that event object that we were looking at, this thing here, is the same object, which is an instance of something called a RequestEvent, which you can read about in the documentation.
+[00:02:07]
+We can now see that when we return visited, if the user has visited the page before, they are no longer stranger, they are friend. Now, the reason we use this cookies API instead of interacting with headers is that not only does cookies set cause a set cookie header to be added to the response.
 
-[00:02:38]
-That is passed into API routes in server.js files, form actions in page.server.js files, and also your load functions in page.server.js and layout.server.js. The event object contains a number of useful properties and methods, some of which you've already encountered in this workshop. The cookies API, and an implementation of the fetch API that comes with some additional powers.
+[00:02:29]
+It also updates the internal map so that if you call cookies.get inside another load function that is also involved in rendering this page. It will be current with the cookie that was set previously. You have a bunch of options that you can pass here, we're using the cookie package under the hood, which you can find on npm.
 
-[00:03:01]
-The function for getting the user's client address, which is useful for things like geolocation. And isDataRequest object, which is true if we're hitting a load function as a result of a client-side navigation, as opposed to rendering an entire HTML document. Event.locals is a place to put arbitrary data, params is the current route parameters.
+[00:02:49]
+But we're adding some defaults to make the behavior of your application more secure. Specifically, we're making all of your cookies HTTP only by default, we're setting secure to true. Except when you're on local host, and we're setting same site to lax. These defaults will protect your users from their cookies being leaked.
 
-[00:03:23]
-Route is an object with an ID property, representing the route that was matched, if any. We've got the setHeaders function that we saw before. And we have that URL object with properties like origin, host name, path, path name, search params, and so on. And so a useful pattern that you'll often use in SvelteKit is to add some data to event.locals inside handle, so that it can be read in subsequent load functions.
+[00:03:08]
 
-[00:03:50]
-So in our hook, we're gonna do event.locals.answer = 42. And then we can read that data inside a load function. Gonna add the event here, and then we're gonna put that data inside this template string. Okay, in a real application, this is the sort of thing that you might use with information about the current user.
+>> To clarify about the thing you said with the cookies, so if I set a cookie in a layout, then I can reference it? Even though it's not actually in the request cookies, I can reference it as if it was in a page server file?
+>> So as long as you, so there's like a potential race condition because the load functions run simultaneously.
 
-[00:04:23]
-You'll do your authentication in the handle hook, grab an object that represents the current user, and put that on event.local so that all of your server load functions can access it. And one of the things that we haven't seen yet is the fetch method that exists on the event object.
+[00:03:30]
+And so if you set the cookie asynchronously after it's been requested in the load function, then that's a bug. And actually that's probably a bug that we could catch and throw an error in that situation because that is actually quite a nasty bug. But more typically, the way that you would use that is inside your, server hook, which we'll cover later on.
 
-[00:04:43]
-So you probably used fetch in the browser. If not, again, MDN has all of the information that you need to know how to use fetch. The fetch that we get on the event object is a little bit different. Because it can be used to make credentialed requests on the server, it inherits the cookies in the authorization header that were passed from the original request from the browser.
+[00:03:57]
+You would do something like event dot locals dot user equals get user, from my cookies. If that doesn't exist, then we set a cookie and then inside your load function, the cookie has been set because your hook always runs before your load function. But we'll get into all of that stuff later on.
 
-[00:05:06]
-That's not something that you get if you're using something like NodeFetch. It can make relative requests on the server, whereas normally in node or server environments, fetch requires a fully qualified URL. And for internal requests, for example, if inside your load function you make a fetch call to one of your own API routes, that doesn't issue an HTTP request, it just calls the function directly, so it's a lot more efficient.
+[00:04:18]
+It's also useful when you're dealing with form actions because if you have a login action, for example, you might set a cookie inside that action. And then when the load function is subsequently called the cookie will have been set by the time you read it in the load function.
 
-[00:05:32]
-And its behavior can be modified with the handleFetch hook, which, by default, looks like this. It's very similar to the handle hook in that it takes the event object and an implementation of fetch. And by default, all we're doing is fetching the request that was passed in. But we can change that, for example, we could respond to requests for this file with responses from this file instead just by changing the behavior of event.fetch.
+[00:04:35]
+So that's why we use the cookies API as opposed to relying on a fresh request coming in.
+>> When working with input dependent data, what is the best approach to loading it? For instance, on a search page, should the user's input be handled with a promise on the component or with a data object?
 
-[00:06:03]
-So open up hooks.server.js, and then inside here, We're gonna find out what the requested URL is. You'll create a new URL object from request.url. Request.url is a string, it's a fully qualified URL, but when we call new URL, we get that nice object with the path name and the origin and all of that other useful stuff.
+[00:04:54]
 
-[00:06:31]
-So if the path name that's being requested is /a, then we're gonna return a response by fetching b instead. Okay, so in our route page.server.js, we are fetching /a, that isn't being redirected inside handleFetch, and we're getting data from /b instead. Now, according to everything that we've seen so far, that's probably not very useful.
+>> It depends on the UI that you're trying to achieve. If you want the results to be streamed in as the user is typing, then you would want to have that logic inside the component, and you would have all of the async handling there. The way that I tend to build search inputs is, I'll just use a regular form that causes the data to be loaded inside a load function.
 
-[00:07:13]
-But later we're gonna learn about something called universal load functions. And that's what this feature is really designed for. In that scenario, handleFetch is useful if you are making requests to a public URL, like api.yourapp.com. And from the browser, you wanna go to that public URL. But if you're making the fetch from the server, then you don't wanna go via the public Internet.
+[00:05:20]
+And so you have to type in the search query and then hit enter, for me I just find that to be a preferable user experience. It also happens to be much easier to implement because you don't need to deal with any of the async logic. SvelteKit takes care of it for you but it depends, there's no canonically right answer.
 
-[00:07:36]
-You don't wanna go through the load balancers and proxies and whatever are between the server that's rendering the HTML and the server that's serving your API, because they can just talk directly to each other. So you can use handleFetch in that context to change requests for api.yourapp.com to localhost whatever.
+[00:05:34]
+So because SvelteKit uses directory based routing, it's easy to place modules and components alongside the routes that use them. I find a good rule of thumb when figuring out where to put code is like put code close to where it's being used. But sometimes code is being used in multiple places and when that happens you don't wanna have to do ../ ../ ../ ../ to get a reference to the module.
 
-[00:08:08]
-The last hook that we're gonna learn about is the handleError hook. And this lets you intercept those unexpected errors that we talked about earlier and trigger some behavior. Maybe you wanna ping a Slack channel, or you wanna send some data to an error logging service. So, to recap, an unexpected error is one that was not created with the error helper from SvelteKit.
+[00:05:58]
+It's nice to have a place to put that stuff that is common to all your routes, and SvelteKit that place is the source/lib directory. Anything inside this directory can be accessed by any module in source via the lib alias. So both of these page.svelte files are importing a file from source.slashlib, they're trying to get a hold of this message.
 
-[00:08:30]
-And generally, when you see an unexpected error, it means that something in your app needs fixing. Default behavior is just to log the error, so if you haven't defined handleError, then it basically behaves a little bit like this. And so in this app, if we navigate to the bad place, we'll see an internal error message.
+[00:06:23]
+And the home page is doing it right, but if we navigate to this deeply nested root, we get an error from vite telling us that it's failed to import. And that's because we've got the wrong number of dot dot slashes, we've got five when we should have four.
 
-[00:08:48]
-But we're not seeing the error that was actually thrown from our load function, which says this is the bad place. But if we open up the terminal, then we will see that error message logged, which will help us diagnose the problem and hopefully fix it. So once again, the reason that we do this is because error messages, by their very nature, can contain unexpected information, you don't control it.
+[00:06:39]
+So, we could fix it by fixing the number of dot dot slashes, but it would be a hell of a lot nicer if we could just use $lib instead. So, get rid of all of that and do the same in page.svel. And that will work consistently for all of the modules and components in your lib folder.
 
-[00:09:13]
-It could be coming from a third party library or something else. And it could contain sensitive information that could reveal information about your setup to people who wish you harm. And so the default behavior in SvelteKit is to redact that information, and just show a generic internal error message instead.
-
-[00:09:30]
-So the error object that is available to your application, whether that's represented as the page.error property in your error.svelte pages or the sveltekit.error property inside your src/error.html. There's just this object here, a plane object with a message that says internal error, or in the case of a 404, it'll say not found.
-
-[00:09:55]
-Now, in some situations you may want to customize this object. So in here, instead of allowing SvelteKit to generate that internal error object, we could return an object of our own, say, everything is fine, refresh the page, and you can see that is now being shown. And we can add a code that goes with it, we can essentially add any serializable data in here.
-
-[00:10:31]
-And so we can now reference properties other than the message inside our custom error page. We'll create a custom error page, click the button here, +error.svelte, and begin by importing the page store again. We'll show the page status, it's gonna be 500. We'll print the error message that was included on that object.
-
-[00:11:11]
-But now we can also add the code property that we added. Why is it that's the sort of thing that might be useful to show to your users so that they can quote that in correspondence with your customer service people or something like that. It's also something that you might use when you're sending details of the error to an error logging service.
-
-[00:11:33]
-So those are the three hooks that we have available, handle, handleFetch, and handleError. And they allow us pretty broad array of customizations of the application.
+[00:06:59]
+So that's a nice place to put shared utility components, utils, js file, other things of that nature.
 

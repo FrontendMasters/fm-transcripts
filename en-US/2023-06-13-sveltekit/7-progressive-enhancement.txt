@@ -1,87 +1,32 @@
 [00:00:00]
->> So in the chapter on loading data, we saw how you can export a load function from your page.server.js and your layout server.js files. Well, we can also export page options from those files. We can export an SSR bullion, a CSR bullion, pre-render value, and a trailing/value, and these control how the page behaves.
+>> Now, as we saw because we're using the form element, this app continues to work even if the user doesn't have JavaScript for some reason. And a page that I often link people to is this one, which describes all the ways in which JavaScript can fail when someone is trying to use your web app.
 
-[00:00:22]
-And in the following exercises, we're gonna learn about each of these in turn. All of the page options that we're about to discuss can be exported from individual pages, or they can be applied to groups of pages by exporting them from a layout file. So if you want some behavior to apply to your entire application, you can put it in a route layout.js file.
+[00:00:17]
+It's quite a long list. I live in New York City, I take the subway a lot. We do not have signal on the subway, and so very often I'll start loading something while I'm at the subway station, I'll disappear into the tunnel, and then the rest of the content fails to load.
 
-[00:00:42]
-And then in child pages, you can enable or disable other aspects of that behavior as you need. This allows you to mix and match different behaviors in your application. For example, you can have an application that is mostly pre-rendered as static HTML, but has some dynamic pages that are rendered with personalized data, for example.
+[00:00:32]
+And so JavaScript fails to kick in, and I'm left with a broken application. And it doesn't need to be this way, we can build things in such a way that they are resilient to those sorts of conditions. Of course, most of the time users do have JavaScript, and when JavaScript is available, we can use it to provide a better user experience than is possible without JavaScript.
 
-[00:01:02]
-And so this makes SvelteKit very versatile for whatever kind of application you're building. The first one we're gonna learn about is SSR. So server-side rendering is the process of generating HTML on the server, and it's what SvelteKit does by default. It's very important for performance and resilience, it's very beneficial for search engine optimization, right?
+[00:00:51]
+This is called progressive enhancement, and in SvelteKit we can progressively enhance forms using an element action which we learned about in the Svelte workshop. First thing we're gonna do is import { enhance } from '$app/forms';. And then down on the form itself, we're just gonna add the use:enhance directive.
 
-[00:01:24]
-While some search engines cannot index content that is rendered in the browser with JavaScript, it happens less frequently and it happens less reliably. So SSR is a really important default to have. Having said that, there are some components that cannot be rendered on the server, maybe they expect to be able to access browser globals like window immediately.
+[00:01:26]
+Add it there. And then the same thing on the other form that deletes the todo. Other than that, everything is gonna behave the same. So now if we add a todo, get some lunch. It's gonna look exactly the same because this is a local development server, so the server round trip was already fast before, but now we're rendering this without reloading the page at all.
 
-[00:01:43]
-And ideally, you would change those components so that they can be used on the server, but sometimes that's just not possible. So in some situations you might need to disable server side rendering, we can do that in a page.server.js, With export const ssr = false, right? This will allow this page here to be rendered without breaking the app.
+[00:02:00]
+But now that we're doing that, we can start to get a little bit fancy. We can start to use things like transitions to make the UI a little bit nicer, and in our case to make what's happening a bit more visible. And we begin by importing {fly, slide} from 'svelte/transition';.
 
-[00:02:13]
-Because if we were to server render this without ssr = false, if you had the default ssr = true, then we get an internal error when you try and server render this page, because window is not available on the server. This is a component that cannot be rendered in a server environment.
+[00:02:24]
+And on the list item, we're rendering each todo. We're gonna add a fly transition when the list item comes in. Give it a y value of 20, so that it flies in for 20 pixels when you create it. And when it vanishes, we'll slide it out. So now, if I add a new todo, You can see that it transitions in nicely.
 
-[00:02:34]
-The counterpart to SSR is CSR. Client side rendering is what makes the page interactive. So here we have a button. When we click on it, it's gonna increment the count, right? It also enables SvelteKit to update the page upon navigation without causing a full page reload. And you can disable it using a page option, we'll add a page.server.js file, I'm gonna export const csr = false, right?
+[00:02:57]
+If I delete one of these todos, you'll see that it slides out. And that's obviously something that you can't do if you don't have JavaScript on the page and you're relying on the full page reload.
+>> How was the delete icon displayed? Are you importing an svg?
+>> Yeah, so the delete icon that you can see on the right-hand side of these todos, that's just an svg that's in the same directory, remove the svg.
 
-[00:03:02]
-This means that no JavaScript is getting sent to the client at all, it also means that our components are no longer interactive. If I click on this button, nothing is going to happen. So most of the time you're not going to use this option but it is a useful way to be able to find out how your app is gonna behave for users who, for whatever reason, cannot use JavaScript.
+[00:03:25]
+On the bottom, we have some CSS which is being added all the way down here, just has a background which is referencing that svg. And the fact that we're able to do url./remove.svg and it renders is because Svelte is resolving that against the current module. When the application is built, it will take that file, hash it, put it in an assets directory, and give it an immutable file name so that it can be cached forever and it gets optimized and everything, and you don't have to worry about it.
 
-[00:03:30]
-Okay, let's talk about prerendering. Prerendering means generating HTML for a page once at build time rather than dynamically for every request that comes into your server. The advantage of pre-rendering is that serving static data is extremely cheap and performant. So it means that you can serve a very large number of users without worrying about things like cache control headers, which are very easy to get wrong.
-
-[00:03:53]
-But the trade-off is that the build process will take longer, and so pre-rendered content can only be updated by building and deploying a new version of the application. So it's up to you when it's appropriate to use this. If you wanna pre-render a page, then you just export const pre-render = true, again from your page.server.js.
-
-[00:04:15]
-Right, this isn't gonna have any observable effect here in the tutorial because we're running the application in dev mode and nothing gets pre-rendered during development. This is a thing that happens when you run NPM, run build. Not everything can be pre-rendered, right? If you're building something that uses dynamic data, then you can't have an HTML file for that.
-
-[00:04:37]
-Basic rule of thumb is that if any two users hitting that URL are gonna get the exact same content in all circumstances, then that page is a good candidate for pre-ordering. You can't pre-render pages with dynamic parameters like earlier when we had /blogs/slug and square brackets. We pre-render things like that as long as SvelteKit can find them, either by you having specified that in your Svelte config, or by svelte kit being able to find links to those pages from crawling your application.
-
-[00:05:13]
-So if you set pre-render to true inside your route.layout.server.js, then you've effectively turned SvelteKit into a static site generator. And this is what you would do, for example, if you're using adapter static, which is the adapter that allows SvelteKit to build applications that can be hosted on places like GitHub pages.
-
-[00:05:37]
-The final page option that we're gonna look at is trailing slash. So two URLs like /foo and /foo/, they might look the same, but they are actually very different. The relative URL like ./bar will resolve to /bar in the first case, but /foo/bar in the second, and search engines will treat those two URLs as distinct, which harms your SEO.
-
-[00:06:04]
-So you don't wanna be loose about your trailing slash, you wanna pick one and stick to it. And the default behavior that SvelteKit chooses is to remove trailing slashes so that If you do have a request for /foo/, SvelteKit will turn that into a request for /foo. So we can see that here we have a bunch of URLs in the navbar, and if I click on always/ it's just gonna go to /always.
-
-[00:06:36]
-And these haven't been implemented yet, so they're all gonna behave the same way. If we go to the always page.server.js. And add export const trailingSlash = 'always', then now the behavior is gonna be reversed. If I navigate to /always/, that's the URL that I get. If I navigate to /always without the slash, it will end up on the same place.
-
-[00:07:13]
-If you wanna accommodate both cases which is not recommended, then you can add the ignore value. All right, and now if I navigate to /ignore without the trailing slash, that's what I'll get there too if I add the trailing slash. There are very few situations where this is appropriate, most of the time you will be using either always or never.
-
-[00:07:45]
-And this also affects pre-rendering, if you have a trailing slash then it will be pre-rendered as an index.html file inside a directory. If the training is removed, then a URL like /never will become never.html. And that's something that you might need to configure with your static web server if that's how you're deploying your application.
-
-[00:08:08]
-
->> Have you seen people make installable PWA with Svelte and do you feel like that? Or have you seen traction with PWAs, whether it's worth it or versus building something for the app store or whatever?
->> It's certainly possible to build a progressive web app with SvelteKit. It gives you all the tools that you need to add a service worker and you can add a manifest.json in your static folder.
-
-[00:08:34]
-It also works with a library called Vite Plugin PWA, which does a lot of the grunt work for you. So absolutely, it's something that you can do. I couldn't tell you how widespread that is, how many people are building things in that style, but it's completely achievable.
->> If I understand correctly, using pre-render true and layout.server.js is the same as using an adapter or static.
-
-[00:09:04]
-
->> You need to do both. Essentially, if you use adapter static and you're not pre-rendering, then it's gonna yell at you because it's gonna say, hang on a minute, we have some non-pre-rendered routes here. And it'll tell you how to resolve that. So if you are using Adapter Static, then you probably want to have export cons pre-rendered true from your route layout that server.js.
-
-[00:09:28]
-But there are some situations in which you might have the bulk of your site pre-rendered, but then have a few things that only use client side rendering, for example. And so it's not a hard requirement that every page in your app is pre-rendered if you are using antistatic.
-
-[00:09:44]
-You can use it to build a fully rendered single page app, for example.
->> I had a situation where the only way to find a link to get to some set of blog posts in a pre-rendered static site was to click through a client side post Paginator that had collapsed page buttons, but Svelte didn't like through of the page links.
-
-[00:10:06]
-Is there a way to get some kind of file manifest for all routes that's SvelteKit can't find, so I don't have to make any update entries data and SvelteKit get config?
->> Yeah, [LAUGH] hold that thought. So there is a pull request open on the SvelteKit repo right now by Elliott Johnson, one of our core team members that adds a new export from your page.server.js files called entries.
-
-[00:10:32]
-This is a function that you define per route when you have dynamic parameters, it returns an array of all of the valid paths for that page. So if you have something like /blog/slug, then you can define an entrance function on that file that will communicate with your CMS, grab whatever data it needs to, and then tell the pre-renderer these are the pages that need to be pre-rendered.
-
-[00:11:00]
-Right now you have to do that in your Svelte config but soon you'll be able to do it in the page itself.
+[00:04:08]
+All you need to do is import the svg from the local directory, so this is a nice way to do this kind of design. And you could also put the removed svg in your lib folder and reference it like that, that would also work. Yeah, that's the kind of nice thing that we get by building on top of the,
 

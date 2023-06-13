@@ -1,64 +1,48 @@
 [00:00:00]
->> All right, let's talk about headers and cookies. So, inside your load function, as well as inside form actions and API routes and hooks, which are things that we'll learn about later in the workshop. You have access to a setHeaders function, which does exactly what you would expect.
+>> Stores are a way of storing data that doesn't belong to an individual component. And Svelte can makes a few read only stores available to your application via the app/stores module. We have the page store, the navigating store, and the updating store. And the one that you'll use most of the time is the page store.
 
-[00:00:15]
-The most common thing that you would use setHeaders for is to set a cache control header on the response so that data doesn't need to be re-requested. But we can't really demonstrate that in this context, so we're gonna do something a little bit more dramatic. We're gonna change the content type of the response, To text/plain, and we're gonna need to reload the page so that we can see that.
+[00:00:20]
+Provides information about the current page such as the URL, the params object that we've already seen in our load functions and our API route handlers. A route object with an ID property that represents the current route. So for example, inside about /page.svelte, the root ID is /about. The HTTP status code of the current page, the error object of the current page if there is one, we'll learn about that later.
 
-[00:00:42]
-You see that it's no longer giving us an HTML response that the browser can render, it's giving us some plain text instead. Now, one thing you can't use the setHeaders function for is to set cookies. Instead, you should use the cookies API, which is also available in all of the same places that setHeaders is.
+[00:00:48]
+The data prop and the form prop that combines all of the data from one of the layout functions and the page data. And so just like with any other store in Svelte, you can reference its value inside a component by prefixing its name with the dollar symbol. So for example, we can access the current path name as dollar page dot URL dot path name.
 
-[00:01:06]
-So, in page.server.js, we're gonna bring in the cookies API. And we're gonna replace this const visited = false line with something based on the cookies that were sent from the browser to the server when the page was requested. Cookies.get('visited'). And then after the first time the user visits, we're gonna set that cookie to true, so that when they come back, we'll recognize them.
+[00:01:11]
+So in our layout, .svelte component here, let's add a script block. And we're gonna import the page store, From $app/stores. But now, inside our nav element, we're going to add an aria current attribute to indicate which of these pages is currently active. I'm just gonna copy that for the about page, then update this bit.
 
-[00:01:40]
-We do that with cookies.set('visited'), give it a value of true. And you should always set a path on your cookies because the browser's default behavior is to set the path on whatever the parent of the path that you're visiting is, which is not very helpful. Most of the time you wanna set your cookies on the root of your application.
+[00:01:57]
+If we reload the page and navigate between these two links, we'll see that the aria-current attribute is updating when we navigate, and we have some CSS that is targeting that attribute. The navigating store represents the current navigation. And so when a navigation starts, whether that's because of a link click, or a back forward navigation, or a programmatic go to.
 
-[00:02:07]
-And we can now see that when we return visited, if the user has visited the page before, they are no longer a stranger, they are a friend. Now, the reason we use this cookies API instead of interacting with headers is that not only does cookies.set cause a set cookie header to be added to the response, it also updates the internal map.
+[00:02:28]
+The value of navigation will become an object with some properties. We have from and to, these are things with a params object, the route object, and the url. We'll also have a navigation type, which can be link, or pop state or go to. And if you wanna see the complete type information for the navigation object, you can look that up on the SvelteKit documentation site.
 
-[00:02:30]
-So that if you call cookies.get inside another load function that is also involved in rendering this page, it will be current with the cookie that was set previously. You have a bunch of options that you can pass here. We're using the cookie package under the hood, which you can find on NPM.
+[00:02:55]
+We can use this store to show a loading navigation, a loading indicator for long-running navigations. So in this exercise in our page server.js, and in our about page server.js, we have these artificial delays, it's gonna take a full second to navigate between these pages. We can see that if we click, it's gonna take a whole second before that updates.
 
-[00:02:49]
-But we're adding some defaults to make the behavior of your application more secure. Specifically, we're making all of your cookies HTTP only by default. We're setting secure to true except when you're on localhost and we're setting sameSite to lax. These defaults will protect your users from their cookies being leaked.
+[00:03:26]
+So inside our layout Svelte where the navigation is defined, I'm gonna bring in the navigating store. And then we're gonna add some UI indicating what's going on. By the way, this URL object here, this is the web standard URL constructor. It's a super useful object that you'll interact with a lot when you're building SvelteKit apps.
 
-[00:03:08]
+[00:04:11]
+So I recommend getting comfortable with this page of MDN. Okay, so now let me navigate between these pages. We see that we get a little indication on the right-hand side telling us what's happening. So more typically, you would use this to have some kind of a progress indicator and so on.
 
->> To clarify about the thing you said with the cookies. So if I set a cookie in a layout, I can reference it? Even though it's not actually in the request cookies, I can reference it as if it was in a page server file?
->> So there's a potential race condition because the load functions run simultaneously.
+[00:04:33]
+This is actually one of the issues that you get with a single-page app. There is no direct feedback when you navigate between pages, you're kind of relying on the navigation to be fast enough that it doesn't matter. But there is gonna be a brand-new navigation API landing in browsers fairly soon, which will allow us to control the refresh icon that starts spinning, when you have a traditional navigation between pages.
 
-[00:03:30]
-And so, if you set the cookie asynchronously after it's been requested in the load function, then that's a bug. And actually, that's probably a bug that we could catch and throw an error in that situation, because that is actually quite a nasty bug. But more typically, the way that you would use that is inside your server hook, which we'll cover later on.
+[00:05:00]
+We'll be able to use that in single page apps too. But for now, it's a good practice to have some kind of loading indicator in your single page app UI. Okay, and finally, the updated store contains a value of true or false depending on whether a new version of the app has been deployed since the page was first opened.
 
-[00:03:57]
-You would do something like event.locals.user = getUser from my cookies, if that doesn't exist, then we set a cookie. And then inside your load function, the cookie has been set because your hook always runs before your load function. But we'll get into all of that stuff later on.
-
-[00:04:18]
-It's also useful when you're dealing with form actions, because if you have a login action, for example, you might set a cookie inside that action. And then when the load function is subsequently called, the cookie will have been set by the time you read it in the load function.
-
-[00:04:35]
-So that's why we use the cookies API as opposed to relying on a fresh request coming in.
->> When working with input-dependent data, what is the best approach to loading it? For instance, on a search page, should the user's input be handled with a promise on the component or with a data object?
-
-[00:04:54]
-
->> It depends on the UI that you're trying to achieve. If you want the results to be streamed in as the user is typing, then you would want to have that logic inside the component, and you would have all of the async handling there. The way that I tend to build search inputs is, I'll just use a regular form that causes the data to be loaded inside a load function.
-
-[00:05:20]
-And so, you have to type in the search query and then hit Enter. For me, I just find that to be a preferable user experience. It also happens to be much easier to implement because you don't need to deal with any of the async objects, SvelteKit takes care of it for you.
-
-[00:05:31]
-But it depends, there's no canonically right answer. So because SvelteKit uses directory-based routing, it's easy to place modules and components alongside the routes that use them. I find a good rule of thumb when figuring out where to put code is, put code close to where it's being used.
+[00:05:25]
+And for this to work, you need to add some configuration to your SvelteConfig.js file. Specifically, you need to add this version object with a name, which changes when your application is redeployed. Right now, we're just using date.now toString, which is the default value, but ideally, you should use something like the current commit hash, so that your deploys are consistent.
 
 [00:05:48]
-But sometimes code is being used in multiple places. And when that happens, you don't wanna have to do ../../../../ to get a reference to the module. It's nice to have a place to put that stuff that is common to all your routes. And in SvelteKit, that place is the source/lib directory.
+And you also need to add a poll interval, I've got five seconds here. This is what SvelteKit is gonna use to check whether the version has changed while the page is open. Now, version changes only happen in production, they don't happen during development. For that reason, updated is always gonna be false in this tutorial.
 
-[00:06:07]
-Anything inside this directory can be accessed by any module installs via the lib alias. So both of these page.svelte files are importing a file from source/lib. They're trying to get ahold of this message. And the homepage is doing it right, but if we navigate to this deeply nested route, we get an error from Vite telling us that it's failed to import.
+[00:06:13]
+But we can imagine, for example, that you would have something like a toast that appears when the updated store changes from false to true. You can use this in other ways. For example, if you have a very long-running session, and the application is redeployed while the user has the app open, then that can break navigations.
 
-[00:06:32]
-And that's because we've got the wrong number of dot, dot slashes, we got five when we should have four. So we could fix it by fixing the number of dot, dot slashes, but it would be a hell of a lot nicer if you could just use $lib instead.
+[00:06:36]
+Because you might try to fetch the code for a new page, and discover that all of the hashes have changed, and so we're unable to import the relevant modules. And in that case, SvelteKit will fall back to a full page navigation, so usually we're able to recover without the user noticing that anything went wrong.
 
-[00:06:45]
-So get rid of all of that, and do the same in page.svelte. And that will work consistently for all of the modules and components in your lib folder. So that's a nice place to put shared utility components, utils.js file, other things of that nature.
+[00:06:56]
+But it can be nice to proactively tell the user that the application has updated or even to disable the router altogether, so that we don't need to have that error handling logic.
 

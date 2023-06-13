@@ -1,64 +1,42 @@
 [00:00:00]
->> So far, we've been creating pages in our application, but SvelteKit allows you to create more than just pages. You can also create API routes by adding a server.js file, instead of a page server.js file in a page.svelte that exports functions corresponding to HTTP methods like GET, POST, PATCH, PUT, DELETE, and so on.
+>> Okay, so our carousel is beginning to take shape, but now we wanna add the other two. We wanna add one for now playing and we wanna add one for upcoming. So back in our data loading function, our page.ts, we're gonna duplicate this line, Then we're gonna add now_playing.
 
-[00:00:19]
-So this app here fetches data from a /roll API route when you click the button. And at the moment, we haven't implemented that route, so let's do that by adding a src/routes/roll/+server.js file. Let's click the New File icon, roll/+server.js. And from here, we can export functions that correspond to the HTTP verbs.
+[00:00:29]
+And the endpoint for this data is movie/now_playing. It's gonna give us the same type of databack and movielist. And then we'll do an upcoming as well using the movie/upcoming endpoint. And we can pass those into our component in the same way. So in our page.svelte component we can duplicate these carousels.
 
-[00:00:48]
-In this case, we're gonna have a GET. We get a random number between 1 and 6. And we're gonna return that as a response object. We need to add a header that tells the browser that the response is of Type': 'application/json'. Now, just like request, this response thing here is a web standard.
+[00:01:02]
+We can add one for now_playing. And we can add one for upcoming. Some of the movies are duplicated between these lists, that's totally fine. These are the three separate views that we wanted to see. Now if you're paying really close attention, you'll notice that there is actually a problem in our data loading function.
 
-[00:01:38]
-It's an object that you deal with when you use the fetch API and other times. And so inside our API route handlers, our job is to take a request and return one of these response objects. You can find the documentation on MDM. Now, since doing this sort of thing is pretty common in an API route, returning JSON, we actually have a helper to do that for you.
+[00:01:29]
+And that is that all of these calls are waterfall. And what I mean by that is we're going away and we're getting the trending data and then we're getting the now plain data and then we're getting the upcoming data. And then finally, we're getting the information about the featured Movie.
 
-[00:02:03]
-I'm gonna import that helper now, import { json } from 'svelte.js/kit';. And then instead of returning all of this, we're just gonna return json, and then pass in the data. So now, if we roll the dice, we're gonna fetch the response, which is the same response object that we've just returned from the API route, and we're gonna assign that to this local value that gets shown when we've rolled.
+[00:01:43]
+And that's no good, we can make that much more efficient by issuing these top three requests in parallel. So we're gonna rewrite this code a little bit. We're gonna do const trending now_playing. And upcoming all together equals await promise.all and then we're just gonna grab all of these API codes, and put them inside that array Gonna get rid of the assignments and we'll turn the semicolons into commas.
 
-[00:02:36]
-Rolled a 1, not very good, try again. Rolled a 4, I'm gonna keep going until I get a 6. Come on. Is my logic bad? I got a 6, finally. All right, we can move on to the next section. Okay, so that was a GET handler, but you can also add handlers that mutate data, such as a POST handler.
+[00:02:24]
+Now we're gonna issue those API calls simultaneously, which is gonna result in a faster page load. This one is inevitably waterfall, because we don't know which movie to get all of the details for until we know what's trending today Obviously, at the moment we just have a grid of images, here we don't know which list is which.
 
-[00:03:07]
-Now, in most cases, you shouldn't use a POST handler when you could use a form action instead. Form actions are gonna involve less code for you to write, and they also work without JavaScript, as we've seen, making things more resilient, But we can do it if we need to for some reason.
+[00:02:57]
+So we're gonna define a new module that describes the different views that we can use in this application. And source /lib will add anew module, views.ts. And inside here I'm gonna declare a new interface, view, we'll export that. Title is gonna be a string, and the endpoint is also gonna be a string.
 
-[00:03:25]
-So we're gonna revisit the todo app from before and we're gonna implement it this time using an API route. Aside the keydown event handler of the input at the top here, we're gonna post some data to the server. The response is gonna be the result of fetching the todo API route.
+[00:03:30]
+And we'll use that endpoint later on when we have dedicated pages for each of these views. And we're gonna create an object of views like this. We've got a trending view, which has a title of Trending and an endpoint as we saw is trending/movie/day. We'll create on our now_playing view, the title of Now playing, and an endpoint of movie/now_playing.
 
-[00:03:54]
-It's gonna be a POST call, so add method: 'POST'. The body is gonna be a stringified JSON object containing the description. And we're gonna add that content-type application JSON header. Okay, so when we hit the Enter key inside this todo, we're posting data to a route that we haven't yet created, so we need to create that now.
+[00:04:15]
+And finally, we've got our upcoming view. Now inside our page.svelte, we can reference these views and pass the view information into the carousel. And then we can render a header and we can also use that information to create links to the trending and now_playing an upcoming movie pages.
 
-[00:04:36]
-Inside the routes directory, create todo folder. Then inside there, create our server.js. And this time, we're gonna define a POST handler instead of a GET handler. I'm gonna import that JSON helper cuz we're gonna use it in a minute. And we're gonna import the same database object that we're using inside the form action before, import * as database from '$lib/server/database.js', that's this file over here.
+[00:04:51]
+So in our carousel component, we're gonna export a new value which is view And is gonna import that from lib.views. And in the carousel, we're now going to add a header, Which is gonna have that column class so that it's constrained to the width. And the title of the h2, or the text of the h2 is gonna be the View title.
 
-[00:05:18]
-Got a question from the crowd?
->> Are API endpoints open by default, or do you need some sort of calls config to open up for third-party users?
->> Yes, so that's a very good question. SvelteKit will by default lock down your API routes to prevent people from posting data from different sites.
+[00:05:32]
+And we're also gonna invite users of this component to pass in an href so that you can see the entire list. And the reason that we're doing that, if you look at the original, is so that when you have a trending carousel, you can click to see all link.
 
-[00:05:42]
-So to protect your users from phishing attacks and things like that, where someone has a website that looks like yours and posts some malicious data, which then uses your cookies to do something nefarious, SvelteKit will look at the origin header when a request comes in. And if you're trying to mutate some data, it will reject it by default.
+[00:06:03]
+And it will take you to a page of all of the trending movies. Right, we've broken the page because we're not passing in view and the href. So let's fix that in our page, see, we're now getting a red squiggly on these carousel components because we're not passing in the props that it expects.
 
-[00:06:02]
-You can disable that behavior and you can add your own calls behavior if you want, but the default behavior is to try and keep your users safe. Hopefully that answers the question.
->> Is that JSON utility just using json.parse under the hood or does it support begins?
->> It's just stringifying the data that you're passing.
+[00:06:31]
+View=, and then we need to import the views data from the file that we just created. Do the same thing for now_playing and upcoming. And we can now see those headers along with those links on our home page. Because if we click those links, nothing is gonna happen yet, because we haven't created that route.
 
-[00:06:28]
-Yeah, it's basically just trigger over returning a new response with json.stringify, the same data. Yeah, if you wanna pass rich data, then you're gonna need to use your own serialization and your own deserialization on the plan. All right, so we've imported everything that we need, it's time to add the handler itself.
-
-[00:06:59]
-First thing we'll do is get the JSON that was sent from the browser, using await request.json();. We're gonna grab the userid from the cookies. And then we're gonna get the id of the todo that we create so that we can pass it back. Passing the userid and the description.
-
-[00:07:38]
-Right, and that's gonna call the createTodo function here, which is gonna create a new ID, just a random string of digits. It'll add that to the in-memory database, and then it'll return the ID to whatever called it. Then we can take that ID, send it back to the browser.
-
-[00:08:04]
-We're gonna pass in status: 201. This time, 201 is the HTTP status code that you use when you create a resource. If you wanna learn more about HTTP status codes, which we'll use a few times in this workshop, a site which is very helpful and explains the difference between, for example, an HTTP 200 and a 201.
-
-[00:08:34]
-No, there we go, 200, okay. So back inside the event handler on the page. We need to do something with the response that we just generated. Grab the response.json, In much the same way that we got the request.json on the server. And then we are gonna mutate the todos array directly inside this handler.
-
-[00:09:20]
-And then, finally, the value gets reset so that we can add a new todo. Now, this mutation that we're doing here, this is perhaps a little bit unorthodox. You should only do this if the result of that mutation is the same result that you would get if you reloaded the page.
-
-[00:09:36]
-Otherwise, you'll get into an inconsistent state. But because we control this state, it's a safe mutation to make. So now, if I add a todo, It's gonna add that to the list.
+[00:07:42]
+So let's do that now,
 

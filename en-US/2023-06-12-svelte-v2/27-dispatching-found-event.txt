@@ -1,112 +1,54 @@
 [00:00:00]
->> Okay, this is the final section of part one, and it's about stores. This is about state that does not belong to a specific component. Cuz very often you will have application state that is not part of the component hierarchy. It's something that can be accessed by multiple components or by a regular JavaScript module.
+>> Okay, so the one case that we haven't handled yet is the case where the user guessed correctly and now has a pair. And so from within this grid component, we need to communicate that up to the game component so that we can update the game state. And to do that, this component grid.svelte needs to become an event dispatcher.
 
 [00:00:22]
-And in Svelte, we have a state management primitive built in, it's called a store. And a store is really just an object with a subscribe method. When you call subscribe on a store, you will pass in a callback that gets executed every time the value of the store changes.
+So, as we've seen in the workshop so far, we'll create dispatch as create EventDispatcher parentheses, and it's automatically imported that for us from svelte. And then inside here, we're gonna dispatch a found event, and we're gonna give it some information. We're gonna pass the emoji that was found in that event.
 
-[00:00:39]
-So in App.svelte, count is a store, and we're calling count.subscribe, and we're assigning to this value count_value. So let's look at the implementation of count. We're importing something called writable from svelte/store. And we're exporting an instance of a writable store with an initial value of 0. Okay, and we can reference this store value in multiple components, let's look at the incrementer.svelte.
+[00:00:51]
+And then in our game.svelte component, I'm gonna move that over to the left so that I can see it. We can now add a found event listener on the grid component. Like so, tab to accept that completion. [SOUND] All right, so this event data is gonna tell us which emoji is found.
 
-[00:01:16]
-We can update the value of the count using the count's update method, count.update. It receives the initial value and returns the next value. So now if we press the + button, we're incrementing the value of count. And inside App.svelte, because we're assigning the current value of the store to count_value, we can see that inside our h1 element.
+[00:01:19]
+You remember that we declared this array up a pair of the emojis that have been found, I'm just gonna push data into that array. [SOUND] Right, this e.detail object is something that you get on a custom event. This isn't a svelte thing. It's a dumb thing. The e.detail can be just an arbitrary object of data.
 
 [00:01:49]
-We can do the opposite in decrementer.svelte. So again count.update, get the old value, and then return the value -1, we can increment, and we can decrement. Then finally in our resetter.svelte, we can implement this reset function. This time we don't need to call update because we don't care about the previous value.
+It's basically whatever you pass in to your dispatch function. Save, so that pretty makes it look nice. And now we need to do something with the array of found emojis. First of all, we need to remove it from the grid because you can't find a pair twice [SOUND].
 
-[00:02:17]
-We'll just call count.set(0) like so. Press the button, the count resets. Now, that works, but there is a subtle bug in this app that's quite similar to the bug we had with onMount where things weren't getting cleaned up when the component was destroyed. So if this component were to get instantiated multiple times, we would be creating multiple subscriptions to this store, and we would never be getting rid of them.
+[00:02:13]
+All right, same drill, and then scroll by now, we need to create this prop on the grid. I'm just gonna duplicate that line with command Shift D. Okay, now we need to represent that inside the square component. So we're gonna pass a found property into here, but it's not gonna be the entire array.
 
-[00:02:51]
-So over time that could result in a memory leak. And one way that we can undo that memory leak is by getting a reference to the unsubscribe function, which is returned from count.subscribe. And we could call it in an onDestroy lifecycle hook, which we didn't talk about. Because generally, I don't recommend that you use it.
+[00:02:37]
+It's just gonna be a Boolean of whether or not found includes the emoji that we're currently dealing with. So inside square, just like selected as a Boolean we're gonna add a found Boolean. And that's gonna be if the array includes the current emoji. And we can use this to remove the span from the grid altogether [SOUND] once the emoji has been found So now if I pick two pairs from the grid, like these two fish, they get removed from the grid.
 
-[00:03:23]
-That would look like this. And so now when the App.svelte is removed from the DOM, we'll clean up that subscription. But this is a lot to write, the onDestroy, the let count_value, the const unsubscribe, the subscribe, the callback onDestroy, all of that. You can imagine that if you have multiple stores that you're referencing inside the component, this is a lot to deal with.
+[00:03:37]
+You'll notice of course that there is a repeating pattern here. The pairs at the top, sorry, the emojis at the top are duplicated in the bottom half of the grid. So this game isn't gonna be a whole lot of fun. So we need to shuffle the emojis. And to do that, we're gonna create a new module called utils.ts.
 
-[00:04:02]
-But because Svelte hates boilerplate, we have a shorthand way of doing all this. I'm just gonna go ahead and get rid of all of that. Get rid of the onDestroy, get rid of the let count_value, get rid of this const subscribe call, and get rid of the call to onDestroy there.
+[00:03:56]
+And inside that module, we're gonna create a shuffle function. Do export function shuffle. And the input to this function is gonna be an array of strings. But the fact that it's an array of strings actually isn't material. The shuffle function doesn't care what it's shuffling. So we're gonna turn this into a generic function.
 
-[00:04:20]
-And we replace the count_value variable with $count. And that is equivalent. That is set at the subscription, and it has added the unsubscribe logic automatically for us. And it works just the same way as before. Right, because the $ prefix tells Svelte that we are dealing with a store value.
+[00:04:34]
+We do that by adding a generic argument like this, and then we can replace the string here with T. This is nice because now when something calls shuffle and passes in an array of whatever values, then TypeScript will know what kind of array is getting back. Okay, so we're gonna implement something called the Fisher-Yates shuffle algorithm, which modifies an array in place.
 
-[00:04:49]
-It is reserved, you cannot create your own variables inside a Svelte component that has that $ prefix. So in that example, count was a writable store, but sometimes it doesn't make sense for a store to be writable. You shouldn't be able to set the value of the store if you have a reference to it and it's read-only.
+[00:05:03]
+We begin by getting the current array length, and then we're just gonna work backwards [SOUND]. At each point, we're gonna get a random value between zero and the current index. [SOUND] So that's math.floor of math.random x i + 1 because we just decremented it. And we wanna get a temporary variable that contains an array I think.
 
-[00:05:12]
-So for things like the mouse position or the user's geolocation, right? There's no reason that you should be able to set those values from outside. And so we have a thing called a readable store as well. In our stores.js module, we're importing the readable function from svelte/stores. And we are creating a readable store, which has an initial value of null, it can be null or undefined or whatever.
+[00:05:48]
+And then we do array i equals array j, array j equals temp. If I get this right first time, I'm gonna be super happy with myself. And then we just return the array at the end. So now inside the game where we create this grid, we can take these pairs where we're just duplicating everything and we can shuffle that before we return it.
 
-[00:05:40]
-And the second function to a readable store is a start function that gets called when the user subscribes to this store. So when the first person subscribes to this store, this callback will be invoked. When the last person stops subscribing to the store, this stop function will get called as well.
+[00:06:22]
+Okay, we need to import it and do that from utils. If I hit Save, hopefully we're gonna get a randomized array. All right, it doesn't load that random because we've got the caterpillars next to each other and the dinosaurs on top of each other, but it is. This is a shuffled array.
 
-[00:06:00]
-So this is a convenient place to do setup and teardown logic. So the current time, let's begin by passing in the current date. Right, and you can see that already the store value in App.svelte is reflecting the current date. Down here it's formatting the current time using the Intl.DateTimeFormat function that's built into the platform.
+[00:06:41]
+Okay, so things are starting to take shape. One thing we're not doing right now is we're not storing the emojis that we've found outside the grid, and we have a space to do that in this info block below the game grid. So we would like to include all of the emogis that have been found so far down here.
 
-[00:06:36]
-And inside here we want to add an interval that's gonna update this once a second. So you can create an interval with const interval = setInterval. That's gonna run once a second, and it's gonna set the value to the current date. And then inside our start function, We'll just clear the interval.
+[00:07:04]
+We're gonna create a new component for this, call it found.svelte. Just do div class equals found. That's gonna take the found array, export, let found string array. And we'll just render, I need to add the lang equals ts, that's why it's giving me the red squigglies, and it's just gonna render an array of all of the found emojis [SOUND].
 
-[00:07:10]
-So now we have this time value that we can use anywhere in our application, and it will always be perfectly consistent. And we don't need to have this setup and teardown logic inside each individual component. It's all encapsulated within the store itself. Sometimes you might have stores whose value is derived from other stores.
+[00:07:43]
+And I'm gonna add a key there so that we can do some funky animation stuff later on in the when we build the app [SOUND]. All right, back in my game.svelte. We can create that component and pass the found array into it. And now if I find a pair like these turtles here then, hopefully it's gonna appear down here.
 
-[00:07:38]
-So in this case, perhaps you wanna have a store that tells us how long the current page has been open. And we can derive that value from the time store. Go back into stores.js, and underneath the time declaration, we're gonna create an elapsed store. It's been scaffolded out already, we just need to add the logic.
+[00:08:18]
+It's a little hard to see though, so gonna go back to found.svelte and add some styles [SOUND]. Maybe, on that a little bit further. We want that to be centered. So, we're gonna add some display flex goodness to div classical sound [SOUND]. Justify content center line items center.
 
-[00:08:06]
-An elapsed store takes one or more stores as its input value. And then it has a callback, which is passed those values whenever they change, and can return a new value. Math.round((time- start) / 1000). So now the time, the elapsed, they're perfectly in sync. You'll notice that I'm using the $ prefix here, even though I'm in a JavaScript module.
-
-[00:08:36]
-There's no syntactical requirement to do that, it's just something that helps keep it consistent with your components. And so it's a convention that I like to use. So here we are deriving a value from a single store. You can derive a store from multiple other stores. And you can also do things asynchronously, if you need to.
-
-[00:08:56]
-If you wanna do that sort of thing, then consult the API reference, and all will be revealed.
->> If we go back to that readable stores one, can you help clarify the purpose in the stores.js file of the stop function, and, What exactly that is doing in this?
-
-[00:09:17]
-
->> So if I were to call time.subscribe, and then do something with the current time, like log it, Then we need to get this value somehow. But by default, this function isn't gonna run, this function is only gonna run once we call .subscribe. Because a lot of the time, this could be wasted effort.
-
-[00:09:54]
-You might have a whole bunch of stores that aren't actually being used at the moment. And so rather than wasting the user's battery on getting the geolocation information or whatever, we wait until that information is actually requested. So this function doesn't get called immediately, it only gets called when we subscribe.
-
-[00:10:12]
-If we were to get the unsubscribe handle, and then later on call that, well, at that point, we need to get rid of that interval, otherwise it's just gonna keep ticking forever. So this function will get called when the first subscriber starts subscribing. And if subsequent things subscribe to the same store, then that function doesn't get re-invoked.
-
-[00:10:41]
-But as soon as everything that is currently subscribing to the store stops subscribing, that's when we call the stop function. So start gets run when the first subscriber arrives. Stop gets run when the last subscriber leaves. Does that make sense? You can imagine that we are not using this, and we don't have this.
-
-[00:11:04]
-This function will not run, and we can verify that by, Adding an alert. Right, we're importing it, we're declaring it, but this function is not running. But if I then uncomment that, Now the function is running. So we have a subscriber, we have one subscriber. If I then do this, we have two subscribers.
-
-[00:11:34]
-And it recalled the alert because it's refreshed the entire module. But if you have multiple subscribers, normally, then you wouldn't see two alerts, you'll only see one. So right now it's tracking two subscribers. And then if we unsubscribe from that, and we get rid of this, this component then is gonna just basically clear the interval, right?
-
-[00:11:57]
-Because no one cares about the time anymore, once everything is unsubscribed. Yeah, sorry, that was not the clearest explanation. But all you need to know is that you need to have your setup code and your teardown code, and Svelte will manage the rest.
->> In clearInterval interval, isn't interval a closure?
-
-[00:12:18]
-
->> So you're returning the stop function from the start function, so yes, stop is a closure. It closes over the interval that you're declaring in the start function. So you're not passing two functions to readable, it's not like we've got one of these and then, One of these.
-
-[00:12:48]
-You're returning stop from start. So anything that you declare inside start, you can reference in stop. All right, let's talk about custom stores. As I said earlier, a store is just an object that has a subscribe method. There's nothing that special about it. So as long as an object correctly implements that method, it's a store.
-
-[00:13:09]
-And beyond that, you can do whatever you want. So we can use stores for domain-specific logic. So in the case of our count store, maybe you want a lot of different things to have a reference to that store. But you don't want everyone to be able to set it's arbitrary values.
-
-[00:13:23]
-You don't wanna be able to set the value to a string or something. So you can restrict what people can do with that store by not exposing the set and update functions, but instead exposing your own functions. So inside stores.js, we have here some scaffolding where we're creating a custom store.
-
-[00:13:49]
-We have the subscribe function, which is returned from writable. And we're just returning that from createCount so that it can be used as a regular store. So that you can use it inside your markup like this, the count is 0. We're not doing anything differently here, we're just referencing that the same way that we would reference any other store.
-
-[00:14:09]
-But instead of returning the set and update methods, we're returning some methods of our own creation, increment, decrement, and reset. At the moment, they're not wired up, so they're not doing anything, let's fix that now. Increment is gonna update n to N+1. decrement is gonna update n to n-1, and reset is gonna set the value to 0.
-
-[00:14:44]
-And now inside App.svelte, we can just pass those methods to our event handler, And interact with the store that way. Finally, just like we can bind the value of things like inputs and text areas to local state, we can bind to stores. As long as a store is writable, it's created with the writable helper from Svelte store, and we can bind to it.
-
-[00:15:21]
-So take the text binding here right now, nothing's happening. But if we change that to a binding, Then the value of name is now bound to the content of the input. If we also add an event handler, we can assign to the value of name in the same way that we would assign to any other value inside a Svelte component.
-
-[00:15:56]
-There we go. Right, you can use name.set, or you can use $name +=, it's really just a stylistic preference.
+[00:09:04]
+We'll put a little gap between the things that we find. Now find some more of these pairs, they'll also get added to that array at the bottom.
 

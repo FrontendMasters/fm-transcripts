@@ -1,96 +1,27 @@
 [00:00:00]
->> I have one quick question about bindings. Are bindings synchronous?
->> Okay, so there's a question about whether bindings are synchronous or not, and that's a really interesting question. The answer is they update the state synchronously. So when you have a bind value on a text input, it is essentially as if you had an on input event handler and you are assigning to the value inside that event handler.
+>> About time we started adding a little bit of game logic. And the first thing we want to do is define the levels of our game. Because we have three different levels, we've got easy, medium and hard, and those are gonna have different grid sizes, different durations, different sets of emojis, and so on.
 
-[00:00:27]
-So in that sense, it is synchronous. But like all state updates, that will be batched and it won't update the DOM until we've waited for the current microtask. Now, because you're interacting with the element yourself, the binding isn't gonna need to update the input, if that makes sense.
+[00:00:20]
+And so it's a good thing to get that roughed out before we go any further. So I'm gonna create a new module called levels.ts. And I'm gonna start by defining an interface for my level. So this is some TypeScript. If you're not familiar with TypeScript, then this might seem a little alien, but this is just basically saying what the shape of a level should be.
 
-[00:00:51]
-Because if you have an input and you type in some text, the input already has that text. So we don't need to wait for the binding to go all the way around and then get fed back into the input as it were, because it's already in the desired end state.
+[00:00:46]
+Export interface level, we're gonna have a few different properties here. We're gonna have a label, that's where we're going to put easy, medium, hard, and so on. We're gonna have a size, which is the horizontal or vertical size of the grid. So the easy mode, we're going to have a 4x4.
 
-[00:01:08]
-But the update to anything else in the DOM, the references, that piece of state, that will happen after the current microtask. Getting super in the weeds here, but hopefully that made sense.
->> How does using await blocks differ to using onMount as below? And so he's got let data onMount in the brackets async.
+[00:01:13]
+For it to be matching pairs, it needs to be even numbers, so we can't have a 5x5 grid, so medium will be 6x6, and then hard is gonna be 8 by 8. So that's the number. We'll give each level a duration, the number of milliseconds that you have to complete the level.
 
-[00:01:33]
-The data equals await get data from backend. I found myself having to do the blow to avoid undefined errors before we migrated to SvelteKit, using plus page.ts load. So maybe I was using onMount improperly.
->> So there is a little bit of a gotcha with onMount. If you look at the reference documentation, svelte.dev slash docs and look at the onMount area, it will tell you that you should not return a promise from onMount.
+[00:01:34]
+And each level is gonna get its own set of emojis. All right, this syntax right here means an array of strings. It's a shorthand way of doing this, those two things are equivalent. Okay, so we'll create our first level, and then we can come back later and do the others, export const levels.
 
-[00:02:09]
-And anytime you have an async function, that function will return a promise. It's just how async functions work. And the reason for that is that we need to get a reference to the tear down callback for when the component is onMounted. And that needs to happen synchronously for a variety of reasons.
+[00:02:07]
+And this is going to be an array of these level objects that we just defined. The first one is gonna be easy, It's gonna have a size of four. It's going to have a duration of, let's say, one minute. We can dial this down later by doing some play testing.
 
-[00:02:29]
-So your onMount callbacks should be synchronous functions. They should not be async functions. You can use async inside an onMount function by creating an, I believe it's called an asynchronous immediately-invoked function expression or IIFE. So you create an async function and then you put the parentheses at the end of it, so it will call it.
+[00:02:28]
+If it's too easy or too hard, we can change it. And then the tricky bit is getting the emojis in here. There's a bunch of places where you could get a list of images or you could like manually type them all out. But for the sake of this workshop, we actually have a list of emojis available here.
 
-[00:02:51]
-And you can use the await keyword inside your IIFE, but you don't want the onMount callback itself to be an async function. Maybe we'll change that in a future version of Svelte, I don't know, but for now, avoid that per the documentation.
->> How does onMount impact the performance?
+[00:02:50]
+If you go to ematchi.vercel.app/gist, it will redirect you to something I made earlier. You can just copy and paste these into your levels.ts file. If you take the easy one, just copy that and then put it inside that string, and then put .split on the space character there.
 
-[00:03:10]
-Wouldn't the components have a waterfall effect or some sort?
->> Yes, so if you're doing your asynchronous work inside onMount, by which I mean like fetching data and things like that, then that work doesn't begin until a component gets mounted to the screen. And if you have a component that only becomes visible when the result of some async operation completes inside a mount.
-
-[00:03:39]
-Then if it has its own async operations, then you'll render the parent component that will eventually render the child component, which will do some async work. Maybe that eventually renders another child component. And that is what we call a waterfall, and that is something that we very much want to avoid.
-
-[00:03:55]
-In general, I do not recommend doing data fetching inside your onMount components. There is a way of doing data fetching asynchronously, which we'll learn about in SvelteKit. And that is by far the preferred way to deal with data. Not just because it avoids that waterfall problem, but also because it works with server-side rendering.
-
-[00:04:15]
-Server-side rendering does not work with onMount because there is no DOM on the server. You're not mounting anything. So when you do work inside an onMount handler, that will have no effect on any content that you are server rendering. SSR is a thing that we are gonna cover in this SvelteKit workshop.
-
-[00:04:32]
-For now the takeaway is avoid doing your data fetching in onMount if you can. And come back for the SvelteKit workshop to learn about data fetching.
->> If you have lots of await blocks in your HTML, would there be a better way to organize this? Also, is there a way to do something like promise dot all for multiple await blocks?
-
-[00:04:54]
-
->> So if you have a promise to all, you would put that inside. I mean, you can have an inline promise that all inside an await function, but you probably want to do any really tricky async logic inside your script block or even in an external module. Because as the question suggests, it can start to get a little bit hairy.
-
-[00:05:12]
-But this again is the kind of stuff that is better moved into your data fetching layer, which happens before rendering. And that's something that we'll talk about when we learn SvelteKit.
->> Several people in chat are not sure what the tick does. And what does it do?
->> [LAUGH] Okay, so the nuts and bolts of what tick does is, all right, so when you assign to a value in a component, the compiler instruments that assignment with a secret internal function called invalidate.
-
-[00:05:51]
-And invalidate has two jobs. It marks that value as dirty inside the component, and it tells a scheduler that is shared by all components that this component has changed. And when that happens, the batching starts, so Svelte will create a promise that will immediately resolve, and then it will wait to see if any other state updates happen before that promise resolves in the next microtask.
-
-[00:06:23]
-If you call tick, you will get a reference to that promise. So at the end of that resolution, the DOM will be updated and the promise returned from your tick function will resolve. If most state updates were happening, then it will just be like calling await promise dot resolve.
-
-[00:06:46]
-And it will essentially just defer some work until the next micro task. Again, super in the weeds. Most of the time, you don't really need to worry about how it's working. You just need to know that it's gonna cause anything after the await tick to happen in the next micro task.
-
-[00:07:06]
-Which is a fancy way of saying it will happen after the current execution block has happened, but before the DOM is updated. So you're not gonna see things like flicker. It's not like if you were doing a set timeout or something and then you would potentially see things in the page become out of sync.
-
-[00:07:25]
-Everything will happen before the DOM is updated but after the current execution block. Hopefully that makes sense.
->> What does this dot refer to?
->> It's a great question. Okay, so down here we have this.selectionStart = selection and this.selectionEnd = selectionEnd. The this inside an event handler refers to the element that the event handler is bound to.
-
-[00:07:43]
-So here we're calling on keydown = handlekeydown. Function blah, const textarea = event.currentTarget. And hopefully this is gonna work. If I press a key here, then we're gonna see this alert(this === textarea). Alert the word true, it worked. Okay, good. I have remembered how the DOM works. Anytime you have an event handler, this is the event target.
-
-[00:08:29]
-Just a convenient way to to interact with the DOM imperatively. Chris, you had a question.
->> Yeah, going back to the use of tick and how that's used to help resolve promises, is it possible then that you would have to call a wait tick multiple times in the same code block?
-
-[00:08:50]
-
->> You should not need to know. Now I can't really imagine a situation in which you would not do that. Unless you needed to do something like you change some state and then you wait for the DOM to update so that maybe you can take a measurement, like a width and a height measurement of an element.
-
-[00:09:06]
-So that you can then set some more state, and then that has a knock-on effect that you need to await. I guess it's possible to get into a situation where that's the case, but it's not something that you would encounter often, certainly. All right, any more questions from the Internet or should we move on to the final section of Part 1?
-
-[00:09:29]
-
->> Just a couple of clarifications. So a cue is it? So basically a tick is like UseEffect or UseLayoutEffect in React?
->> Yeah, so UseLayoutEffect in React is where you declare a function that is gonna happen every time the dependencies of that effect change. When you call tick, it's happening in some code that is already running and it will only happen once, of course.
-
-[00:09:59]
-But it is you would use it in much the same context as you would use UseLayoutEffect, which is to take some measurement of the DOM or to do something in response to the DOM updating. Whereas UseEffect you don't have the same guarantees about the callback getting executed immediately after the DOM has been updated.
-
-[00:10:20]
-They reserve the right to do that after a period of time.
+[00:03:14]
+All right, that's gonna give us an array of emojis that we can use.
 

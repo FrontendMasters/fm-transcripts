@@ -1,48 +1,115 @@
 [00:00:00]
->> So whenever you're building an application, you're probably gonna be dealing with some environment variables, things like API keys and database credentials. And these can be added to a .env file when you're developing locally, so that you can know those secrets. In this exercise we want to allow the user to enter the website if they know the correct passphrase using an environment variable.
+>> Previously when we learned about loading, we loaded data from the server using page.server.js and layout.server.js files. This is very convenient if you need to do things like getting data directly from a database, or reading cookies, and so on. But sometimes that isn't what you want. Sometimes it doesn't make sense.
 
-[00:00:25]
-So right now, if they know the passphrase which is open sesame, nothing happens or at least nothing good happens because we haven't declared that environment variable in our button file. So we'll do that now, create the passphrase, open SESAME, And now inside our route page server js, we can import that environment variable from the env static private module, And this is where they're getting kicked out before cuz the data get passphrase does not equal the hard coded value or replace that hard coded value, we'll replace the hard coded value with the environment variable.
+[00:00:19]
+For example, if you're loading data from an external API that is not your server, then there's no point going to your server so that it can then go to the external API, get the data, and then send it back to the browser. The browser can just communicate with that external API directly.
 
-[00:01:14]
-And now if you sign open sesame into the input, I'm in. Now, it's important that when you're dealing with environment variables, that you don't accidentally expose them to the user because then they could be stolen and that would not be good. And SvelteKit actively prevents you from accidentally revealing your secrets.
+[00:00:34]
+Or maybe you want to use in-memory data if it's available. Perhaps you want to delay navigation until an image has been preloaded or something like that. Or finally, you might wanna return something from your load function that cannot be serialized. So in order to load data from the server, it needs to come over the network in a serializable form.
 
-[00:01:36]
-If you try and pull nvars into your page.svelte component, Sorry, I lost my scroll pace. If you try and import env/static/private into your Svelte component, then it's gonna break. All right, we see this error message from V that says cannot import env/static/private into client side code. Right, this is a server only module, and there's a few server only modules Svelte Kit.
+[00:00:53]
+And SvelteKit uses a library called devalue to turn server data into JSON, and that gives you more power than a regular JSON object. You'd include things like dates and begins, and maps and sets, and regular expressions, and so on, but it can't serialize your own custom classes and things like that.
 
-[00:02:17]
-Anytime you have a module that has the .server suffix, page.server.js, layout.server.js, +server.js, or any of your own modules that have a.server.js and suffix. And also any modules inside source/lib/server, these are considered server modules that cannot be imported into client side code under any circumstances, and so within those files it's quite safe to access environment variables into communicate directly with your database.
+[00:01:13]
+So in that situation, it would make sense to use what's called a universal load function. So in this app, we have a few server load functions inside these red, green, and blue apps. And what this load function is doing, it's importing a component, namely, red.svelte, and it's trying to return that from the load function.
 
-[00:02:46]
-And in turn, those modules can only be imported by other server modules. You might be wondering why this module has such a funny name env/static/private. The static part indicates that these values are known at build time, and that means that they can be statically replaced. And this enables useful optimizations.
+[00:01:41]
+But if we navigate to this page, we're gonna get an error because a component is not one of the things that you can serialize and send from the server to the browser. The same thing is true if you navigate to the other pages. So we need to turn these load functions into universal load functions, and we'll do that by renaming page.server.js to page.js, like that, do the same for green, And the same for blue.
 
-[00:03:07]
-For example, if you have a feature flag that is statically analyzed at build time, then any code that is inside this block will just be removed altogether if the feature flag is not currently enabled. So where possible, we recommend using static environment variables but some cases, it might not be possible, you might need to refer to environment variables that are not known when your app is built but only known when your app is run.
+[00:02:16]
+Right, and now when we navigate to those pages, we are, in fact, returning the component from the load function. So these load functions are just like any other function in your app, you can use them anywhere in any module. You're not restricted as to where you can use that data.
 
-[00:03:32]
-And for these we use dynamic environment variables. So we have the same exercise as before, but this time we're gonna use dynamic environment variables instead of static ones. First, we're gonna change the module that we're importing from to dynamic, And we're gonna import env instead of passphrase because we don't know yet what properties that env object is going to have.
+[00:02:40]
+So cool thing that we can do now that we're returning a component from load function is we can use it inside the layout even though we're returning it from the page. Because the data is available on the page store as the data property. So inside our navigation bar in the layout.svelte, we're gonna go down here, and we're gonna add a new if block.
 
-[00:04:04]
-And then down here we're gonna replace passphrase with env.passphrase. And now as before when we type in the passphrase, we get into the website. So, so far we've been dealing with environment variables that are secret, and they can only be accessed by server modules but you might have some environment variables that are safe to reveal to the user.
+[00:03:04]
+If a component was returned from the load function, And this can be any load function that was involved in fetching data for this page. Then we can inject that component into the navigation bar. Right, and this is something that's only possible because we have the separation between the data fetching process and the rendering process.
 
-[00:04:35]
-And these are distinguished from private environment variables by having a PUBLIC_prefix which you can configure in your stock config. So in our .env file here, we're gonna set some public environment variables, but pick a color like steel blue for the background and bisque for the foreground. And then inside our component we can in fact import these and replace the hard coded variables that we currently have.
+[00:03:41]
+Something that you can use for putting a custom menu inside your navigation bar or adding breadcrumbs and things like that, stuff that is really difficult to do if you don't have that separation. In some scenarios you might want to use a server load function and a universal load function together.
 
-[00:05:03]
-So just delete all of that And import PUBLIC_THEME_BACKGROUND and PUBLIC_THEME_FOREGROUND From env/static/public. And now when we reload this page, it's pulling those values directly from our env file, so we can change that And it will it will update the app. And again, because we're pulling from a static env file, those properties will be replaced in your code when the application is built.
+[00:03:56]
+For example, you might need to return some data from the server, but you also need to return a value that cannot be serialized as server data, like a component. So in this example, we want to return a different component from our universal load function based on whether some data that we got from the server is cool or not.
 
-[00:05:48]
-Finally, of course, we can have dynamic public environment variables to same as before, we're just gonna change the input to env and grab that from the dynamic module instead. And then we'll prefix all of these with the env seen there, And now the application renders same as before.
+[00:04:16]
+So in our page.js file, we can access the data that is returned from here, By grabbing the data property from the event. And we'll just replace this false with data.cool, right? And because the data that we're getting from the server is cool, we're now able to import the cool component instead of the boring component.
 
-[00:06:17]
-Any questions about environment variables? All right, well I have some good news. We have finished the tutorial. Congratulations everyone, thank you for bearing with me, this has been a lot of content to get through. If you've made it the entire way through this tutorial, you can now consider yourself a Svelte and SvelteKit experts.
+[00:04:42]
+It's still saying to do add a message because the universal load function is replacing the data that was returned from the server load function. They're not getting mixed together. So here, we need to replace the placeholder with data.message. And so now we have a universal load function that is returning data directly from the server.
 
-[00:06:38]
-You can start building apps on your own machines by just typing npm create svelte on the command line, follow the prompts, that will set you up with a new application. But this is not the end, Svelte and SvelteKit will continue to evolve, we're always adding new features and as a consequence this documentation will also evolve.
+[00:05:13]
+Now earlier when we're looking at layout data, we saw that if a layout load function returns some data, it's accessible within that layout.svelte component. But it's also accessible within every child page.svelte component. But sometimes it's useful for the load functions themselves to be able to get access to data from the parents, and this can be done with something called await parent.
 
-[00:06:56]
-So I do encourage you to check back periodically and see if there's new material. And if you wanna keep up with developments in the Svelte world, you can join our Discord server, it's a very friendly space at svelte.dev/chat. And you can follow Svelte society on Twitter, where you'll get a stream of updates on everything Svelte related.
+[00:05:36]
+And to show how this works, we're gonna sum two numbers that come from different load functions. We have a layout load, and then we have another layout load here, and then we have a page load. So inside our route layout.server.js, we're gonna return a value. That is a: 1, right?
 
-[00:07:16]
-We are very happy to welcome you all to the Svelte community. Thank you for doing the tutorial with us. And now we're gonna move on to the final part of this workshop, where we're gonna take everything that we've learned in the Svelte course and the SvelteKit course, and we're gonna build a full stack application.
+[00:05:59]
+And so this sum page here, which is referring to the data that is combined from the different layout and page load functions, is showing data.a now has a value. And we can get that data in our sum/layout.js load function. First, grab the parent property. And then get the value of a from the parent layout load.
+
+[00:06:34]
+And we can now return a value that depends on that value, b is a + 1. And you'll see that b is now populating data.b in our page.svelte component. You'll notice here that the route layout is using layout.server.js file, i.e., a server load function, whereas the sum layout is just layout.js.
+
+[00:06:58]
+So this is a universal load function. A universal load function can get parent data from a parent server load function, but the reverse is not true. If we had layout.js in the route and layout.server.js inside the sum route, then we would not be able to access parent data.
+
+[00:07:15]
+And then finally, in the page load function, we can get the parent data from both of the parent load functions. Again, we're gonna grab parent here, and we'll do a, b, Equals await parent. And we'll return c is the value of a + b. All right, this is a bit of a contrived example.
+
+[00:07:43]
+That's not something that you're gonna encounter often, but it's a useful thing to have in your toolkit when you do need it. One thing that you do need to be aware of is that all of these load functions are running in parallel. That's so that we get the data as fast as possible.
+
+[00:07:58]
+But if you start using await parent, then that essentially means that everything that happens after that line in your load function is waterfalled on the completion of the parent load functions. And so if you're doing any other asynchronous work inside your load function, like fetching data from an API or something, then you wanna make sure that you do that before you call await parent if it's possible to do so.
+
+[00:08:20]
+
+>> Are there any performance benefits to loading components from a page.js rather than importing them as modules directly into the route? In SvelteKit 1, it was mentioned as opposed to other frameworks like Next, SvelteKit defaults to client-side navigation after the initial server-rendered page load. Does that mean that on the initial load, Svelte will send the JavaScript for the entire site as opposed to Next, where you'll hit a server for each navigation?
+
+[00:08:49]
+Or will it download the JavaScript for that for each route independently?
+>> We use route-based code splitting in SvelteKit. So when you hit the first page, you will get the JavaScript that's needed for any interaction on that page. And you will get the client side route so that SvelteKit can navigate to new pages.
+
+[00:09:08]
+But you will not get the code for subsequent routes. You only get that once the navigation begins. So it's all split up in a mathematically optimal way so that you're getting a minimum amount of code that you need to at each stage of the navigation. You can use a service worker or preloading to get more of your app if you need to preload things eagerly, but the default behavior is to only get code when you need it.
+
+[00:09:34]
+
+>> Instead of doing import component from component, we can import the component from page.js in a load function, as we just saw. Are there any difference in performance in terms of lazy loading components or any other concept?
+>> No, in either case, the navigation is gonna be blocked on that component being imported.
+
+[00:09:58]
+And it really doesn't make any difference whether it's a static import from within a component file or a dynamic input inside your load function. It's gonna have the same end result. It's just that the dynamic import is gonna be more work and harder to do. So I would recommend using static imports, unless you have a reason to use a dynamic import because you'll have an easier time that way.
+
+[00:10:22]
+So when the user navigates from one page to another, SvelteKit calls your load functions, but only if it thinks that something has changed. For example, navigating between time zones in this app causes the load function in our page.js to rerun. So we see that we're getting the time zone updated, which is being reflected in the h1 element there.
+
+[00:10:49]
+But the load function in our layout does not rerun, because as far as Svelte is concerned, it wasn't invalidated by the navigation. It's not using anything here that is relevant to that navigation between different routes. And we can fix that by manually invalidating it using a function called invalidate, which takes a URL and reruns any load functions that depend on it.
+
+[00:11:15]
+So this load function here, because we're calling fetch /api/now, we know that this load function depends on that resource, the /api/now resource. So let's go over to the page.svelte, and we'll add an onMount callback that invalidates that resource once a second. Import onMount, from svelte. I'm gonna import the invalidate function from $app/navigation.
+
+[00:11:58]
+Then we'll create an onMount callback, That sets up an interval. It's gonna run once a second. Make sure that you return the clearInterval teardown. And inside that interval, we're gonna invalidate that resource. Right, and you'll see that the time is now updating. As we navigate around the site, the time zone inside this function is being invalidated independently of the other load function which depends on the API now resource.
+
+[00:12:58]
+And we can also pass a function to invalidate instead of an individual string, in which case, you can invalidate based on all of the URLs that the current load functions depend on. So in that example that we just saw, we were registering that API now, resource as a dependency because we were fetching it.
+
+[00:13:16]
+But sometimes it's not appropriate to use fetch, in which case, you can specify a dependency manually with a function called depends. And depends takes a URL, but a URL doesn't need to be an actual thing on the Internet, it can be just a signifier that we create. So we can create custom invalidation keys like data:now.
+
+[00:13:39]
+Inside our layout.js, we're gonna get rid of the fetch and replace it with depends. And at the top of here, we're gonna say depends data:now to tell SvelteKit that this load function depends on the data:now resource. I'm just gonna get rid of all of that stuff and just return Date.now directly from the server load function, or from the load function.
+
+[00:14:12]
+And then we need to update the invalidate call so that it's invalidating the resource that we just created instead of the API now resource. So go into the interval and change that to data:now. Right, and we're now invalidating that load function without even hitting the network. We're not getting anything from the server, we're just rerunning that load function once a second.
+
+[00:14:42]
+Right, then finally, there's the new clear option. We can invalidate everything on the page in one go using a function called InvalidateAll. So we'll get rid of the invalidate import here, replace that with invalidateAll. And here, we'll just get rid of that resource and specify invalidateAll instead. And now we can get rid of that artificial resource.
+
+[00:15:11]
+And now everything is being reset once a second. This is what's happening behind the scenes when you use a progressively enhanced form, right? You will post some data to the server, you will get something back. SvelteKit is gonna conservatively assume that something has changed in your app and that there's probably some data that needs to be refreshed as a result of that.
+
+[00:15:33]
+So anytime you submit data with the use enhance action, SvelteKit is just gonna invalidate everything, unless you tell it not to.
 

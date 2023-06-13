@@ -1,93 +1,31 @@
 [00:00:00]
->> But if we get into an infinite scrolling situation, then this is not going to be ideal because we don't want to be rendering hundreds and hundreds of these elements. Instead, we want to render just a few at a time. So we need to use a technique called windowing, and only render the elements that are actually relevant at the moment.
+>> So we're gonna create a new route inside our source/routes directory which is gonna be called movies slash, and then view as a dynamic parameter. And then inside that we can create a page.svelte component. And we're gonna be loading some data, so we'll add a page.ts as well.
 
-[00:00:19]
-And in order to do this, we first need to wrap this entire thing in an element that I'm gonna call viewport. div class=viewport, And that's gonna have, for now just so that we can see it, we'll give it a maximum height of, say, 500 pixels. And we'll make that, Overflow.
+[00:00:33]
+Now, we can actually do one better than having a dynamic parameter here. Because we've defined which views are valid, trending, now playing and upcoming, we can use a route matcher so that this view dynamic parameter is not matched for anything that is not one of those three things.
 
-[00:00:54]
-Y of auto. And right now, of course, we're still rendering everything. But now that we have some scroll behavior on that viewport, we can start to do some calculations about which of these elements should actually be shown. And before we do that, let's add the next page link for the users who don't have JavaScript.
+[00:00:51]
+So the way that we do that is we create a matcher inside source/params. We'll create a new matcher, call it list.ts. And you'll remember that we need to export a match function, which is gonna return true if the parameter matches and false if it doesn't. And if were return param, In views, which is just import like that.
 
-[00:01:22]
-So if next is specified, then we'll add <a href=next with some text that just says next page. So for our windowing we're gonna need to add a scroll handler and on every scroll event we're gonna need to recalculate which elements should currently be in the view. So I'm gonna create a function called handlescroll.
+[00:01:37]
+Then this is gonna return true if the parameter is trending, now playing or upcoming, but false if it's anything else. Now that we've got that, we can add that to the parameter here. Just rename that directory view = list. And now if we go to /movies/trending, the page exists.
 
-[00:01:53]
-And I'm gonna create some variables that are bound to the elements that we're dealing with here. We're gonna have one for the viewport, it's gonna be an HTML div element, and we're gonna have one for the results block as well, and I'm gonna use bind this to get references to them.
+[00:02:02]
+If we change that in any way, like trending X, then it's a fall out for it, no longer matches. This gives us some confidence when we're building our data loading logic that we are in fact dealing with a valid view.
+>> Sorry if I missed it but is there is there any reason you would wanna do it this way versus just making three routes for trending, playing, etc.?
 
-[00:02:18]
-If you put on the outer div. And results on the inner div there. And we're gonna add the scroll listener to the viewport itself. It's gonna move this style declaration into the CSS, so that is out of the way, it's already there. OnScroll, we'll pass in that handle scroll function.
+[00:02:25]
 
-[00:02:50]
-Just to verify that it's working, we'll log out the word scrolling, open our dev tools, go to the console. Right, when we scroll, we get the event handler has been called. And this handle scroll function is going to have two jobs, firstly is gonna determine which elements are currently in view, so that we can get rid of the ones that are not.
+>> Yeah, so the question was what why are we creating a dynamic parameter instead of just repeating the directory? And the answer is that these pages are essentially the same that using the same component, they're using the same logic. And we could do it by just reusing components in three separate files, but then if we add a new vu, like, the most popular movies or like the top rated movies, then we've got to keep duplicating code.
 
-[00:03:29]
-But secondly, it's also gonna tell the parent component, how close we are to the end. If we're getting to the bottom of the display elements, then if this is an infinite scroll component, then we gonna need to go and fetch some more data. And so for that to work, we gonna need to emit an event.
+[00:02:49]
+And if we do it this way instead then it allows us to express those things just once. It's also for the sake of the workshop, it's a good opportunity to use more SvelteKit features and that's the main reason if I'm honest. Yes.
+>> Do you need to remove the three awaits in the promise?
 
-[00:03:47]
-But we not gonna worry about that just now, for right now we're just gonna deal with the windowing aspect. So to track which elements are supposed to be in view, we're gonna create a value a. This is gonna be the first visible element and b is the last, or the first invisible element I should say.
+[00:03:11]
 
-[00:04:19]
-And we can initialize these to 0 and movies.length. So by default, everything is gonna get rendered. Movie.slice a, b is gonna ensure that only the movies that we're currently concerned with are being rendered And inside handles scroll, we need to update those values. But if we're gonna be taking things out of the DOM, then everything else is gonna jump up to fill that space.
+>> Yes. All right, so, thank you to whoever noticed that after removing the waterfall in our route load function, we actually did no such thing because we're still awaiting the API calls here. We need to get rid of each of these. Like that, although this is now erroring because we're not returning a movie list from the fetch call, we're returning a promise of a movie list.
 
-[00:04:57]
-So we're also gonna need to add some padding on this element to compensate for the elements that have been removed. So we're gonna add some padding_top = 0 and padding bottom = 0, right? So if we take out the first row of elements, then we'll add some padding on the results div that will make everything else get pushed down as though that row of elements was still there.
-
-[00:05:25]
-In order to do any of this, we need to know what size the elements in this grid are. So we need to start adding some values for those as well. We'll have one for item width, which is gonna be a number, one for item height, also gonna be a number and we'll have one for the number of columns.
-
-[00:05:48]
-And right now that's hard coded in our CSS, down here is 4, so I'm just gonna do that here as well. Later, we can make this responsive because on mobile, we're gonna have like two columns, and then on a much bigger screen, we're gonna have 6. It'd be nice for that to be dynamic, but for now, we'll just do hard coding.
-
-[00:06:15]
-In order to get these values, we're gonna need to do some measurements every time the page is resized. So we're gonna add a resize function as well as a scroll function. Function handle_resize and in here, we're gonna get those item width and item height values. And so that we can call that function every time the window gets resized, we'll add a spelt colon window.
-
-[00:06:47]
-On resize=handle_resize but we also wanna call this function when the component is first mounted. So we're gonna add an on mount, I'm just gonna immediately call handle_resize. And of course, after we've taken the measurements that we're about to take, we're gonna wanna update the a and b and padding values.
-
-[00:07:15]
-So at the bottom of our handle_resize function, we're gonna call handle_scroll. So the first thing we're gonna do inside handle resize is, grab a reference to the first element, because we know that all of these poster images have the same aspect ratio. And because this is a regular grid, we can use that as a proxy for all of them.
-
-[00:07:42]
-So the first element is gonna tell us what the width of every single item is, const first=results.firstchild. And you'll recall that results is bound to this div class=results. So it's gonna give us the first anchor, element. And the item width is just gonna be the offset width of element item height, itemheight=first.offsetheight, and num_columns again, we're gonna keep that as 4, for now So it's giving us some red squigglies here because we can't guarantee or TypeScript at least can't guarantee that results has any children at all.
-
-[00:08:45]
-So we need to tell it that no, we do definitely have a child here, an exclamation mark. But that is actually a good point, we might not have any elements at all in which case we probably don't want to to render this results page at all. So later we'll make sure that we only render the results page component when we do in fact have some movies It's complaining that this first element might not be the sort of thing that has an offset width or an offset height.
-
-[00:09:20]
-So we need to give TypeScript some more information. Do as HTML_anchor element because that's what it is and now you can see those red squigglers have gone away. Now that we've got the width and the height, we can start doing some calculations inside our handle scroll function and get rid of that logging.
-
-[00:09:43]
-And we're gonna set the value of a, it's gonna be. Math.floor of the viewport, scrolltop divided by the item height, which is the height of each row, multiplied by the number of columns. And then the final value, the b value, which is the first element that is not yet visible.
-
-[00:10:24]
-We can calculate that with math.ceil, math.ceiling of scroll top, plus, so if you put .scrolltop+viewport client height. Divided by item height and then multiplied by the number of columns. Right, so if we just get get rid of this for a minute, so that we can visualize this. We're gonna add some debugging information, showing items a to b, and it, it's doing some funky floating point stuff here, because I got my parenthesis in the wrong place.
-
-[00:11:20]
-So let's just fix that real quick. You can see that it's currently showing items 0 to 20. And that makes sense because we can see 4 by 5 is showing all 20 elements. If we made this window smaller. Then I would hope that it was, It was gonna change that but it has not changed that, let me just take a quick look and figure out why I think it might be because the viewport is too large.
-
-[00:12:18]
-Okay, if you constrain the viewport so that we only get a smaller window, then we can see now as we are scrolling it's figuring out correctly which elements are currently visible. So now we just need to add the padding and then we can actually get rid of the elements that are not currently in the visible viewport.
-
-[00:12:44]
-Padding_top. Is gonna be Math.floor of a divided by the number of columns, multiplied by the item_height. And padding_bottom is gonna be math.floor, we get the length of the entire array minus b, so that gives us all of the xs at the end, divided by the number of columns multiplied by the item height.
-
-[00:13:24]
-Okay so now if we put that slice back in there so that we only render the elements that we care about. And then on the results div, we'll add some inline styles which apply that padding. Style:padding-top=. Padding_top px and we'll duplicate that for the bottom. And now you can't tell by looking at it, but hopefully if we look inside the DOM.
-
-[00:14:04]
-We'll see that the fourth item there is actually the first item in the DOM. We haven't got the first four elements of the array in the DOM, but as far as the user is concerned, everything is there. So this is the basis of a windowing mechanism. You'll recall that our results page component has two jobs.
-
-[00:14:27]
-One is the windowing, but the other is that it needs to tell its parent when the user has scrolled far enough, that it needs to load some more data. So this component needs to become an event dispatcher. So we're gonna create a dispatch function. By importing createEventDispatcher from Svelte and coding it.
-
-[00:14:48]
-And then inside our scroll handler, we're gonna determine whether or not we are close enough to the end that it's time to tell the parent component to load some more data. So the value that we care about is the remaining scroll room, and we can calculate that by doing const remaining = viewport.scrollHeight- viewport.scrollTop+viewport.clientHeight.
-
-[00:15:29]
-And if we log that out as we're scrolling, You can see that number gets lower the closer that we get to the end, until eventually, when we get to the bottom, that number is 0. And just as a crude heuristic, we'll say that if that value drops below say 400, then we'll broadcast an event that tells the parent we need to load some more data.
-
-[00:16:11]
-I don't know what to call this event, naming stuff is hard. I'm just gonna call it, end, like that, that'll do. And now in the page that is using this component, we can add an on:end handler. And we can load some more data. We'll just verify that that's working.
-
-[00:16:51]
-If we scroll down far enough then it starts logging that we need to load some more data.
+[00:03:40]
+So we need to get each of these and just wrap that in a promise like that. And now because we're awaiting all of these trending has the correct type again of movie list so. Thank you to whoever noticed that in the chat, that's very helpful.
 

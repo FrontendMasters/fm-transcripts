@@ -1,30 +1,96 @@
 [00:00:00]
->> Okay, so our view page is starting to take shape. But obviously we need to get more CSS in here so the viewport isn't constrained by this. And the first thing we're gonna need to do is set some more styles on the body element. So we're gonna open our styles.css file.
+>> But if we get into an infinite scrolling situation, then this is not gonna be ideal. Because we don't wanna be rendering hundreds and hundreds of these elements. Instead, we want to render just a few at a time. So we need to use a technique called windowing, and only render the elements that are actually relevant at the moment.
 
 [00:00:20]
-And we're gonna give the body a height of 100 vh like this, And a margin of 0. And then inside the layout we want the main element to fill as much of the screen as possible without exceeding its bounds. So I'll add a selector for main. And we'll give it a height of 0, but a flex of 1, which is a bit of an odd combination, but it basically means expand to fill the space available, but don't say any more than that.
+And in order to do this, we first need to wrap this entire thing in an element that I'm gonna call viewport, div class = viewport. For now, just so that we can see it, we'll give it a maximum height of say 500 pixels. And we'll make that overflow-y of auto.
 
-[00:01:09]
-And we'll combine that with overflow hidden. And now that we've done that, we can get rid of the overflow. That constrained viewport size. So we'll just delete that height of 20 pixels there. And it looks like we need to add some more CSS in order to allow the container to flex.
+[00:00:59]
+And right now, of course, we're still rendering everything. But now that we have some scroll behavior on that viewport, we can start to do some calculations about which of these elements should actually be shown. And before we do that, let's add the next page link for the users who don't have JavaScript.
 
-[00:01:53]
-All right, once again we're adding display flex to an element, we're gonna give it a flex direction of column. And we're gonna give this element a height of 100%. And so now this is behaving the way that we want it to. So let's implement infinite loading. Here, instead of logging that we need to load some more data, we'll actually log the data.
+[00:01:23]
+So if next is specified, then we'll add a href = (next) with some text that just says next page. So for our windowing, we're gonna need to add a scroll handler. And on every scroll event, we're gonna need to recalculate which elements should currently be in the view.
 
-[00:02:24]
-It'll actually load the data. And we'll turn this into a sync function. And because every time we scroll this event fires, we wanna keep track of whether we're already loading the next data so that we don't issue a whole bunch of requests at once. So I'm gonna add a new value appending.
+[00:01:45]
+So I'm gonna create a function called handle_scroll. And I'm gonna create some variables that are bound to the elements that we're dealing with here. We're gonna have one for the viewport. It's gonna be an HTMLDivElement. And we're gonna have one for the results block as well. And I'm gonna use bind:this to get references to them.
 
-[00:02:47]
-And default that to false. First up, if there is no next page, then we don't have anything to load. So if data.next_page does not exist, then we're just gonna bail out. And if we're already appending some data, then we're gonna bail out as well. We're gonna use the API that we built earlier.
+[00:02:18]
+Viewport on the outer div. And results on the inner div there. And we're gonna add the scroll listener to the viewport itself. It's gonna move this style declaration into the CSS so that is out of the way. It's already there. On scroll, we'll pass in that handle scroll function.
 
-[00:03:25]
-All right, because it's not using any server-only code, it's quite okay to import this into our page component. We'll do const next = away api.get, and this time we're passing in the windows fetch object instead of the load event fetch object. It's the same thing because we've got a fully qualified URL.
+[00:02:50]
+Just to verify that it's working, we'll log out the word scrolling, open our dev tools, go to the console. Right when we scroll, we get the event handler has been called. And this handle scroll function is gonna have two jobs. Firstly, it's gonna determine which elements are currently in view so that we can get rid of the ones that are not.
 
-[00:03:53]
-And now we're gonna use the endpoint that was returned from our load function. And the page parameter is gonna be data next_page. And we're just gonna mutate the array in place like we did in the earlier exercise with our to-dos. Data.movies =, we'll copy the existing movies and then we'll add the next results.
+[00:03:30]
+But secondly, it's also gonna tell the parent component, how close we are to the end. If we're getting to the bottom of the display elements, then if this is an infinite scroll component, then we're gonna need to go and fetch some more data. And so for that to work, we're gonna need to emit an event.
 
-[00:04:36]
-And we'll need to update the next page as well, data.next_page = next.page is less than all of the total pages. And if we just copy the logic from before it should work, otherwise that's gonna be null. Okay, let's cross our fingers. If this works, then we're gonna have infinite loading.
+[00:03:47]
+But we're not gonna worry about that just now for right now, we're just gonna deal with the windowing aspect. So to track which elements are supposed to be in view, we're gonna create a value a. This is gonna be the first visible element. And b is the last, or the first invisible element, I should say.
 
-[00:05:07]
-And you can see that number on the right is in fact increasing. So we've loaded all of this extra data, but we're not rendering it to the DOM, we're only rendering 16 items at a time. So that implements our trending, upcoming, and now playing views. I'm just gonna get rid of this debugging code here because that's no longer relevant.
+[00:04:21]
+And we can initialize these to zero and movies.length So by default, everything is gonna get rendered. Movies.slice a, b is gonna ensure that only the movies that we're currently concerned with are being rendered. And inside handles scroll, we need to update those values. But if we're gonna be taking things out of the DOM, then everything else is gonna jump up to fill that space.
+
+[00:04:57]
+So we're also gonna need to add some padding on this element to compensate for the elements that have been removed. So we're gonna add some padding, padding_top = 0 and padding_bottom = 0, right? So if we take out the first row of elements, then we'll add some padding on the results div that will make everything else get pushed down as though that row of elements was still there.
+
+[00:05:26]
+In order to do any of this, we need to know what size the elements in this grid are. So we need to start adding some values for those as well. We'll have one for item width, which is gonna be a number. And one for item height, also gonna be a number.
+
+[00:05:45]
+And we'll have one for the number of columns. And right now, that's hard-coded in our CSS, down here is 4. So I'm just gonna do that here as well. Later, we can make this responsive because on mobile, we're gonna have two columns, and then on a much bigger screen, we're gonna have six.
+
+[00:06:06]
+It'd be nice for that to be dynamic, but for now, we'll just do hard coding. In order to get these values, we're gonna need to do some measurements every time the page is resized. So we're gonna add a resize function as well as a scroll function. Function handle_resize, and in here, we're gonna get those item width and item height values.
+
+[00:06:41]
+And so that we can call that function every time the window gets resized, we'll add a Svelte:window on:resize = (handle_resize). But we also wanna call this function when the component is first mounted. So we're gonna add an onMount. I'm just gonna immediately call handle_resize. And of course, after we've taken the measurements that we're about to take, we're gonna wanna update the a and b and padding values.
+
+[00:07:15]
+So at the bottom of our handle_resize function, we're gonna call it handle_scroll. So the first thing we're gonna do inside handle_resize is grab a reference to the first element. Because we know that all of these poster images have the same aspect ratio, and because this is a regular grid, we can use that as a proxy for all of them.
+
+[00:07:42]
+So the first element is gonna tell us what the width of every single item is. Const first = results.firstChild, and you'll recall that results is bound to this div class = results. So it's gonna give us the first anchor element. And the item_width is this is just gonna be the offsetWidth of that element item_height.
+
+[00:08:19]
+Item_height = first.offsetHeight. And num_columns again we're gonna keep that as 4 now. So it's giving us some red squigglies here because we can't guarantee, or TypeScript at least can't guarantee that results has any children at all. So we need to tell it that, no, we do definitely have a child here!
+
+[00:08:52]
+But that is actually a good point. We might not have any elements at all. In which case, we probably don't want to render this results page at all. So later, we'll make sure that we only render the results page component when we do in fact have some movies.
+
+[00:09:13]
+It's complaining that this first element might not be the sort of thing that has an offset width or an offset height, so we need to give TypeScript some more information. Do as HTMLAnchorElement because that's what it is. And now you can see those red squigglers have gone away.
+
+[00:09:33]
+And now that we've got the width and the height, we can start doing some calculations. Inside our handle scroll function, we get rid of that logging and we're gonna set the value of a. It's gonna be the Math.floor of the viewport scroll top divided by the item height which is the height of each row multiplied by the number of columns.
+
+[00:10:17]
+And then the final value, the b value, which is the first element that is not yet visible, we can calculate that with math.ceil, math.ceiling of scrollTop +. So a viewport.scrollTop + the viewport.clientHeight. Divided by the item_height, and then multiplied by the number of columns. All right, so if we just get rid of this for a minute so that we can visualize this, we're gonna add some debugging information showing items a- b.
+
+[00:11:13]
+And it's doing some funky floating point stuff here. Because I got my parentheses in the wrong place, so let's just fix that real quick. You can see that it's currently showing items 0 to 20. And that makes sense because we can see, 4 by 5 is showing all 20 elements.
+
+[00:11:41]
+If we make this window smaller, then I would hope that it was going to change that, but it has not changed that. Let me just take a quick look and figure out why. I think it might be because, The viewport is too large. Okay, if we constrain the viewport so that we only get a smaller window, then we can see now that as we're scrolling, it's figuring out correctly which elements are currently visible.
+
+[00:12:35]
+So now we just need to add the padding, and then we can actually get rid of the elements that are not currently in the visible viewport. Padding_top is gonna be math.floor of a divided by the number of columns multiplied by the item_height. And padding_bottom is gonna be math.floor.
+
+[00:13:06]
+We get the length of the entire array minus b, so that gives us all of the excess at the end, divided by the number of columns, multiplied by the item height. Okay, so now if we put that slice back in there, so that we only render the elements that we care about.
+
+[00:13:32]
+And then on the results div we'll add some inline styles which apply that padding, style:padding_top = (padding_top)px. We'll duplicate that for the bottom. And now you can't tell by looking at it. But hopefully, if you look inside the DOM, we'll see that the fourth item there is actually the first item in the DOM, right?
+
+[00:14:12]
+We haven't got the first four elements of the array in the DOM, but as far as the user's concerned, everything is there. So this is the basis of our windowing mechanism. You'll recall that our results page component has two jobs. One is the windowing, but the other is that it needs to tell its parent when the user has scrolled far enough that it needs to load some more data.
+
+[00:14:35]
+So this component needs to become an event dispatcher. So we're gonna create a dispatch function, By importing createEventDispatcher from Svelte and calling it. And then inside our scroll handler, we're gonna determine whether or not we are close enough to the end that it's time to tell the parent component to load some more data.
+
+[00:15:02]
+So the value that we'd care about is the remaining scroll room. And we can calculate that by doing const remaining = viewport.scrollHeight- viewport.scrollTop + viewport.clientHeight. And if we log that out as we're scrolling, You can see that, that number gets lower the closer that we get to the end, until eventually, when we get to the bottom, that number is 0.
+
+[00:15:53]
+And just as a crude heuristic, we'll say that if that value drops below say 400, then we'll broadcast an event that tells the patient we need to load some more data. I don't know what to call this event. Naming stuff is hard. I'm just gonna call it end, like that, that'll do.
+
+[00:16:28]
+And now in the page that is using this component, we can add an on:end handler. Then we can load some more data. We'll just verify that that's working. If we scroll down far enough, then it starts logging that we need to load some more data.
 

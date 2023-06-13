@@ -1,78 +1,58 @@
 [00:00:00]
->> Okay, it's time to talk about the circle of life. So every component has a life cycle that starts when it's created and ends when it is destroyed. And there's a handful of functions that allow you to run code inside your component at key moments during that life cycle.
+>> So in all the examples that we've looked at so far, the script block contains code that runs when each component is initialized. And most of the time that is all that you will need. Very occasionally, you will need to run some code outside of an individual component instance.
 
 [00:00:15]
-The one that you're gonna use most frequently is called onMount. And it's a function that allows you to specify a callback that will get invoked when the component is first mounted to the DOM. So in this exercise we have a canvas element that we would like to animate using the paint function in this gradient.js file.
+So if you go back to our audio example familiar. One thing about this that's not so great is that you can play, all of these tracks simultaneously, right? This is not what we want in a music player app. It'd be better if we could stop the current audio from playing when a new audio player starts.
 
-[00:00:34]
-It's just gonna take an input canvas context and a value t and it's gonna do some maths and it's gonna turn that into a colorful canvas. So we'll first import onMount into our component. And then we'll call onMount, pass it a callback. And first up, we're gonna get a reference to that canvas element using document querySelector.
+[00:00:38]
+And we can do that by declaring some module context. Inside AudioPlayer.svelte, we're gonna create a new script block, but this time we're gonna add this context = module attribute. Inside that we're gonna declare a value current. And all of the instances of audio player can see that value.
 
-[00:01:08]
-And if alarm bells are ringing that we shouldn't be using document.querySelector, you're absolutely right. But we're gonna come to that in a later exercise. Begin by doing canvas = document.querySelector('canvas'). And then if you haven't used the Canvas API before, once you've got your reference to the element, you then need to create a canvas context that you can paint with.
+[00:01:12]
+And so on our audio player, we can add an event listener. When the audio starts playing, We check if there's an existing audio element playing, and if so, we pause it. Right, if this audio element is not current, and if the current exists, pause it, and change the value of current to be the current audio.
 
-[00:01:31]
-const context = canvas.getContext('2d'). 2d is opposed to WebGL. And then we're gonna do some work in a loop, gonna call requestAnimationFrame. And inside here we're gonna have a named function so that we can refer to it, that takes a value t, which is the current time. Inside the loop, the first thing we're gonna do is call the loop again inside another requestAnimationFrame.
+[00:01:56]
+Right, and now when we start playing these,
 
-[00:02:10]
-And then we're gonna call our paint function using the context that we just created with the t value that got passed into the requestAnimationFrame handler. So now, this function is being called roughly 60 times a second. Okay, there is a problem with the code that we just wrote.
+[00:01:58]
+[MUSIC]
 
-[00:02:38]
-And this is kind of an easy thing to overlook, but it's important not to make this mistake. If you're doing some work in onMount, you need to make sure that you undo it when the component is unmounted. And the way that we're gonna do that is by returning a function that calls some cleanup code.
+[00:02:00]
+Each new audio player will stop the last one. We can also export things from the module context. So again back in AudioPlayer.svelte, we have this module context, and we would like to make it possible for a consumer of this component to stop all of the audio. So create a new function, stopAll.
 
-[00:02:57]
-Any function that is returned from onMount will get called when the component is destroyed. In our case, we wanna cancel the AnimationFrame to stop this loop from running. In order to do that, we need to create a frame variable locally. And we need to assign to that every time we call requestAnimationFrame.
+[00:02:34]
+And if there is a current audio element, we'll pause it. And then now inside our App.svelt, we can now import the named function that we just declared, just like any other JavaScript module. And we can add a new button below the audio tracks. And we click it, we just call that function.
 
-[00:03:17]
-And then in the return callback, we just call cancelAnimationFrame and pass that ID in. And so, now when this component is taken off the screen, we'll stop running that loop. Now, as you saw, we had that code running, and it continued to run, and it was actually kind of fine.
+[00:03:12]
+[MUSIC]
+
+[00:03:16]
+Works as expected. So you cannot have a default export from your script context = module because the component is the default export. Yep, it's basically just a normal JavaScript module, and so you have all of the power of a normal JavaScript module. Does anyone have any questions about module context?
 
 [00:03:38]
-It was just updating a canvas that you couldn't see anymore, which is obviously no use. If you did that too many times in the same app, you would eventually start to run into memory leaks, and that's something that we very much want to avoid. We have other lifecycle functions.
+All right, we're getting very close, yes, Chris.
+>> What was the purpose of instantiating current in a separate script block?
+>> So if you were to declare current inside the normal script, this is scoped to the component instance. So inside here, we can change the value inside the component, but it doesn't impact any of the other components.
 
-[00:03:56]
-beforeUpdate and afterUpdate are lifecycle functions that are called immediately before the DOM is updated and immediately after the DOM is updated. So basically, in Svelte we are dealing with declarative state, but occasionally we need to break out of that. We need to use an escape hatch to access the DOM directly because some things are hard to do in a purely state-driven way.
+[00:04:03]
+By having it up here, this is part of the module, and all of the instances of this component can read the same variable.
+>> Does this affect after update? I mean, does it trigger a rerender across all of their components sharing this context?
+>> No, it does not.
 
-[00:04:23]
-So this is the Eliza chatbot. Before there was ChatGPT, there was Eliza, this comes from the 70s. And it's pretty cool. No, actually, everything is great. We can talk to it, the only problem is the messages aren't appearing because we got a scroll, completely misunderstood me. No, I'm very positive, right?
+[00:04:21]
+So the values inside the context=module, these are not reactive in the same way that variables inside the component's normal script block are reactive. This is just a regular JavaScript variable with no magic applied to it. If you do want components to be able to react to changes in this data, that's when you should use a store instead of a normal variable.
 
-[00:04:57]
-[LAUGH] You're being a bit negative. But we have to do that every time we add some more content because the DOM doesn't know that it needs to scroll. But we can fix that using beforeUpdate and afterUpdate. We'll begin by creating an auto scroll value. This is gonna track whether or not we currently should be in auto scroll mode.
+[00:04:45]
+Okay, so sometimes it's useful to be able to inspect a piece of data as it's flowing through your app. You can use console.log liberally inside your markup if you want. But if you wanna add a debugger statement inside your component markup, you can do that with the debug tag with a comma separated list of the values that you want to inspect.
 
-[00:05:22]
-I'm gonna default to false. Now the first time beforeUpdate gets called, the dev might not have been rendered to the DOM yet. So we're getting a reference to the development using something called bind this, which we'll discover in a later exercise, for now just pretend that this makes sense.
+[00:05:05]
+So in our App.svelte here, we've got a console.log of user, and when we change the value of that, it's gonna get logged to the console. This is easiest to see if I open this in a separate window. Let's get rid of all of the junk. If we start typing in here, you'll see that it does in fact get logged out.
 
-[00:05:52]
-So if the div has been created, then we wanna calculate whether or not we should be in auto scroll mode. And the way that we're gonna do that is by figuring out what the distances between the bottom of the scroll area and the outer container. And it took me a few go's to get this right.
+[00:05:31]
+But we can do one better than that. We can get rid of the console.log and replace it with a debug tag. And now you'll see that because we have devtools open, we've actually paused execution of the component and we can start to see these local variables. And we can interact with them and understand how the data is flowing through our application.
 
-[00:06:18]
-This is the sort of thing that I struggle with. So I'm just gonna copy the code over from the left. const scrollableDistance = div.scrollHeight- div.offsetHeight. And then we're gonna auto scroll if there's less than 20 pixels between the bottom of the window and the bottom of the container.
+[00:05:56]
+And that concludes parts one and two of the Svelte tutorial. You basically know everything there is to know about Svelte now. All of the features that Svelte itself has to offer. So hopefully, you've learned something during this process, whether it's entirely new things or a refresher of things that you are a little bit rusty on.
 
-[00:06:56]
-And then once we've updated the DOM, once the new chat messages have been added to the window, if we are in auto scroll mode, Then in that case, we're gonna call div.scrollTo 0, and then div.scrollHeight will take us to the very bottom of the chat. All right, let's see if that worked.
-
-[00:07:27]
-I don't have a problem. What is your problem? And you'll see that it's auto-scrolling nicely. If, on the other hand, we were not near the bottom of the chat, Then auto-scroll will be false. And so, when the afterUpdate function gets invoked, we are not gonna then scroll back to the bottom of the chat.
-
-[00:07:59]
-All right, you probably won't find yourself using beforeUpdate and afterUpdate all that often. It's really only when you need to interact with the DOM in this very specific way. But it's useful when you do need it. Another lifecycle function that we're gonna talk about is tick. Now, onMount, beforeUpdate, and afterUpdate all have to get called while the component is initializing.
-
-[00:08:28]
-It doesn't have to be inside the script tag. You could be calling out to a function in another module, but it does have to get called while the component is initializing because that's how the callbacks get assigned to that component. Tick is different. Tick can get called at any point, and what tick does is it returns a promise that resolves when any pending state updates are applied to the DOM.
-
-[00:08:52]
-The reason this works is that when you update component state in Svelte, it doesn't update the DOM immediately. So when we do count plus equals 1, it's not updating the text inside the button right there and then, it's actually waiting to see if there are any more state updates that it's gonna need to apply at the same time.
-
-[00:09:11]
-Because it's more efficient to do things in a batched way than it is to do them synchronously. But that can be tricky if you're updating state in such a way that causes the DOM to update in a way that you need to monitor. For example, a little bit of a contrived example, but we've got a text area here.
-
-[00:09:33]
-And if I select some text like this, and I hit the tab key, then we have a handleKeyDown function, which is gonna get the selection range and it's gonna turn it to shouty case or quiet case, depending on what it currently is. And so if I select that and I hit tab, it's done that, it's turned that text into uppercase text.
-
-[00:09:59]
-But it's also moved my cursor to the end of the text area, which is not what I want. I want the selection to stay in place. And I have some code here that should be doing that. It's resetting the selectionStart and the selectionEnd. But it's not having any effect because the DOM hasn't updated yet.
-
-[00:10:18]
-We're waiting to see if there are any other state updates that we need to take account of. So we can fix this by importing the tick helper from Svelte. And then immediately before we call this.selectionStart = selectionStart, we're just gonna await that tick. And so now, if we select some text and we hit tab, it will uppercase it but it will preserve the selection.
-
-[00:10:52]
-If I hit it again, it will lowercase it. Again, this isn't a function that you will use a whole lot. In the same way that beforeUpdate and afterUpdate are really kind of escape hatches, tick is an escape hatch for when you need to interact with the DOM manually.
+[00:06:23]
+But for now, you should take a break, pat yourself on the back, and feel good about becoming a Svelte expert.
 
