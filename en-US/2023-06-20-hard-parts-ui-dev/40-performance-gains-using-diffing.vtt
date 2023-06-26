@@ -1,0 +1,435 @@
+WEBVTT
+
+1
+00:00:00.120 --> 00:00:04.912
+We managed to prevent ourselves
+rerunning our updateDOM
+
+2
+00:00:04.912 --> 00:00:09.703
+function every single time by
+introducing this hook code
+
+3
+00:00:09.703 --> 00:00:14.390
+in a function that we could hook into,
+that allowed us,
+
+4
+00:00:14.390 --> 00:00:19.775
+when we updated our data,
+to mask the fact that we will also rerun
+
+5
+00:00:19.775 --> 00:00:25.200
+in our updateDOM function,
+converting it all to DOM elements.
+
+6
+00:00:26.250 --> 00:00:28.180
+However, there was another problem.
+
+7
+00:00:28.180 --> 00:00:34.043
+We had a full representation in JavaScript
+based on our data as it had changed, full
+
+8
+00:00:34.043 --> 00:00:40.270
+updated representation of what was to show
+up on the page via the call to createVDOM.
+
+9
+00:00:40.270 --> 00:00:42.740
+Wonderful visual, updated with our data.
+
+10
+00:00:42.740 --> 00:00:46.771
+However, we then just proceeded to map
+through each element and just recreate
+
+11
+00:00:46.771 --> 00:00:51.303
+them from scratch every time, replace the
+existing elements from scratch every time.
+
+12
+00:00:51.303 --> 00:00:53.864
+Was that really necessary, or
+
+13
+00:00:53.864 --> 00:00:59.880
+could we have looked at that
+JavaScript intermediate representation?
+
+14
+00:00:59.880 --> 00:01:01.315
+And what's the job on the page?
+
+15
+00:01:01.315 --> 00:01:05.973
+Use the fact we have that, and the fact we
+have the previous one based on the last
+
+16
+00:01:05.973 --> 00:01:09.572
+data, and the fact that the only
+thing they use overseas is,
+
+17
+00:01:09.572 --> 00:01:14.180
+the data flowed through that
+representation description onto the page.
+
+18
+00:01:14.180 --> 00:01:17.213
+There's no other stuff on the page
+that could otherwise have shown up.
+
+19
+00:01:17.213 --> 00:01:22.082
+It's all through that description in
+JavaScript, the visual, the virtual,
+
+20
+00:01:22.082 --> 00:01:26.953
+the JavaScript DOM use that to compare
+how they actually changed between the two
+
+21
+00:01:26.953 --> 00:01:32.170
+different states between the two different
+values of our data in JavaScript.
+
+22
+00:01:32.170 --> 00:01:40.835
+And then based on that, make the incisive
+actual changes to the real C++ DOM.
+
+23
+00:01:40.835 --> 00:01:43.259
+And that is what we're gonna do.
+
+24
+00:01:43.259 --> 00:01:47.389
+All the benefit of composition,
+that means moving around elements on
+
+25
+00:01:47.389 --> 00:01:52.150
+a JavaScript representation so that we can
+have them all in JavaScript memory and
+
+26
+00:01:52.150 --> 00:01:56.924
+have them visually represented there
+with one single description, one to one.
+
+27
+00:01:56.924 --> 00:02:00.886
+No conditional on this change,
+change this bit of the page,
+
+28
+00:02:00.886 --> 00:02:04.162
+do conditional on this change,
+change this bit.
+
+29
+00:02:04.162 --> 00:02:07.559
+No, just data, and
+here is what will be displayed,
+
+30
+00:02:07.559 --> 00:02:10.850
+description of it in
+full light back in HTML.
+
+31
+00:02:10.850 --> 00:02:16.540
+Very descriptive, very declarative, very
+composable, but dangerously inefficient.
+
+32
+00:02:16.540 --> 00:02:19.857
+And so we're gonna introduce here,
+well, maybe it says on this slide here,
+
+33
+00:02:19.857 --> 00:02:22.580
+all this benefit, but
+it's still dangerously inefficient.
+
+34
+00:02:22.580 --> 00:02:24.454
+Only some of our elements
+need recreating from scratch.
+
+35
+00:02:24.454 --> 00:02:28.919
+Couldn't we recreate a vDOM from
+scratch to give us composition, but
+
+36
+00:02:28.919 --> 00:02:31.490
+then write an algorithm?
+
+37
+00:02:31.490 --> 00:02:36.180
+Clever code to check what
+elements actually differ, and
+
+38
+00:02:36.180 --> 00:02:41.830
+only change the DOM elements
+that really need updating.
+
+39
+00:02:41.830 --> 00:02:45.455
+So we're gonna need to figure out
+which elements need updating.
+
+40
+00:02:45.455 --> 00:02:49.906
+We've got here some preliminary code
+before we get to our final code in UI hard
+
+41
+00:02:49.906 --> 00:02:54.699
+parts here, some preliminary code which is
+gonna build into that where we have data
+
+42
+00:02:54.699 --> 00:02:55.672
+in JavaScript.
+
+43
+00:02:55.672 --> 00:03:00.600
+We have a function createVDOM that is
+going to, when run, produce a description
+
+44
+00:03:00.600 --> 00:03:04.307
+based on that current data or
+what should show up on the page.
+
+45
+00:03:04.307 --> 00:03:05.282
+We have a handle function.
+
+46
+00:03:05.282 --> 00:03:07.504
+And we have this new function findDiff.
+
+47
+00:03:07.504 --> 00:03:13.884
+And then in line 23 and 25 or 6,
+we have two codes to create VDOM,
+
+48
+00:03:13.884 --> 00:03:18.520
+which is gonna produce
+that instantiated array.
+
+49
+00:03:18.520 --> 00:03:22.407
+I mean, it's instantiated,
+means put the data into it, in this case,
+
+50
+00:03:22.407 --> 00:03:25.000
+array of subarrays describing the page.
+
+51
+00:03:25.000 --> 00:03:27.355
+First time with name
+being an empty string,
+
+52
+00:03:27.355 --> 00:03:30.090
+second time with name being will, okay?
+
+53
+00:03:30.090 --> 00:03:34.085
+And we are then going to run createVDOM
+again and get that list of elements
+
+54
+00:03:34.085 --> 00:03:38.510
+that are hopefully gonna become
+actual elements once we convert them.
+
+55
+00:03:38.510 --> 00:03:43.334
+But these ones are in JavaScript, within
+that case, input, and then will, and then
+
+56
+00:03:43.334 --> 00:03:48.630
+the handle function still, div, and then
+hello will, and then div, and great job.
+
+57
+00:03:48.630 --> 00:03:53.405
+We then are going to run in line 28,
+a function we're coding here
+
+58
+00:03:53.405 --> 00:03:58.439
+findDiff that is gonna compare those
+two arrays of lists of elements,
+
+59
+00:03:58.439 --> 00:04:01.705
+array of sub arrays,
+that list of elements.
+
+60
+00:04:01.705 --> 00:04:02.970
+And how is it gonna do it?
+
+61
+00:04:02.970 --> 00:04:08.124
+We're gonna loop through one by one.
+
+62
+00:04:08.124 --> 00:04:14.024
+And then when i is 0,
+we're going to look at the zero index or
+
+63
+00:04:14.024 --> 00:04:19.929
+zeroth element of the created
+visual virtual DOM in VDOM1,
+
+64
+00:04:19.929 --> 00:04:24.790
+which will be input,
+empty string, handle, and
+
+65
+00:04:24.790 --> 00:04:32.190
+compare it to the current,
+which will be input, will, and handle.
+
+66
+00:04:32.190 --> 00:04:36.951
+And if they're not the same, then we're
+gonna write some code to change the actual
+
+67
+00:04:36.951 --> 00:04:41.800
+DOM element that we hopefully created the
+first time that we took that created VDOM.
+
+68
+00:04:41.800 --> 00:04:45.109
+And actually, someone had to create
+the elements in the first place and
+
+69
+00:04:45.109 --> 00:04:47.440
+put them on the actual
+C++ DOM in the first case.
+
+70
+00:04:47.440 --> 00:04:52.679
+But next time we're gonna check,
+has the data led
+
+71
+00:04:52.679 --> 00:04:58.915
+to an actual change in the elements
+such that we need to go and
+
+72
+00:04:58.915 --> 00:05:05.070
+make any significant edit to
+the real C++ DOM elements?
+
+73
+00:05:05.070 --> 00:05:06.026
+Amazing, amazing.
+
+74
+00:05:06.026 --> 00:05:11.077
+We're gonna have to use
+JSON.stringify as our tool for
+
+75
+00:05:11.077 --> 00:05:15.170
+easily comparing arrays and their content.
+
+76
+00:05:15.170 --> 00:05:19.857
+So we're gonna pass in input, name,
+handle, which will be input, sorry,
+
+77
+00:05:19.857 --> 00:05:24.617
+that'll be input empty string, handle,
+and that'll turn into, [INAUDIBLE]
+
+78
+00:05:24.617 --> 00:05:29.978
+JSON.stringify, that'll turn into
+the string, input, space, function handle.
+
+79
+00:05:29.978 --> 00:05:33.388
+And then when we do it again,
+it'll be, input, Will,
+
+80
+00:05:33.388 --> 00:05:37.454
+function handle attribute will
+be input as you probably, input,
+
+81
+00:05:37.454 --> 00:05:42.187
+function handle, and the next time
+will be input, Will, function handle.
+
+82
+00:05:42.187 --> 00:05:42.867
+Will they be the same?
+
+83
+00:05:42.867 --> 00:05:45.500
+No, they will not.
+
+84
+00:05:45.500 --> 00:05:50.162
+And so we will have to go and
+do some real changes.
+
+85
+00:05:50.162 --> 00:05:54.904
+However, for i equals 0, 1, 2, the ID2,
+
+86
+00:05:54.904 --> 00:05:58.462
+whatever it's called, index 2,
+
+87
+00:05:58.462 --> 00:06:03.500
+will div great job and
+div great job be the same?
+
+88
+00:06:03.500 --> 00:06:06.164
+You bet they will, thank you, exactly.
+
+89
+00:06:06.164 --> 00:06:06.940
+They'll be exactly the same.
+
+90
+00:06:06.940 --> 00:06:09.203
+So will we go and
+change any actual DOM elements?
+
+91
+00:06:09.203 --> 00:06:11.676
+No, we won't even need to.
+
