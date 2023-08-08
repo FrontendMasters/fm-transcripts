@@ -1,0 +1,102 @@
+[00:00:00]
+>> So, back in the cx.go, when you're doing the http.get, I guess I'm used to structures where you have to then do, like, a .then or do an await kind of thing. So is that already built in, that it's waiting until it gets something back?
+>> So you're used to async operations using solutions such as promises, or callbacks.
+
+[00:00:29]
+Well, you don't have that here. So here this is a synchronous operation, not an asynchronous operation. So actually what happens here is that when you call get, within get, we can even drill down within the structure and find the code, there will be a while, a for, actually, a for, waiting for the network to finish.
+
+[00:00:49]
+And then it's giving you back the execution. So, this is not an async operation, actually it's a sync operation, okay? So it's not async it's sync. So this is a synchronous operation. Do we have asynchronous operations in Go? Typically no, you use Goroutines for doing that to avoid blocking the thread.
+
+[00:01:10]
+Because, yeah, what happens now for example if I, let's say to avoid copy and pasting, let's move this into another function that is going to be getCurrencyData that will receive the currency code, and it will do this. And instead of ("BTC"), I'm going to say currency. So I just refactor this into the other order, currency string, not string currency.
+
+[00:01:37]
+No, this is not Java or C-sharp. And from here, then I'm going to call getCurrencyData of ("BTC"), okay? It's the same code, just with a function. But I did this because now I can call another one for Ethereum or Ether, that's the actual name of the currency. Or I can get another one for Bitcoin Cash or I can add Bitcoin Cash that it should be BCH, I think.
+
+[00:02:05]
+That's the name of Bitcoin Cash, it's another version of Bitcoin. So okay. So if I run this, let me clear first. It goes one by one, okay? And in the same order. It was pretty fast, okay? But that depends on the case. It depends on the network, on the traffic at that moment, okay?
+
+[00:02:32]
+They are synchronous. So one needs to wait for the other one. So how to do something different? Well, do you remember how to convert these function calls into Goroutines? Go prefix, just add go, go, go. Now, each call will be executed in its own Goroutine, let's say its own thread, so they're not blocking the thread.
+
+[00:03:03]
+But if I execute this now, what will happen? Nothing, actually, there are other things happening, but I'm not seeing the results. Do you remember why?
+>> Because main shut down before those other ones got done.
+>> Exactly, the main function ends immediately and when the main function ends actually the whole process ends, so the main Goroutine ends and the process with all the Goroutines ends.
+
+[00:03:28]
+So actually these are actually firing like new threads, I need to wait for them. So the simplest and easiest and laziest way to solve the problem right now is to call time sleep, and let's sleep for a lot of nanosecond, remember, this is nanoseconds. Instead of doing that, we can just say, let's wait for a minute or maybe a couple of seconds.
+
+[00:03:52]
+We multiply that by 5, so we wait 5 seconds. So at least for 5 seconds, now each call will go and wait and that that a hey I guess is because now you realize that it's in a different order. So I've got the results for Ethereum that Bitcoin cash and that because say, it's a reverse order.
+
+[00:04:18]
+No, that was just luck probably. If I try again, you can see it's not the same. Every time I will get a different order because in the order, the responses are coming back. And there is a little bit of traffic, random things going on there. But now we can see that we are opening throwing, opening different threads, and each thread will work separately.
+
+[00:04:38]
+We have now Goroutines going and grabbing different currency rates, but we have this hacky sleep here that doesn't seem like a good idea. So we need to find a way to actually wait for these Goroutines to finish. And that's that will solve the problems that we have sometimes with channels, the channels will get into a deadlock.
+
+[00:05:05]
+So we actually need to be sure that this is working properly. So warning, the code that I'm going to write is not going to be difficult, but it's also will look a little hacky, okay? So it will take some time to get used to how that works. So first for that we are going to create something known as a sync group.
+
+[00:05:27]
+So we are going to create a variable. And typically we're going to create, we call that wg, waiting group. So it's kind of a value that will wait for Goroutines to finish. That's kind of the idea. Instead of doing this, like calling getCurrencyData like this, I will move this to a slice.
+
+[00:05:54]
+Or an array, this is just the same. So I'm going to say that, let's say currencies is a new variable. And I can say something like this, it's on a of a string, that we have "BTC", "ETH" and "BCH", you can add more if you want. Of course, they need to be supported by, That provider, and then I'm going to make a for.
+
+[00:06:24]
+So I will say for each currency on the range of the currencies. That's how you do it for each. If you don't need the index use underscore, and here we are going to go, go getCurrency of currencies, like that. Currency, there we go. So, we're still not using that waitGroup, or we don't understand yet how it works, but we will get there.
+
+[00:06:59]
+So the idea is that the waitGroup, It's a value. It's kind of a counter actually. So we're going to count, it's a counter, we are adding to that counter, and we are subtracting to the counter. And at any time we can ask that waiting group to wait. Wait for the counter to get back to 0, okay?
+
+[00:07:28]
+And it will synchronously wait until it gets to 0. So it is like asleep, but not with a fixed time. It will be fixed to that particular moment, okay, when the counter goes to 0. So what's the point? I should talk to my working group and I will add 1 to that counter every time we are opening a new Goroutine.
+
+[00:07:54]
+So we are opening new routine and we say, 1, okay? Make sense? And what I need to do at one point is to subtract, careful, I'm going to refactor the code while I'm explaining. So just have that in mind. So I should do some feel like done, done will actually subtract 1, it's saying, okay, I'm done with 1?
+
+[00:08:17]
+Do you need to know which one is done, no. So this is counting 1, and done is subtracting 1, and then the wait we wait for getting to 0, okay? Make sense? Do you understand the idea? So every time we open a Goroutine, we say 1, add 1, and every time that Goroutine ends, we should call done.
+
+[00:08:42]
+Make sense? However, that's not what's actually happening there in my code, why? Because line 17, in fact, let me add a print here just for us to think about this. So I'm going to print here. Let's say, and I'm going to print here. Let's say. T, so if you execute main, Which letter will be executed first?
+
+[00:09:22]
+T or O?
+>> T.
+>> T or O? T, we have a T.
+>> O.
+>> Okay, we have a O.
+>> [LAUGH]
+>> I see many of you are thinking so what's going on?
+>> Online somebody said T.
+>> I think it'd be T.
+>> I think it-
+
+[00:09:42]
+
+>> Why T?
+>> Cuz Go will take a certain amount of time to happen.
+>> Yeah, so the thing is that maybe I mean, the right answer is that we're not sure. But it's definitely not O for sure or not T for sure. Definitely not O for sure.
+
+[00:09:57]
+So what's going on here is when we have a Go call, we are creating a new Goroutine. So basically, the O will be executed in a new Goroutine. And immediately, the main Goroutine will go to line 17 and it will print immediately T, which means, forget about the T and the O.
+
+[00:10:17]
+But wg.done will be executed immediately after launching the Goroutine. It's not waiting for the Goroutine to end, because line17 is executing in the main Goroutine. So everything that you see here it's the main Goroutine, and because I'm calling getCurrency data only with a Go, everything that is here it's in a new Goroutine.
+
+[00:10:47]
+So we don't see that in the source code you're suddenly choosing to think about this visually, okay? That because we are executing getCurrencyData with a Go prefix, that means that we are always using a Goroutine. So line 18, it's actually going to be executed immediately after 17 without waiting for.
+
+[00:11:12]
+So that done should be here somehow. I'm refactoring this, so don't do it yet. But the idea is that, okay? The problem is that, yeah, wg does not exist in the context of the getCurrency data. I could create the package variable and then use that, it's okay. But still, it's kind of not well written.
+
+[00:11:38]
+I mean, it will work, but it's not well written because, I mean, getCurrencyData shouldn't care about a waiting group. So what's a waiting group for getCurrency data? It's not its responsibility to something around waiting. I don't care, my responsibility is to get a string and get the data and print the response.
+
+[00:12:00]
+That's all I need to do. So that's why this is not completely right. So we need to find a solution on how we can do this. So I'm going to refactor, and this is going to look a little hacky. But let's see if we can understand what going on.
+
