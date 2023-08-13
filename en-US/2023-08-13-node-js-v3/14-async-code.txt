@@ -1,0 +1,177 @@
+[00:00:00]
+>> But now, back to business where we're going to implement all the functionality for the commands that we created. So if you need to catch up on some of those commands, no worries, I got you. Just head over to the notes that I have, and you can just hit this nice copy button right here, and you should get to where we are, where we left off.
+
+[00:00:17]
+Also, you can head over to the repo and everything there. It's finished, you can check it out. So no need to be stressed if you aren't here yet. You got many ways to catch up. Okay, so we left off on creating these commands. They don't do anything right now, so we need to do that.
+
+[00:00:34]
+But let's kinda think about how we wanna do that, cuz it's gonna really come down to a bunch of opinions on how we wanna organize things, how we wanna abstract things. But I think, the biggest question is, what do we do with these notes? If we're creating notes, and we're reading notes, and doing all this stuff with notes, where do they go?
+
+[00:00:56]
+Typically, when you make an app, you have a database. We're not doing that today. [LAUGH] So we're not gonna connect to database and new database things. But we will create our own persistent storage, which the OG databases files. So we're gonna use files as our database of choice to interact with our notes.
+
+[00:01:17]
+And before we talk about files, there's a lot of buildup and understanding that I wanna make sure you know before we hop into it and start doing some of that. So the first thing is asynchronous JavaScript in Node. And if you've ever used, like I said, if you've ever built anything in modern React, any framework, you probably already know a lot of this stuff.
+
+[00:01:40]
+But I think it's very important to go through the why behind it and how we got here, cuz a lot of this has to do with Node. And even more so, you will do more async programming in Node than you would in client-side JavaScript, just way more, it's not even close.
+
+[00:01:58]
+Okay, so asynchronous code and Node, it's an important concept. We talked about how it's event-driven, or I'm sorry, event loop in parallel, and highly concurrent. And the reason that is, or how that's possible is that a lot of things can be async. So what does it mean to be async?
+
+[00:02:17]
+Basically, the best way I can describe async code is that things don't run in order in which they were written, right? You can do something in parallel. I'm not gonna say, I think there's a difference between you aren't doing things at the same time. So I don't wanna confuse that.
+
+[00:02:34]
+By default, you're not doing that. You will have to opt into certain features in Node.js to do things at the same time, like workers and threads. But you can schedule things to happen later, I'll say that, but you aren't doing multiple things at the same time by default, that's a performance thing.
+
+[00:02:52]
+But from the outside looking in, it feels the same. I'm just wanting to make that distinction before somebody to corrects me like no, that's not it, threads and stuff. Yeah, I know, you can do threads, but we're not gonna talk about that today. So the first way we can handle asynchronous code in JavaScript, this isn't specific to Node.
+
+[00:03:07]
+In fact, none of this stuff is specific to Node. It's just JavaScript in general, but I wanna talk about in the context of Node, is callbacks. So if you've ever done something like fs, which you haven't, I'm sure, cuz you probably just learned this, it's asynchronous. In order to operate on a file, it doesn't happen synchronously by default.
+
+[00:03:26]
+The amount of work that has to go into finding a file, opening it, processing it, parsing it, is asynchronous. It's non-blocking. So in order to be able to run some code after that file, in this case, was read, you wanna provide a callback. You can be notified when that file is ready to be operated on, all right?
+
+[00:03:47]
+So callbacks are one way to do asynchronous code, but not every function with a callback is asynchronous, right? Let's try something right quick. So if I go in here, I'm just gonna make a little test file here. And let's say I have this code right here, right? If I say new Array, I'm gonna throw a curveball at you, see if y'all paying attention.
+
+[00:04:10]
+Sounds funny size, 20, fill(0).map. Okay, so I'm gonna do this, and I'm just going to console.log. Oops, i, okay, so this takes a callback. It's iterating over 20,000 things. Is this asynchronous or synchronous?
+>> Synchronous.
+>> Why is it synchronous?
+>> There's no await keyword.
+>> There's no what?
+
+[00:04:54]
+
+>> Await or async keywords.
+>> There's no await or async keywords?
+>> Yeah. Although, you can't apply those to synchronous functions, they just won't do anything, but that's a good observation.
+>> I'm not sure what fill does, but it doesn't look like any of those methods.
+>> Yeah, all fill does is, I mean, let's run this code.
+
+[00:05:19]
+Let's see. This might even run, I'm asking questions, my code might be broken. [LAUGH] Let's see if that even works. Okay, it does. So all fill does is just fill every everything in the array with whatever you put here. So it's an array with 20,000 undefined. Without fill, it has been an array of 20,000 undefined.
+
+[00:05:44]
+And I say actually replace each undefined with 0, and then map over that and log the index of each one. So if I found a log underscore, it'll say 0 every time. So you're right, this is synchronous. And the reason it is synchronous, because it's a trick question.
+
+[00:05:57]
+It's because it's not asynchronous. [LAUGH] There's nothing asynchronous happening here. Really, it comes down to three things why something's gonna be asychronous for the most part. A, you're interacting with the network. So you're doing something over the network over the Internet, so it's asynchronous. Two, you are using some type of timing function, set timeout, set interval, something like that makes it asynchronous.
+
+[00:06:20]
+And the third thing is probably the file system or database. So interacting with storage, basically. So files, database, something like that, interacting with the storage is gonna be asynchronous. 99% of the time, that is the only asynchronous stuff you'll be doing in Node. Could anything else be asynchronous?
+
+[00:06:39]
+Sure, but if you drill down on that, it's probably one of those three things, right? I'm interacting with storage, I'm doing something on the Internet, or someone's doing a timing function somewhere, that's basically it. None of this code is doing that, so it's synchronous. So that means if I go to this next line here, it won't run until all this is done, right?
+
+[00:07:02]
+Cuz it's synchronous, it's line by line. So the reason I gave you this example is because just because there's a callback here, that doesn't mean it will always be asynchronous. It's just like callbacks are how we can handle asynchronous things, but not everything with a callback is asynchronous.
+
+[00:07:17]
+Does that make sense? Now, if we were gonna do something with a callback that was asynchronous, I'm gonna just copy this code. This will bring us to the next problem how we solve the problem of how you're about to observe, is let's say, I wanna read this file, right?
+
+[00:07:32]
+And then once that file is read, I wanna read another file. So say that, and then once that file is read, I wanna read another file, right? And it just goes on, and on, and on. And eventually, you reach this point of what's called callback hell, or up side down pyramid.
+
+[00:07:53]
+I'll show you a better example. Let's see, [LAUGH] is a website called callbackhell.com. That is funny. No, there's a way worse example that I wanna show. Here we go. So you eventually end up with something like this, right? Where it's just this pyramid effect of a callback inside of a callback, inside of a callback, inside of a callback, inside of a callback.
+
+[00:08:19]
+Because you don't wanna do the next thing as the previous thing is done, but the previous thing isn't done until you're in the callbacks. So you got to put all your code in all these callbacks. This is really hard to look at and really hard to understand. So we come up with a different way to make this better.
+
+[00:08:37]
+Anybody know what that is? Starts with a P.
+>> A Promise.
+>> A Promise, yeah. We created Promises to solve this. So now, instead of doing all of this, we can do something like this. We can say, you know what? Then, when that is done, I want to do something, right?
+
+[00:09:02]
+So I can do a console.log here. Before I continue, you might ask yourself, how does this change anything? We're still inside of a callback. We are, but we're only ever inside of one level of callbacks. If I wanna do something after this, I won't have to do it inside of this callback here.
+
+[00:09:18]
+I can just go here and do another, then and do whatever I want. I'm only ever one level deep, and I can just keep chaining these. As long as it keeps returning something, I can keep chaining this Promise forever. So yes, you still get callbacks, but they're only ever one level deep, so visually it looks better.
+
+[00:09:36]
+So yeah, it's kinda cool. And then the thing about Promises that, you can create your own promises, right? Like for instance, if I had a function called wait like this that took some time, and let's say by default, it takes a callback, and then it does a set timeout.
+
+[00:09:57]
+On that time, and then it runs your callback, right? And if I wanted to call wait, like this, for 3,000 seconds or 3,000 milliseconds and wait for it, I'm just gonna do this actually. Yeah, do that. Actually, that's just too hard to understand, people are gonna ask questions.
+
+[00:10:28]
+I'm just gonna do this. Let's do it this way. So now, I can just say, 3 seconds has passed, right? So when I run this code, 3 seconds will pass, I'll call back run, and then we'll get the log, right? Okay, if I wanna turn it into a Promise, so I don't have to do something like, okay, well, I wanna wait.
+
+[00:10:50]
+But then, I also wanna wait 2 more seconds, right? And then I wanna wait. You get the point, right? Instead of doing this, I could turn this into a Promise and I could say, all right, let's take this function and instead let's return a new Promise. Like this, which takes a callback.
+
+[00:11:15]
+And this Promise callback takes in a resolve and a reject. I can use that function, Like this, or I'm sorry, let me clean this up a better way, actually. Let's do it this way. I'll make a function, I'll put this function back actually, and then inside of here, we'll return a Promise.
+
+[00:11:39]
+Return a new Promise like this with a resolve and a reject. And then inside of here, I can do my setTimeout. Okay, is trying to tell me what to do. And it's missing that. There we go. Okay, so now, give me my setTimeout. Instead of calling the callback, I don't need a callback anymore.
+
+[00:12:03]
+I can just call resolve, like that. So now, this is a Promise. So now, instead of doing these callbacks like this, I can say wait 3,000 seconds or 3,000 milliseconds and then do whatever I want. In this case, I can say wait another 2,000 milliseconds, and then I can keep going on, and on, and on, and it's only ever one level deep.
+
+[00:12:31]
+It won't keep going. So that's me permissifying a function. Actually, Node has in a built-in promissify utility. Let's see if I can remember what it is. There it is, promissify. So you can promissify any function that takes a callback is like a second argument, and it'll basically do this for you.
+
+[00:12:59]
+But I do it manually if I have to, which most of the time don't, because most of the days everything is Promise-based anyway, so you don't really have to permissify a lot of things. But sometimes, you're running against some old code that was written in 2016, that's using callbacks and you got to turn into a Promise.
+
+[00:13:15]
+So that's Promises, and it's cool. But you know.it'd be better if we didn't have to do this at all. If all we had to do was something like this. What if the code on the previous line finished before the code on the next line executed just like synchronous code.
+
+[00:13:36]
+How do we get back to synchronous code, where we can just do this with these things being async, all right, and that's where async await comes in. So that's the third thing. So async await is the ability to turn asynchronous code that returns a Promise into synchronous code that's line by line.
+
+[00:13:54]
+And the way that works is, all you have to do is just put an await in front of anything that returns a Promise. And now, the next line won't run until the previous line is done. It is the equivalent of using a dot, then and a Promise. It's the equivalent of writing code in a callback in a callback.
+
+[00:14:13]
+And in Node.js, the latest version, we actually have something called top-level async. Because, actually, you can't use await by itself in the browser or other environments. But here in Node, we can, because it is assumed that there's something called async in the global space. But by default, you'd have to do something like this, right?
+
+[00:14:31]
+I have to make a function called run. I have to put all this in it, and then how to put the word async in front of it like that, and then I'll be able to do await. But in this version of Node, this async is in the global space, so you can just do await in the root of your file anywhere, and it will work without you putting async in a function.
+
+[00:14:52]
+It's pretty powerful. So this turns our asynchronous code in a synchronous code, and not just on a line basis. I mean, I could do something like this. I could put in an await in here and await some other async thing that returns a number. And now that will have to be awaited, before this is even ran and in this is waited and then it could go on forever.
+
+[00:15:17]
+You can pretty much use, you can use await anywhere synchronous code is, very powerful. So this is the preferred method. But in order to do this, whatever you're awaiting, has to return a Promise. So I'll walked you through all that pain, because chances are, you're gonna go join a team, or you are at a team that has legacy code, they probably have callbacks everywhere.
+
+[00:15:40]
+They might have Promises, maybe they have async await, who knows, or all three or some combination of the two. So I want you to understand how all that works, and how you might be able to change things. And once you get to a Promise, then you can get to an async await if the version of Node that you're on enables you to use async await.
+
+[00:15:58]
+I forgot our version enables this, but it was long. I mean, it was a pretty far version ago, so it's not like bleeding edge. So it really just depends, but this is where you wanna get to, this is the standard right here. Any questions on that?
+>> Why would you want to make asynchronous code synchronous with an extra step?
+
+[00:16:26]
+
+>> Why would you wanna make asynchronous code synchronous? Are you saying, why would you wanna use async await?
+>> Yeah.
+>> Yeah, so the reason you would want to use async await is because, so this example is very trivial. But in more complicated examples, let's say you had a route handler that signed up a user.
+
+[00:16:46]
+So there's a lot of stuff happening in that route handler it. It checked the database, which is asynchronous. It created a new customer inside of Stripe. It reported something to analytics. So you have all these dependencies, all these pieces of code that's waiting on other pieces of code.
+
+[00:17:02]
+And the more you embed them, the more complicated it is to look at and decouple, cuz they're all depending on each other. So it can be very confusing to reason about what's happening and what order, and I think that leads to a lot of confusion. It leads to things like race conditions, where you'll see this a lot.
+
+[00:17:22]
+[LAUGH] People will have async problems in their code, and they're like, I know how to solve this. I'll do a setTimeout for some arbitrary number and that'll fix this issue. But you don't know what number to put, because you don't know how fast something's gonna happen. It's random.
+
+[00:17:35]
+So then you just start increasing the number. You start increasing the number. Okay, so avoid all of that. You can just make it synchronous to where now you know for sure the next line is never gonna run until the previous line is done. And that is the most you have to think about, whereas before, it's like you got to think about all this stuff.
+
+[00:17:52]
+So it's definitely more of an esthetic thing for us humans to be able to reason about our code. It doesn't actually change the behavior. But to be able to do something, this streamline would take you, I don't know, eight, nine lines of code with a Promise to do and it would be ugly.
+
+[00:18:09]
+Whereas I can do this in one line with async await. So it's just better to look at less code, and it takes advantage of something that's new in JavaScript that you'll probably never use by hand, and that's called a generator. You've ever seen JavaScript generators, okay? That's what this is doing underneath the hood.
+
+[00:18:26]
+So when generators came to the spec, people were like, I'm never gonna use that. It's true, no one uses it. If they do, somebody needs to have a sit down with that person, cuz it needs to stop. Async await uses generators in the background.
+
