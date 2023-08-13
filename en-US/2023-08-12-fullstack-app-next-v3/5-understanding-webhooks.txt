@@ -1,0 +1,55 @@
+[00:00:00]
+>> So we mostly finished all the authentication work. I think what was left is just getting it to redirect to the new user, which we will need to do and I'll talk about that in a minute. And we gotta set some stuff up before we can do that.
+
+[00:00:16]
+But yeah, it's mostly there for free, right. ClerkJS makes it pretty simple to set up authentication. And you'll see once we use some of those helpers inside of our data fetching functions that it's really, really, really simple to do. So let's talk about that whole new user thing.
+
+[00:00:32]
+So the reason we need to do that is mostly just how ClerkJS handles authentication. So if you follow along in their docs, actually I don't even know where in the docs they talk about it so I'll just explain it. But basically, we want to be able to sync.
+
+[00:00:49]
+So when you use a third-party service like Clerk for authentication, they keep track of all your users for you. And that's cool, but I don't want some other app keeping track of my users. I wanna keep track of my own users in my database. I just don't want that to happen, so I need to find some way to sync the users that they create when people sign up to my app with the database of users that I have.
+
+[00:01:12]
+And they have a way to do that, it's mostly through a webhook. So if you don't know what a webhook is, this basically means once someone interacts with Clerk's APIs to sign up, sign in, whatever, they will then take a URL that I gave them and issue a request of that URL to let me know that someone has done something and then I can sync my database.
+
+[00:01:34]
+The problem with that is that is asynchronous, as in there's no way for me to wait for a webhook, or at least no elegant way, right. If I'm waiting for them to talk to my server, that's a lot different than me firing off an API request and then getting a result back, cuz in this case that's not happening.
+
+[00:01:55]
+Someone signs up and then I just have to wait until, they hit my API, cool, someone signed up, let me sync the database. And I don't want to let the user in my app unless they're in my database. So that means they're just gonna be sitting there waiting, I guess, while I'm polling some location on my back end to see if the database got updated.
+
+[00:02:16]
+That's a little gross, so I don't wanna do that. So instead, what we're gonna do is we're going to redirect the user to another page. In that page we'll do some server side logic through a server component that will then take the authentication logic that is already in the browser, fetch the user from Clerk, and then create a user in the database there and then anything else we need for the user.
+
+[00:02:40]
+So this is where if you had to create a customer, you had to set up a project for the user, anything you need to initialize you would do it there on the server cuz it's a server side component. And only then do we redirect them to, in this case, journal.
+
+[00:02:55]
+So that's what we wanna do. But in order to do any of that we gotta make a database, and a database schema, and set all that up, so that's what we're gonna do next
+>> Can you explain a webhook a little better. I think I know what you're talking about, but more context would be helpful for me.
+
+[00:03:10]
+
+>> Explain what, what was it?
+>> Webhook.
+>> Webhook, yes, okay. So what is a webhook? A webhook is essentially, it's like an event, okay. Let's talk about two servers, let's talk about GitHub and then your server. So if you created a webhook on GitHub, and let's say you wanted to subscribe to the pull request comment event, okay.
+
+[00:03:32]
+So what would happen is you would give GitHub a URL to your API, let's say you have yourwebsite.com/API/webhooks, all right. And you say hey, GitHub, I wanna subscribe to the pull request comment event. So GitHub's like, okay cool, whenever someone makes a comment on a pull request I'm going to issue a request to the URL that you gave me with the event information, whatever information they wanna send they're gonna send it to you.
+
+[00:04:00]
+And then that way you can respond to that, you can take that information and, I don't know, let's say your app is a Slack bot that shows Slack messages every time someone makes a message on a pull request. So your server will then get notified by GitHub that someone made a comment, and then now you can issue a Slack message in Slack because you just got notified.
+
+[00:04:19]
+So it makes your app real time because you get notified by events, and that's basically what a webhook is. And that's great in that scenario because no one went in Slack and was like, show me the pull request messages. So they were not waiting on it, it just came in, which is a great use case for webhooks.
+
+[00:04:36]
+But if you're like, I click this button, I fire off a request, but now I have to wait until the server that I talk to comes back. Webhooks aren't good for that because you don't know when it's gonna come back and it's not responding to a request, it's requesting your server, it's actually the opposite.
+
+[00:04:57]
+So the only way to know that, to keep it serial inside your webhook handler is to update some state somewhere, typically a database. And then on your front end you just keep polling to see if that thing got updated in the database, and if it did you knew that the webhook got fired.
+
+[00:05:14]
+And that's just it's not fun to do, so I'm not gonna sit here and write polling logic and do stuff like that. So we're just gonna use this shortcut to do that.
+

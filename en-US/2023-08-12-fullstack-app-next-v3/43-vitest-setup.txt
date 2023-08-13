@@ -1,0 +1,100 @@
+[00:00:00]
+>> The app is mostly done as far as the things that I wanted to show. I mean, there's a lot of bugs in here as far as revalidating data, cached data and some of the hooks that we have, and those are the ones I know about. So I'm sure there's more, as extra credit, go find all the bugs and get rid of them.
+
+[00:00:19]
+And see how far that takes you. So what we'll do now, though, is get this thing ready for production. And to do that, it's probably wise just to probably write some tests. So, I mean, this is so bleeding edge right now, writing tests for anything in Next.js 13.
+
+[00:00:39]
+There's not even a documentation on how to do it, [LAUGH]. You can't even look this up. So this is literally just me banging my head against the wall for about two weeks trying to figure out how to do tests. And yeah, this is what I figured out. So I will show you how to write some tests for server components and things like that.
+
+[00:00:58]
+And then we'll attempt to get this thing deployed. We'll see what happens. I say attempt because we might have troubles with the in-memory factor store. So, I don't know, we'll see. Everything else should be fine. Okay, so to write some tests, we need a bunch of stuff. And when I say a bunch of stuff, I mean a bunch of stuff.
+
+[00:01:21]
+So few of the things we need to download. Anyone ever use the tool called V, V-I-T-E? Okay, we'll be using V test to do the test, which is like an abstraction on, it uses Jest, but it's not Jest, and it's using the V compiler and not Webpack. So we'll be using that, but there's just a bunch of stuff that we have to install.
+
+[00:01:45]
+So we need to install this library called testing-library. So we'll do that. So I'm going to say npm install @testinglibrary. Sorry, testing-library. And then we want /jsdom, I believe. There's also another one for React. So I'm just gonna copy that. We want the one for React /react. We want vtest or vitest.
+
+[00:02:18]
+vitest? Probably vitest, vitest. I think that's what it's called. vitest, we have to download a plugin for that. So that one's gonna be @vitejs/plugin-react-swc. Swc is the compiler that Next.js uses to compile itself. We got a plugin for that, So that Vite can tie into it. There's also a, Thought there was more.
+
+[00:02:56]
+No, there's more, let's see. Yeah, jsdom. jsdom, it's a mock for the real dom, but a node, so you can use the real dom and node. It doesn't do anything. It just makes it so your code works. So you can render client side components in the server. It's a JavaScript representation of the DOM, jsdom.
+
+[00:03:24]
+Makes sense. And I think that's it. Just wanna make sure, Okay, I think that's it. So we'll install these. We'll probably just do save dev on them, save-dev.
+>> What's that?
+>> You don't have to do save-dev. I'm just doing it. It's --save-dev.
+>> I just mean that first testing library, jsdom.
+
+[00:03:53]
+Yeah, it's supposed to be Jest.
+>> It's Jest, sorry.
+>> Was the testing library.
+>> There it is.
+>> All right, jest or something.
+>> Here we go.
+>> Oop, it still doesn't like testing-library. It's jest-dom, okay. I didn't really know how to make these names.
+>> [LAUGH]
+>> Okay, so we got that.
+
+[00:04:23]
+First thing we need to do is we need to extend our tsconfig to support this. So what we'll do is we'll make a new tsconfig just for our test on a route. And we're gonna do that. If you're using TypeScript, this is fine, but I'm just gonna say tsconfig.node.json.
+
+[00:04:42]
+That's because our tests are gonna run in a different runtime. And then what our code runs in, two different runtimes. It's gonna pull in some of the same files, but those files are gonna be executed differently by different build system than what the build system that Next.js is using.
+
+[00:04:57]
+It's literally the equivalent if you just took a random JavaScript file right now and try to run it in the terminal with Node. It's just gonna run in that runtime and outside of the context of Next.js. So anything that's specific to your Next.js project, like some of these paths or how to handle CSS files, that will just break in any of the runtime because it's not set up for that.
+
+[00:05:22]
+So we'll make that, we'll make this configure right here, and basically it's just going to set up a Vite environment for us. So we're just gonna interact with the compiler here. Do es next for the modules. Module resolution is a bundler. What does all this mean? This is just telling you what type of module system we're using.
+
+[00:05:46]
+This is telling you how to resolve the modules, whether it's like the bundler, whether it's like the native environment like Node, in this case the bundler, let the bundler do it. Vite being the bundler probably. Allow synthetic imports. This has something to do with composability between Common.js and Ecmascript modules, so they can inter-op with each other.
+
+[00:06:11]
+So you can create these fake import, it's nothing you would have to do. It's just allowing something to happen. And then some config file that we haven't made yet. We'll include that in a minute. Next thing we need to do is go to the original tsconfig, and at the bottom we just need to add a references path to point to that new tsconfig.
+
+[00:06:30]
+It's kinda like an extending. So that way, when we use the new tsconfig, it's also getting the benefit of this. Because if we're testing some of our Next.js components and files, we still want those to work as far as TypeScript is concerned. We need this config as well, so we're just gonna reference it.
+
+[00:06:55]
+Okay, now, we're going to make our vite.config, so we'll do that. It's just called vite.config.ts on the root, vite.config.ts, like that. And we're just gonna import a few things. We're gonna import defineConfig. And we're gonna import React from the SWC plugin, like so. And then from here we're just going to set up this config specifically for the test, which is probably different from another vite.config that you might have used.
+
+[00:07:41]
+So we're gonna use this React SWC plugin here in the plugins array. And then we're gonna say, these are the test files we want you to look for. So anything inside of a folder called __tests__ or any file that has a .spec or .test in it. Those are test files.
+
+[00:08:04]
+Use globals, yes. Environment is jsdom. Is there a file you want to run before the test run to set those test up? Yes, we're gonna run a file called setupTests. We're gonna make that file. And then do you want to reset the mocks before each test runs? Yes, please do that.
+
+[00:08:24]
+That way we don't have to do it ourselves. If you've written tests, you know that it's better to have stateless tests than it is to have stateful tests. You don't want running one test that put stuff in a database, and then the next test depends on the previous test running and stuff being in a database.
+
+[00:08:39]
+Good luck, good luck with that. Same thing is true for mocks. Just reset the mocks.
+>> This is maybe not a fair question to ask, but do you know if the kind of gnarliness of setting up Vite even though there's already a turbo pack, etc, just to run the tests?
+
+[00:09:00]
+Is that just purely because the app router is still kind of in flight and an experimental feature?
+>> I think it's less about the app router and more just about server components. It's so new, and Next.js is the only framework that's like, I mean, React has support for server components.
+
+[00:09:21]
+But setting up server components in React is not as simple as setting up server components in Next.js. So, no one who needs testing is using it right now, right? The people who need testing are enterprise people, or people who have bigger teams or people who have teams. Those people really need testing.
+
+[00:09:39]
+You're not using server components yet. So I think it's gonna be a minute before we see some of that. And a lot of the tooling is still being updated. But, yeah, it's mostly just because of server side components. It's not something, most of the time when you render a component and a Vite or jsdom or something like that, it's synchronous.
+
+[00:09:58]
+You can just render it and it's done. I mean, not now, because those functions can call data server-side, and then those server-side functions have dependencies, and then all this other stuff. So it's mostly because of that. That's where I was banging my head up against the wall. And then when I got the solution, I was like, [SOUND] this makes sense, [LAUGH].
+
+[00:10:24]
+All right, we are getting somewhere. The next thing we wanna do is create a file called setUpTests.ts on the root. It's literally just gonna do this one thing. Just make sure it's the same file here, same name, my setUpTests, plural. So setUpTests.ts. I'll paste that here. So in a TypeScript file, this is basically, it's not only just a comment, but you can see it's highlighted differently to read a comment.
+
+[00:10:58]
+Because it's telling the TypeScript compiler that there are some types located here, use those, it's basically saying. And then it's gonna import the jsdom, this is creating the jsdom environment. Again, the jsdom environment is like a mock of the browser. So the React components think that they're in a browser, because they have access to the same things.
+
+[00:11:22]
+They have access to something called window. They have access to document. They have access to the same stuff you would have in a DOM. They just don't do anything.
+

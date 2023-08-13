@@ -1,0 +1,81 @@
+[00:00:00]
+>> Hopefully, somebody has their mind blown about some of this really cool stuff and how easy it was to do this. I mean, we literally just hit an API and then we have these really cool tools with laying chain to help us with parsing and stuff like that.
+
+[00:00:12]
+So the next thing we wanna do is actually parse this. We wanna get the JSON from this text. And we want to actually have the output be JSON. So this is one step we got to do. We just have to call parse on a parser on the output, and that will give us back the JSON, okay?
+
+[00:00:33]
+So we'll do that. Even with all of this, sometimes we might not get back exactly what we want, so we might have to address that and I'll talk about that. And the way [LAUGH] we address it is with more AI. We just throw AI at it and it just works.
+
+[00:00:47]
+So let's do that. So I'm gonna get rid of my logs right quick. And then what I'm gonna do, I'm gonna try to catch this. And the reason I'm gonna try to cache this is because if our parser fails at trying to parse this JSON, I want to do something else.
+
+[00:01:04]
+So I'm just going to return parser.parse the result. So remember, our parser is based off this schema, so it's going to try to parse it in the shape of this, right? So it's just gonna try to get back to JSON. And if we get an error, we'll log it so you can see it.
+
+[00:01:30]
+This is the one time I actually do want it to show an error unless it won't because I want it now. So we'll do that. And then the last thing we'll do is we'll, we'll run it right click so we can see it. But I also just want to start moving this stuff over out of the service site call that I'm doing on the server component and bringing it to the actual place where we're gonna be using it.
+
+[00:01:53]
+But yeah, we can log the result of this right quick just so we can have a sanity check. So I'm just gonna do the log over here. So I'll log this whole await thing. Gotta love async await. And I'm just gonna refresh this and run this just to see what it looks like when it's parsed.
+
+[00:02:18]
+If everything works, we should just get back a JavaScript object, that's the point. And if it doesn't, the error should have been thrown and we'll see the error. Cool, it worked. We got back a JavaScript object. So the parcel worked in this case. Again, if it would have broke, we would have gotten the error.
+
+[00:02:42]
+Basically, you would have gotten a JSON parse error, like, hey, I tried to parse this, but I couldn't, so you'll get a parsing error. There's a way to fix that. If it stays consistent, it looks like we don't have to do it, but I might just show you how to do it anyway, [LAUGH] cuz I kept running into problems with it, so we might do it anyway.
+
+[00:03:00]
+Any questions on this? Okay, looks like we got everything we need to insert this into the database. All we gotta do now is go to where we're updating and creating an entry and make a new analyze instance in the database and we can bring that into our UI.
+
+[00:03:16]
+So let's do that. First things first, I'm just gonna get rid of the call here. We don't need this anymore. That was just for me to test it out. We don't want this running here. We want this running in our APIs. So if I go to where we're creating a journal which will be api/ journal/route.ts, this is where we create an entry.
+
+[00:03:38]
+So I'll just go. I mean, I guess you could probably skip doing an analysis on the initial entry because it's always just gonna be this content, but we might as well just kick it off and just do it there. So we'll just do it here. And the best way we can do that is basically, we can wait until after this is done.
+
+[00:04:04]
+We can do a nested right within here, but we'll just wait till it's done because we wanna get the content. So we'll say const analysis = await analyze. And we just wanna pass in entry.content. That's it. And this should get us back to the JavaScript object, unless it doesn't cause the parse broke.
+
+[00:04:37]
+All right, we'll get that back. And then now we can save this in the database with a new entry or a new analysis entry. So this will be newanalysis. Actually, we're not even gonna sit in this back, so I'm just gonna await it. This will be prisma.analysis.create like so.
+
+[00:05:00]
+So we can create an analysis. If we go look at our schema, we can see that an analysis needs an entry, a mood, summary, color, negative. I forgot to put subject in here. So let's add subject to the schema. So we'll add a subject there. We'll save that Because we did change the schema, you know we gotta run npx prisma db push.
+
+[00:05:34]
+Exactly, gotta do that. Probably you gonna get an error here. No, we're good. No, we haven't made any analyses yet, so we're not gonna get an error. We would have though because this is required, and we already had some analyses that didn't like, you're making a new required field, but without a default, you're gonna have some data loss.
+
+[00:05:51]
+And then it'll be like we got to reset the whole database and you just got to go through all this stuff all over again. So we're good there. Highly recommend when you do that to stop your server and started again because the Prisma client and runtime won't pick up those database changes until you restart.
+
+[00:06:10]
+There we go. So we're gonna create, and then we're gonna say data. And for the data here, we need the entry ID, which will just be entry.id. And then we need the entire analysis which we can just spread over cuz all the property names are the exact same name in the schema as they are in the schema that was created in here.
+
+[00:06:35]
+Right, let me explain that one more time. So all the property names here, mood, summary, color, negative, and subject are the same names and the same types as they are in this zod schema. Mood, summary, subject, negative, color, boolean, string, string, string, string. So we could just map the whole object over.
+
+[00:06:56]
+We don't have to write them one by one. Cool, this thing's freaking out because one of these things might be undefined or something like that. But I'm just going to ignore it. Hopefully, it's fine. If not, we'll figure it out. Hopefully, it's just a TypeScript error and not a run-time error.
+
+[00:07:16]
+Okay, so we got that. We're just gonna do the same thing inside of, well, I guess we'll do the update in a minute. Let's just try this right now just to see if it creates. So we'll run this when we make a new one. And let's see what errors we get, if any.
+
+[00:07:32]
+So that just means it was gonna refresh right-click. Okay, now I'm just gonna make a new entry. Let's see what happens. It's definitely taking a long time, so I know it's talking to OpenAPI right now. There we go. Okay, it did it. Yeah, I guess it was just stale or something.
+
+[00:07:54]
+Okay, so we have that. We can double-check in our database. Cause we were not putting anything here yet, we can just check to see if that got created. So I'm just gonna do npx prisma, studio. That's gonna open up our studio. You can see that I do you have an analysis here and it was created for this journal entry, and it has a mood, a summary, a color, a negative, and work.
+
+[00:08:20]
+So that whole flow of taking in the content of a journal entry, going to some LOM, asking it to do an analysis on all these things, getting back structured output, and then saving that to the database. You just did that. It's pretty impressive. This was so hard to do.
+
+[00:08:41]
+Five years ago, six years ago, you had to be an AI expert. You had to have access to GPUs. You had to have a good model that was trained. You had to have it, which means you had great access to clean data. There are so many things you would had to have to do this, and it still wouldn't have been as good.
+
+[00:08:59]
+It still would have been bad. So the fact that you just had an API call like you hit a Pokemon API or something like that, it's kinda impressive. And if you're already thinking like, wow, I can make some crazy stuff with this technology, then yeah. When I said earlier, I'm having a lot of fun just writing code now, it is because of this.
+
+[00:09:17]
+I'm just like, man. I can make some crazy stuff.
+
