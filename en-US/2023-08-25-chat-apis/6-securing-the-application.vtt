@@ -1,0 +1,513 @@
+WEBVTT
+
+1
+00:00:00.140 --> 00:00:04.941
+Because we are doing all of this as API
+that anybody can hit from anywhere.
+
+2
+00:00:04.941 --> 00:00:08.850
+We want to make sure that these are valid
+requests coming from Slack, right?
+
+3
+00:00:08.850 --> 00:00:12.156
+That's an important thing for
+us to have done, so
+
+4
+00:00:12.156 --> 00:00:16.270
+before we go any further,
+let's actually add that in.
+
+5
+00:00:16.270 --> 00:00:20.738
+And we're gonna do that by
+opening up our util again,
+
+6
+00:00:20.738 --> 00:00:26.000
+and grab this Slack util,
+oops, I'll close this one.
+
+7
+00:00:26.000 --> 00:00:32.320
+And below the Slack API,
+I want to add a few pieces.
+
+8
+00:00:32.320 --> 00:00:37.240
+So I'm going to get a couple of things, a
+couple of exports that I need or imports.
+
+9
+00:00:37.240 --> 00:00:43.174
+So I'm gonna need the handler type, or
+the handler event type specifically.
+
+10
+00:00:46.476 --> 00:00:50.253
+From netlify functions, and that's so
+that we get again some autocomplete.
+
+11
+00:00:50.253 --> 00:00:53.038
+And then we're going to be hashing this so
+
+12
+00:00:53.038 --> 00:00:56.151
+we're gonna use the create
+HMAC from crypto.
+
+13
+00:00:58.097 --> 00:01:03.215
+And that's a built-in node module,
+and then I can collapse this one down.
+
+14
+00:01:03.215 --> 00:01:08.609
+We're going to export a new
+function called verifySlackRequest,
+
+15
+00:01:08.609 --> 00:01:13.820
+and that's gonna take the request
+which will be a handler event.
+
+16
+00:01:15.680 --> 00:01:20.366
+So, the first thing we wanna do is get
+the pieces out that we're gonna need, so
+
+17
+00:01:20.366 --> 00:01:23.715
+we need our
+process.env.SLACK_SIGNING_SECRET.
+
+18
+00:01:26.270 --> 00:01:29.424
+And then we need to make sure
+that it doesn't yell at us for
+
+19
+00:01:29.424 --> 00:01:31.148
+that potentially being null.
+
+20
+00:01:31.148 --> 00:01:33.922
+We know that it's set
+because we set it ourselves,
+
+21
+00:01:33.922 --> 00:01:39.500
+then we're going to check the signature,
+and that's gonna come out of the headers.
+
+22
+00:01:39.500 --> 00:01:47.090
+So we get the x-slack-signature is
+the header that they will send with that,
+
+23
+00:01:47.090 --> 00:01:51.970
+the signature that we're gonna compare.
+
+24
+00:01:51.970 --> 00:01:55.286
+So we're gonna write this and then we'll
+kinda talk through what it does cuz this
+
+25
+00:01:55.286 --> 00:01:57.004
+crypto stuff can get a little head bendy.
+
+26
+00:01:57.004 --> 00:02:00.827
+So stick with me and we will step
+through it once the code is written.
+
+27
+00:02:00.827 --> 00:02:03.620
+So next we're gonna get a timestamp,
+
+28
+00:02:03.620 --> 00:02:07.383
+the timestamp that we want
+is the request headers.
+
+29
+00:02:07.383 --> 00:02:11.775
+And that is gonna be
+the x-slack-request-timestamp,
+
+30
+00:02:11.775 --> 00:02:14.468
+that's when the request was made.
+
+31
+00:02:14.468 --> 00:02:17.812
+Because there's something
+called a replay attack,
+
+32
+00:02:17.812 --> 00:02:20.794
+where someone can send
+the same request later.
+
+33
+00:02:20.794 --> 00:02:24.210
+Looks like I forgot an s on this one,
+so we'll fix that.
+
+34
+00:02:25.850 --> 00:02:32.256
+Then, I'm gonna do now because
+we need the current time,
+
+35
+00:02:32.256 --> 00:02:37.244
+so we're gonna run math floor of date.now.
+
+36
+00:02:37.244 --> 00:02:42.474
+And then we're gonna divide by
+1,000 because the precision
+
+37
+00:02:42.474 --> 00:02:47.550
+of a slack timestamp is lower
+than the precision of date.now.
+
+38
+00:02:47.550 --> 00:02:53.410
+So it's a thousand microseconds,
+milliseconds, I'm not sure which.
+
+39
+00:02:53.410 --> 00:02:57.891
+But by dividing by a thousand
+we get to the same number, and
+
+40
+00:02:57.891 --> 00:03:02.295
+by running Math.floor,
+it hits the same number there.
+
+41
+00:03:02.295 --> 00:03:07.518
+So then, just to make sure
+that nothing funky is up,
+
+42
+00:03:07.518 --> 00:03:13.015
+we're gonna run a Math.abs and
+do a now- timestamp.
+
+43
+00:03:13.015 --> 00:03:17.822
+And if that is greater than 300,
+meaning the timestamp is more than five
+
+44
+00:03:17.822 --> 00:03:22.730
+minutes off what our server thinks now is,
+we're just gonna return false.
+
+45
+00:03:22.730 --> 00:03:26.098
+We're gonna assume something's funky,
+this is an invalid request, so
+
+46
+00:03:26.098 --> 00:03:27.140
+we'll just throw it.
+
+47
+00:03:28.340 --> 00:03:31.450
+Next, we need to generate
+a hash of our message.
+
+48
+00:03:31.450 --> 00:03:36.416
+So we're gonna create Hmac and
+we're gonna use
+
+49
+00:03:36.416 --> 00:03:42.510
+the sha256 algorithm and
+pass in the secret.
+
+50
+00:03:42.510 --> 00:03:45.518
+So this is the signing secret that
+we'll use to generate the hash.
+
+51
+00:03:47.188 --> 00:03:52.403
+We wanna update the value with v0,
+this is a format
+
+52
+00:03:52.403 --> 00:03:57.511
+that slack defines
+the timestamp of the message.
+
+53
+00:03:57.511 --> 00:04:05.610
+And then we're gonna use the request
+body unencoded just as it was sent.
+
+54
+00:04:05.610 --> 00:04:10.570
+And finally we're going to digest
+that to get out the hex value.
+
+55
+00:04:11.570 --> 00:04:16.758
+So we want a hex value, which is a hash of
+this string using our signing secret and
+
+56
+00:04:16.758 --> 00:04:18.549
+the sha256 algorithm.
+
+57
+00:04:19.960 --> 00:04:26.125
+And finally, we're going to
+check whether or not these zero.
+
+58
+00:04:28.127 --> 00:04:30.143
+And the hash.
+
+59
+00:04:32.739 --> 00:04:34.571
+Is the same as our signature.
+
+60
+00:04:36.541 --> 00:04:38.486
+Okay, so a lot happens in here,
+
+61
+00:04:38.486 --> 00:04:42.320
+so let's talk through how this works and
+why it's important.
+
+62
+00:04:43.400 --> 00:04:45.867
+So, when you're dealing with a request,
+
+63
+00:04:45.867 --> 00:04:48.891
+you wanna make sure that
+that request is authentic.
+
+64
+00:04:48.891 --> 00:04:52.058
+And there are a lot of ways
+that you can do this, but
+
+65
+00:04:52.058 --> 00:04:55.770
+this idea of sending a signature
+is one of the ways that is.
+
+66
+00:04:55.770 --> 00:04:59.917
+It's still kinda hard to understand,
+but is at least, I don't know,
+
+67
+00:04:59.917 --> 00:05:03.140
+it makes sense to me and
+I'm not a cryptographer.
+
+68
+00:05:03.140 --> 00:05:05.236
+So what we're doing is we're saying,
+
+69
+00:05:05.236 --> 00:05:09.200
+Slack has a secret password that it
+shares with us, the signing secret.
+
+70
+00:05:09.200 --> 00:05:13.792
+This is the key that we will
+use to generate these hashes,
+
+71
+00:05:13.792 --> 00:05:16.960
+that key is not sent with the messages.
+
+72
+00:05:16.960 --> 00:05:22.325
+But what is done is slack uses that
+site signing secret to create a hash
+
+73
+00:05:22.325 --> 00:05:27.782
+of the request body and the timestamp
+that it uses to say if your request
+
+74
+00:05:27.782 --> 00:05:33.611
+matches what we generated at the time
+that we sent this, then it's valid.
+
+75
+00:05:33.611 --> 00:05:38.050
+So we're able to say we have
+the secret nobody else does.
+
+76
+00:05:38.050 --> 00:05:40.189
+And Slack has a secret.
+
+77
+00:05:40.189 --> 00:05:45.451
+so when we check that something that's
+hashed using our signing secret matches
+
+78
+00:05:45.451 --> 00:05:50.179
+the same input value, so the v0,
+the timestamp and the request body.
+
+79
+00:05:50.179 --> 00:05:53.116
+If those two things come out the same,
+that means that whoever sent it has
+
+80
+00:05:53.116 --> 00:05:55.440
+the signing secret, and
+we can assume that it's valid.
+
+81
+00:05:56.730 --> 00:05:58.473
+Now, that will be the sort
+of thing that like,
+
+82
+00:05:58.473 --> 00:06:01.382
+if you're ever worried that somebody
+has it, like after I do this workshop,
+
+83
+00:06:01.382 --> 00:06:03.383
+because I've showed
+everybody my signing secret.
+
+84
+00:06:03.383 --> 00:06:05.379
+I am going to immediately go unroll that,
+
+85
+00:06:05.379 --> 00:06:08.352
+which I'll then have to update
+in the environment variable.
+
+86
+00:06:08.352 --> 00:06:11.070
+Or anybody could send anything
+they want to my Slack instance.
+
+87
+00:06:12.940 --> 00:06:17.404
+So now, what this does is it allows us
+to be sure that the messages coming in
+
+88
+00:06:17.404 --> 00:06:18.416
+are from Slack.
+
+89
+00:06:18.416 --> 00:06:19.848
+Which gives us much,
+
+90
+00:06:19.848 --> 00:06:25.511
+much more confidence that the things that
+follow this verification will just work.
+
+91
+00:06:25.511 --> 00:06:30.438
+So in here we can validate
+the Slack request by just checking,
+
+92
+00:06:30.438 --> 00:06:37.000
+we'll load the value into valid, and
+verifySlackRequest and pass in the event.
+
+93
+00:06:39.150 --> 00:06:42.726
+And then if it's not valid,
+
+94
+00:06:42.726 --> 00:06:48.988
+we will console.error and
+say invalid request.
+
+95
+00:06:48.988 --> 00:06:53.893
+And then we will also
+return a status code of
+
+96
+00:06:53.893 --> 00:06:58.540
+400 and say body of invalid request.
+
+97
+00:07:00.150 --> 00:07:02.914
+And so
+basically what we're saying is like, hey,
+
+98
+00:07:02.914 --> 00:07:05.566
+whatever you did you're
+not allowed to do here.
+
+99
+00:07:05.566 --> 00:07:10.272
+If we get past this point then it is
+valid and we can continue as usual.
+
+100
+00:07:11.846 --> 00:07:15.525
+So to test this it's not gonna look
+any different because it's actually
+
+101
+00:07:15.525 --> 00:07:16.195
+gonna work.
+
+102
+00:07:18.251 --> 00:07:18.817
+Right?
+
+103
+00:07:18.817 --> 00:07:22.026
+So we get our another dad joke, but
+
+104
+00:07:22.026 --> 00:07:27.131
+if we were to fake this and
+say that our request failed.
+
+105
+00:07:29.019 --> 00:07:35.619
+Then it would fail, and in the console
+here, we would see invalid request.
+
+106
+00:07:35.619 --> 00:07:39.256
+So if somebody starts sending us stuff,
+then we would be able to say, no,
+
+107
+00:07:39.256 --> 00:07:41.619
+that's not okay whatever
+it is you're doing.
+

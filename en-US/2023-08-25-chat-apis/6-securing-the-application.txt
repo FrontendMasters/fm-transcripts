@@ -1,0 +1,60 @@
+[00:00:00]
+>> Because we are doing all of this as API that anybody can hit from anywhere. We want to make sure that these are valid requests coming from Slack, right? That's an important thing for us to have done, so before we go any further, let's actually add that in.
+
+[00:00:16]
+And we're gonna do that by opening up our util again, and grab this Slack util, oops, I'll close this one. And below the Slack API, I want to add a few pieces. So I'm going to get a couple of things, a couple of exports that I need or imports.
+
+[00:00:37]
+So I'm gonna need the handler type, or the handler event type specifically. From netlify functions, and that's so that we get again some autocomplete. And then we're going to be hashing this so we're gonna use the create HMAC from crypto. And that's a built-in node module, and then I can collapse this one down.
+
+[00:01:03]
+We're going to export a new function called verifySlackRequest, and that's gonna take the request which will be a handler event. So, the first thing we wanna do is get the pieces out that we're gonna need, so we need our process.env.SLACK_SIGNING_SECRET. And then we need to make sure that it doesn't yell at us for that potentially being null.
+
+[00:01:31]
+We know that it's set because we set it ourselves, then we're going to check the signature, and that's gonna come out of the headers. So we get the x-slack-signature is the header that they will send with that, the signature that we're gonna compare. So we're gonna write this and then we'll kinda talk through what it does cuz this crypto stuff can get a little head bendy.
+
+[00:01:57]
+So stick with me and we will step through it once the code is written. So next we're gonna get a timestamp, the timestamp that we want is the request headers. And that is gonna be the x-slack-request-timestamp, that's when the request was made. Because there's something called a replay attack, where someone can send the same request later.
+
+[00:02:20]
+Looks like I forgot an s on this one, so we'll fix that. Then, I'm gonna do now because we need the current time, so we're gonna run math floor of date.now. And then we're gonna divide by 1,000 because the precision of a slack timestamp is lower than the precision of date.now.
+
+[00:02:47]
+So it's a thousand microseconds, milliseconds, I'm not sure which. But by dividing by a thousand we get to the same number, and by running Math.floor, it hits the same number there. So then, just to make sure that nothing funky is up, we're gonna run a Math.abs and do a now- timestamp.
+
+[00:03:13]
+And if that is greater than 300, meaning the timestamp is more than five minutes off what our server thinks now is, we're just gonna return false. We're gonna assume something's funky, this is an invalid request, so we'll just throw it. Next, we need to generate a hash of our message.
+
+[00:03:31]
+So we're gonna create Hmac and we're gonna use the sha256 algorithm and pass in the secret. So this is the signing secret that we'll use to generate the hash. We wanna update the value with v0, this is a format that slack defines the timestamp of the message. And then we're gonna use the request body unencoded just as it was sent.
+
+[00:04:05]
+And finally we're going to digest that to get out the hex value. So we want a hex value, which is a hash of this string using our signing secret and the sha256 algorithm. And finally, we're going to check whether or not these zero. And the hash. Is the same as our signature.
+
+[00:04:36]
+Okay, so a lot happens in here, so let's talk through how this works and why it's important. So, when you're dealing with a request, you wanna make sure that that request is authentic. And there are a lot of ways that you can do this, but this idea of sending a signature is one of the ways that is.
+
+[00:04:55]
+It's still kinda hard to understand, but is at least, I don't know, it makes sense to me and I'm not a cryptographer. So what we're doing is we're saying, Slack has a secret password that it shares with us, the signing secret. This is the key that we will use to generate these hashes, that key is not sent with the messages.
+
+[00:05:16]
+But what is done is slack uses that site signing secret to create a hash of the request body and the timestamp that it uses to say if your request matches what we generated at the time that we sent this, then it's valid. So we're able to say we have the secret nobody else does.
+
+[00:05:38]
+And Slack has a secret. so when we check that something that's hashed using our signing secret matches the same input value, so the v0, the timestamp and the request body. If those two things come out the same, that means that whoever sent it has the signing secret, and we can assume that it's valid.
+
+[00:05:56]
+Now, that will be the sort of thing that like, if you're ever worried that somebody has it, like after I do this workshop, because I've showed everybody my signing secret. I am going to immediately go unroll that, which I'll then have to update in the environment variable. Or anybody could send anything they want to my Slack instance.
+
+[00:06:12]
+So now, what this does is it allows us to be sure that the messages coming in are from Slack. Which gives us much, much more confidence that the things that follow this verification will just work. So in here we can validate the Slack request by just checking, we'll load the value into valid, and verifySlackRequest and pass in the event.
+
+[00:06:39]
+And then if it's not valid, we will console.error and say invalid request. And then we will also return a status code of 400 and say body of invalid request. And so basically what we're saying is like, hey, whatever you did you're not allowed to do here. If we get past this point then it is valid and we can continue as usual.
+
+[00:07:11]
+So to test this it's not gonna look any different because it's actually gonna work. Right? So we get our another dad joke, but if we were to fake this and say that our request failed. Then it would fail, and in the console here, we would see invalid request.
+
+[00:07:35]
+So if somebody starts sending us stuff, then we would be able to say, no, that's not okay whatever it is you're doing.
+

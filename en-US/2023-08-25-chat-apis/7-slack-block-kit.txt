@@ -1,0 +1,78 @@
+[00:00:00]
+>> So up to this point, we've looked at kind of direct interactivity where somebody runs a command and then we don't have to worry about what their input was, we can just send something back. To make this truly useful, we wanna make it a two way conversation. We want someone to be able to send some data to us and then respond based on that data.
+
+[00:00:20]
+So, we will be using something called the Block Kit Builder which I can quickly show here. And the way that this works is Slack has this very thorough custom implementation of all sorts of things that you can do in Slack. So if you wanna add text fields, if you wanna add static_select, if you wanna add buttons, you wanna add images, all of these things are possible to do inside of Slack if you use their JSON Schema.
+
+[00:00:59]
+And as you can see, this JSON Schema is thorough. It has a lot of pieces. It's pretty verbose, which is a good thing because it means that it's very descriptive and you can parse it and I like that about it, but it can be a little bit of a pain to write.
+
+[00:01:13]
+So we're gona create a helper that lets us generate these blocks through a little utility function, just to keep our code a little more compact. Cuz otherwise, what ends up happening is, your function ends up just being this giant block of JSON that you either have to collapse or move around.
+
+[00:01:30]
+So I like being a little more terse with the utility. You can make a choice, you don't necessarily need to do this. I prefer it, and so that's why I keep doing it. And what I wanna do is go back into our slack util here, And down below our verification, I'm going to add a new export.
+
+[00:01:53]
+This is gonna be called blocks. And it's gonna be an object that is full of the blocks that we want to create. So we're using a subset here, you won't need to use all of these. So I'm gonna create one for sections. I'm gonna create one for an input.
+
+[00:02:15]
+And I believe we need to select And that's all we're gonna use today. Like I said, there are a lot of blocks. So as you kind of build out your own chat ops, you might need to expand this to accommodate more things, but this is what we're doing for the demo.
+
+[00:02:37]
+So we'll keep it nice and tight as much as we can. So that's gonna accept text and we're gonna call this a sectionBlockArgs so that we get some autocomplete there and that is going to return a Slack block section And it says, yeah, because we're not returning anything yet, it says that it's invalid.
+
+[00:03:04]
+So we need to actually return and we can say it's gonna be a type of section. And we're gonna have text of type, we'll use Markdown. Now, Slack their mikdan isn't Markdown, it's a specific dialect that they've created to give Markdown-like capabilities, which I think is why they spell this differently.
+
+[00:03:28]
+I'm not sure, but for whatever reason, they don't like vowels. And then we pass in this text. And now that we've satisfied the conditions of a SlackBlockSection, we don't have that red squiggly anymore, and that will give us a valid Slack block. Next, we're gonna do the same thing, but for the input and the select, these are both a little more in depth.
+
+[00:03:50]
+So for our input, we're gonna have an id, we're gonna have a label. In fact, we can autocomplete some of this, we just go straight to our Input(BlockArgs) here. And give us our label, a placeholder, will need the initial value, which I'm gonna set to be blank, and the hint, which we can also set to be blank.
+
+[00:04:12]
+We'll look at what both of these are as we start actually using them. And that is going to return a SlackBlockInput. And to make that valid we're gonna return an object, it has a block_id which will be the id, and _block. It's gonna have a type which will be input.
+
+[00:04:37]
+It's going to have a label which will include a type. In our case, we're gonna use plain_text and the text will be the label itself that we passed in as an argument. Then we've got the element. The element is the actual input part. So we're gonna give it an action_id, that's the ID.
+
+[00:05:00]
+We're going to give it a type, and that is a plain_text_input. Boy, plain_text_input. And then we're going to give it a placeholder. And so a placeholder is like what will be visible inside the input when nothing's been added to it. So that is an object and it has a type of plain_text.
+
+[00:05:28]
+This is a very common pattern in Slack blocks is this type in text. The text itself will be our placeholder. Then we've got an initial value which follows just the initial value being a string. And then outside of the element we can set a hint if we want.
+
+[00:05:49]
+The hint is text shown underneath the input, so we can give people a clue that doesn't disappear when they start typing. And the text itself will be our hint. So, saving that, then we can move into our select. And our select is going to be SelectBlockArgs, and that is going to return a SlackBlockInput.
+
+[00:06:18]
+Because the select and an input are effectively the same thing, they just have a couple extra fields in a select. So this one is going to take an ID, a label, a placeholder, and options. The options being what you can select from the drop down. And this will return a block _id.
+
+[00:06:41]
+And that's going to, again, be the id_block. I'll show you why I use this naming convention when we get into accessing the values. But the the short answer is, we're going to have to drill down through a giant object in the values. So having predictable things like the id_block and then the id as opposed to what gets auto generated by Slack, is gonna make it possible to work with these values and a little easier for us to think about.
+
+[00:07:11]
+We're gonna set a type of input. We will use a label. That label is going to be exactly the same as this one, so I'm gonna copy paste it. And then we want an element. That element is going to have an action_id of id. The type is going to be a static_select this time.
+
+[00:07:36]
+And for the placeholder, now this is inside the element. So the placeholder goes here, that's going to have a type of plain_text and a text of placeholder. If you wanna use emojis and stuff you can also set emoji to true in these, but we're we're not using them so you can leave it or not doesn't really matter.
+
+[00:08:02]
+For options, we are going to map over the options that were given. And we are going to know that these have a label and a value, because that is what we've defined them to have. And for each one, we're gonna return text, and it has a type of plain_text.
+
+[00:08:24]
+It has the text value itself of label. And we can set emoji to true if we want And then the last thing we want is the value. So this is how we actually get options into it ,so we can save that. And now we have these little helpers that we'll be able to use to make our lives easier as we're building out our modal.
+
+[00:08:54]
+Because what we wanna do next is actually create from the slash command. We wanna pop up a modal window that asks a couple questions that we need in order to respond to the request. And we keep it simple, when I was building this for a previous team, we had three questions.
+
+[00:09:14]
+It was, what do you need? When do you need it by? Because if it doesn't have a deadline, is it actually important, right? And how urgent is this? What's the risk if we don't get this done? It's nice to have, it's a must have it's a critical blocker, making sure that we have an understanding of what the level of urgency is for the thing.
+
+[00:09:34]
+And then an optional input for, are there any other details that we need links to stuff etc. And by keeping it small, because the arg is always gather all of the information but what I found is, if you give people one or two fields to fill out, they'll do it.
+
+[00:09:49]
+If you give them ten fields, they won't, or they'll start kind of short-cutting those fields and then they become less information. So you want the absolute minimum number of inputs that you can to actually do your job. Anything else can be in an additional context box so that people can help out there.
+
