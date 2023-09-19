@@ -1,0 +1,99 @@
+[00:00:00]
+>> And now, what we wanna do is we've picked a file, we've logged into the console, that feels great, I guess. I mean, I couldn't have done that node because I couldn't have done the file open dialog, but you know what I mean, it's still like, I wanna see this thing in the UI.
+
+[00:00:17]
+So now we got to figure out how to get something from the main process and send it on through to the renderer process, right? And this is where that beginning of this inter-process communication comes through, right, which is at any given point, renderer processes can send messages. Actually, they can call functions from the main process, but it's actually a cheat.
+
+[00:00:41]
+And we'll see, I'll show you later. But they can send messages to the main process, and the main process can reach out to a given process and send a message back to it as well. The goal here is to take [LAUGH] this wonderful file that we have read and get it to actually show up in the UI, right?
+
+[00:01:03]
+And once we get this loop going, then it's a gravy train at this point, but right now, we're just logging into the console, which doesn't feel great. One thing I need to do is, the main process can't just broadcast it everywhere, it's got to be like, what window would you like me to talk to?
+
+[00:01:20]
+Yes, we have one window, right? But having a multi-window app is really just like having some kinda hash map where you're adding removing them or an actual map in JavaScript. But we wanna at least pretend there might be more than one window one day, right? And give ourselves the accoutrements around that even if there is not really a great use case for this moment.
+
+[00:01:41]
+Yeah, I mean, you could argue we could open up multiple of these. And this is somewhat I have a version of this that I use because I use a bunch of custom remark and rehab plugins that I wanna see as I'm viewing stuff. I just don't have the editor in, I have it watching a file and stuff along those lines.
+
+[00:01:57]
+So it's a little bit different, but it's a super useful tool that you can build your own light saber as we do this together. So we do need to tell a given browser window that we have some content and we would like to load it. So what I'm gonna do is since I have it in the show, this is one of the reasons that I gave myself the browser window, which is when we trigger the showOpenDialogue, we know what window asked for it, right?
+
+[00:02:20]
+So I'm also gonna say that that's gonna be, and you can make it the second argument, make it the first argument, you do whatever you want. I'm gonna say that that is a BrowserWindow instance as well. And so we'll have that, we'll have the content, and so we'll parse in that browserWindow as well.
+
+[00:02:39]
+So we let them pick a file, and we know what window asks for the file, we're gonna pass that to openFile along with the file that they chose, right? And this is nice because if we wanted to trigger the ability to open a file and send it to a window from somewhere else, we could totally do that.
+
+[00:02:56]
+Could you break this up into even smaller pieces? You absolutely could and might you eventually you probably will. But the risk of just not refactoring node code for the fun of it and sticking to what we came here to learn, I think this is good enough for right now.
+
+[00:03:09]
+So now, what I wanna do is I want to be able to send this to the browserWindow that asked for it. So you've got effectively a way to think about this. You've got the browser window, and then you've got the actual web contents, which I didn't mean to use the definition in the explanation, but I didn't tell you what the words were yet, so it feels good.
+
+[00:03:33]
+So now we can do browserwindow.webContents. You can kinda see that the auto complete is ruining the gag right here. So we've got this file-opened, you can call it openFile, whatever, this is just a string, it has no meaning in Electron other than the meaning that you give it.
+
+[00:03:56]
+It is like, what kind of channel are you sending this message over, right? Cuz later, you could have anything, right? This can be any string whatsoever, it depends on your application. I'm gonna be really honest with you, do I waffle back and forth between past tense and present tense in the same way that I do with Redux actions?
+
+[00:04:16]
+I do. Today, this is the one that I have chosen, right? On a different day, I might choose something different. Cuz I might send one called openFile from the renderer process when they hit the button and file-opened. Yeah, I don't know, you can name this anything you want, go for it.
+
+[00:04:34]
+And I am gonna send through the filePath and the content of the file, right? And you could do that in a different order if you want as well. I might actually choose to send the content first. In this case, and so now I can send this information to the browserWindow that asked for it.
+
+[00:04:59]
+But like most events in the DOM, in JavaScript, in Node, and what have you, sending event when no one's listening for it doesn't really matter, does it, right? So the next step is to figure out how to read this message, right? And so this is where the IPC pieces come in, this is technically using ipcMain in this case.
+
+[00:05:27]
+There is another library called ipcRenderer. Now, the one thing that I should warn you about this is that is, again, this is what I said before in that diagram that we showed, which is that preload script is technically happening in the renderer process. But it is the only one with access to any kind of Electron nuances, right?
+
+[00:05:49]
+And so we don't have access to ipcRenderer in the actual browser context, we only have access to ipcRenderer in the preload script. Now, could I do stuff like nodeIntegration: true? I could, I think I might actually go in here. And that would give me all of node in the Chrome instance.
+
+[00:06:16]
+And I could do require FS and talk directly to databases from the Chrome context. That will get you the old behavior, that was the way that you did it up until a few years ago. That said, I'm just gonna just pretend this doesn't exist and pretend that we actually care somewhat about security and best practices on our time together.
+
+[00:06:41]
+So in this world, preload has access to, I think, the clipboard module, ipcRenderer, the process object, and the web contents that it's gonna load. So we can get access to these messages only in the preload script. So let's go over there for now. This code should make sense to anyone who's looking at it presently.
+
+[00:07:07]
+Great, and so here we can import ipcRenderer from electron, right? And so we've got that in place, and we can do an ipcRenderer, .on, or Renderer. .on, and again, as you look at the function signature here, it's any channel, right? So, This is where you could get a little fancier with the types that we're gonna get to today, because it's the same way with Redux actions, you must spell that, right?
+
+[00:07:51]
+And you will wonder why your app doesn't work, ask me how I know. But generally speaking, so we called it file-opened, and if I look back at what I wrote, I was parsing the content first and the filePath second, right? So we'll say event, Important note here is that, as you can see, Regardless of what we parse in the message, the actual event is the first followed by whatever you parse through as the subsequent arguments.
+
+[00:08:28]
+So if we go back to the main things that you parsed in the channel, content and filePath, those become the second and third arguments with the event becoming the first argument, right? And we know that those are, at this moment, gonna be both strings. String, and I'm just gonna make this an underscore so that ESLint leaves me alone about the fact that I'm not using it.
+
+[00:08:52]
+Great, and let's just start with the easiest possible thing right now, which is just, we're just gonna console.log the content in the filePath to verify that we've got that full-on connection between the two in place. So let's go ahead and verify, because you know what? I don't wanna code more before I make sure that everything I just wrote works.
+
+[00:09:14]
+Cool, so we can go pick a file, and you can see that now we have access to that in the renderer process. So now we can read a file from Node and just push it right on through to the preload script that can then theoretically do stuff with the DOM, right?
+
+[00:09:32]
+Again, the preload script runs once. It's kinda always still running in the background, but you have access to write code once. And you can't like, okay, now that they've done something else in the DOM, go ahead and modify the preload script, and you could with really, really bad practices and hacking.
+
+[00:09:48]
+Yes, right. Could you just take the entire ipcRenderer and expose it down? And could you go out of your way to create as many security holes as possible? Of course, you could, I'm not going to. That's an exercise for you when you have a tight deadline. So at this point, we can write it to the DOM at this point and be good.
+
+[00:10:11]
+Now, I have this just because I don't wanna, I could theoretically do a document.getElementId. I just stored all those selectors in a second file called elements. That should be lowercase, I think it's renderer, renderer. Cool, and all that, it's an object with getters for all of my different selectors, right?
+
+[00:10:50]
+Yes, I know that it has the idea of MarkdownView. I could do a document.queryselector, we could do that as well. But live coding me wanted a little bit of autocomplete and the known selectors, in this case, so live coding me gets that. So at this point, I can basically say, I can do Elements.MarkdownView.
+
+[00:11:14]
+And I know that that's a TextArea element cuz I use TypeScript. So I can say that that will equal the content. And then I have another helper, that's just renderMarkdown to HTML. And that will put it in that second div, right? Cuz yes, you can watch me do DOM manipulation, if you really want.
+
+[00:11:31]
+But I just wrote myself some helper methods, and that will run it through remark with a bunch of different plugins, so on and so forth. So now when we get the fileOpen message, we take that content, we put it in that text area, and then we take the markdown turn HTML and set the inner HTML of the div over to the right side.
+
+[00:11:50]
+And ideally, we should be able to open files. And we've got that first piece of triggering, I mean, right now that fileOpenDialogue happens no matter what. And we'll see how to do the other way of communication, cuz then once we have the full loop, now we're cooking with gas, as they say.
+
+[00:12:06]
+So we've got that, let's verify that it works the way that I think it does before I get too carried away with myself And I will pick this one, and you can see that now I can open files in the file system, and they render over in the DOM itself.
+

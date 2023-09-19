@@ -1,0 +1,114 @@
+[00:00:00]
+>> So we have the ability to open one and trigger a show open dialog, right? Show open dialog has a sibling conveniently titled show save dialog, right? And show save dialog does somewhat the same thing except the opposite and should be able to give you the ability to export a file.
+
+[00:00:22]
+We're going to worry about the exporting the inner HTML of that rendered view because we're just exporting. I don't care about knowing what the current file is and saving over the current file versus prompting for a file if we don't have one. There's a little bit of nuance and intricacies with just saving a file that I will spare you.
+
+[00:00:39]
+If you want to try that one, go for it. But we'll try exporting the HTML, all right, spend a little bit time then we'll do together.
+>> Anon has a quick question from the live coding. Why do we have to use the IPC renderer on file opened in the preload script?
+
+[00:01:01]
+Shouldn't preload script only contain what it has to expose to the renderer process? Why are we even using an IPC renderer in preload script?
+>> So the question is, why are we using the IPC renderer in the preload script? I mean, part of that is it's the only place we can use it, right?
+
+[00:01:21]
+IPC render isn't available in the browser context at all, right? Unless we pass something in and so the only place we would get any of these electron modules is in the preload script. So it's our only kind of opportunity. Now we can argue that instead of modifying the DOM directly, I should be labeled to maybe register a callback or something along those lines.
+
+[00:01:45]
+And I can do something like OnFileOpened or onFileOpen I like that better. And this is a very okay pattern as well and I could say something like, allow the renderer process to just say OnFileOpen and then listen to that message and pass the callback through. That will work as well.
+
+[00:02:11]
+And then I don't modify the DOM in here, right? And I do it in the renderer process like that would work too. And arguably, that's possibly better, right? I don't know at this point in a simple app, I don't know how much it goes either way, but we can go with that.
+
+[00:02:27]
+Let's, let's actually just do it. So let's say we'll move this code through. And now in the renderer process, Let's go and we'll say, I gotta add that to the type, so we'll say, OnFileOpen. Where are yeah, it will take a callback that takes the string of the file content.
+
+[00:02:54]
+And eventually it's gonna take the file paths. Let's just be honest with ourselves. Or could take that since that is the thing that goes to the channel. So now it takes a callback. And we can go into the render and we can say now instead OnFileOpen. And that's where I could say what I had before.
+
+[00:03:21]
+This should do the trick as well. What did I call it? OnFileOpen to save that. I just think That looks off. I think it'll actually compile though, we'll take a look at that a second. It seems like it's like running off an old type file from the nine different times I've had this open.
+
+[00:03:45]
+So I'm gonna have to quit VS code and start it again. But this should do the trick where instead of, to summarize what I just did here is before we were listening to the message and modifying the DOM and there were questions of why should the [INAUDIBLE] touch the DOM at all?
+
+[00:04:00]
+And that's fair. So now we're actually saying hey, we have this OnFileOpen where you can send us a call back of what you would like to do and then we will then register that here as well. So let's go ahead and make sure that works and then we'll solve the other pieces well.
+
+[00:04:22]
+Now we can open it, go in here as well, same basic idea. So we can either do it directly in there, we can have the ability to register callbacks. We'll do something like this later in the workshop as well. Both of those are totally fine. Arguably this gives you a little bit more granularity to have other yeah, especially in a larger app.
+
+[00:04:44]
+Then might have components that are mounted and unmounted and stuff along those lines. You might find yourself doing something like this. In fact, you could theoretically, if you're using React, you could write a React hook around this, right? Which is just all of a sudden registers, the things that it cares about, and handles stuff along those lines.
+
+[00:05:01]
+All those abstractions make total sense as well. So I've got that and now I don't care about any of the elements in the DOM as well, so that's kinda cool. On the export piece, let's go and solve for that as well. I'm gonna start in the type just simply so I don't have to go back.
+
+[00:05:22]
+And I think this is gonna start with, showExportHtmlDialog, it seens like good enough name. And so we've got that there and then in our preload we can just register that showExportHtmlDialog which will then send a message over. Now, I could just show it and then I could ask for the HTML again.
+
+[00:05:46]
+But I'm probably sure if I'm going to show the ExportHtmlDialog, what's going to happen next after they pick a place? Probably going to save the HTML, right? So I'm going to choose to kind of send. So we're going to say that this actually take some HTML as a string and call it content and call it whatever you want.
+
+[00:06:05]
+I will send that through as well, make sure I said that my type. I did not. And there is a way to like derive this from the context bridge which I was gonna show you later but I might become impatient and show you sooner, we'll find out. All right, so we've got that.
+
+[00:06:25]
+Now the next part is this. We don't need this console log anymore. We get the point. We'll do the elements, ExportHtmlButton, where we'll grab. This is the rendered view. We'll grab the HTML from the render view and we will send that to the show HTML dialog. What does it say of HTML?
+
+[00:06:53]
+Elements plural. ExportHtmlButton, cool so we'll grab it from the DOM and we're just gonna send it along that message that we just set up, right? And now we need to go catch it in our main process, right? So at this point, we should be. We should have the event listener.
+
+[00:07:13]
+We should grab the HTML. The window.api.export or showExportHtmlDialog will and I guess I could call that export HTML as well. It's up to you. I'm changing my mind rapidly back and forth in each direction, but we'll keep it for now. And we'll say, this will send the message all along and again, you could just choose to call it export HTML, that's not bad.
+
+[00:07:39]
+And but let's go listen for it over on this side, which is when we receive that message, we'll have the event, we'll have the HTML that we received. I don't need the event just yet. Now, I get to choose whether or not I need to tell the Window that this happened, right, in either direction.
+
+[00:07:59]
+I don't necessarily need that immediately. And I will use this as an example to show you the difference between invoke versus on, but let's keep it simple and get the core functionality working first. And so we'll get this and then actually I'm gonna want the event because I need the browser window need is a strong word.
+
+[00:08:20]
+I want to do the same thing where it's attached to the window. So I need to know who sent it to me. So that becomes very similar to what we had here, which is like, who sent this event? Get me the browser window so I can attach a dialogue to it is effectively what we're saying here.
+
+[00:08:36]
+And so now we've got, let's give ourselves a function. Let's put it, let's be at least a little bit organized here. We'll say, const show ExportHTMLDialogue, which will take the browser window and the HTML. And this is again before we had dialog dot show open dialog, this is simply gonna be, it's going to be the showSaveDialog.
+
+[00:09:07]
+The title you will not see on macOS. I think you might see it if it's not attached to the window but I think it also depends on the version of macOS. I don't know if you see it at all these days. You will see it in Windows, I believe, as well.
+
+[00:09:19]
+I don't care about the default path per se, you can specify all of those things too but we'll have that for now in there. And let's see what else would we want in here, I probably want to specify what the default extension ought to be. So we'll go ahead, well, that also it's weird.
+
+[00:09:42]
+It's still filters, but it's mostly to give it the same kind of like API, as we had before, which is we'll say an HTML file with extension HTML. Could you do htm, you could. I'm not going to because I don't want to. So we'll have that result in there.
+
+[00:09:57]
+And then one thing we do want to do is if it was cancelled, they just said I don't want to do this, stop the process. We're done here. And you could have different functionality in here like if we wanted to tell the DOM like, you cancelled it. I don't particularly want to.
+
+[00:10:14]
+So this one, that's not true, because we don't have multiple file paths, because you can select multiple files, you can't choose to save to multiple files. So at this point we'll just say this is actually just a single file path singular on the result object. Const, talking and coding at the same time goes super well.
+
+[00:10:39]
+And if for some reason, again, like, I don't think that I can get this far without getting us a file path. But to keep TypeScript happy, we will then, we don't have a export HTML just yet, so we're going to get yelled at, but we'll write it. We'll say the file path that we'll get from where they picked in the HTML that we pass the whole way through.
+
+[00:11:00]
+So lastly, we just need to do that. So we'll say exportHtml. They'll take the file path and the string. And this just becomes node once again, where we say, make an async function. And we'll just say like that, this is gonna be a write file doesn't return anything.
+
+[00:11:21]
+So pass that through the file path. Write file not the one from original-fs. Cool, so we've got this write file that we've got to pull in from the file system promises library. And so we'll export the file it's tricky like I am probably done here but I could theoretically also decide that I want to send something back.
+
+[00:11:56]
+As well of like, okay and we exported a file. It's kind of up to you, right, if you really wanna do that. I'm not gonna do it for now and we'll kind of play around with it in a second and we'll do some experiments. So we've got the ability to show a file.
+
+[00:12:09]
+We're not doing anything with it. Again, we need to listen for this, so we'll go ahead and say. This should probably, unless I've made some terrible Boo-Boo along the way, should receive the message, show the ExportHTMLDialog, right? Get the file if it exists, pass it over. These could probably be put together, but in following the pattern I did for open file, which I know there's nine ways to open a file and I guess theoretically I think I would always need a window for this one.
+
+[00:12:42]
+So I could combine them, I'd rather consistent code than an extra function ain't bothering nobody. Cool and so we should have famous last words. We should have a somewhat consistent, full loop here as well and so now we can go in both directions, so we'll go, Let's save HTML, cool.
+
+[00:13:10]
+You can see we automatically get the .HTML extension. Everything is as we might expect.
+>> And we can save it and if all went well, I think I saved it in important documents. We've got banana.html. All right, so just open from the file system, we can write to the file system, we can do all of those things and get a whole bunch of that kinda in place and have that full loop in both directions.
+

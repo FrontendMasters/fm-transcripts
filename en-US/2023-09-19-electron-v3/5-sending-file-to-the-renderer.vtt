@@ -1,0 +1,867 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:04.622
+And now,
+what we wanna do is we've picked a file,
+
+2
+00:00:04.622 --> 00:00:10.358
+we've logged into the console,
+that feels great, I guess.
+
+3
+00:00:10.358 --> 00:00:13.157
+I mean, I couldn't have done that
+node because I couldn't have done
+
+4
+00:00:13.157 --> 00:00:15.858
+the file open dialog, but
+you know what I mean, it's still like,
+
+5
+00:00:15.858 --> 00:00:17.177
+I wanna see this thing in the UI.
+
+6
+00:00:17.177 --> 00:00:23.290
+So now we got to figure out how to get
+something from the main process and
+
+7
+00:00:23.290 --> 00:00:27.856
+send it on through to
+the renderer process, right?
+
+8
+00:00:27.856 --> 00:00:33.209
+And this is where that beginning of this
+inter-process communication comes through,
+
+9
+00:00:33.209 --> 00:00:37.925
+right, which is at any given point,
+renderer processes can send messages.
+
+10
+00:00:37.925 --> 00:00:41.289
+Actually, they can call functions from the
+main process, but it's actually a cheat.
+
+11
+00:00:41.289 --> 00:00:43.674
+And we'll see, I'll show you later.
+
+12
+00:00:43.674 --> 00:00:48.763
+But they can send messages to the main
+process, and the main process
+
+13
+00:00:48.763 --> 00:00:53.868
+can reach out to a given process and
+send a message back to it as well.
+
+14
+00:00:53.868 --> 00:00:59.768
+The goal here is to take [LAUGH] this
+wonderful file that we have read and
+
+15
+00:00:59.768 --> 00:01:03.541
+get it to actually show up in the UI,
+right?
+
+16
+00:01:03.541 --> 00:01:07.807
+And once we get this loop going,
+then it's a gravy train at this point, but
+
+17
+00:01:07.807 --> 00:01:12.370
+right now, we're just logging into
+the console, which doesn't feel great.
+
+18
+00:01:12.370 --> 00:01:16.346
+One thing I need to do is,
+the main process can't just broadcast it
+
+19
+00:01:16.346 --> 00:01:20.892
+everywhere, it's got to be like,
+what window would you like me to talk to?
+
+20
+00:01:20.892 --> 00:01:22.841
+Yes, we have one window, right?
+
+21
+00:01:22.841 --> 00:01:27.871
+But having a multi-window app is really
+just like having some kinda hash
+
+22
+00:01:27.871 --> 00:01:32.824
+map where you're adding removing them or
+an actual map in JavaScript.
+
+23
+00:01:32.824 --> 00:01:37.151
+But we wanna at least pretend there might
+be more than one window one day, right?
+
+24
+00:01:37.151 --> 00:01:39.971
+And give ourselves the accoutrements
+around that even if there is
+
+25
+00:01:39.971 --> 00:01:41.875
+not really a great use case for
+this moment.
+
+26
+00:01:41.875 --> 00:01:45.200
+Yeah, I mean, you could argue we
+could open up multiple of these.
+
+27
+00:01:45.200 --> 00:01:49.843
+And this is somewhat I have a version of
+this that I use because I use a bunch of
+
+28
+00:01:49.843 --> 00:01:54.288
+custom remark and rehab plugins that
+I wanna see as I'm viewing stuff.
+
+29
+00:01:54.288 --> 00:01:56.379
+I just don't have the editor in,
+I have it watching a file and
+
+30
+00:01:56.379 --> 00:01:57.281
+stuff along those lines.
+
+31
+00:01:57.281 --> 00:02:01.208
+So it's a little bit different, but it's a
+super useful tool that you can build your
+
+32
+00:02:01.208 --> 00:02:03.045
+own light saber as we do this together.
+
+33
+00:02:03.045 --> 00:02:08.532
+So we do need to tell a given browser
+window that we have some content and
+
+34
+00:02:08.532 --> 00:02:10.489
+we would like to load it.
+
+35
+00:02:10.489 --> 00:02:12.995
+So what I'm gonna do is
+since I have it in the show,
+
+36
+00:02:12.995 --> 00:02:16.520
+this is one of the reasons that I
+gave myself the browser window, which
+
+37
+00:02:16.520 --> 00:02:20.807
+is when we trigger the showOpenDialogue,
+we know what window asked for it, right?
+
+38
+00:02:20.807 --> 00:02:24.403
+So I'm also gonna say that that's gonna
+be, and you can make it the second
+
+39
+00:02:24.403 --> 00:02:27.658
+argument, make it the first argument,
+you do whatever you want.
+
+40
+00:02:27.658 --> 00:02:32.943
+I'm gonna say that that is
+a BrowserWindow instance as well.
+
+41
+00:02:32.943 --> 00:02:35.605
+And so we'll have that,
+we'll have the content, and so
+
+42
+00:02:35.605 --> 00:02:37.718
+we'll parse in that browserWindow as well.
+
+43
+00:02:39.652 --> 00:02:43.940
+So we let them pick a file, and
+we know what window asks for the file,
+
+44
+00:02:43.940 --> 00:02:48.995
+we're gonna pass that to openFile along
+with the file that they chose, right?
+
+45
+00:02:48.995 --> 00:02:52.972
+And this is nice because if we wanted to
+trigger the ability to open a file and
+
+46
+00:02:52.972 --> 00:02:56.525
+send it to a window from somewhere else,
+we could totally do that.
+
+47
+00:02:56.525 --> 00:02:58.549
+Could you break this up
+into even smaller pieces?
+
+48
+00:02:58.549 --> 00:03:02.652
+You absolutely could and
+might you eventually you probably will.
+
+49
+00:03:02.652 --> 00:03:05.636
+But the risk of just not refactoring
+node code for the fun of it and
+
+50
+00:03:05.636 --> 00:03:09.404
+sticking to what we came here to learn,
+I think this is good enough for right now.
+
+51
+00:03:09.404 --> 00:03:14.669
+So now, what I wanna do is
+I want to be able to send
+
+52
+00:03:14.669 --> 00:03:19.693
+this to the browserWindow that asked for
+it.
+
+53
+00:03:19.693 --> 00:03:21.967
+So you've got effectively
+a way to think about this.
+
+54
+00:03:21.967 --> 00:03:26.475
+You've got the browser window, and
+then you've got the actual web contents,
+
+55
+00:03:26.475 --> 00:03:30.241
+which I didn't mean to use
+the definition in the explanation, but
+
+56
+00:03:30.241 --> 00:03:33.683
+I didn't tell you what the words were yet,
+so it feels good.
+
+57
+00:03:33.683 --> 00:03:40.746
+So now we can do
+browserwindow.webContents.
+
+58
+00:03:40.746 --> 00:03:47.382
+You can kinda see that the auto
+complete is ruining the gag right here.
+
+59
+00:03:47.382 --> 00:03:52.102
+So we've got this file-opened, you can
+call it openFile, whatever, this is just
+
+60
+00:03:52.102 --> 00:03:56.565
+a string, it has no meaning in Electron
+other than the meaning that you give it.
+
+61
+00:03:56.565 --> 00:04:00.541
+It is like, what kind of channel are you
+sending this message over, right?
+
+62
+00:04:00.541 --> 00:04:03.534
+Cuz later, you could have anything, right?
+
+63
+00:04:03.534 --> 00:04:08.259
+This can be any string whatsoever,
+it depends on your application.
+
+64
+00:04:08.259 --> 00:04:12.520
+I'm gonna be really honest with you,
+do I waffle back and forth between
+
+65
+00:04:12.520 --> 00:04:16.868
+past tense and present tense in the same
+way that I do with Redux actions?
+
+66
+00:04:16.868 --> 00:04:17.948
+I do.
+
+67
+00:04:17.948 --> 00:04:22.011
+Today, this is the one that I have chosen,
+right?
+
+68
+00:04:22.011 --> 00:04:25.605
+On a different day,
+I might choose something different.
+
+69
+00:04:25.605 --> 00:04:29.637
+Cuz I might send one called openFile
+from the renderer process when they hit
+
+70
+00:04:29.637 --> 00:04:31.309
+the button and file-opened.
+
+71
+00:04:31.309 --> 00:04:34.818
+Yeah, I don't know, you can name
+this anything you want, go for it.
+
+72
+00:04:34.818 --> 00:04:39.822
+And I am gonna send
+through the filePath and
+
+73
+00:04:39.822 --> 00:04:43.717
+the content of the file, right?
+
+74
+00:04:43.717 --> 00:04:46.691
+And you could do that in a different
+order if you want as well.
+
+75
+00:04:46.691 --> 00:04:50.445
+I might actually choose to
+send the content first.
+
+76
+00:04:52.602 --> 00:04:54.169
+In this case, and so
+
+77
+00:04:54.169 --> 00:04:59.718
+now I can send this information to
+the browserWindow that asked for it.
+
+78
+00:04:59.718 --> 00:05:04.397
+But like most events in the DOM,
+in JavaScript, in Node,
+
+79
+00:05:04.397 --> 00:05:09.363
+and what have you,
+sending event when no one's listening for
+
+80
+00:05:09.363 --> 00:05:13.105
+it doesn't really matter, does it, right?
+
+81
+00:05:13.105 --> 00:05:21.160
+So the next step is to figure out
+how to read this message, right?
+
+82
+00:05:21.160 --> 00:05:24.152
+And so
+this is where the IPC pieces come in,
+
+83
+00:05:24.152 --> 00:05:27.572
+this is technically using
+ipcMain in this case.
+
+84
+00:05:27.572 --> 00:05:31.073
+There is another library
+called ipcRenderer.
+
+85
+00:05:31.073 --> 00:05:35.062
+Now, the one thing that I should warn
+you about this is that is, again,
+
+86
+00:05:35.062 --> 00:05:38.587
+this is what I said before in that
+diagram that we showed, which
+
+87
+00:05:38.587 --> 00:05:42.806
+is that preload script is technically
+happening in the renderer process.
+
+88
+00:05:42.806 --> 00:05:49.043
+But it is the only one with access to
+any kind of Electron nuances, right?
+
+89
+00:05:49.043 --> 00:05:54.692
+And so we don't have access to ipcRenderer
+in the actual browser context,
+
+90
+00:05:54.692 --> 00:05:59.101
+we only have access to ipcRenderer
+in the preload script.
+
+91
+00:05:59.101 --> 00:06:07.708
+Now, could I do stuff like
+nodeIntegration: true?
+
+92
+00:06:07.708 --> 00:06:12.205
+I could,
+I think I might actually go in here.
+
+93
+00:06:12.205 --> 00:06:16.799
+And that would give me all of
+node in the Chrome instance.
+
+94
+00:06:16.799 --> 00:06:19.352
+And I could do require FS and
+
+95
+00:06:19.352 --> 00:06:24.351
+talk directly to databases
+from the Chrome context.
+
+96
+00:06:24.351 --> 00:06:27.321
+That will get you the old behavior,
+
+97
+00:06:27.321 --> 00:06:31.877
+that was the way that you did
+it up until a few years ago.
+
+98
+00:06:31.877 --> 00:06:36.537
+That said, I'm just gonna just pretend
+this doesn't exist and pretend that we
+
+99
+00:06:36.537 --> 00:06:41.284
+actually care somewhat about security and
+best practices on our time together.
+
+100
+00:06:41.284 --> 00:06:45.700
+So in this world,
+preload has access to, I think,
+
+101
+00:06:45.700 --> 00:06:50.943
+the clipboard module,
+ipcRenderer, the process object,
+
+102
+00:06:50.943 --> 00:06:54.776
+and the web contents that it's gonna load.
+
+103
+00:06:54.776 --> 00:06:59.811
+So we can get access to these
+messages only in the preload script.
+
+104
+00:06:59.811 --> 00:07:02.920
+So let's go over there for now.
+
+105
+00:07:02.920 --> 00:07:07.312
+This code should make sense to anyone
+who's looking at it presently.
+
+106
+00:07:07.312 --> 00:07:12.810
+Great, and so here we can import
+
+107
+00:07:12.810 --> 00:07:19.336
+ipcRenderer from electron, right?
+
+108
+00:07:19.336 --> 00:07:23.434
+And so we've got that in place,
+and we can do an ipcRenderer,
+
+109
+00:07:25.815 --> 00:07:28.809
+.on, or Renderer.
+
+110
+00:07:32.987 --> 00:07:36.924
+.on, and again, as you look at
+the function signature here,
+
+111
+00:07:36.924 --> 00:07:38.721
+it's any channel, right?
+
+112
+00:07:38.721 --> 00:07:43.430
+So, This is where you could get
+
+113
+00:07:43.430 --> 00:07:47.087
+a little fancier with the types
+that we're gonna get to today,
+
+114
+00:07:47.087 --> 00:07:51.585
+because it's the same way with Redux
+actions, you must spell that, right?
+
+115
+00:07:51.585 --> 00:07:55.275
+And you will wonder why your app
+doesn't work, ask me how I know.
+
+116
+00:07:55.275 --> 00:08:00.259
+But generally speaking, so
+we called it file-opened, and
+
+117
+00:08:00.259 --> 00:08:05.535
+if I look back at what I wrote,
+I was parsing the content first and
+
+118
+00:08:05.535 --> 00:08:08.096
+the filePath second, right?
+
+119
+00:08:08.096 --> 00:08:14.783
+So we'll say event, Important note
+here is that, as you can see,
+
+120
+00:08:17.737 --> 00:08:22.997
+Regardless of what we parse in
+the message, the actual event is the first
+
+121
+00:08:22.997 --> 00:08:28.097
+followed by whatever you parse
+through as the subsequent arguments.
+
+122
+00:08:28.097 --> 00:08:32.429
+So if we go back to the main things that
+you parsed in the channel, content and
+
+123
+00:08:32.429 --> 00:08:34.665
+filePath, those become the second and
+
+124
+00:08:34.665 --> 00:08:38.680
+third arguments with the event
+becoming the first argument, right?
+
+125
+00:08:38.680 --> 00:08:45.803
+And we know that those are,
+at this moment, gonna be both strings.
+
+126
+00:08:45.803 --> 00:08:48.802
+String, and
+I'm just gonna make this an underscore so
+
+127
+00:08:48.802 --> 00:08:52.399
+that ESLint leaves me alone about
+the fact that I'm not using it.
+
+128
+00:08:52.399 --> 00:08:57.858
+Great, and let's just start with
+the easiest possible thing right now,
+
+129
+00:08:57.858 --> 00:09:03.407
+which is just, we're just gonna
+console.log the content in the filePath
+
+130
+00:09:03.407 --> 00:09:09.153
+to verify that we've got that full-on
+connection between the two in place.
+
+131
+00:09:09.153 --> 00:09:11.680
+So let's go ahead and verify,
+because you know what?
+
+132
+00:09:11.680 --> 00:09:14.532
+I don't wanna code more before I make
+sure that everything I just wrote works.
+
+133
+00:09:14.532 --> 00:09:16.794
+Cool, so we can go pick a file, and
+
+134
+00:09:16.794 --> 00:09:21.164
+you can see that now we have access
+to that in the renderer process.
+
+135
+00:09:21.164 --> 00:09:23.954
+So now we can read a file from Node and
+
+136
+00:09:23.954 --> 00:09:27.860
+just push it right on
+through to the preload script
+
+137
+00:09:27.860 --> 00:09:32.513
+that can then theoretically
+do stuff with the DOM, right?
+
+138
+00:09:32.513 --> 00:09:34.470
+Again, the preload script runs once.
+
+139
+00:09:34.470 --> 00:09:36.743
+It's kinda always still
+running in the background, but
+
+140
+00:09:36.743 --> 00:09:38.171
+you have access to write code once.
+
+141
+00:09:38.171 --> 00:09:42.801
+And you can't like, okay, now that
+they've done something else in the DOM,
+
+142
+00:09:42.801 --> 00:09:46.798
+go ahead and modify the preload script,
+and you could with really,
+
+143
+00:09:46.798 --> 00:09:48.923
+really bad practices and hacking.
+
+144
+00:09:48.923 --> 00:09:49.969
+Yes, right.
+
+145
+00:09:49.969 --> 00:09:53.291
+Could you just take the entire
+ipcRenderer and expose it down?
+
+146
+00:09:53.291 --> 00:09:58.647
+And could you go out of your way to create
+as many security holes as possible?
+
+147
+00:09:58.647 --> 00:10:01.516
+Of course, you could, I'm not going to.
+
+148
+00:10:01.516 --> 00:10:06.205
+That's an exercise for
+you when you have a tight deadline.
+
+149
+00:10:06.205 --> 00:10:11.111
+So at this point, we can write it to
+the DOM at this point and be good.
+
+150
+00:10:11.111 --> 00:10:14.432
+Now, I have this just
+because I don't wanna,
+
+151
+00:10:14.432 --> 00:10:18.359
+I could theoretically do
+a document.getElementId.
+
+152
+00:10:18.359 --> 00:10:23.425
+I just stored all those selectors
+in a second file called elements.
+
+153
+00:10:30.354 --> 00:10:34.527
+That should be lowercase, I think it's
+
+154
+00:10:34.527 --> 00:10:40.162
+renderer, renderer.
+
+155
+00:10:42.472 --> 00:10:47.275
+Cool, and all that,
+it's an object with getters for
+
+156
+00:10:47.275 --> 00:10:50.918
+all of my different selectors, right?
+
+157
+00:10:50.918 --> 00:10:54.038
+Yes, I know that it has
+the idea of MarkdownView.
+
+158
+00:10:54.038 --> 00:10:58.369
+I could do a document.queryselector,
+we could do that as well.
+
+159
+00:10:58.369 --> 00:11:02.678
+But live coding me wanted
+a little bit of autocomplete and
+
+160
+00:11:02.678 --> 00:11:07.635
+the known selectors, in this case,
+so live coding me gets that.
+
+161
+00:11:07.635 --> 00:11:14.673
+So at this point, I can basically say,
+I can do Elements.MarkdownView.
+
+162
+00:11:14.673 --> 00:11:18.451
+And I know that that's a TextArea
+element cuz I use TypeScript.
+
+163
+00:11:18.451 --> 00:11:20.902
+So I can say that that
+will equal the content.
+
+164
+00:11:20.902 --> 00:11:25.770
+And then I have another helper,
+that's just renderMarkdown to HTML.
+
+165
+00:11:25.770 --> 00:11:27.606
+And that will put it in that second div,
+right?
+
+166
+00:11:27.606 --> 00:11:31.335
+Cuz yes, you can watch me do DOM
+manipulation, if you really want.
+
+167
+00:11:31.335 --> 00:11:34.156
+But I just wrote myself some
+helper methods, and that will
+
+168
+00:11:34.156 --> 00:11:37.852
+run it through remark with a bunch of
+different plugins, so on and so forth.
+
+169
+00:11:37.852 --> 00:11:42.184
+So now when we get the fileOpen message,
+we take that content,
+
+170
+00:11:42.184 --> 00:11:46.923
+we put it in that text area, and
+then we take the markdown turn HTML and
+
+171
+00:11:46.923 --> 00:11:50.470
+set the inner HTML of the div
+over to the right side.
+
+172
+00:11:50.470 --> 00:11:53.030
+And ideally,
+we should be able to open files.
+
+173
+00:11:53.030 --> 00:11:56.555
+And we've got that first
+piece of triggering, I mean,
+
+174
+00:11:56.555 --> 00:12:00.237
+right now that fileOpenDialogue
+happens no matter what.
+
+175
+00:12:00.237 --> 00:12:02.809
+And we'll see how to do
+the other way of communication,
+
+176
+00:12:02.809 --> 00:12:06.437
+cuz then once we have the full loop,
+now we're cooking with gas, as they say.
+
+177
+00:12:06.437 --> 00:12:10.731
+So we've got that, let's verify that it
+works the way that I think it does before
+
+178
+00:12:10.731 --> 00:12:17.456
+I get too carried away with myself And
+
+179
+00:12:17.456 --> 00:12:22.362
+I will pick this one, and
+you can see that now I can open files
+
+180
+00:12:22.362 --> 00:12:27.284
+in the file system, and
+they render over in the DOM itself.
+

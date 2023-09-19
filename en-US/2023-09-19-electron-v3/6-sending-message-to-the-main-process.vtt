@@ -1,0 +1,782 @@
+WEBVTT
+
+1
+00:00:00.411 --> 00:00:06.022
+What I would really like is to make
+that button do a thing, right?
+
+2
+00:00:06.022 --> 00:00:08.843
+Maybe it's not even the worst thing in
+the world that if there is no file loaded,
+
+3
+00:00:08.843 --> 00:00:11.931
+immediately start with a file open dialog,
+but maybe I just wanna write here, right?
+
+4
+00:00:11.931 --> 00:00:15.120
+Maybe I wanna choose when I wanna
+open a file or not open a file.
+
+5
+00:00:15.120 --> 00:00:18.165
+So now we need to figure out
+communication in the other direction.
+
+6
+00:00:18.165 --> 00:00:22.447
+How do we send messages from the renderer
+process back to the main process?
+
+7
+00:00:22.447 --> 00:00:29.169
+So let's get the direction going
+the other way in this case.
+
+8
+00:00:29.169 --> 00:00:33.147
+So we wanna start by getting
+rid of the automatic,
+
+9
+00:00:33.147 --> 00:00:37.897
+no matter what,
+all-the-time code that we had in place.
+
+10
+00:00:37.897 --> 00:00:43.171
+Yeah right now we have to do the work
+ourself we've got to do something to get
+
+11
+00:00:43.171 --> 00:00:48.212
+that file open dialog to work, and
+that's our mission at this moment.
+
+12
+00:00:48.212 --> 00:00:53.854
+So we have one kinda new concept which
+is as I said before the stuff in the DOM
+
+13
+00:00:53.854 --> 00:00:59.418
+has no is effectively not dissimilar
+to writing brothers as a side code.
+
+14
+00:00:59.418 --> 00:01:01.407
+It does not know about electron and
+
+15
+00:01:01.407 --> 00:01:05.727
+just kinda goes to the question we have
+in the very beginning of like, hey,
+
+16
+00:01:05.727 --> 00:01:08.698
+can I also put together
+a regular web UI on this one.
+
+17
+00:01:08.698 --> 00:01:11.848
+Maybe not with these buttons but for
+
+18
+00:01:11.848 --> 00:01:16.573
+different purposes you can
+because the renderer code
+
+19
+00:01:16.573 --> 00:01:21.625
+knows very little about what
+is happening in electrons.
+
+20
+00:01:21.625 --> 00:01:27.444
+So we have to expose the ability to talk
+to the main process in a very allow listed
+
+21
+00:01:27.444 --> 00:01:33.014
+kind of way of doing that and say,
+okay, here, here's a bridge, right?
+
+22
+00:01:33.014 --> 00:01:36.945
+Back to the main context with only a few
+things that you should be able to do.
+
+23
+00:01:36.945 --> 00:01:42.375
+That way, if I do get a malicious script,
+I don't worry about any of these things.
+
+24
+00:01:42.375 --> 00:01:47.123
+And I keep using the term bridge and
+I keep picking a file called
+
+25
+00:01:47.123 --> 00:01:52.254
+context bridge.md as if I am trying
+to allude what the library is.
+
+26
+00:01:52.254 --> 00:01:57.197
+As if I put the answer on the screen the
+entire time without directly referencing
+
+27
+00:01:57.197 --> 00:02:00.957
+it, which is the context bridge
+is a effectively a way to have
+
+28
+00:02:00.957 --> 00:02:03.122
+a kind of isolated closure scope.
+
+29
+00:02:03.122 --> 00:02:07.236
+And there's a bunch of ways to do this,
+you are doing a really specific out,
+
+30
+00:02:07.236 --> 00:02:09.359
+you can have very different contexts,
+
+31
+00:02:09.359 --> 00:02:12.016
+even this window only gets
+access to this thing.
+
+32
+00:02:12.016 --> 00:02:14.707
+The other thing we don't
+have that level of need, so
+
+33
+00:02:14.707 --> 00:02:17.229
+we're gonna use what's
+called the main world.
+
+34
+00:02:17.229 --> 00:02:20.934
+You can have any number of worlds
+with different things exposed.
+
+35
+00:02:20.934 --> 00:02:25.882
+We're gonna put everything in the single
+domain world using the context bridge We
+
+36
+00:02:25.882 --> 00:02:30.397
+will expose the ability to send a message,
+and only a message at this moment
+
+37
+00:02:30.397 --> 00:02:35.011
+to the main process saying trigger
+that show open dialogue please, right?
+
+38
+00:02:35.011 --> 00:02:40.522
+So in this case we go back
+to that preload script and
+
+39
+00:02:40.522 --> 00:02:43.943
+we can pull in context bridge.
+
+40
+00:02:46.211 --> 00:02:50.090
+All right, and so
+we've got a context bridge and
+
+41
+00:02:50.090 --> 00:02:54.164
+we're gonna worry about
+the exposeInMainWorld.
+
+42
+00:02:54.164 --> 00:02:56.852
+There are other,
+world is a really cool term, but
+
+43
+00:02:56.852 --> 00:02:59.163
+it doesn't mean anything particularly.
+
+44
+00:02:59.163 --> 00:03:02.991
+It's just what kinda isolated
+context do you want.
+
+45
+00:03:02.991 --> 00:03:07.544
+It's using the context isolation
+that is present in Chrome, and
+
+46
+00:03:07.544 --> 00:03:10.706
+then we just give it some kind of key,
+right?
+
+47
+00:03:10.706 --> 00:03:14.363
+And the same way we had a key very much
+for the IPC renderer is some kind of key.
+
+48
+00:03:14.363 --> 00:03:15.519
+Depending what you're doing,
+
+49
+00:03:15.519 --> 00:03:17.624
+you might call some different
+you could call it electron.
+
+50
+00:03:17.624 --> 00:03:19.975
+I don't know, call it whatever you want.
+
+51
+00:03:19.975 --> 00:03:23.228
+I'm gonna call this one API,
+because it's a way that I'm gonna trigger
+
+52
+00:03:23.228 --> 00:03:26.337
+stuff back to the main ones and
+I couldn't come up with a better name.
+
+53
+00:03:26.337 --> 00:03:29.733
+And then after that,
+it takes an object, right?
+
+54
+00:03:29.733 --> 00:03:33.439
+And this object is basically things that
+
+55
+00:03:33.439 --> 00:03:37.691
+you want to expose into
+the renderer process.
+
+56
+00:03:37.691 --> 00:03:41.264
+And so for our case, is like we can
+say something along the lines of,
+
+57
+00:03:41.264 --> 00:03:44.100
+let's just say this is
+the show open dialog, right?
+
+58
+00:03:46.673 --> 00:03:50.157
+And it doesn't have to be the same
+as the method in the main process.
+
+59
+00:03:50.157 --> 00:03:55.661
+That is just simply, it makes sense
+that it's a method in the main process,
+
+60
+00:03:55.661 --> 00:04:00.400
+but it doesn't have to be, but
+I'm not coming up with a new name.
+
+61
+00:04:00.400 --> 00:04:05.811
+So we have a few options in here,
+in this case we can send a message.
+
+62
+00:04:05.811 --> 00:04:08.944
+This case is show open dialogue,
+which seems like a good name for
+
+63
+00:04:08.944 --> 00:04:12.441
+a message to send the main process,
+if I would to show an open dialogue.
+
+64
+00:04:12.441 --> 00:04:15.722
+But again, these strings are arbitrary,
+they don't mean anything.
+
+65
+00:04:15.722 --> 00:04:18.824
+It's just,
+if you send a message on this channel,
+
+66
+00:04:18.824 --> 00:04:21.432
+you need to receive it
+on the same channel.
+
+67
+00:04:21.432 --> 00:04:22.964
+So we have send, and
+
+68
+00:04:22.964 --> 00:04:28.202
+there's a few different IPC methods
+that we will look at in a second.
+
+69
+00:04:28.202 --> 00:04:33.827
+And I'll kinda talk about
+some of the differences.
+
+70
+00:04:33.827 --> 00:04:37.502
+There are some that seem more
+compelling and seem better,
+
+71
+00:04:37.502 --> 00:04:41.703
+I'm gonna tell you right now,
+the simplest is probably the best.
+
+72
+00:04:41.703 --> 00:04:46.285
+Send is to basically send a message
+you saw it on the other direction,
+
+73
+00:04:46.285 --> 00:04:50.640
+it has a friend called invoke,
+which we'll look at separately.
+
+74
+00:04:50.640 --> 00:04:53.674
+You will see me over our time together,
+I will use invoke and
+
+75
+00:04:53.674 --> 00:04:57.450
+then I will switch it back to send
+mostly to demonstrate how invoke works.
+
+76
+00:04:57.450 --> 00:04:59.942
+And then I will go back
+to preferring send,
+
+77
+00:04:59.942 --> 00:05:03.414
+send sends a message it's kind of send and
+forget, right?
+
+78
+00:05:03.414 --> 00:05:06.959
+Very much like most things when
+we're dealing with events.
+
+79
+00:05:06.959 --> 00:05:12.968
+Invoke will send a message that on the
+main process you can set of listening for,
+
+80
+00:05:12.968 --> 00:05:13.604
+right?
+
+81
+00:05:13.604 --> 00:05:15.347
+Instead of on you can handle,
+
+82
+00:05:15.347 --> 00:05:20.110
+and then have a return value that then
+goes back to the renderer process, right?
+
+83
+00:05:20.110 --> 00:05:23.273
+That said,
+stuff like opening a file seems like yes,
+
+84
+00:05:23.273 --> 00:05:27.651
+I want to be able to have that kinda
+very synchronous feeling as promises.
+
+85
+00:05:27.651 --> 00:05:30.582
+But synchronous feeling API,
+the problem is for
+
+86
+00:05:30.582 --> 00:05:34.599
+opening a file there ends up being
+nine ways that you do it, right?
+
+87
+00:05:34.599 --> 00:05:38.465
+It ends up being a file menu,
+ends up being dragging something on, and
+
+88
+00:05:38.465 --> 00:05:40.889
+ends up being triggering
+it from a button and
+
+89
+00:05:40.889 --> 00:05:44.513
+coupling these things will almost
+always make you somewhat sad.
+
+90
+00:05:44.513 --> 00:05:47.474
+But it is also a simpler process than
+having two different channels and
+
+91
+00:05:47.474 --> 00:05:48.488
+setting up listeners.
+
+92
+00:05:48.488 --> 00:05:49.908
+It's doing it under the hood.
+
+93
+00:05:49.908 --> 00:05:53.363
+You could write it
+yourself if you wanted to.
+
+94
+00:05:53.363 --> 00:05:58.215
+So in this case,
+let's send the show open dialogue, right?
+
+95
+00:05:58.215 --> 00:06:02.126
+And you notice I didn't call it open file,
+because again, if I drag a file on,
+
+96
+00:06:02.126 --> 00:06:04.814
+I don't need to show the show
+open dialogue, right?
+
+97
+00:06:04.814 --> 00:06:08.177
+Some of this is just the thinking
+through of the application.
+
+98
+00:06:08.177 --> 00:06:12.417
+So we wanna show an open dialogue,
+and we're just gonna say that, hey,
+
+99
+00:06:12.417 --> 00:06:15.140
+I would like to make this
+a thing that happens.
+
+100
+00:06:15.140 --> 00:06:20.502
+There is one small thing that we
+need to do for TypeScript's sake,
+
+101
+00:06:20.502 --> 00:06:26.845
+which is, like I explained to TypeScript
+that this is now a thing that exists.
+
+102
+00:06:26.845 --> 00:06:28.875
+And there's a bunch of places I can do it,
+and
+
+103
+00:06:28.875 --> 00:06:30.860
+I will try different
+options as we go along.
+
+104
+00:06:30.860 --> 00:06:34.842
+But effectively, when you expose
+something in the main world,
+
+105
+00:06:34.842 --> 00:06:38.465
+that API becomes a property
+on the window object, right?
+
+106
+00:06:38.465 --> 00:06:43.386
+And then whatever objects you put in here,
+and these can be async functions,
+
+107
+00:06:43.386 --> 00:06:47.713
+they should stay to relatively
+simple strings and stuff like that.
+
+108
+00:06:47.713 --> 00:06:50.018
+You can't send complicated
+objects the same way,
+
+109
+00:06:50.018 --> 00:06:51.578
+you can't do it over the network.
+
+110
+00:06:51.578 --> 00:06:53.007
+There are other ways to do that.
+
+111
+00:06:53.007 --> 00:06:58.154
+But generally speaking,
+it puts a given key on the window object
+
+112
+00:06:58.154 --> 00:07:03.506
+that then becomes available to you and
+you can use in your browser.
+
+113
+00:07:03.506 --> 00:07:06.505
+At this moment, this is the first time
+that TypeScript's gonna get angry at us.
+
+114
+00:07:06.505 --> 00:07:10.689
+Because it's you call window.API,
+TypeScript should be like,
+
+115
+00:07:10.689 --> 00:07:12.565
+that's not a thing, right?
+
+116
+00:07:12.565 --> 00:07:14.083
+And so I'm just gonna do it in here.
+
+117
+00:07:14.083 --> 00:07:19.248
+You can literally probably do
+it in that file if you want to.
+
+118
+00:07:19.248 --> 00:07:22.234
+And so here we've got, we're just
+gonna extend the window objects.
+
+119
+00:07:22.234 --> 00:07:26.561
+Also I have this API key on here and
+it has show open dialogue.
+
+120
+00:07:26.561 --> 00:07:31.990
+This will keep you from making boo-boos,
+but it is an extra hassle and
+
+121
+00:07:31.990 --> 00:07:35.672
+I will show you probably
+in the second example,
+
+122
+00:07:35.672 --> 00:07:38.819
+how to dynamically program your types.
+
+123
+00:07:38.819 --> 00:07:42.033
+But let's focus for now.
+
+124
+00:07:42.033 --> 00:07:47.477
+So cool, we're putting that in
+the main world in the context bridge
+
+125
+00:07:47.477 --> 00:07:53.031
+on the window object and now we should
+have this ability here as well.
+
+126
+00:07:53.031 --> 00:07:58.361
+Great, and so what I can do at this point
+is I'm gonna go into that renderer for
+
+127
+00:07:58.361 --> 00:07:59.517
+the first time.
+
+128
+00:07:59.517 --> 00:08:03.778
+And so that's just listening for the text
+area and then showing on the other side,
+
+129
+00:08:03.778 --> 00:08:05.707
+that's purely client-side code.
+
+130
+00:08:05.707 --> 00:08:11.377
+What I also wanna do is do this elements,
+elements, yeah, sure.
+
+131
+00:08:11.377 --> 00:08:18.164
+The open file button, and
+then was a addEventListener for a click.
+
+132
+00:08:18.164 --> 00:08:22.918
+And when that happens, we'll call this
+window API Show Open dialog, right?
+
+133
+00:08:22.918 --> 00:08:27.276
+So that will then that has access to
+the context versus the preload script,
+
+134
+00:08:27.276 --> 00:08:29.766
+which can then send
+messages to the main and
+
+135
+00:08:29.766 --> 00:08:32.552
+then we should have the full
+loop at this point.
+
+136
+00:08:32.552 --> 00:08:33.183
+So let's try out.
+
+137
+00:08:49.740 --> 00:08:54.415
+So close, and theoretically, this is
+now code that should regenerate, so
+
+138
+00:08:54.415 --> 00:08:56.251
+let's say Open File button.
+
+139
+00:09:03.109 --> 00:09:04.262
+I know what the issue is.
+
+140
+00:09:04.262 --> 00:09:05.325
+Does anyone know what the issue is?
+
+141
+00:09:08.442 --> 00:09:11.656
+I didn't purposely make this mistake,
+but I talked about it.
+
+142
+00:09:16.223 --> 00:09:18.027
+Let's review what I did.
+
+143
+00:09:18.027 --> 00:09:21.977
+Window.api show open dialog, right?
+
+144
+00:09:21.977 --> 00:09:26.721
+Which goes into the preload to send this
+show open dialog to the main process.
+
+145
+00:09:29.321 --> 00:09:34.167
+There's nothing listening for in the main
+process, we didn't write that code, right?
+
+146
+00:09:34.167 --> 00:09:38.720
+So let's talk about that real quick and
+let's get that in place and
+
+147
+00:09:38.720 --> 00:09:42.866
+that will then complete the loop
+which is this IPC renderer or
+
+148
+00:09:42.866 --> 00:09:45.894
+IC main at this point, show open dialogue.
+
+149
+00:09:50.715 --> 00:09:53.637
+That is gonna be
+the listener in this case.
+
+150
+00:09:53.637 --> 00:09:57.423
+And as you can see what we wanna do is
+on the event we have this event sender,
+
+151
+00:09:57.423 --> 00:10:01.349
+there's also an event reply if you just
+wanted to set something right back.
+
+152
+00:10:01.349 --> 00:10:04.533
+If you wanted to do something and
+immediately send it back,
+
+153
+00:10:04.533 --> 00:10:06.198
+Event Reply will do the trick.
+
+154
+00:10:06.198 --> 00:10:11.920
+But we've got this flow of attaching it to
+the dialogue and stuff along those lines.
+
+155
+00:10:11.920 --> 00:10:15.769
+So we've got browsing window has a class
+method called from web contents,
+
+156
+00:10:15.769 --> 00:10:17.671
+which is what this sender is, oops.
+
+157
+00:10:19.857 --> 00:10:21.811
+Right, that is a web contents.
+
+158
+00:10:21.811 --> 00:10:26.227
+So we'll get the browser window, if for
+some reason we got this thing with no
+
+159
+00:10:26.227 --> 00:10:31.058
+event, which I don't think that's mostly
+to keep TypeScript from yelling at me.
+
+160
+00:10:31.058 --> 00:10:34.214
+Then we will parse it in, and
+now we should have the full flow.
+
+161
+00:10:34.214 --> 00:10:36.301
+We send a message, no one listens for it.
+
+162
+00:10:46.173 --> 00:10:50.199
+Open file, Pick the context bridge.
+
+163
+00:10:50.199 --> 00:10:52.474
+We now have that full integration.
+

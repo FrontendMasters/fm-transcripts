@@ -1,0 +1,90 @@
+[00:00:00]
+>> What I would really like is to make that button do a thing, right? Maybe it's not even the worst thing in the world that if there is no file loaded, immediately start with a file open dialog, but maybe I just wanna write here, right? Maybe I wanna choose when I wanna open a file or not open a file.
+
+[00:00:15]
+So now we need to figure out communication in the other direction. How do we send messages from the renderer process back to the main process? So let's get the direction going the other way in this case. So we wanna start by getting rid of the automatic, no matter what, all-the-time code that we had in place.
+
+[00:00:37]
+Yeah right now we have to do the work ourself we've got to do something to get that file open dialog to work, and that's our mission at this moment. So we have one kinda new concept which is as I said before the stuff in the DOM has no is effectively not dissimilar to writing brothers as a side code.
+
+[00:00:59]
+It does not know about electron and just kinda goes to the question we have in the very beginning of like, hey, can I also put together a regular web UI on this one. Maybe not with these buttons but for different purposes you can because the renderer code knows very little about what is happening in electrons.
+
+[00:01:21]
+So we have to expose the ability to talk to the main process in a very allow listed kind of way of doing that and say, okay, here, here's a bridge, right? Back to the main context with only a few things that you should be able to do. That way, if I do get a malicious script, I don't worry about any of these things.
+
+[00:01:42]
+And I keep using the term bridge and I keep picking a file called context bridge.md as if I am trying to allude what the library is. As if I put the answer on the screen the entire time without directly referencing it, which is the context bridge is a effectively a way to have a kind of isolated closure scope.
+
+[00:02:03]
+And there's a bunch of ways to do this, you are doing a really specific out, you can have very different contexts, even this window only gets access to this thing. The other thing we don't have that level of need, so we're gonna use what's called the main world.
+
+[00:02:17]
+You can have any number of worlds with different things exposed. We're gonna put everything in the single domain world using the context bridge We will expose the ability to send a message, and only a message at this moment to the main process saying trigger that show open dialogue please, right?
+
+[00:02:35]
+So in this case we go back to that preload script and we can pull in context bridge. All right, and so we've got a context bridge and we're gonna worry about the exposeInMainWorld. There are other, world is a really cool term, but it doesn't mean anything particularly. It's just what kinda isolated context do you want.
+
+[00:03:02]
+It's using the context isolation that is present in Chrome, and then we just give it some kind of key, right? And the same way we had a key very much for the IPC renderer is some kind of key. Depending what you're doing, you might call some different you could call it electron.
+
+[00:03:17]
+I don't know, call it whatever you want. I'm gonna call this one API, because it's a way that I'm gonna trigger stuff back to the main ones and I couldn't come up with a better name. And then after that, it takes an object, right? And this object is basically things that you want to expose into the renderer process.
+
+[00:03:37]
+And so for our case, is like we can say something along the lines of, let's just say this is the show open dialog, right? And it doesn't have to be the same as the method in the main process. That is just simply, it makes sense that it's a method in the main process, but it doesn't have to be, but I'm not coming up with a new name.
+
+[00:04:00]
+So we have a few options in here, in this case we can send a message. This case is show open dialogue, which seems like a good name for a message to send the main process, if I would to show an open dialogue. But again, these strings are arbitrary, they don't mean anything.
+
+[00:04:15]
+It's just, if you send a message on this channel, you need to receive it on the same channel. So we have send, and there's a few different IPC methods that we will look at in a second. And I'll kinda talk about some of the differences. There are some that seem more compelling and seem better, I'm gonna tell you right now, the simplest is probably the best.
+
+[00:04:41]
+Send is to basically send a message you saw it on the other direction, it has a friend called invoke, which we'll look at separately. You will see me over our time together, I will use invoke and then I will switch it back to send mostly to demonstrate how invoke works.
+
+[00:04:57]
+And then I will go back to preferring send, send sends a message it's kind of send and forget, right? Very much like most things when we're dealing with events. Invoke will send a message that on the main process you can set of listening for, right? Instead of on you can handle, and then have a return value that then goes back to the renderer process, right?
+
+[00:05:20]
+That said, stuff like opening a file seems like yes, I want to be able to have that kinda very synchronous feeling as promises. But synchronous feeling API, the problem is for opening a file there ends up being nine ways that you do it, right? It ends up being a file menu, ends up being dragging something on, and ends up being triggering it from a button and coupling these things will almost always make you somewhat sad.
+
+[00:05:44]
+But it is also a simpler process than having two different channels and setting up listeners. It's doing it under the hood. You could write it yourself if you wanted to. So in this case, let's send the show open dialogue, right? And you notice I didn't call it open file, because again, if I drag a file on, I don't need to show the show open dialogue, right?
+
+[00:06:04]
+Some of this is just the thinking through of the application. So we wanna show an open dialogue, and we're just gonna say that, hey, I would like to make this a thing that happens. There is one small thing that we need to do for TypeScript's sake, which is, like I explained to TypeScript that this is now a thing that exists.
+
+[00:06:26]
+And there's a bunch of places I can do it, and I will try different options as we go along. But effectively, when you expose something in the main world, that API becomes a property on the window object, right? And then whatever objects you put in here, and these can be async functions, they should stay to relatively simple strings and stuff like that.
+
+[00:06:47]
+You can't send complicated objects the same way, you can't do it over the network. There are other ways to do that. But generally speaking, it puts a given key on the window object that then becomes available to you and you can use in your browser. At this moment, this is the first time that TypeScript's gonna get angry at us.
+
+[00:07:06]
+Because it's you call window.API, TypeScript should be like, that's not a thing, right? And so I'm just gonna do it in here. You can literally probably do it in that file if you want to. And so here we've got, we're just gonna extend the window objects. Also I have this API key on here and it has show open dialogue.
+
+[00:07:26]
+This will keep you from making boo-boos, but it is an extra hassle and I will show you probably in the second example, how to dynamically program your types. But let's focus for now. So cool, we're putting that in the main world in the context bridge on the window object and now we should have this ability here as well.
+
+[00:07:53]
+Great, and so what I can do at this point is I'm gonna go into that renderer for the first time. And so that's just listening for the text area and then showing on the other side, that's purely client-side code. What I also wanna do is do this elements, elements, yeah, sure.
+
+[00:08:11]
+The open file button, and then was a addEventListener for a click. And when that happens, we'll call this window API Show Open dialog, right? So that will then that has access to the context versus the preload script, which can then send messages to the main and then we should have the full loop at this point.
+
+[00:08:32]
+So let's try out. So close, and theoretically, this is now code that should regenerate, so let's say Open File button. I know what the issue is. Does anyone know what the issue is? I didn't purposely make this mistake, but I talked about it. Let's review what I did.
+
+[00:09:18]
+Window.api show open dialog, right? Which goes into the preload to send this show open dialog to the main process. There's nothing listening for in the main process, we didn't write that code, right? So let's talk about that real quick and let's get that in place and that will then complete the loop which is this IPC renderer or IC main at this point, show open dialogue.
+
+[00:09:50]
+That is gonna be the listener in this case. And as you can see what we wanna do is on the event we have this event sender, there's also an event reply if you just wanted to set something right back. If you wanted to do something and immediately send it back, Event Reply will do the trick.
+
+[00:10:06]
+But we've got this flow of attaching it to the dialogue and stuff along those lines. So we've got browsing window has a class method called from web contents, which is what this sender is, oops. Right, that is a web contents. So we'll get the browser window, if for some reason we got this thing with no event, which I don't think that's mostly to keep TypeScript from yelling at me.
+
+[00:10:31]
+Then we will parse it in, and now we should have the full flow. We send a message, no one listens for it. Open file, Pick the context bridge. We now have that full integration.
+
