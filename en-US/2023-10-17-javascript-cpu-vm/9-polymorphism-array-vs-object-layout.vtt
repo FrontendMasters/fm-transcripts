@@ -1,0 +1,1241 @@
+WEBVTT
+
+1
+00:00:00.589 --> 00:00:05.694
+The next one is what we
+call polymorphic behavior,
+
+2
+00:00:05.694 --> 00:00:10.572
+right, or inline caching,
+or property reads.
+
+3
+00:00:10.572 --> 00:00:15.347
+In other words,
+if you're reading a property on an object,
+
+4
+00:00:15.347 --> 00:00:19.010
+and we do that a lot,
+right, it could be fast.
+
+5
+00:00:19.010 --> 00:00:26.410
+In other words, it could take almost
+instant to up to 60 times slower.
+
+6
+00:00:26.410 --> 00:00:31.423
+This is not 60%,
+this is 60X slower, right?
+
+7
+00:00:31.423 --> 00:00:34.400
+So there's a huge difference in
+performance between a fast path and
+
+8
+00:00:34.400 --> 00:00:35.190
+an unhappy path.
+
+9
+00:00:35.190 --> 00:00:38.505
+So let's see what the test looks like.
+
+10
+00:00:38.505 --> 00:00:41.153
+And then let's see what's actually
+happening under the hood.
+
+11
+00:00:41.153 --> 00:00:46.200
+But actually before I do that,
+we need to talk about,
+
+12
+00:00:46.200 --> 00:00:49.686
+how does a VM layout object, right?
+
+13
+00:00:49.686 --> 00:00:53.620
+So we talked about the physical machine.
+
+14
+00:00:53.620 --> 00:00:56.572
+And the reason I talked
+about the physical machine,
+
+15
+00:00:56.572 --> 00:00:59.934
+because I wanna tie it to how
+VMs actually work internally.
+
+16
+00:00:59.934 --> 00:01:02.890
+And so
+let's talk about how VMs layout an array.
+
+17
+00:01:02.890 --> 00:01:06.801
+So let's say you do something
+very simple and you say,
+
+18
+00:01:06.801 --> 00:01:10.042
+myArray 1, 4, a bunch of numbers into it.
+
+19
+00:01:10.042 --> 00:01:15.355
+And then you wanna access
+the array using some index, right?
+
+20
+00:01:15.355 --> 00:01:20.073
+So the way this would translate is that,
+well, VM would, inside of the data
+
+21
+00:01:20.073 --> 00:01:24.742
+section, would create array with
+different values inside of it, right?
+
+22
+00:01:24.742 --> 00:01:25.995
+And you can think of it as an object,
+right?
+
+23
+00:01:25.995 --> 00:01:29.749
+So this object at the location 0
+would have a special hiddenClassId.
+
+24
+00:01:29.749 --> 00:01:31.602
+I'll explain it in a second.
+
+25
+00:01:31.602 --> 00:01:33.424
+It needs to know about a prototype chain.
+
+26
+00:01:33.424 --> 00:01:35.013
+We can talk about it later.
+
+27
+00:01:35.013 --> 00:01:38.655
+It will have a pointer to an actual
+array which is stored somewhere else.
+
+28
+00:01:38.655 --> 00:01:43.656
+The reason why it's stored somewhere
+else is because arrays can grow in size,
+
+29
+00:01:43.656 --> 00:01:46.707
+but your reference to
+the array stays the same.
+
+30
+00:01:46.707 --> 00:01:49.093
+So in other words,
+there has to be a level of indirection.
+
+31
+00:01:49.093 --> 00:01:53.813
+I cannot give you a reference to a memory
+location that later I decide is too small
+
+32
+00:01:53.813 --> 00:01:55.373
+for me to store the value.
+
+33
+00:01:55.373 --> 00:01:58.659
+And then I will have to go back and
+somehow change all the pointers,
+
+34
+00:01:58.659 --> 00:02:00.604
+which is kind of nonsensical, right?
+
+35
+00:02:00.604 --> 00:02:05.116
+So instead, I give you a pointer
+to an intermediary object.
+
+36
+00:02:05.116 --> 00:02:06.921
+And that intermediary object will
+point to the actual location.
+
+37
+00:02:06.921 --> 00:02:09.736
+Now I'm free to allocate more or
+less stuff.
+
+38
+00:02:09.736 --> 00:02:12.838
+Now, not only that, if you ask for
+an array of three, I'm not gonna
+
+39
+00:02:12.838 --> 00:02:16.397
+create an array of three, because
+chances are, you're gonna push into it.
+
+40
+00:02:16.397 --> 00:02:18.329
+And so I'm gonna create a bigger array.
+
+41
+00:02:18.329 --> 00:02:21.969
+And if I don't use it, I don't use it,
+I'm gonna waste a little bit of time.
+
+42
+00:02:21.969 --> 00:02:23.767
+But then if you push stuff into it,
+
+43
+00:02:23.767 --> 00:02:27.180
+I won't have to copy the array
+every single time you push into it.
+
+44
+00:02:27.180 --> 00:02:32.080
+So I'm always gonna allocate a little
+more so that pushes can be fast.
+
+45
+00:02:32.080 --> 00:02:36.590
+And every once in a while, you're gonna
+overblow my optimistic guess, that's fine.
+
+46
+00:02:36.590 --> 00:02:40.004
+I'll copy it into a new
+location where I have space.
+
+47
+00:02:40.004 --> 00:02:43.434
+I'll copy all the values, I'll update
+the pointer and make everybody happy.
+
+48
+00:02:43.434 --> 00:02:48.605
+And finally, I'm gonna keep the actual
+length property in the system so
+
+49
+00:02:48.605 --> 00:02:51.316
+that I know what the actual length is,
+
+50
+00:02:51.316 --> 00:02:55.414
+because the thing I actually
+store is typically bigger.
+
+51
+00:02:55.414 --> 00:02:56.273
+And yeah.
+
+52
+00:02:56.273 --> 00:03:00.584
+&gt;&gt; In other languages where you have
+to specify the length of an array and
+
+53
+00:03:00.584 --> 00:03:05.730
+it can't really change, is it following
+that same system of Java, for example?
+
+54
+00:03:05.730 --> 00:03:08.602
+&gt;&gt; I don't believe you can
+have a fixed array in Java.
+
+55
+00:03:08.602 --> 00:03:12.490
+I think in Java you can
+specify initial array size.
+
+56
+00:03:12.490 --> 00:03:16.540
+I don't believe you can have a fixed one.
+
+57
+00:03:16.540 --> 00:03:21.203
+But different languages can
+choose different things.
+
+58
+00:03:21.203 --> 00:03:25.261
+I don't know what other languages will
+do because there's bajillion different
+
+59
+00:03:25.261 --> 00:03:25.925
+languages.
+
+60
+00:03:25.925 --> 00:03:28.580
+These are the choices that
+typically are made, but
+
+61
+00:03:28.580 --> 00:03:31.990
+doesn't mean that everybody has
+to make these choices, right?
+
+62
+00:03:31.990 --> 00:03:37.080
+I believe, I don't know,
+I'm not an expert in Rust.
+
+63
+00:03:37.080 --> 00:03:41.095
+But I would imagine that Rust would
+probably have an array that is fixed size
+
+64
+00:03:41.095 --> 00:03:43.207
+because that would kind of make sense.
+
+65
+00:03:43.207 --> 00:03:46.100
+But I'm purely speculating and
+guessing, so I don't know.
+
+66
+00:03:49.302 --> 00:03:51.030
+Okay, so what is this hiddenClassId?
+
+67
+00:03:51.030 --> 00:03:56.810
+This contains a internal data structure
+that the VM uses for different tricks.
+
+68
+00:03:56.810 --> 00:03:59.709
+We'll talk about it later in it, but
+
+69
+00:03:59.709 --> 00:04:03.830
+basically there is more
+stuff that VM needs to know.
+
+70
+00:04:03.830 --> 00:04:05.377
+In order to make these things work,
+
+71
+00:04:05.377 --> 00:04:07.711
+we're gonna keep setting
+internal data structure.
+
+72
+00:04:07.711 --> 00:04:11.687
+And what's interesting about it is that
+the pointer to the internal data structure
+
+73
+00:04:11.687 --> 00:04:13.920
+is always the first thing in an array,
+right?
+
+74
+00:04:13.920 --> 00:04:19.299
+So if you think about these objects in
+memory, you can think of it as in like,
+
+75
+00:04:19.299 --> 00:04:22.799
+it's just a contiguous
+block of memory somewhere.
+
+76
+00:04:22.799 --> 00:04:26.047
+And as long as I have a pointer
+to the beginning of the memory,
+
+77
+00:04:26.047 --> 00:04:28.530
+I know how much offset I
+need to get into it, and
+
+78
+00:04:28.530 --> 00:04:31.104
+therefore I know what to read out of it,
+right?
+
+79
+00:04:32.859 --> 00:04:38.652
+And so to perform the operation like
+reading a particular value out of memory,
+
+80
+00:04:38.652 --> 00:04:41.899
+a simplified version, not the real thing,
+
+81
+00:04:41.899 --> 00:04:46.639
+simplified version in terms
+of instruction would be like,
+
+82
+00:04:46.639 --> 00:04:50.538
+you load the address of
+the myRawArray into the A0.
+
+83
+00:04:50.538 --> 00:04:57.990
+You load the someIndex into AE0, and
+then you perform the read operation.
+
+84
+00:04:57.990 --> 00:05:03.280
+This is what's happening underneath
+in the physical machine, right?
+
+85
+00:05:03.280 --> 00:05:06.274
+And as you can see,
+this is a pretty straightforward thing,
+
+86
+00:05:06.274 --> 00:05:10.340
+it's easy to map these things through,
+and CPUs are pretty good at accessing it.
+
+87
+00:05:10.340 --> 00:05:15.501
+And even though the arrays in JavaScript
+are more complicated versions
+
+88
+00:05:15.501 --> 00:05:21.092
+of memory access in CPU, there's
+enough similarities where you're like,
+
+89
+00:05:21.092 --> 00:05:25.320
+yeah, I can see how that maps
+pretty neatly over, right?
+
+90
+00:05:25.320 --> 00:05:28.233
+There is couple of levels
+of indirections in there.
+
+91
+00:05:28.233 --> 00:05:31.801
+There might be, this is incorrect
+because it has to do a check.
+
+92
+00:05:31.801 --> 00:05:35.297
+It has to check the size of someIndex
+to make sure you're not reading past
+
+93
+00:05:35.297 --> 00:05:36.800
+the length of the array, etc.
+
+94
+00:05:36.800 --> 00:05:40.318
+So this is simplified code here.
+
+95
+00:05:40.318 --> 00:05:46.490
+But fundamentally, that maps pretty
+cleanly to what the CPU does internally.
+
+96
+00:05:46.490 --> 00:05:51.392
+And because it maps cleanly, I am going
+to argue that VMs are extremely, sorry,
+
+97
+00:05:51.392 --> 00:05:55.718
+arrays, for the most part,
+some exceptions we'll talk about later,
+
+98
+00:05:55.718 --> 00:05:59.704
+are extremely predictable in
+terms of the performance, right?
+
+99
+00:05:59.704 --> 00:06:05.800
+The way you access things in an array,
+it's gonna be pretty fast and predictable.
+
+100
+00:06:05.800 --> 00:06:09.701
+There isn't gonna be surprise,
+surprise, all of a sudden you're slow.
+
+101
+00:06:09.701 --> 00:06:16.280
+I'll show you a bunch of examples later
+where, surprise, you're slow, in here.
+
+102
+00:06:16.280 --> 00:06:18.740
+So the way this works, right,
+
+103
+00:06:18.740 --> 00:06:24.040
+is as long as the someIndex is
+between 0 and the length value here,
+
+104
+00:06:24.040 --> 00:06:29.814
+the operation is extremely fast because
+all you do is load a 0 into here,
+
+105
+00:06:29.814 --> 00:06:35.327
+load the offset into AE0, and
+then read the value and you're done.
+
+106
+00:06:35.327 --> 00:06:39.502
+So it's extremely fast operations.
+
+107
+00:06:39.502 --> 00:06:41.700
+So what do we do with objects?
+
+108
+00:06:41.700 --> 00:06:44.060
+And this is where things get complicated.
+
+109
+00:06:44.060 --> 00:06:49.890
+So at this point, hopefully I'm
+convincing or I'm kind of getting you to
+
+110
+00:06:49.890 --> 00:06:56.486
+understand that everything on a physical
+machine is just an array access, right?
+
+111
+00:06:56.486 --> 00:06:59.149
+CPUs are good at that.
+They have index registers.
+
+112
+00:06:59.149 --> 00:07:00.817
+They know how to do index plus offset.
+
+113
+00:07:00.817 --> 00:07:05.080
+It's just a memory access
+in terms of array.
+
+114
+00:07:05.080 --> 00:07:09.248
+Okay, so let's say we are going to do now
+
+115
+00:07:09.248 --> 00:07:14.040
+a object which has a person and
+a name, right?
+
+116
+00:07:14.040 --> 00:07:19.048
+And if you think about it,
+an object is really just an array,
+
+117
+00:07:19.048 --> 00:07:24.470
+except that instead of number indices,
+you have names, right?
+
+118
+00:07:24.470 --> 00:07:27.420
+And then you can just say person.name.
+
+119
+00:07:27.420 --> 00:07:30.610
+Okay, so what happens underneath?
+
+120
+00:07:30.610 --> 00:07:34.137
+What happens underneath is that
+when you wanna create a person,
+
+121
+00:07:34.137 --> 00:07:37.350
+what you do is,
+you create actually two separate object.
+
+122
+00:07:37.350 --> 00:07:41.454
+One is this hidden class,
+which the VA calls hidden classes.
+
+123
+00:07:41.454 --> 00:07:42.945
+I don't know why they're called hidden
+classes, but that's what it's called.
+
+124
+00:07:42.945 --> 00:07:48.257
+It's an internal data structure that you
+as a developer do not have access to.
+
+125
+00:07:48.257 --> 00:07:51.212
+There's nothing you can
+do to peek into it.
+
+126
+00:07:53.683 --> 00:07:57.471
+And the way to think about it,
+this is not actually how the VM stores it.
+
+127
+00:07:57.471 --> 00:08:01.363
+But for the simplicity sake,
+the way to think about it is,
+
+128
+00:08:01.363 --> 00:08:04.620
+let's say that the hidden
+array is just a index,
+
+129
+00:08:04.620 --> 00:08:07.976
+it's just an array with
+the strings inside of it.
+
+130
+00:08:07.976 --> 00:08:11.820
+So that when you store the actual person,
+you will create an array that
+
+131
+00:08:11.820 --> 00:08:15.599
+contains the first location is always
+gonna be the hidden class, and
+
+132
+00:08:15.599 --> 00:08:17.120
+then you store the values.
+
+133
+00:08:17.120 --> 00:08:19.247
+In this case,
+you will store Jack and 30, right?
+
+134
+00:08:19.247 --> 00:08:22.599
+And now if you wanna do person.name,
+
+135
+00:08:22.599 --> 00:08:26.894
+what you actually gonna
+do is you're gonna say,
+
+136
+00:08:26.894 --> 00:08:34.460
+I know that the zeroeth location is always
+the special thing reserved for me, right?
+
+137
+00:08:34.460 --> 00:08:35.625
+So I know it's safe to do person 0.
+
+138
+00:08:35.625 --> 00:08:41.240
+And I know it's an array of strings.
+
+139
+00:08:41.240 --> 00:08:42.997
+Again, the actual relation's
+a little more complicated.
+
+140
+00:08:42.997 --> 00:08:47.362
+And therefore, I can basically do the
+equivalent of, give me the indexOf name.
+
+141
+00:08:48.414 --> 00:08:53.271
+And so in this case, it runs through the
+index and it says, name is on location 1.
+
+142
+00:08:53.271 --> 00:08:57.209
+And so
+now you can use that to access the person.
+
+143
+00:08:57.209 --> 00:09:01.107
+And now you get a person lookup.
+
+144
+00:09:01.107 --> 00:09:04.010
+Now looking at this,
+you should be going like, really?
+
+145
+00:09:04.010 --> 00:09:06.067
+That's what's going on under the hood.
+
+146
+00:09:06.067 --> 00:09:09.500
+This seems awfully inefficient.
+
+147
+00:09:09.500 --> 00:09:12.011
+Yes, that is what's
+going on under the hood.
+
+148
+00:09:12.011 --> 00:09:12.730
+Now there's couple of differences.
+
+149
+00:09:12.730 --> 00:09:16.430
+First of all,
+the indexOf is a linear search.
+
+150
+00:09:16.430 --> 00:09:18.930
+The actual implementation
+is more of a hash.
+
+151
+00:09:18.930 --> 00:09:23.547
+And so it's a fixed cost,
+not a linear search.
+
+152
+00:09:23.547 --> 00:09:30.055
+But bearing the difference,
+fundamentally, this is what's going on.
+
+153
+00:09:30.055 --> 00:09:35.125
+Now there are languages like Java or
+C, etc,
+
+154
+00:09:35.125 --> 00:09:40.731
+where this lookup,
+this conversion of a property
+
+155
+00:09:40.731 --> 00:09:45.810
+to an offset can be done
+during compile time.
+
+156
+00:09:45.810 --> 00:09:50.263
+So if you have a static
+languages where the shape of
+
+157
+00:09:50.263 --> 00:09:54.503
+objects is known ahead of time,
+like C or Java,
+
+158
+00:09:54.503 --> 00:09:58.971
+then you can do this
+translation at compile time.
+
+159
+00:09:58.971 --> 00:10:03.462
+And therefore, you know how things
+point ahead of time, and so
+
+160
+00:10:03.462 --> 00:10:06.272
+this operation becomes inexpensive.
+
+161
+00:10:06.272 --> 00:10:08.986
+JavaScript is not one of those languages,
+because JavaScript is dynamic.
+
+162
+00:10:08.986 --> 00:10:13.990
+You can create new properties all
+the time to change things etc, etc, etc.
+
+163
+00:10:13.990 --> 00:10:17.477
+Okay, so this is expensive,
+and this is slow.
+
+164
+00:10:17.477 --> 00:10:20.190
+What can a VM do to make this faster?
+
+165
+00:10:23.340 --> 00:10:27.888
+Okay, before we actually go to this,
+let's talk about a second scenario.
+
+166
+00:10:27.888 --> 00:10:31.110
+Second scenario is, let's say I have
+two objects, person1 and person2.
+
+167
+00:10:31.110 --> 00:10:35.264
+And Jack was 30, now let's add Mary, 28.
+
+168
+00:10:35.264 --> 00:10:40.917
+Notice that the two objects
+share their hidden class.
+
+169
+00:10:40.917 --> 00:10:44.430
+I didn't create two separate
+hidden classes, it's the same one.
+
+170
+00:10:44.430 --> 00:10:48.993
+And the terminology we use is that the
+shape of these two objects is the same.
+
+171
+00:10:50.835 --> 00:10:53.200
+And this will matter later, okay?
+
+172
+00:10:53.200 --> 00:10:58.517
+So the shape of person1 and
+the shape of person2 is the same thing.
+
+173
+00:10:58.517 --> 00:11:04.062
+And so what you end up with are two
+arrays which store the underlying data,
+
+174
+00:11:04.062 --> 00:11:07.910
+with their hidden classes
+pointing to the internal
+
+175
+00:11:07.910 --> 00:11:12.670
+data structure that describes
+the shape of the object, okay?
+
+176
+00:11:12.670 --> 00:11:14.700
+So that's what's happening under the hood.
+
+177
+00:11:14.700 --> 00:11:18.844
+And you can see that doesn't matter
+whether you pass in person1 or
+
+178
+00:11:18.844 --> 00:11:20.626
+person2 in this location.
+
+179
+00:11:20.626 --> 00:11:21.983
+The right thing will happen in here.
+
+180
+00:11:21.983 --> 00:11:24.979
+Because you're just looking up the index,
+in this case,
+
+181
+00:11:24.979 --> 00:11:28.108
+both of them have the same exact index,
+will both return 1.
+
+182
+00:11:28.108 --> 00:11:31.914
+And so whether you're using person1 or
+person2,
+
+183
+00:11:31.914 --> 00:11:36.507
+you know that the name is on
+the location 1 inside of the array.
+
+184
+00:11:36.507 --> 00:11:39.730
+&gt;&gt; So another hidden class isn't
+created cuz they have the same shape?
+
+185
+00:11:39.730 --> 00:11:43.241
+&gt;&gt; Right, it should basically now
+show the next thing which is,
+
+186
+00:11:43.241 --> 00:11:45.950
+what happens if the hidden
+class is different?
+
+187
+00:11:45.950 --> 00:11:51.839
+Another situation where,
+let's say you would reverse the order,
+
+188
+00:11:51.839 --> 00:11:57.004
+you would say age first and
+then the name, or you would say,
+
+189
+00:11:57.004 --> 00:12:02.494
+maybe there is another property
+called children or whatever.
+
+190
+00:12:02.494 --> 00:12:04.394
+The moment you have
+an additional property,
+
+191
+00:12:04.394 --> 00:12:05.948
+you have a different shape, right?
+
+192
+00:12:05.948 --> 00:12:09.874
+And the moment you have a different shape,
+you have to create a new hidden class.
+
+193
+00:12:09.874 --> 00:12:13.740
+And the weird thing in JavaScript is that
+the hidden classes can actually change.
+
+194
+00:12:13.740 --> 00:12:18.581
+So you can have an object that has
+a hidden class, and just by adding
+
+195
+00:12:18.581 --> 00:12:23.867
+a property onto it, you can transition
+it to a new hidden class, right?
+
+196
+00:12:23.867 --> 00:12:28.020
+And the VM is pretty good about
+tracking the transitions.
+
+197
+00:12:28.020 --> 00:12:32.440
+So as long as you add
+the properties in the same order,
+
+198
+00:12:32.440 --> 00:12:36.468
+that hidden class transitions
+will be the same,
+
+199
+00:12:36.468 --> 00:12:40.610
+and you will end up in
+the same shape of the object.
+
+200
+00:12:40.610 --> 00:12:44.578
+So from the perspective
+of the virtual machine,
+
+201
+00:12:44.578 --> 00:12:47.591
+it's gonna be the same exact thing.
+
+202
+00:12:47.591 --> 00:12:50.773
+&gt;&gt; Do you ever lose
+the original hidden class?
+
+203
+00:12:50.773 --> 00:12:53.104
+&gt;&gt; Even in terms of memory pressure?
+
+204
+00:12:53.104 --> 00:12:56.349
+&gt;&gt; Just in terms of being
+able to access it again.
+
+205
+00:12:56.349 --> 00:13:00.866
+&gt;&gt; I don't know, I believe that original
+versions of V8, this is my speculation,
+
+206
+00:13:00.866 --> 00:13:01.788
+could be wrong.
+
+207
+00:13:01.788 --> 00:13:06.626
+I believe the original versions of
+V8 did not release hitting classes
+
+208
+00:13:06.626 --> 00:13:11.300
+as the application ran, and so
+it was possible to run out of memory.
+
+209
+00:13:11.300 --> 00:13:15.462
+I believe the newer versions are smart
+enough to release the old hitting classes
+
+210
+00:13:15.462 --> 00:13:16.590
+that I no longer use.
+
+211
+00:13:16.590 --> 00:13:21.093
+But don't quote me on this,
+I am not 100% Sure.
+
+212
+00:13:21.093 --> 00:13:24.943
+&gt;&gt; Is there a difference in
+methods of making objects then,
+
+213
+00:13:24.943 --> 00:13:28.320
+like object literal versus create or
+something?
+
+214
+00:13:28.320 --> 00:13:34.022
+&gt;&gt; No, but the thing you should be
+thinking about, we'll talk about it later,
+
+215
+00:13:34.022 --> 00:13:37.894
+now next is,
+the way you create the object matters.
+
+216
+00:13:37.894 --> 00:13:42.481
+And so it probably is a good idea to
+have a single dedicated function for
+
+217
+00:13:42.481 --> 00:13:46.759
+creating the object so that you
+can guarantee that no matter which
+
+218
+00:13:46.759 --> 00:13:50.597
+code path you take,
+you end up with the same hidden class.
+
+219
+00:13:50.597 --> 00:13:51.928
+That's one thing.
+
+220
+00:13:51.928 --> 00:13:56.907
+The other thing that's a good idea is
+to don't add properties after the fact.
+
+221
+00:13:56.907 --> 00:14:00.985
+So if you have a property that may or
+may not be there,
+
+222
+00:14:00.985 --> 00:14:04.523
+just make it and
+set it to undefined, right?
+
+223
+00:14:04.523 --> 00:14:09.037
+Because that allocates the space for
+it and gives it a hidden class.
+
+224
+00:14:09.037 --> 00:14:12.823
+And then later on when you read into
+the property, you're not going to be
+
+225
+00:14:12.823 --> 00:14:16.876
+transitioning the object to a different
+hidden class or anything like that.
+
+226
+00:14:16.876 --> 00:14:21.528
+So in general,
+a good rule of thumb is, always
+
+227
+00:14:23.662 --> 00:14:28.923
+Have a single place where you
+allocate the function, the object.
+
+228
+00:14:28.923 --> 00:14:31.090
+So have a factory function or
+something like that.
+
+229
+00:14:31.090 --> 00:14:36.470
+And the second good rule is, always
+initialize all the possible properties.
+
+230
+00:14:36.470 --> 00:14:39.831
+So one of the things I tell people is,
+in TypeScript you can say,
+
+231
+00:14:39.831 --> 00:14:43.208
+property question mark equals
+whatever I say, don't do that.
+
+232
+00:14:43.208 --> 00:14:48.200
+Say, property colon, undefined, or
+whatever value you want, right?
+
+233
+00:14:48.200 --> 00:14:52.329
+Because that one says, you have to have
+this property, it just might be undefined.
+
+234
+00:14:52.329 --> 00:14:58.402
+Versus the question mark says, you may or
+may not have this property, right?
+
+235
+00:14:58.402 --> 00:14:59.180
+It's a minor thing.
+
+236
+00:14:59.180 --> 00:15:03.216
+In many cases it doesn't matter,
+but sometimes it does, yes?
+
+237
+00:15:03.216 --> 00:15:07.300
+&gt;&gt; So this applies to classes and
+class constructors as well?
+
+238
+00:15:07.300 --> 00:15:08.302
+And then constructor?
+
+239
+00:15:08.302 --> 00:15:09.562
+&gt;&gt; Yes.
+
+240
+00:15:09.562 --> 00:15:11.320
+&gt;&gt; Adding every property,
+setting it to undefined?
+
+241
+00:15:11.320 --> 00:15:15.829
+&gt;&gt; Yes, so if you have a class and a class
+constructor, the good rule of thumb would
+
+242
+00:15:15.829 --> 00:15:18.741
+be to initialize all
+the properties ahead of time.
+
+243
+00:15:18.741 --> 00:15:20.560
+If you can initialize it to actual value,
+great.
+
+244
+00:15:20.560 --> 00:15:25.630
+If not, initialize it to undefined,
+and then set the property later.
+
+245
+00:15:25.630 --> 00:15:30.192
+Because underneath it all,
+there's gonna be a storm of hidden classes
+
+246
+00:15:30.192 --> 00:15:33.471
+that will be happening,
+and you wanna avoid that.
+
+247
+00:15:33.471 --> 00:15:37.624
+The thing that the VM can do is
+that when it's running a function,
+
+248
+00:15:37.624 --> 00:15:42.320
+within that function, it can see all
+the operations that you're doing.
+
+249
+00:15:42.320 --> 00:15:46.721
+And therefore, it knows that, I know
+if I come in with this hidden class,
+
+250
+00:15:46.721 --> 00:15:48.989
+by the time all the operations are done,
+
+251
+00:15:48.989 --> 00:15:52.418
+the class that gonna exit is
+either this class or that class.
+
+252
+00:15:52.418 --> 00:15:57.414
+And so all the, if you've read property
+A and then you've read a property B and
+
+253
+00:15:57.414 --> 00:16:02.661
+property C, is not like the VM is, okay,
+hidden class A, B, and then C, right?
+
+254
+00:16:02.661 --> 00:16:06.027
+It knows how to co-locate it
+all together and be like, okay,
+
+255
+00:16:06.027 --> 00:16:10.065
+you go from here to there, and
+then do all the other operations together.
+
+256
+00:16:10.065 --> 00:16:13.112
+So in general, it's a good idea to
+put everything together in a single
+
+257
+00:16:13.112 --> 00:16:16.211
+function where the optimizer can
+look at it and be like, right, so
+
+258
+00:16:16.211 --> 00:16:18.869
+you're just gonna add the six
+properties now to the object.
+
+259
+00:16:18.869 --> 00:16:22.830
+Therefore I'm gonna transition from here
+to here, and then add the properties.
+

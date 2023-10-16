@@ -1,0 +1,144 @@
+[00:00:00]
+>> JSX ,so JSX the way it is written is that the JSX converts into object literals, right? And these object literals, it's kind of sorry hard to see, these object literals have properties and keys. And now that you know everything we talked about about how this means that every single element inside of JSX really will have a different set of attributes, which means it will have a different hidden shape, right?
+
+[00:00:29]
+So you can see how that's gonna become a problem. And so, what does the system wanna do internally? Well, the system wants to convert these into attributes in the DOM, which means that we're gonna do a lot of iterations over these keys and lots of reads of these keys, etc.
+
+[00:00:44]
+And so, all of this together conspires against us, right, and makes it so that this thing is not the most performing way of doing this. Now, in the grand scheme of things turns out DOM is so slow that it doesn't really matter how fast the JSX is. But it is things things to keep in mind.
+
+[00:01:01]
+And again, this is an example where microbenchmarks will tend to lie to you because you will not exercise the secondary cache as hard as you would do it in a real application. And what the alternative would be is to instead of putting in an object literals to put it inside of regular arrays, where the odd indices contain the keys and even indices contain the values or vice versa which way when you want it, right?
+
+[00:01:29]
+
+>> You said that JSX doesn't add that much overhead over the DOM manipulation part but it would add a lot of extra memory, right, so garbage collection and stuff.
+>> So, memory, yes, in terms of memory objects and arrays are about the same. So I don't necessarily think one will be better necessarily than the other.
+
+[00:01:54]
+I think that the key thing is that internally the framework has to iterate and read the values of these properties. And this iteration is what's expensive, right? I don't know exact numbers, but I believe last time I was chatting with folks from React, they said that the iteration of the properties is somewhere in the order of 5% of the application runtime.
+
+[00:02:19]
+So it's not terribly significant, and maybe from 5% we could make it in 2.5%, so overall you would just have a couple of percentage, points difference. I mean on the real application so it's not a huge difference but it is a difference, right, in some cases and so it would help.
+
+[00:02:38]
+Okay, so let's look at this particular benchmark. So what are we doing here? So we're creating either an object which has 100 keys or we creating an array where every other the even numbers are the keys and the odd numbers are the values, right? So this array is actually gonna be twice the size of the object because it has to store twice as much information.
+
+[00:03:04]
+Objects essentially cheat because the values are stored in one location and the keys are stored in the hidden class, right? If sometimes the hidden classes can be shared, sometimes they cannot be shared, right? But if they can be shared, then you definitely get savings and you wouldn't get savings in this particular case with arrays.
+
+[00:03:23]
+So these are trade-offs to kind of think about. But let's kind of do and kind of look at these particular benchmarks. So the first benchmark is to just read all the properties. In other words, iterate over every single value and read it, right, and then sum it up.
+
+[00:03:41]
+So let's go through the benchmark, right? So this benchmark, what it does is it tries to simply read all the values and sum them up together, right? So it just does a sum of all the things. Now, in order to get this, there's two things that have to happen.
+
+[00:03:54]
+First, we have to enumerate all of the properties. For the VM, that's relatively straightforward because it can go and through the hidden class, it can get to an internal data structure where it knows all the keys. So that in itself is not expensive. This bit right here though is, because this actually causes a megamorphic read, because the key we're reading is always different.
+
+[00:04:18]
+I don't know if the VMs are smart enough to recognize the fact that like, look, I am actually doing a key off over the object and I'm reading this key in this exact place, same place. And so in theory, the VM could be intelligent enough to be like, actually, let me just read the values directly.
+
+[00:04:35]
+I don't think it does that because if I remember correctly, this will give you the keys on the prototypes as well, right? Or am I wrong on this? I don't know. I know in some instances, you might get the parent wants as well. And so this is not as easy as just like reading the values.
+
+[00:04:54]
+You actually have to do some logic in here as well, yes.
+>> What if we were to do like object.keys or object.entries? And do the same process, do we know?
+>> So object.entries I think you would have an ease. I don't know. I mean I can see how the VM could optimize different things.
+
+[00:05:17]
+Again, like once you understand how the thing works on a silicon and hopefully Apple is able to kind of convey that, right? How you can see that you just have these objects which are arrays, etc. You can kind of derive in terms of like what is and isn't possible.
+
+[00:05:31]
+It may be that the VM hasn't chosen to implement this particular optimization, but you should have a pretty good idea of what is and isn't realistic, right, through all this stuff. So something like object.keys collecting the keys should be relatively straightforward process because that information is stored inside of the hidden class for that particular object.
+
+[00:05:52]
+And so it should be a pretty easy way to do that for the VM, should be pretty efficient The reading though would might be more complicated, right? Because then you would have to read the keys, and that's kind of trickier. Okay, so in here, we just simply do the copying.
+
+[00:06:11]
+Here, what we're doing is we're doing the same exact operation. The only thing we're doing different is we're copying the object over first. So obviously, this is gonna be slower, because the cost of copying that object is gonna cost us something. But now we have the problem that we are essentially enumerating over the properties twice.
+
+[00:06:29]
+Once we have to enumerate here, and then we again enumerate here, and both are megamorphic. So now we do the same exact thing with arrays. So in an array, we do the same exact thing. We just say, hey, can I just go and add up all the numbers?
+
+[00:06:40]
+Obviously, I have to skip, so I do every other one, right? And I'm gonna do the same exact thing where I do a copy first, and then I'm gonna iterate over the copy of the array, again, skipping every other thing, right? So the question is, how much of a performance difference is this?
+
+[00:06:56]
+How much would you expect? You would expect about the same, or way faster? All right, well, let's try it. So here we go. So the fastest one, it was obviously just iterating over the array. And the difference is huge, right, between those two. That's a pretty significant difference.
+
+[00:07:19]
+And again let's see, how many, what do we have here? So in this case, we have a size of 100, which means that we didn't overwhelm the second level cache. So if I go and make this into 10,000, this should be a significant difference in performance. Penalty because we would like bust the second level cache.
+
+[00:07:45]
+Let's see how we do. Hopefully it will run, while it's running. So the array is the fastest. Notice, making a copy is relatively cheap. The cost of a copy is next to nothing which is kind of surprising, right? But to make a copy of an object, that's a little more expensive.
+
+[00:08:11]
+So here is 680% versus 6,000%. It's a huge difference in performance that you can have. And so let's see here, we did with more objects, right? You see, originally, the difference in performance was 680%. Now the difference is 3,000%. So when we made the number of shapes bigger, we really messed with the VM even more.
+
+[00:08:41]
+And again, I'm going to come back because this is why microbenchmarks lie to you. Because it's not a real program, it's a small subset. And all these secondary caches can play tricks on you and make it look like the stuff is faster than it actually is. But I find it really kind of fascinating.
+
+[00:09:00]
+I think it's really surprising to people that a copy of an array, which is what this is, is really cheap, right? Because internally, all you have to do is copy memory and CPUs usually have dedicated instructions to be like, copy this memory over here, right? And so it's super cheap whereas copying an object you can't just copy the values is more like you have to make sure that in this particular case we might end up with a different hidden class, right?
+
+[00:09:32]
+Because it could be additional properties added to this particular list, right? And so the copying there, also I believe the prototypes chains will flatten, right? So if this object has properties inherited from a prototype chain, the child will have it flattened. So you can't just copy things over.
+
+[00:09:49]
+Things become a lot more complicated than that. And so whenever you deal with objects, you should be really thinking in your head like, can the VM take advantage of inline caching? If the answer is yes, then your code is good in terms of performance. If the answer is no, then you might consider writing it differently.
+
+[00:10:08]
+Now, should you do it all the time, no. Sometimes it just doesn't matter, right? But if it's hot code, then you probably should consider it. Questions here.
+>> Micro benchmarks are somewhat more reliable on fully compiled languages.
+>> I would say on fully compiled languages, they'll be a lot more predictable, yes.
+
+[00:10:31]
+I think the place where people will shoot themselves in the foot with the naming languages like JavaScript is that because they don't present sufficiently complex problem to the micro benchmark because it's a micro, right? The micro benchmarks will tend to over optimize than what they will do in reality, right?
+
+[00:10:52]
+They will say you always call me with the same function, in line. In reality, that might not happen, right? Or you might have a deopt. You always come with the same shape, inline caches everywhere. Again, in the reality that might not happen. Or even if you don't have the same shape, I showed you how the second layer cache might be lying to you, because as long as the number of objects that you access is small enough, it's not a big deal, the second level cache will save you.
+
+[00:11:17]
+And so all of those things, if you add them up essentially mean that you have to be careful with micro benchmarks. They're useful, they show useful stuff. But a lot of times, they're kind of tricky. Actually, one of the things I want to show you is that oftentimes when I write my benchmark, I am always sure to do an effect on a variable that's outside of a loop like this.
+
+[00:11:44]
+Because sometimes, under certain conditions, the VM can look at this code and be like, that has no side effect, I'm just gonna skip it. And by doing something like this, the VM can't skip it, because there's a code path by which information is leaking out, right? So it cannot be smart enough to do these tricks.
+
+[00:12:06]
+But in theory, right, in theory, if the compiler was intelligent enough, it could look at all this thing and say, none of this stuff is necessary, right? I could just skip it. Cuz it says, you're reading sum, you're computing the sum value, but then on the end of the day, you're not doing anything with it.
+
+[00:12:22]
+So it's unnecessary, delete, delete, delete. All right, and prune the code. Luckily we're not that far yet but I mean, if we got that far, you would have really hard time writing micro benchmarks because it would be relatively easy for the compiler to prove that something is uneeded and just throw it away.
+
+[00:12:42]
+And there have been incidences of this is all this in the past where the benchmarks just look ridiculously better because it's just omitting something that cannot be eliminated in the real case, yeah Mark.
+>> Are there any options to turn off some of these optimizations that you'd be confident about your benchmarks?
+
+[00:13:00]
+
+>> Yes, there are actually. So when you execute node, you can pass in a whole bunch of options to tell it don't do certain things. So for example, you can tell the system do not do inlining. And it will not inline any functions. Of course, your code is gonna run slower, but it might be easier to collect certain information.
+
+[00:13:19]
+So if you really wanna know what the cost of certain things are, turning off inliner is important. The way this manifests itself, and again, the tools are changing all the time. So I might be telling you information that might have been true a while ago and no longer the case.
+
+[00:13:34]
+But I have noticed that when I try to benchmark things, I will see that a particular function is gonna be expensive, and then it just disappears. It's no longer there. And what's happening is it's showing like, look, it's expensive before I inlined it, and then I inlined it, and it's gone.
+
+[00:13:50]
+It no longer exists. So as far as the benchmark is concerned, that function disappeared, and now this other function just became more expensive. But it's not obvious what's happening. And so sometimes it's difficult to unwind what's actually happening in your system. And so it's nice to run your code when you disable inlining because you have a better view of the information that you get out of the profiler, right?
+
+[00:14:17]
+But of course, your code then runs slower because inlining is a useful technique which gives you benefits, especially for small functions. And we tend to write like tiny little gitters that return the value or add things together, etc. And in situations like that, inlining actually makes a huge difference because the cost of the operation that you're doing typically is less than the actual overhead of making that call.
+
+[00:14:42]
+And so in cases like that inlining is a huge benefit, right?
+>> There's someone asking for a clarification. A deep copy copies all fields and makes copies of dynamically allocated memory pointed to by the fields. Deep copy occurs when an object is copied along with the objects to which it refers.
+
+[00:15:05]
+
+>> Yeah, but JavaScript does not have a deep copy. Well there's, I think there's a helper function or something, but when you do dot, dot, dot, that's not a deep copy. That's a shallow copy, right?
+>> Yeah, there's structured clone.
+>> There's a structured clone, yes for deep copy, but we're not talking about that.
+

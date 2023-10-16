@@ -1,0 +1,415 @@
+WEBVTT
+
+1
+00:00:00.310 --> 00:00:03.955
+All right, let's talk about JavaScript VM,
+which stands for
+
+2
+00:00:03.955 --> 00:00:05.897
+virtual machine under the hood.
+
+3
+00:00:05.897 --> 00:00:10.136
+What I wanted to really get here on is
+basically how do JavaScript virtual
+
+4
+00:00:10.136 --> 00:00:11.115
+machines work?
+
+5
+00:00:11.115 --> 00:00:14.560
+Right, there's the physical machine
+of a computer, the silicon, and
+
+6
+00:00:14.560 --> 00:00:17.554
+there is the virtual machine of
+what JavaScript provides, and
+
+7
+00:00:17.554 --> 00:00:21.244
+there's a big chasm between the two, and
+so how do exactly do we bridge this?
+
+8
+00:00:21.244 --> 00:00:24.478
+And the bridging of the two chasms
+actually has implications about
+
+9
+00:00:24.478 --> 00:00:25.235
+performance.
+
+10
+00:00:25.235 --> 00:00:27.384
+And so we're actually gonna
+talk about performance.
+
+11
+00:00:27.384 --> 00:00:30.834
+And my hope is that if I explain
+to you how physical machines work,
+
+12
+00:00:30.834 --> 00:00:34.471
+then you're gonna be able to kind
+of derive in your head of like,
+
+13
+00:00:34.471 --> 00:00:36.443
+I understand now why this is slower.
+
+14
+00:00:36.443 --> 00:00:37.457
+This is not performing,
+
+15
+00:00:37.457 --> 00:00:40.557
+because they'll totally make sense as
+to what has to happen under the hood.
+
+16
+00:00:40.557 --> 00:00:41.968
+So this is really what
+I'm gonna talk about.
+
+17
+00:00:41.968 --> 00:00:44.329
+So first little bit about me.
+
+18
+00:00:44.329 --> 00:00:45.562
+So hi, I'm Miško Hevery.
+
+19
+00:00:45.562 --> 00:00:47.339
+I'm a CTO at Builder IO.
+
+20
+00:00:47.339 --> 00:00:51.939
+Builder Io does this cool,
+headless visual CMS system.
+
+21
+00:00:51.939 --> 00:00:54.273
+In the past,
+I created this thing called AngularJS.
+
+22
+00:00:54.273 --> 00:00:57.663
+Angular and
+now I work on this thing called Quick.
+
+23
+00:00:57.663 --> 00:01:02.839
+Quick is a new kind of framework that
+really focuses on a time to interactivity,
+
+24
+00:01:02.839 --> 00:01:06.085
+get the applications going
+as fast as possible and
+
+25
+00:01:06.085 --> 00:01:09.350
+we do this by really
+cleverly not doing anything.
+
+26
+00:01:09.350 --> 00:01:13.179
+Basically we try too hard
+to not download the code,
+
+27
+00:01:13.179 --> 00:01:16.125
+not execute the code, and do nothing.
+
+28
+00:01:16.125 --> 00:01:20.236
+So the thing we're gonna talk about
+today is I had all of these posts
+
+29
+00:01:20.236 --> 00:01:24.422
+that I put on Twitter, X,
+I don't know what you call it these days,
+
+30
+00:01:24.422 --> 00:01:27.519
+things that show off weird
+things in JavaScript.
+
+31
+00:01:27.519 --> 00:01:28.441
+Things like, hey,
+
+32
+00:01:28.441 --> 00:01:31.931
+did you know that triple equals can be
+15 times slower than double equals?
+
+33
+00:01:31.931 --> 00:01:35.531
+That seems crazy, right?
+
+34
+00:01:35.531 --> 00:01:37.643
+Did you know that, like, a plus b, but
+
+35
+00:01:37.643 --> 00:01:41.626
+then b plus a can actually have
+different performance characteristics?
+
+36
+00:01:41.626 --> 00:01:42.942
+What?
+That makes no sense.
+
+37
+00:01:42.942 --> 00:01:45.644
+Why would that be?
+
+38
+00:01:45.644 --> 00:01:49.807
+Another one, my favorite one,
+is that, negative x and
+
+39
+00:01:49.807 --> 00:01:54.159
+0 minus x can actually have,
+10x slowdown in Firefox.
+
+40
+00:01:54.159 --> 00:01:58.431
+And so you really are starting to wonder
+like is JavaScript just kind of messed up?
+
+41
+00:01:58.431 --> 00:02:00.841
+Is it just like fundamentally broken?
+
+42
+00:02:00.841 --> 00:02:04.532
+And I think a lot of these things just
+make total sense once you understand
+
+43
+00:02:04.532 --> 00:02:06.844
+what's actually happening under the hood.
+
+44
+00:02:06.844 --> 00:02:11.193
+The other one I have over there
+is that JSX, could have been,
+
+45
+00:02:11.193 --> 00:02:12.912
+how many times faster?
+
+46
+00:02:12.912 --> 00:02:17.322
+I forget,
+I think twice as fast if we could just use
+
+47
+00:02:17.322 --> 00:02:22.263
+arrays instead of object literals for
+storing things.
+
+48
+00:02:22.263 --> 00:02:26.983
+And my absolute favorite is
+the anamorphism which the difference
+
+49
+00:02:26.983 --> 00:02:31.804
+between anamorphic read and
+a megamorphic read can be 60 times.
+
+50
+00:02:31.804 --> 00:02:36.197
+So, you better know why these things
+are happening, what exactly is going
+
+51
+00:02:36.197 --> 00:02:40.728
+on under the hood, and how to prevent
+these things because they can have a huge
+
+52
+00:02:40.728 --> 00:02:44.447
+impact in terms of the performance
+of the code that is running.
+
+53
+00:02:44.447 --> 00:02:48.799
+So, what I wanna talk to you today about
+is kind of we're gonna start with talking
+
+54
+00:02:48.799 --> 00:02:52.140
+about the virtual machines,
+what they do, how do they work?
+
+55
+00:02:52.140 --> 00:02:57.020
+And really, it really helps to talk about
+the CPU first, how does the CPU work?
+
+56
+00:02:57.020 --> 00:02:59.093
+Which is the physical machine, right?
+
+57
+00:02:59.093 --> 00:03:04.075
+The actual hardware that we have is
+the CPU and CPU runs instructions and
+
+58
+00:03:04.075 --> 00:03:08.736
+how exactly does the CPU's work
+really dictate everything else.
+
+59
+00:03:08.736 --> 00:03:11.719
+And then we're gonna talk
+about virtual machines, and
+
+60
+00:03:11.719 --> 00:03:16.113
+mainly how virtual machines create things
+that don't exist in a physical world.
+
+61
+00:03:16.113 --> 00:03:20.735
+So array, objects, functions,
+function calls, classes,
+
+62
+00:03:20.735 --> 00:03:25.620
+prototypes, all of these things
+that we take for granted as part of
+
+63
+00:03:25.620 --> 00:03:31.228
+the JavaScript virtual machine,
+they don't exist in physical hardware.
+
+64
+00:03:31.228 --> 00:03:34.198
+And so the job of the VM is to
+create these things, right?
+
+65
+00:03:34.198 --> 00:03:38.642
+The job of the VM is to create the
+illusion that we have these higher-order
+
+66
+00:03:38.642 --> 00:03:42.524
+concepts, they don't actually
+exist inside of the hardware.
+
+67
+00:03:42.524 --> 00:03:44.916
+And once you understand the hardware and
+
+68
+00:03:44.916 --> 00:03:47.940
+you understand how the VM
+creates these concepts,
+
+69
+00:03:47.940 --> 00:03:52.874
+then many of these bizarre things in terms
+of performance become totally obvious.
+
+70
+00:03:52.874 --> 00:03:54.480
+Of course, this is why this is so
+
+71
+00:03:54.480 --> 00:03:58.112
+much slower because this is what the VM
+actually has to do under the hood.
+
+72
+00:03:58.112 --> 00:04:01.740
+And then I'm gonna show
+you a DeoptExplorer,
+
+73
+00:04:01.740 --> 00:04:06.855
+which is a way of running code in in V8,
+in the special set of flags
+
+74
+00:04:06.855 --> 00:04:11.691
+that collects all of this kind
+of internals of the framework,
+
+75
+00:04:11.691 --> 00:04:17.013
+of the virtual machine, so
+not the framework the virtual machine.
+
+76
+00:04:17.013 --> 00:04:18.849
+And it saves it in the log file and
+
+77
+00:04:18.849 --> 00:04:23.133
+then the DeoptExplorer is a project by
+Microsoft that takes this log file,
+
+78
+00:04:23.133 --> 00:04:27.827
+which is kind of human readable, but not
+really, and gives you a nice GUI over it.
+
+79
+00:04:27.827 --> 00:04:30.269
+So you can go and
+explore what's going on and
+
+80
+00:04:30.269 --> 00:04:34.234
+you can actually see many of these
+things that are going on inside of it.
+
+81
+00:04:34.234 --> 00:04:39.336
+And then I'm gonna go through a couple
+of main things that happen in JavaScript
+
+82
+00:04:39.336 --> 00:04:44.844
+mainly deopting, what is it, why does it
+happen, what are the consequences of it?
+
+83
+00:04:44.844 --> 00:04:50.325
+Megamorphism and inline caching,
+which deal with properties.
+
+84
+00:04:50.325 --> 00:04:53.385
+We're gonna talk about a little bit
+of a holey arrays, in other words,
+
+85
+00:04:53.385 --> 00:04:54.722
+arrays which have holes in it.
+
+86
+00:04:54.722 --> 00:04:58.711
+And we're gonna leave it
+off with double equals and
+
+87
+00:04:58.711 --> 00:05:01.779
+triple equals to kind of finish it off.
+

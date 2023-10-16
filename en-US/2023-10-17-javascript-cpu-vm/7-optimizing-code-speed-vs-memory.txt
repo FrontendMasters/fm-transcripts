@@ -1,0 +1,144 @@
+[00:00:00]
+>> So what do we learn basically is that fundamentally, you have this memory array, right? And you have a CPU and the CPU reads and writes into the memory and there is basically an address that you tell the memory, which address do you want to read and write out, right?
+
+[00:00:15]
+And CPU basically processes and internally has a bunch of registers. It has the arithmetic logic unit, which basically means addition, multiplication, and so on. And you have the program counter, stack pointer, etc., to have the special instructions. So the physical machines really understands only numbers, arithmetic, flat memory, right?
+
+[00:00:35]
+It understands index access, so that's the idea of A0 plus some AE0, A extend AE. It really understand subroutines and I hopefully made point clear that subroutines are really dumbed down version of a function call, right? There's many things missing in a subroutine that would make it into a function call mainly, there are no calling conventions.
+
+[00:00:57]
+Calling conventions is on to the compiler to produce, right? In other words, how to parameters get into the subroutine, and how does the values get out of the subroutine, and the idea of local variables. We haven't really talked about it, but they usually go on a stack. So Fortran doesn't have a concept of local variables.
+
+[00:01:19]
+So in Fortran, when you call a function recursively, you still have access to the same variables and yet recursion is fun. So that's your physical machine. And so out of this physical machine, somehow you have to make an actual machine, right? And we have to make a JavaScript virtual machine, right?
+
+[00:01:37]
+Something that looks like JavaScript to you. And so the first bizarre thing I'm gonna show you is that how in the world is it possible that a plus b would be significantly faster than b plus a? That makes no sense, right? Why should this be? So let's hop in back into our code, so we're gonna just grab the count from the command line and I'm gonna have a couple functions there a b c and d and if you look across these functions are identical.
+
+[00:02:09]
+The only difference is the value that they returned, right? Sometimes there's 1, 2, 3 or 4 and we're gonna benchmark them. And so we're gonna have a benchmark function. And the way the benchmark will work is we'll say, console log, shows which one is gonna be running. Grab the performance, run the loop in some number of times, and then compute the finish time, and then print out how long did it take to run the single iteration of this particular function, right?
+
+[00:02:43]
+So let's do that. Of course, I forgot the command. What am I running here? I think it's just there ,okay, so an nr deopt. Okay, so we'll run it and we see that, for the most part, they're about the same. I don't know what happened to D. D is way slower.
+
+[00:03:08]
+Probably the garbage collection has kicked in. But the reason they're about the same is because we're only running 10 iterations. So let's increase the number of iterations that we run. And we get the first one is a little slower, the next one has become faster. What's happening? Well, there is certainly startup costs that exist inside of the VMs, and also, it takes a while before they compile things, etc.
+
+[00:03:31]
+So when the VM first starts running, it runs an interpretive mode, and then later it switches into compile mode. And so, the why not compile everything from the beginning? Well, it takes time to compile things, right? And so you're doing a trade off being, well, if I'm only running this code once, it's probably faster for me to just run it and other on the other hand, if it's not a tight loop, it's probably better for me to compile it and run it in a faster per iteration.
+
+[00:03:58]
+And here you can see that originally these loops start pretty slow. They take four microseconds to run, but as the VM warms up the performance improves, it's the same exact function, you can see the functions is getting better and faster and faster. So then we go to maybe a hundred and now we're really cooking and you can see that the VM is really has gotten its stride and it's running pretty good.
+
+[00:04:27]
+And now let's go to even faster. And yeah, now they're about the same, right? Let's go even more iterations. And the first two, looks like the last two are really compiled at this point, you can see that it's down to eight. Let's go to even more iterations. Now all of them seem to be running in the compiled mode and they run about the same but go, let's go even more iterations and now we're things start to happen.
+
+[00:04:57]
+What in the world, why is A so much faster than everybody else? You notice that A is running about less than 2 microseconds per iteration, whereas everybody else is about 4.6 or so iterations, and I can keep going in terms of the number of iterations. It's not gonna change.
+
+[00:05:19]
+This number is gonna be pretty stable. At this point, we are running as fast as we can, and yet the first one is way faster than everybody else. Why? What's going on in here? If you look at what we're actually running, is we're running the same exact code.
+
+[00:05:37]
+Why is that? And just to kind of prove a point, I can switch, I can run B first, and then A. And then what we're gonna see is that it's still the first one that ran was faster than the other ones. Why? What's going on? Anybody wants to take a guess?
+
+[00:06:01]
+
+>> Is the value stored in a better place in the CPU first one that goes in?
+>> Not quite. So look at this particular function here.
+>> What of caching?
+>> Caching would be a good guess, but it's a caching in a way that you don't expect. So let me explain what's happening here.
+
+[00:06:29]
+We run this function and this function is iterating over and over the fn. And remember function is a subroutine with this whole complicated overhead of like, I when I call a function, I have to push values onto the stack, I have to make sure that I save all the registers then I do work and then I return back.
+
+[00:06:48]
+And in this case, the actual work that we're doing, we're just adding two numbers together or comparing and returning a number and that's so insignificant compared to the cost of actually making the call is that the call is dominating the cost of the function, the amount of work that we're actually doing inside of the function.
+
+[00:07:06]
+And so, what the VM does after a while it says you know what, I see that you keep calling this function here. I'm gonna inline it. And so it takes the function and inlines it into this location, and now this loop can run a lot faster because what happens is when you inline, so lemme let's back up how compilation works.
+
+[00:07:27]
+Let's back up. One of the things that the compiler has to do is look at the code and look at the local variables, and then decide where do these local variables go? Do they go into registers, or do they go into memory? You can imagine that if you have a lot of local variables, you will exhaust all possible registers, and eventually you have to go into memory, right?
+
+[00:07:49]
+So, the compiler has to make some choices. Where do I store this stuff? Maybe it's temporary and I can store it inside of a register. Maybe it's long enough that I have to put it on memory, et cetera. It has to make choices. And so it looks at the program, and whenever it comes across a function call, it doesn't look into the function cuz that's something else, right?
+
+[00:08:08]
+And so it only does optimization, figuring out what goes where based on what it sees inside of its current function. So if you can inline the function then the layout and assignment of registers can be better laid out because now you can basically save yourself the making the call but not just saving yourself the call the calling convention.
+
+[00:08:30]
+Because it's inline disappears, and instead the compiler looks at the whole function that's in lined and says, if I just like lay out the registers differently, I can save myself the trouble of going to the memory. Right? And so the function originally was compiled once without the function in lined.
+
+[00:08:53]
+And then the CPU ran for a while and the virtual machine notice you keep running this thing over and over again. I think it'd be useful to inline it. So let's try to inline it see if I can get better performance out of the system and sure enough, I can get so much better performance, right?
+
+[00:09:07]
+So the reason why B runs or the the first one runs fast it's because the first one got inlined, but now notice what happens next. Now we finish all the iteration, we go up and now we run B with a different value of the benchmark. And now we run this, and now the compiler realizes, wow, I made a mistake.
+
+[00:09:34]
+I inlined something that I thought was constant, but it turns out it isn't. I have now observed that this function fn is not the same function all the time. Sometimes it's fna, and sometimes it's fnb, and therefore I've made a mistake, right? The compiler was trying to do the best possible thing, given the knowledge it had, and up to that point, it has always only seen function A.
+
+[00:10:04]
+And therefore it was a reasonable assumption to say, this is always gonna be a function A. But now when he saw an example of a Black Swan, you know the Black Swan example? Everybody thinks there's only white swans because that's all you've ever seen. But you only need one black swan to kind of convince you like, no, there are different colors.
+
+[00:10:24]
+You just don't have one, okay? So now it has seen a different function and now the compiler is like, crap, I missed up I can't inline this anymore. Because I've seen that sometimes it's function A and sometimes it's function B, and because of that, the inline that I have done was incorrect.
+
+[00:10:39]
+And that's called a deopt, right? The compiler was trying to optimize something and because it had insufficient information, it optimized something in an incorrect way, and so now it has to back off from this optimization. And so deopt is when the compiler gets to see a black swan go by and says, oops, the assumptions I have made here, no longer hold true.
+
+[00:11:07]
+And therefore the code that I have generated is incorrect. What actually happens is when the code is generated, the compiler leaves behind checks. So when it inlines the function A, there's a hidden check that basically says, before you pretend everything is normal, double check that function A is really the same function, right?
+
+[00:11:29]
+And of course, that check is always true until it isn't. And when it isn't, the compiler is like, oops, I messed up. And this is what is called a deopt, right? And so in a deopt, it undoes the work and says, okay, I cannot inline this. It marks this as non-inlinable and then continues running the code in a non-inlined way because it now knows that sometimes it's function A, sometimes it's function B.
+
+[00:11:57]
+Why does this matter? It matters because it is so easy to convince yourself of the wrong thing on microbenchmarks, specifically because of this. When you make a microbenchmark, you're saying, look how fast my code is, but what you're not doing is you're not exercising all of the different paths.
+
+[00:12:20]
+And as a result, the VM looks at the code and says, all of these functions are constant, I can inline them. And it does so, and it gives you the illusion that the code you have just written performs a lot better than it will actually perform in reality, right?
+
+[00:12:39]
+Whenever you do micro benchmarks, the reason why micro benchmarks are looked at with great skepticism, is because stuff like this, it's so easy to kind of shoot yourself in the foot and start measuring the wrong thing, right? And so in this particular case, the question you should be asking yourself is how could I have seen this coming?
+
+[00:13:08]
+And the way you would know to answer the question is that a lot of it is kind of experience of like when you're doing it for a while you kind of know what to look for. The thing to look for here is to recognize the fact you know what, this is gonna be a problem because when I wrote the code I knew because I'm human I know more than a compiler does, right?
+
+[00:13:30]
+I knew that this function is going to change shape over time. We talk about shape as in the reference, the kind of function we get here. It's changing shape here, right? So, the fancy term for it, it's polymorphic, right? Poly means many more have means to change, right?
+
+[00:13:48]
+So it has many changes that are happening there. So the fancy word for this is that it's polymorphic. So the way the modern VAT or modern virtual machines work is they, try to look for things that appear constant, and if they notice basically, it executes this piece of code several thousand times, and if in several thousand times it has never seen it to change, then it just assumes that it must never change.
+
+[00:14:14]
+And then that assumption is used to better compile the output code. Until that assumption is no longer true, and then things break. And this is when we get a deopt, right? So when when people talk about deopts what it means is that the VM ran, it collected information it observed the world and up to that point, it looked like these set of invariants were true.
+
+[00:14:43]
+Based on those invariants, it generated code that later proved to be wrong. And so a deopt is whenever the invariant that you thought was true turns out was not, okay? So if you have been coding for a while, and as a human, whenever you see this thing, you should ask yourself, first of all, many times it just doesn't matter, so don't assume that, apply this everywhere, right?
+
+[00:15:09]
+Decide whether it matters or not. When you have something that you think matters in terms of performance, ask yourself, is this function actually expensive? Is it monomorphic, right? Is this always gonna be the same function or not? And if the answer is none, it's a different function, then second question to ask is, well, is the cost of calling the function compared to the amount of work the function is doing significant, right?
+
+[00:15:33]
+Because if this function is something super expensive, it doesn't matter whether in lines or does it makes no difference. And if it doesn't, then you might consider for example, to do the inlining yourself. So let me give you an example, a typical thing we might do is we might have a queue of a list of functions to run.
+
+[00:15:54]
+And let's say you have two different functions you run, either let's say add numbers or multiply numbers, right? Those are pretty six simple operations. And so you put them inside of an array, and you tell the program to fall over the loop over the array, and then read the function and invoke it.
+
+[00:16:14]
+What the VM will see is that those are functions that are always different, I can't inline them. But what if you can inline it yourself? What if you put the two functions, you inline the functions directly in there, and just put an if statement in front of it, and then inside of the array, instead of putting the functions, you just put a number, or boolean, true or false, meaning true means add the numbers, false means to multiply the numbers, right?
+
+[00:16:40]
+That alone will make the code run faster, because you fundamentally did the inlining for it, and now you've made the invariant that the data flowing through the system is monomorphic, right? You are always gonna get a boolean and the function you're calling is always the same. And in some cases, that might make a difference, right?
+
+[00:17:00]
+We're talking here about two and a half times faster in this particular case. So, again, it depends on a situation that you might have. Yes?
+>> Is function declaration faster than function expression because function expression works with only references?
+>> There's no difference. To my knowledge, there is no difference, because even a function declaration came close over other things.
+
+[00:17:25]
+So the two have differences in terms of how you declare them and how they're allocated, but at one time my understanding is they're absolutely the same as far as the VM is concerned.
+

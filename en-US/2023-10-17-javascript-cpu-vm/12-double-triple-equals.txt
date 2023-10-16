@@ -1,0 +1,75 @@
+[00:00:00]
+>> Okay, so we talked about the inline caches and how inline caches work. And so you can see that inline cache is a pretty cool trick that VMS can use to make property access faster. And so for the most part, property access is fast. And that's one of the reasons why as I said when VA first came out with Chrome, 10 15 years ago, I don't remember how about a long time it was such a huge step in performance because it added inline caching.
+
+[00:00:30]
+Now, the funny thing is that inline caching was not a new concept. Other VMs already do this already. So the trick was well known. It's just for some reason JavaScript was not considered cool or whatever and so the JavaScript interpreters didn't really use it. But now we do and it's kind of an important trick.
+
+[00:00:51]
+The other thing I kind of showed you is this hidden class thing that happens underneath an whole. And I showed you how the Dopt Explorer kind of shows you these particular things, right? And I showed you how to use that particular tool, so I think it's pretty cool.
+
+[00:01:02]
+We have a couple of more benchmarks to show off, so let's see. Let's talk about equality, so there is double equal and triple equal in JavaScript, right? And we all know kind of the differences. By the way, once you should kind of look up, actually, this is a tweet that I did so we can kind of go onto it, let's go.
+
+[00:01:21]
+Bigger font. What's kind of cool I find is this particular matrix here, which shows off what other type and which other type have the same value in both double equal and triple equal. And you can see that it's kind of a complicated thing. And I don't think anybody actually knows this.
+
+[00:01:43]
+From day to day, we don't kind of keep this in our head. And so it's just another argument led like, hey, keep the world simple and just do the right stuff. Okay, so why is there such a big difference between the two? So let's kind of look into it.
+
+[00:02:02]
+So let's go equality, And let's run. So let's run the equality benchmark and we get that the double equals. Wait, what the triple equals is slower? Wait, no, that doesn't make any sense. Because I'm doing triple equals and I'm printing double equals. Triple equals is significantly faster than double equals.
+
+[00:02:35]
+Why is that? Well, it comes down to that triple equals just has to compare the values directly. There's no coercion that has to happen, right? Whereas a double equals is like, well, I'm a number, you're a string, we could still be equal if I convert the string into a number or if I convert a number into a string, and so it's like all this extra step that has to happen in there to kind of figure this out if that actually works out or not.
+
+[00:03:03]
+So in this particular case, let's see what is the benchmark do? So in this case, we have bunch of objects. And into the objects we put in a custom property for every single object. So this is gonna be mega morphic, right right here. And then we are going to put a value in here for I, and then for the comparison we're gonna either do a triple equal so we're gonna compare the object to 1.
+
+[00:03:34]
+Now notice is a number, and this object is going to be an object the fact that it's mega morphic doesn't matter because we're not actually reading any properties off of it, right. Whereas in this case we're using a double equals. So we're comparing an object to a number which should always be false In here.
+
+[00:03:58]
+And so this particular path is super fast because to compare two objects, the object is just a memory location, right? And so you compare the number that's inside of a register with another number that you expect. Are they same? Yes, no. Move on with your life, pretty, straightforward.
+
+[00:04:15]
+With double equals, the world is a little more complicated because there is coercion and hopefully I'm pronouncing it right. Coercion, right? And the coercion means that you might have to call the value of property. And so I'm gonna show you a couple of cool things, which I think are just weird that happens in JavaScript.
+
+[00:04:36]
+So we're running the benchmark. First of all, we are gonna get that the triple equals is significantly faster than double equals, right? So then let's add a value of property to the object. And now let's run it. Twice as fast. Isn't that weird? Just by adding this particular property to it?
+
+[00:05:05]
+Okay, let's modify a property on the object prototype of, which is the value of, and let's run it now. Again a different number, not as bad, but a different number. So what's going on over here? Why do these things affect the runtime performance? And it's one of those weird things about JavaScript is that when you miss something over here, which you feels completely unrelated to something else, yet there is a path that somehow makes it related.
+
+[00:05:36]
+And so it's oftentimes possible to change a performance of a system far away, which you think is unrelated. Just by adding properties to prototypes somewhere else, which is another reason why you should probably do that out-of-the-box. The reason for that is because a double equals needs to do a coercion of this object and the way we coerce the object, is we call the value of property.
+
+[00:06:02]
+Let me maybe show this to you in another example. So 3=3, true. There's not a, that surprising result. Okay, let's say we have a value of object. So first of all, we all agree that is not, of course not I'm sorry. That's false, right? What did you know that you can do this?
+
+[00:06:33]
+That's true. This is coercion, right? So how does it know if a object is actually equal to 3? Well the JavaScript under the hood calls value off on that particular object. And by calling value off, we can get the result. So now that you know this, you can see how adding the property would change things.
+
+[00:06:58]
+And so let's do another thing. Let's comment out this property, right? This property makes lots and lots of different shapes. By commenting out this property, all of a sudden all the shapes are the same, right? And so, yet again, if I run this, it will change the performance of the system.
+
+[00:07:15]
+So the speed here is different than a speed when it's commented out. At least it should be, right? Yes, there's a slight difference in speed. And it all has to do with the prototype change, right? Because the double equal internally grabs this object and calls dot value off on.
+
+[00:07:40]
+And what have you learned about calling a dot value off? Well, that may be a megamorphic call or maybe a monomorphic call. It depends, right, depending on the shape of the object. So this read here can actually internally call dot value off, and that dot value off actually can mess with us depending on whether we have the same object all the time.
+
+[00:08:00]
+Whether we have a different shape of the object and whether this value off is declared here or it's declared on a prototype. So I believe the fastest iteration should be this one where the value off is declared here and we didn't mess with the prototype. So this should be the fastest version of the double equals 25 microseconds.
+
+[00:08:23]
+And so I think this is kind of interesting. And so in here we can look at the inline caches and we can see, what things are performing well. So right now, everything you see is green, right? There's no red bits anywhere. Let's go back to quality. So let's change this.
+
+[00:08:46]
+And then run it again. So now we should see megamorphic stuff. No, it's not gonna show it to us. Doesn't show okay. I would expect that this would mark it as red because internally the object shape is always different, and it has to hold that value of somebody doesn't tell it to us, but that's what's happening under the hood.
+
+[00:09:23]
+That's why you can end up with a situation like these where things are very, very different types of performance. I think that in general, there's very few reasons to use double equals if you think about it. For the most part, what you really meant to say was triple equals, you're just being lazy.
+
+[00:09:40]
+Okay, so generally, using triple equals is kinda preferred over double equals. Now, I'm guilty of this, too. I'm lazy, too. I also tend to put in two double equals instead of triple equal. But you can see that it kinda have a performance impact to your application.
+

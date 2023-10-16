@@ -1,0 +1,103 @@
+[00:00:00]
+>> Okay, so let's talk about subroutines. We know why we need functions, right? Could you imagine writing code without functions? Like how you just wanna do stuff over and over again, and you need things for doing this, right? So what's the mechanism for doing it? So here we're gonna load A1, A0.
+
+[00:00:18]
+So again, we load the data section, in this case, it's 23. Notice it's becoming annoying, doesn't it? If you change the program, you have to change this number. This is gonna be a problem and this is why we have compilers. This is why nobody writes machine code, right?
+
+[00:00:33]
+Even the simplest compiler which is the assembly, and we'll get through it in a second. Okay, so let's introduce the idea of calling a subroutine. And the reason why we call it a subroutine not a function is a subroutine is extremely primitive. A function has a return value.
+
+[00:00:52]
+A function has a set of parameters. Subroutines have none of it. They don't have a return value, they don't understand the concept of parameters or anything. It's just basically move something somewhere else. What we're gonna do is we're gonna load a A0 is, let's see, 23 is the location of the data section, 0 in here.
+
+[00:01:18]
+And then we're gonna call subroutine, and we need to give it an address. And so in this case, the address is 19. And I intentionally aligned this so this is 10. So 19 will be the same as 29. So it will be right here. This is the instruction that we jump to, right?
+
+[00:01:31]
+So from here, the CPU just goes into this instruction. It performs a bunch of things and then it will do a return. And return will give it back into where it left off. So it will go back to 16. And now you're thinking to yourself, wait, wait, wait, wait, how does this work?
+
+[00:01:49]
+How does the CPU supposed to know how to go back to some place? We have to keep information about that somehow, right? So let's go to the CPU side and let's go to go subroutine, where is it? Here we go, GO_SUB. So we go and read the address of where we wanna go.
+
+[00:02:11]
+That's pretty straightforward. And now we have to do some trickery. So remember that PC is the address of the next instruction I'm about to do. So the PC now gets set to go subroutine. So that's the address of where we're supposed to go. But now we have lost where we used to be.
+
+[00:02:31]
+So how do we know where we come back? And so we need another special register called the stack pointer. And stack pointer stores the current value of program counter. So when a return instruction happens, you do the step in reverse. You restore the program counter from the stack pointer.
+
+[00:02:48]
+Notice something interesting. Where exactly in memory should the stack pointer be? Because it's data, right? And so a default place is to just initialize the stack pointer to the end of memory. And a stack grows from one end of the memory, your code is on the other side of the memory.
+
+[00:03:10]
+The stuff in the middle is your data, and you really better hope that the data and the stack pointers don't meet. Because if they meet, the stack pointer will overwrite your data and it will keep overwriting it into your instruction code, etc and completely mess things up, right?
+
+[00:03:27]
+And these are basically the kind of crashes you see when you use stuff like C. Like you're stuck, you got into an infinite loop, you kept calling yourself. So the stack pointer just kept on recording where you were coming from and eventually it ran off and destroyed everything inside of your memory.
+
+[00:03:45]
+So when you create this, you need to leave space for the stack pointer. And I intentionally didn't leave space. And in this particular case, what does this do? Let's see, this, yes.
+>> Is that called a stack overflow?
+>> That is called a stack overflow? Yes, that is exactly what that is.
+
+[00:04:01]
+Stack overflow is when your stack grows out of what you have allocated. So typically, the compilers will allocate certain amount of space. They think, I don't think you will ever recurse deeper than x, some number x. And they allocate that space and then they all put checks to make sure that you will never go over that, right?
+
+[00:04:21]
+So a modern CPU will throw a, or so a modern virtual machine will throw a nice error saying you've overflown, and an old one will just overwrite it and destroy everything else in the process.
+>> Does AE0 then have boundaries?
+>> No, there's no boundaries in the CPU, right?
+
+[00:04:39]
+It's up to the compiler to do the right thing. There are no boundaries in a sense that you can do whatever you want, but modern CPUs have something called a virtual memory. I'm showing you a very simplified CPU because I don't wanna get things complicated. But the way it works in reality is that you have a physical memory and you have a virtual memory.
+
+[00:05:01]
+And what virtual memory is, is basically mapping of what's called pages, a section of memory onto what you think the memory is. And then a CPU can run in what they call levels, kernels, rings? Rings, I think it's called rings. I can't remember. There's special levels basically where you can run.
+
+[00:05:22]
+And in the ring zero is what the operating system runs on and it can access anything anywhere. But then when it enters a higher-level ring, you get to only see the set of memory that is mapped to its memory space. And so when the CPU is in this application mode, it doesn't get to read anything at once.
+
+[00:05:41]
+On top of that, modern CPUs have rules encoded inside of it, which basically mark individual pages as either execution only or read only. And that prevents accessing or overriding things that you're not supposed to. So there are some checks in modern CPUs, but that's all modern stuff. If you go back and think of the simplest possible thing, it's just physical memory, do whatever you want, etc.
+
+[00:06:11]
+Okay, so this subroutine, what does it do? It looks like it increments the value of R0. So, you load things into memory, into the A0 and R0 values. So, it's supposed to increment 10, 11, 20, and 40, right? And so, what we're doing here is we are into A0.
+
+[00:06:33]
+We are loading the zeroth index of 23, and then we call go subroutine. And then we load index 1 and we go subroutine, and 19, go subroutine, and so on. And so what we're doing here is we're just incrementing these values, right? So let's run this. And it blew up.
+
+[00:06:55]
+So let's see what happened. What happened is we have these values 10, 20, 30, 40. What happened is the stack pointer started overriding things from the back. As we called our subroutine, we messed with the values. And when we got to value 41, that was also the value, we incremented 40 to 41, and then we wrote it back in and then the subroutine wanted to return.
+
+[00:07:20]
+And it said, look at the end of the memory. That's where your thing is, but then we just overwrote the number. And so it had to return to a bogus non-existing state and it blew up, right? And so the only difference between this program, which blows up, and this program that works is that on the end of it, I allocated a bunch of 0s for the stack.
+
+[00:07:44]
+And this makes the code work just fine. So now, if you run this program, you notice that we started with 10, 20, 30, 40 and then we ended up with 11, 21, 31, 41. And so the subroutines job was to increment the value in a particular memory. Now, I kind of intentionally made a nice offset here for you so you can see when you're inside of a subroutine.
+
+[00:08:06]
+But you can see how you load, the 23 goes to the array index, right? The data section, and then the GO_SUB makes an assumption. It makes an assumption that the thing that is in A0 and AE0 is the parameters of the function. And that's one assumption you can do for communicating data from a call site to a subroutine, right?
+
+[00:08:38]
+And that's called the calling convention. In other words, what are the rules of passing data to a subroutine? How do I pass it? Do I pass it in memory? Do I pass it through registers? Do I pass it through stack, which we're not gonna get into here? How do we pass data to the subroutine, right?
+
+[00:08:57]
+This is essentially what parameters are in the modern function, right? How do we do this? And so there's not just that, it's other things. For example, so if the subroutine runs and it needs to modify R0 and R1, is it okay to just clobber the value? Or is the function that's calling us going to crash because it assumed that these things didn't get modified, right?
+
+[00:09:23]
+So, calling convention basically sets a rule. It's a concept that CPU doesn't understand, but it's a kind of an agreement between everybody involved. That basically says that, hey, who's responsible for saving the values of the registers, so that I can. Because internally when I'm executing, I need to have my few registers so that I can do work, right?
+
+[00:09:45]
+Without registers, I can't do anything because it's my local thing, right? So that means when I'm doing my stuff, I need some registers and that means that when you called me, I'm gonna destroy those as I run it. So who's responsible for saving the values of these registers?
+
+[00:10:00]
+Is it me? Is it you? Is it okay that certain things are marked as free to destroy? You have to have an agreement. And unless you have this agreement between who's doing the call site and calling, it doesn't work. And this is called the calling convention. Typically, the way this works is that we put arguments into registers until we run out of registers.
+
+[00:10:23]
+And then we put them in a stack. And then I believe typically the subroutine is responsible for making sure that it doesn't destroy any value. In other words, if it wants to use a register, it is responsible for saving its value than using it. And before it returns, it's supposed to restore the value so that it can return, right?
+
+[00:10:45]
+And you can see how there is an overhead to calling a function. The overhead isn't in the jump. The overhead is in how do I pass parameters? And how do I save the kind of the state of the system so that when I go and run a different program, it doesn't destroy the set of registers that the previous program had and all hell breaks loose?
+
+[00:11:13]
+And so those are calling conventions and this is why modern virtual machines spend a lot of time inlining things. Because if you can inline things, that means you can skip the cost of who's saving what and where does things go and etc, right? And so code inlining is a common problem, a common feature of modern CPUs and things go and get done.
+
