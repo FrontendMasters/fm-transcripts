@@ -1,0 +1,106 @@
+[00:00:00]
+>> So we have our workspace set up but there's a difference between these two. And you can kind of tell by just looking at it, right? One says like applied check whereas the other one has nothing. Well, that's because we set up the workspace to be local, right?
+
+[00:00:16]
+This is again the one chicken before the egg scenario where we kind of have to initialize state before we can actually have it track. And that's because Terraform doesn't know what the repo is yet. We haven't added that to state yet, right? We wanna do that next. So now what we wanna do is we wanna clone after we've created our workspace, we wanna clone our second repository, which is our GitHub repository.
+
+[00:00:41]
+I'm gonna say, gh pr clone for me github, cool. Okay, so now I have two automation repositories a GitHub repository and a tfe repository. So now I'm gonna go into my GitHub repository, right? And we're gonna start automating again. So in this scenario, we're gonna start directly out of the box with configuration.
+
+[00:01:09]
+We now know we like configuring things, right? And we now know that's a convention we wanna keep. So let's create a new file called locals.tf. This is a pattern that we're gonna do and keep doing, right? Now you guys know that we can do this, right? You guys are aware of that.
+
+[00:01:26]
+And I asked you last time, what do you think the names of the resources that we needed to put in there were? Right, so now we're in the GitHub Automation Repository. What do you think the names are we need to put in here?
+>> It gonna depend on the
+
+[00:01:41]
+
+>> Repo names.
+>> Repo names, exactly. Repo names because that's what we wanna iterate over. We wanna just make configurations for all of our repos to start. What I'm gonna do is I'm just gonna be very straightforward and I'm gonna create a variable inside of locals called repos.
+
+[00:01:59]
+And that map now has two repos inside of it eci-terraform-tfe and eci-terraform-github. Now you might be like, hey Eric, how are you gonna do that? They already exist. Here's the last chicken before the egg scenario. These are our sources of truth, right? But so is Terraform. But Terraform depends on GitHub, right?
+
+[00:02:25]
+So the path I just showed you was the path of least resistance which is something must exist before we can create the other thing. So we do Terraform repo first to create Terraform Cloud. Sync, cool you're now in sync. Okay, now that this is in sync go over here and create the workspace.
+
+[00:02:45]
+Cool, okay awesome. But this workspace has nothing to synchronize with yet, right? So now manually create the repository. Okay, cool but these two aren't synced with these two yet, right? So what we're gonna do is this repo here and this repo here are gonna get imported into this state.
+
+[00:03:03]
+And now terraform manages our workspaces and our repositories everything is automated now. Okay, so what we're gonna do is we're gonna create a main.tf file. Now, spoilers we're gonna be using some more of my modules. But I have tested these on a personal account so we are good.
+
+[00:03:24]
+[LAUGH] So in this case what we wanna do is we wanna copy and paste our first module. So I'm gonna go ahead and give that to you so that you guys can start typing this out. But this is essentially our repository module. Now this repository module does a few things, right?
+
+[00:03:41]
+For starters it, let's get rid of this this doesn't need to be here. It does the for_each like we're used to, right? for_each like we're used to. We have a source which is the GitHub repository module and the version that we're using, right? We then have a description.
+
+[00:03:58]
+I haven't added this to the config yet, right? But the reason why I said just start here and then add your resource is because you don't know necessarily yet what you're gonna have over here. You know what I mean? It's okay to start and be like, okay, now let me go figure out what I need and then let me go at it, right?
+
+[00:04:18]
+And so in this case what we wanna do is it looks like we need to add a description for each repo, we need to add a potential gitignore for each repo, a name for it. var.owner, okay, interesting, something we might be reusing more than once. Topics for each repo and visibility for each repo, okay?
+
+[00:04:37]
+So let's go ahead and configure it. So the first one is gonna be for our TFE repository. And it's gonna look something like that. So we're gonna say the description Automation for Terraform Enterprise. The gitignore_template was the one we already set it to, right? The eci-terraform-tfe that's the name of the repository.
+
+[00:05:07]
+I don't know why that's actually in there that doesn't need to be in there. Let me just check that really quick, yeah I might have actually done that by accident sorry about that. I'm trying to think if there's a reason why I have the name there, there shouldn't be.
+
+[00:05:28]
+Yeah, so let's do this each.key. Yes, exactly. Yeah, we want it to be the key. We always want the name of the repository or the the resource name to be the key. Now okay I know why I did this. Let's say you're in a scenario where your workspace doesn't match or your resource name might not match what you wanna actually name it, right?
+
+[00:05:57]
+So here's a common scenario. If we go back to here and this is a bit of a spoiler this is why I added this. We have prod network but then we also have prod cluster and prod service, right? But there's another angle that we're gonna take with this which is environments, right?
+
+[00:06:16]
+So we're not just gonna have workspaces or resources that are just their normal names. They might have other changes to them like a dash prod or a dash dev or something like that. And so in this scenario because we realize that that's gonna be something we're gonna deal with in the future.
+
+[00:06:34]
+We're actually gonna keep the value.name here. And the reason for that is because we do know that there might be a scenario where the key for what we're trying to make might not match the value of the actual name of the repository. In Terraform Cloud, it makes a little bit more sense, right?
+
+[00:06:55]
+Because there's never really gonna be a disconnect. It's always gonna be like one-to-one so to speak. But in this scenario, the flexibility of passing the name gives you a little bit more options in the future when you wanna be more dynamic. Which is something we're gonna do a little later.
+
+[00:07:10]
+So let's keep the name for now, right? But again, just note that this makes it so we don't run over ourselves later. Yeah.
+>> About the topics, that array can you feed that anything? Or does that have to tightly correspond to assigned topics on GitHub?
+>> No, you can type in anything.
+
+[00:07:27]
+Yeah there
+>> That's just an array local to the declarations here in locals for however you wanna be tracking that stuff.
+>> Exactly, yeah, so for example if I go back to my GitHub, if I go to my org > View organization you'll see here that I've got like eci-service, frontend-masters here.
+
+[00:07:53]
+But then you'll see here my most used topics like this is all from my organization so I can be like all right let's look at frontend-masters. And then I can see my stuff, I can see if there's other people's stuff as well. But you'll see here it's looking in ALT-F4 by default.
+
+[00:08:05]
+So it's really your own level of how you wanna filter around in GitHub, yeah.
+>> I suppose my question then is if I don't have topics configured in GitHub right now, if I put stuff in,
+>> There's no topics to configure they're just like tags. [INAUDIBLE]
+>> Yeah, well you don't need to create them.
+
+[00:08:23]
+They will just be whatever you want them to be, yeah. Okay, cool so we've got that, right? Now let's do the exact same thing for GitHub. So I'm going to copy this config real quick. And I'm going to paste in the GitHub one, okay? Yeah, okay so go ahead and get that one in for me really quick before I close it.
+
+[00:08:50]
+
+>> gitignore_template is do you want Terraform to be in our GitHub?
+>> That's a predefined one. So Terraform just name it or just put the value as Terraform, GitHub
+>> I'm just wondering do we want the terraform gitignore_template to be in all of our GitHub.
+>> So let's think really quick, what are we creating?
+
+[00:09:11]
+We're creating a Terraform automation repository right?
+>> Is your automation repository these aren't code repositories or
+>> This repository is going to have the automation that will create the other repositories, automation that helps automation, right? So Terraform Cloud is what made it so that we can create our Terraform GitHub.
+
+[00:09:29]
+And Terraform GitHub is gonna make it so we can create all of our repositories. There is one other thing let me yeah, the owner right so we said that we needed a owner, right? So we're gonna do variables,tf and we're going to paste in our owner variable declaration, right?
+
+[00:09:47]
+So I'm gonna go back to main that's what my main looks like and that's what my variables looks like.
+
