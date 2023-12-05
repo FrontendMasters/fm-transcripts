@@ -1,0 +1,126 @@
+[00:00:00]
+>> Next, we're gonna be dealing with pure type information. And what I mean is really two types of things. One is we're gonna define interfaces for things that are important to our Slack app. Message, a channel, a team, which is like a group of channels, and then a user, right?
+
+[00:00:19]
+Users write messages, so their pictures' associated with the message. We're also going to look at a case where, so we just talked about definitely typed and bringing published type information in from the definitely-typed package. We'll look at what it would take to locally write some type information. Maybe you just wanna make a few adjustments within your project.
+
+[00:00:43]
+You don't wanna worry about getting a pull request merged, indefinitely typed. And to be honest, any fixes that you make to types that you consume, they usually start out within your project. And once you sort of get a feel for them being broadly useful, that's when you'll sort of bring it into definitely typed anyway.
+
+[00:01:02]
+So we'll do both of those things. Types that relate to our own code and are part of our API surface, and I'm using that, maybe not part of our API surface, but part of the domain modeling of the problem we're trying to solve. They could be part of your API surface too.
+
+[00:01:18]
+And then fixes and customizations for dependencies that you consume. So, here's my little diagram of kind of the relationships between things in a Slack app. Teams have many channels which have many messages, and each message relates to a user. The user is the author of a message. We're gonna model that in types.
+
+[00:01:41]
+And here are the interfaces we'll end up with. I'm following, I think it's a C# convention, although I'm not super prolific with C# using a capital I to indicate that this is an interface. I like doing this because it's very obvious when you import things, you know what you're getting.
+
+[00:01:59]
+You know that this is just an interface, it's not a class. You shouldn't be calling new on it. Some people hate this. It's really a taste thing, but it's my course, and I get to decide what I prefer to do.
+>> [LAUGH].
+>> [LAUGH] So- [INAUDIBLE]
+>> [LAUGH] So let's grab these files and we're going to create a new place to put these.
+
+[00:02:24]
+It's right inside our source folder, types.ts. So just making sure that I'm in the right package here. So here's chat, here's source, types.ts. This is not a declaration file. This is a TS file. Part of why I want it to be a TS file is I want this potentially to be if I were exporting this from my project, I would want it to just be like any other thing that I'm exporting.
+
+[00:03:05]
+Okay, this is where I'm touching the TS file. We're gonna bring this into a couple different parts of the code base. So within our data folder, there are a bunch of things that are intending to sorta hold channels, hold a cached list of channels or messages or teams.
+
+[00:03:31]
+So we're gonna go and apply this interface in those places. And we're also gonna apply them through our React components. Now I want you to pay attention to this technique. We're using the Pick built-in TypeScript utility type, which basically lets us, in this case, just grab a couple of properties and their respective types off of something like channel.
+
+[00:03:56]
+So this even, though channel has a teamId and a messages array, we're just saying, grab from channel, the name and the ID. So you'll get a new object type that's just got like name, a string, an ID. I think it's, is it a number? It's a number. So part of why I do this is I don't really, I still value encapsulation when treading these types through.
+
+[00:04:25]
+And I like to be very deliberate about what each component that includes information relating to a channel, what it can access. And right now as our code stands today, we don't have any formalized concept of this. But what I can get as a benefit with TypeScript here is I can say, this is just a sidebar that should show names of channels.
+
+[00:04:47]
+It doesn't need all the messages of those channels. And by defining the type in a narrow way like this, I can sort of be deliberate about what I think this component should know about channel, rather than just threading IChannel through anywhere anyone needs to know about a channel in any sense.
+
+[00:05:07]
+Does that make sense? And in defining your type this way, you still have a centrally defined IChannel interface. So this is much better than sort of in lining a bunch of object types, which might, at this moment, align with IChannel. But if you refactor, you gotta go through and catch all of those things and it becomes a little burdensome.
+
+[00:05:30]
+And this is an example where maybe we use this particular pair of properties very frequently. We could create a type alias for it, just to make things a little bit more semantic. So, let's go ahead and look through our React components and the data folder. And again, starting lowest level first.
+
+[00:05:53]
+So I'm gonna go to channels.ts. The name of this function is getChannelById. I see that it returns a Promise<any>. It seems like it should return a promise that resolves to an IChannel. This seems like we're retrieving a channel. So I will want to use the IChannel interface in its full glory.
+
+[00:06:15]
+So let's put a return type on this. And auto-importing is helpful here. While we're here, id looks like it could be a string or number. We could do keyof any, right? It's any valid thing that could be a property key, number, string, symbol. And here we're passing in, it's an implicit conversion of a symbol to a string that will fail at runtime.
+
+[00:06:51]
+All right, we're gonna go with number or string. Great, okay and while I'm here, gosh, the API call returns. Just judging by this path, it's like a promise that resolves to the channel. Man, I wanna change that, I'm gonna resist. We're not here for that right now. All right, messages, let's do the same thing here, teamId, channelId, returns channel messages.
+
+[00:07:27]
+It does return a promise. I think it's a promise that resolves to an array of IMessage. Cool, all right? Teams, let's look at that one. All right, we got getAllTeams, returns a promise. This returns a promise. So this is a promise that resolves to an array of teams.
+
+[00:08:00]
+Get that auto import working. And getTeamById, that seems like a promise that resolves to a single team. Fantastic, and we could do the same thing with this ID number or string. It's really the only thing it could be. I'd know it's a number, I do know, but we're pretending like I don't know.
+
+[00:08:31]
+Well, no, let's be real about this. I can look in my database. This is what I would do. What really can this thing be? Whoa, okay, look, it's just strings that's for teams. Users have numbers, channels have strings, messages have strings. So, let's go back, users have numbers, everything else has strings.
+
+[00:09:02]
+So teams, can say that's a string. Messages, it just takes in a teamId and a channelId, both strings. Channels, strings, doesn't really matter, but this is an example, I access, I go get information about what could this actually be? And if I were more rigorous here, I would actually look at my API and see, is it coercing a string to a number or what?
+
+[00:09:42]
+It's all just getting put into a path param here to make the API call. Ans so even if it comes in as a number, it'll end up becoming a string. This is where it's used, right? Ends up being a string, it's part of the URL. All right, let's look at our React components.
+
+[00:10:00]
+We can run a type check real quick to see, We're not gonna see a type check yet cuz everything compiles already. We're just gonna go and start threading things through. All right, we have a channel, we're gonna start lower. Let's look at the footer. Whoa, interesting. Okay, we have a property name here called channel, and it's got name and channelName.
+
+[00:10:30]
+This tells me that we want something with a name on it. Now I'm not really improving the type here. It's still just a name with a property here. This is of type any, I guess I am improving that. So I would say this is a React functional component, And it's gonna be a Pick<IChannel, 'string'>.
+
+[00:10:58]
+Oop, but not in quotes. My brain thought string, and I made a string. Nope, it is in quotes, sorry. [LAUGH] Okay, that's interesting. It's not actually that shape. It's this shape, Right? Here is the outer object. Channel is the property, I'm gonna move this to a new line so we can see it.
+
+[00:11:30]
+And what's going on here? This brace I don't need, there's a brace, out here we need the brace. There we go, just a syntax error. Here's our object type. This is our props type effectively. At some point it makes sense to break this out into its own interface, especially when things get any more complicated than this.
+
+[00:11:52]
+But look, we've improved our type, that's a string now, channelName. We could go to the footer, sorry, the header, okay, I see here a title and a description. I could put a more meaningful type here. There we go. Title is not an any anymore. We could have left this alone, too.
+
+[00:12:25]
+We're just trying to provide some specific type of information where it makes sense. Message, okay, this is an interesting one. Just looking at, okay, we're consuming some of user here. We certainly are plucking the body and the date and the user off of the message. I've deliberately created a little bit of a misalignment here, just so that we can learn how to deal with it.
+
+[00:12:50]
+So let's try this. And we might look at IMessage. And we'd look at this interface and we say, okay, this has the user and the body. But it has a createdAt field here. There's a createdAt field here that's a string. Maybe it's like a ISO 8601 timestamp. And this component, sorry, it's not.
+
+[00:13:19]
+Is it this one? Yeah, it is this one. This component kind of wants a date. No, it wasn't this one. Although this also wants a date. Here it is. Message.tsx, that's the right file. This wants a date, but we don't have that. And again, I don't wanna perturb code too much here.
+
+[00:13:40]
+So what I would do in this situation, I'd say createdAt. We're not gonna just return this JSX fragment as it is. We'll return that. You get a closed brace at the end. And then I would create a date here. Something like that, that we don't need. Trying not to change the way the code works while we're improving the types.
+
+[00:14:16]
+And I get a different thing in here, I end up with this, which means down here, we're happy. Now I have changed the contract that this component has with the component above it. I expect I'll need to sort of thread it through a little bit differently. Oops, and it turns out, Channel is probably what renders a bunch of messages.
+
+[00:14:45]
+So, let's type this. A component that's called Channel probably needs the whole IChannel interface. Its reason for existence is to render a channel in its entirety. If I were to look into this, I would see we've got the header, we've got a messages.map, and here are all of the messages.
+
+[00:15:07]
+So we can go ahead and assume that this needs full exposure to the IChannel interface. And again, rep, Just makes it a little easier to pass it in as a prop. All right, and down here we have an error. It looks like we're just moving where the state conversion occurred.
+
+[00:15:36]
+I kind of like that we're making this change. I like that we pushed it down into the inner channel message component because this lets us pass in a message in a different way. So we can actually, let's just see if this takes in the whole message, it does.
+
+[00:15:57]
+That's its prop type, it's the whole message. Now we could actually take this and do something like that, are we allowed to do that? We need a key as we're iterating over this. So we could use the message ID as the key. This is something that React needs in order to understand that an individual item and the list was updated, saves it from having to sort of re-render an entire list of things.
+
+[00:16:25]
+Which, if you imagine we're building Slack and we have a infinite scrolling list of historical messages, you don't wanna be re-rendering that, losing the user's scroll position, that kind of thing. But this is a different way to pass this interface in. My preference would be to do it kind of as a named prop, kind of like what we're doing up here.
+
+[00:16:49]
+But this was already the contract, right? This channel message, it was having us peel apart the individual properties of a message and pass them straight through. And we're effectively doing this now. Now this is an any type, I think we can do better. We can get rid of this thing, that little workaround from earlier, and even get rid of this thing, and this thing.
+
+[00:17:17]
+And what we can do here is say, We're saying useState in my state is an IMessage array. There's my array of messages. When I set messages, I'm taking in as an argument, it's not giving me a nice function signature, but I'm passing in an array of messages when an API response comes back.
+
+[00:17:45]
+So what we get here is down here, a lot more type safety. There's IMessage. There's my message ID. My map function works a lot nicer now.
+

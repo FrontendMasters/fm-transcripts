@@ -1,0 +1,74 @@
+[00:00:00]
+>> So let's talk about that concept of sort of locally patching imported types. And we're gonna take advantage of the kind of the type acquisition step by step process that we described, where you'd first look at specific paths. The same way that we use that beta chat-stdlib file.
+
+[00:00:26]
+We can use that same approach to sort of override the types of things that we import from other places. So, I've created here, and please do the same, a folder called types in the root of my chat project. And I'm gonna go into my tsconfig. And in here, now, you might wonder, do I want it to be a type root?
+
+[00:00:54]
+Or do I want it to be something different? I'm gonna actually use paths with this folder. So what we're saying here? If we think back to the order of precedence for type acquisition, paths is number one. It is the first place TypeScript will look. If we define this as a type root, we might have other type roots, the @types folder.
+
+[00:01:31]
+And this gives us a strictly higher priority way of describing types. So let's go ahead and look at, we're gonna make a little change here. We're gonna go to our networking.ts file after we save this tsconfig, networking.ts. And instead of consuming this HTTPError class from this local module here, this is a CommonJS file.
+
+[00:02:02]
+Just an example of CommonJS interoping nicely with TypeScript, everything is compiling fine here. But instead of consuming that, let's consume it from a different module, http-error. That is a real thing that I've set up in the package.json. Just to show you that, Here it is. Don't worry about where this dependency is coming from, we will get there.
+
+[00:02:37]
+But just know that you should think of it as being in your Node modules folder, almost. And if I hover over this, it says it can't find a declaration file for this module. And because of that, HTTPError, it doesn't have any type. So it's implicitly in any, which means, down here when we're calling it, I'm getting no help making sure that I'm using this correctly.
+
+[00:03:10]
+So what we would do here is we would say, I wanna fix this locally. I don't wanna go through creating a new definitely-typed package. And figuring out how to add that, and publishing it, and then pulling that version down. You wanna resolve this as quickly as possible, this is part of operating at scale.
+
+[00:03:30]
+We can't wait for pull requests to be merged. We wanna fix changes locally, and then out of band, so we unblock ourselves. And then we can get it patched, bring it in, remove the workaround. And we've gotta keep everything working productively here. So, okay, in our types folder, we're gonna create a declaration file, http-error.d.ts.
+
+[00:04:00]
+The name is important. And here, we're gonna say export class HTTPError, and I'm gonna save. And I'm gonna restart TypeScript. Hey, look at that in our tooltip, class HTTPError. So, effectively, what we've done is, in the tsconfig, because of what we added to paths, whenever we're trying to acquire types for a module, the first place TypeScript will look is in our types folder.
+
+[00:04:51]
+And it will try to find a module in here that matches what is being attempted as an import. And if something is found there, those are the types it uses. If something is not found there that matches the name of the package, we keep looking. We go into Node modules, we go and look at the @types folder in Node modules.
+
+[00:05:16]
+I could demonstrate some harmful stuff we could do here. It's, say, react.d.ts, and then we're gonna say, export a Banana, and save. And now all of our UI code is gonna be very unhappy, or it should be. Look, React.PropsWithChildren, it doesn't exist. But, sure enough, React.Banana is there.
+
+[00:05:46]
+So we'll delete that file, that's probably not what we want. But that's an example of us superseding what's in Node modules. It's important to be able to do this to keep your team unblocked. Because you will find errors in types, and you will need to patch things up.
+
+[00:06:05]
+And this is a great way of doing it, checking it in, and then be a good JavaScript ecosystem citizen. See if you can get it pulled into where it belongs. But that's not on the critical path, that's not part of what needs to happen before you're unblocked. So we're not quite done yet.
+
+[00:06:27]
+If we look down, now that we have type checking, it's not just a zero-argument constructor situation here. We need that response to come in as an argument, and then a string. So we can just say constructor response. And then a description, that's a string. And there we go, error's gone.
+
+[00:06:53]
+That's where our type information's gotta go. If I do Cmd + click on this, it'll just take me to this file. That's where the types are coming from. So two different ways we can deal with pure type information. We looked at interfaces, which we model as something that's part of our app.
+
+[00:07:12]
+And then this, I would say it's not part of our app. I mean, it's part of our repo. And it's necessary in order for our app to compile, but nothing about what you see here will be something that you'd ship with your app. And this is why I put it in two different places.
+
+[00:07:29]
+It makes it very clear, things that you will distribute or deploy, versus things that are sort of type information that's just required in order to compile. And run yarn type check, make sure we're in a good state, and then we're good. We're getting there. Let's check those app, the error in src/types, time to kick ESLint.
+
+[00:08:13]
+Messages are declared here. TeamSelector.test, our tests have errors, okay, let's see. Messages is missing in this type. Okay, TeamSelector, what I would do here is I'd pick, cuz I don't wanna change my tests just to make this pass. I'm just trying to describe my code, I don't wanna alter tests.
+
+[00:08:38]
+I should be able to not touch the tests and get this code change. So let's look in our TeamSelector component. Yep, so here, apparently, we're gonna do a Pick. We can even do it this way, Exclude<keyof Iteam, 'messages'>. So just to put that on another line. So we're saying this is a long type here.
+
+[00:09:12]
+I would take feedback in a code review that this is a very verbose way of expressing this. But what we're saying here is, I want everything on ITeam, except for messages. And we're having to use Pick and Exclude. Everything on ITeam except for, this is the subset of ITeam that is not messages.
+
+[00:09:35]
+That's kind of the way we're articulating this. And then it looks like we have another thing of this nature, where, We're including id and username, and the test does not want to have to include that. So here we do Pick<IMessage>, we'll just do this a little more reasonably here.
+
+[00:10:05]
+User or createdAt or body. Let's make sure there's not one more, there is. All right, just for expedience here, I'm just gonna put messages here, empty array. One more, we'll fix this the quick and improper way as well. And it wants what, id, username, maybe both. And this, it wants createdAt.
+
+[00:11:23]
+Yeah, so maybe changing that contract was not ideal. But we're getting alerted to it because TypeScript is doing the type checking here. Great.
+>> One question in the chat is, could you have used Omit ITeam, messages?
+>> I totally could, my brain doesn't jump straight to there, cuz Omit hasn't existed for a crazy long time.
+
+[00:12:00]
+I'd argue I did use Omit, I just spelled it out more deliberately. But yes, absolutely, that's a more concise way to write it. It's such a common thing to do that they gave us a utility type for it.
+
