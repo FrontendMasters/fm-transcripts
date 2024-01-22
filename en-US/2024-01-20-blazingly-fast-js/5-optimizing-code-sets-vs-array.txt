@@ -1,0 +1,104 @@
+[00:00:00]
+>> And so we're gonna go back here, and let's just stop this cuz we don't need the client and the server running. We can just stop those, and let's just look at the update function for a second. Or let me make sure that that's what I wanted to do.
+
+[00:00:14]
+I did a little bit of profiling, so let's look at the code. Yeah, let's look at the code. So I'm gonna navigate to game/game.ts, and I'm gonna look at update. So it is really this function right here that is taking the lion's share of our running time, from 71 to 117.
+
+[00:00:33]
+So I can even zoom it out. It's really not that complicated. It's just a bunch of checking. So does anybody have some ideas of what we could do to make this code faster?
+>> We're doing a lot of for loops. We're doing, We're iterating over the bullets several times, and we're adding it to an array, and then we're going back to that array to actually delete them out.
+
+[00:00:59]
+And we could probably combine that into the same process so you're looping less.
+>> Okay, I like that answer. So is looping the problem? It could actually very well be the problem. And later on, we will look at some looping techniques to make this faster. Or really, we'll be making specific updates to this code that really adhere to what the game is doing as opposed to just generally solving problems.
+
+[00:01:22]
+But right now that is not where the big lion's share of time is being spent. So I'll just go on and I'll just tell you where it's going. It's not push. No, it's not push. It's not removing from the set, that's wrong. It's something a little bit different, okay?
+
+[00:01:40]
+So we're gonna go to the next slide. So our first optimization, we're gonna take a look at update. Maps and sets aren't always the right answer. I know this may come as a bit of a shock, but here's a quote from Bjarne, okay? You may have heard of him, created C++, pretty smart guy.
+
+[00:01:57]
+Some people would say not a smart guy, but you're wrong, you're just upset because C++ hurts you. So let's just look at this. And yes, my recommendation is to use standard vector by default. More generally, use a contiguous representation unless there's good reason not to. So right now we're just using a set because it's easy to add to, it's O(1) to add, O(1) to remove.
+
+[00:02:17]
+The problem is that O(1) is a lie, sort of. Meaning that if you add 1,000 elements to a set, it's amortized the same amount of time to add 1,000 elements. If you remove 1,000 elements from anywhere within the set, it's amortized constant time to remove them. In an array, that's not the case, right?
+
+[00:02:36]
+You add to an array, it may have to reallocate, but effectively, it's gonna have amortized push to the end, constant time. But when you remove, it may have to shift around stuff. So typically, you'd never remove from the middle of an array cuz you have to do some order of n operation.
+
+[00:02:51]
+The thing about sets and maps is that that constant time has a big C in front of it. It's also gonna have difference in how the memory is laid out. Meaning that you're gonna also have memory in array is nice and packed, and your system can do really amazing things when memory is close together.
+
+[00:03:10]
+Whereas with the set, your memory, who knows where it's at? It's gonna stored in an array that's also having a linked list for collisions, and there could be some very unique ways in which it's being stored. I don't know exactly how it's stored in V8, but typically, hash set is gonna be an array with linked lists inside of it for collision.
+
+[00:03:26]
+And then it has to do a linear search through the linked list to see are you the thing, are you the thing, are you the thing? So it's not necessarily super fast. If you don't know the difference between array and set, hey, guess what? There's a free course on frontendmasters.com/trial that you can use forever.
+
+[00:03:42]
+And I made that course. And so it's called The Last Algorithm's Course You Need. I will be doing The Last Algorithm's Course You Want cuz the algorithms there are gonna be so complex, you'll never want to look at an algorithm again. It's gonna be fantastic. So let's try to prove this.
+
+[00:03:57]
+Let's try to see. That's not an ad, that was self-promotion. I think that was a beautiful blog. All right, so let's try to prove this out. Are sets slower or faster than arrays in some case? So I'm gonna go over some basic code that I have in this repository.
+
+[00:04:17]
+So I'm gonna just kinda quit out of Shooter, back up up once, and go into set of a folder called set. So it's just in the root of the thing that you cloned down. And I'm gonna open it up here. And yes, I did write it using JSDoc, cuz honestly, JSDoc, it's shockingly great to use when you don't want to have a whole TypeScript thing.
+
+[00:04:36]
+So I'm gonna go all the way down to right here, these two functions right here, findWithArray versus findWithSet. So all I'm gonna do here is I'm gonna create a new set. I'm gonna have some basic bookkeeping cuz I wanted to make sure I was actually getting the right thing and I printed out some values.
+
+[00:04:53]
+So these, we don't even technically need most of those anymore, but it doesn't really matter. And then I'm gonna to grab a single character from this iterator and I'm gonna save the previous size of the set. I'm gonna add that chat to the set. If the size did not change, meaning that when we added it, we already had that character in the set, I'm gonna reset and add that chat to the set.
+
+[00:05:16]
+So that way we reset. Our goal is to find a count of unique characters in a row, and then report, hey, I found 14 unique in a row. That was my goal number. We found it. And so I'm gonna see how fast can sets do that versus an array.
+
+[00:05:32]
+An array is literally the same thing. It's gonna have the same iterator that we're doing. We're gonna keep doing it while array.length is less than count. But if the array includes the character, now remember include is gonna have to linearly walk through the array, versus a set, we only just add it and see if the size is the same.
+
+[00:05:48]
+If it is included, we'll create a new array, and then we'll push the character to the end of the array. Sounds good? All right, so this is like a classic thing here. So I saw someone saying something about Advent of Code. Yes, this is actually an Advent of Code strategy to make something much faster is to stop using a set and start using an array.
+
+[00:06:10]
+If you care about trying to make your Advent of Code faster, if you don't know what Advent of Code is, it's a really great way to learn a new language. I highly recommend you do it. You get great data structures and algorithms ideas. You get really cool performance tips from everybody else.
+
+[00:06:22]
+And it's the only time in the world in which thousands of people, hundreds of thousands of people are all solving the same problems in languages they're unfamiliar with. So it's really easy to work with people and learn from everybody at the same time. Highly recommend it, great way to become a better programmer.
+
+[00:06:38]
+The createString function is really simple. All it does is until we hit this charsUntil, I return a substring that doesn't have that unique amount of counts. So we're always failing in worst case scenario. So if we're looking for 15, I'm gonna return 14 unique characters over and over and over again, which means it will fail every single time on the 15th one until we reach this charsUntil.
+
+[00:07:00]
+So pretty simple, that charsUntil, I have it at 800,000. So it's nice, long amount of failure before we actually find something. And of course, the string is just one long string. I think there's 79 unique characters in here, so we can do up to 79. And then I simply just grab the count from process to and do that.
+
+[00:07:19]
+So it's a pretty simple one. I also have one called a random createString, which is more kind of like how the world works, where sometimes you have maybe only 15 out of 30 were unique and then it fails. And only 3 out of 30 were unique, then 27.
+
+[00:07:34]
+So it tests more of what happens if you don't always add to the maximum. You're kind of fluctuating in between some goals, which one's faster. So when I take that and we go to set, and I simply go node src/index, it's going to run with the default amount.
+
+[00:07:51]
+Which I didn't put the default amount in here, it's actually in data. The default amount is 10. So if we only do 10 characters, meaning that I'm gonna return 9 unique characters for 800,000 characters straight. And then afterwards, return ten unique characters. Once I find that unique characters, it's like, awesome.
+
+[00:08:11]
+And it's gonna do that 40 times for set. It's gonna do that 40 times for array. And look at that, array took literally half the time as set in this micro benchmark. It's kind of shocking to see that array took 455 milliseconds, whereas set took 934 milliseconds. And we can run this over and over again, we'll get some variation of it.
+
+[00:08:31]
+But arrays are pretty much uniquely faster, at least on my machine, and on a lot of people's machines, for items under 10. Because the memory is close together, the lookups are really easy when you do includes how memory is laid out, it can just run through that really, really fast.
+
+[00:08:46]
+It's simple. And look at that. Huge wins here. So if I want to increase it, let's do 20 unique characters instead of 10. Shockingly, we still, at least on my machine, and probably on your machine, are still seeing it being arrays are faster. So 20 unique characters. A lot of people would not think that if you did an includes on an array, which is a linear search, is gonna be faster than doing a set check.
+
+[00:09:09]
+Well, it can be if you're constructing and removing and deleting and adding elements to an array versus a set. It's just unusual, right? At 30, usually, this is where I start seeing it kind of break down to where arrays and them are kind of operating in the same plane.
+
+[00:09:24]
+So at this point it looks like arrays are slightly slower, and then it gets worse and worse and worse. Obviously, as the number goes higher, you start seeing sets really win. So there is a breakpoint in which you should use sets, but there's also a breakpoint in which you should use arrays.
+
+[00:09:39]
+And this is a really great optimization. Very few people take advantage of this in the JavaScript world. I'm sure right now that almost every single JavaScript library could take advantage of this idea that they use sets just naturally to look things up, when maybe you should just use an array until you exceed a certain size and then switch into a set.
+
+[00:10:00]
+Really easy, simple way to make great performance wins.
+

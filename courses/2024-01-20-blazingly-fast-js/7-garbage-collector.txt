@@ -1,0 +1,120 @@
+[00:00:00]
+>> All right, I'm gonna let this go all the way up till about 2002 runs through. There we go. I'm gonna kill those two things, I'm gonna do one more test, we're gonna go up to 2000. I'm gonna do 2000, awesome. Make sure you don't have an inspect flag on.
+
+[00:00:11]
+If you have the Inspect flag on, well, that's just gonna suck. So, [LAUGH] don't do that. All right, and so I'm gonna take that. One more, put a two there so we're at 2000 and let's see how bad this one is. It's looking a lot better than it was last time but we just got started running so we'll see what happens as all the games really get running around in here.
+
+[00:00:35]
+I mean it looks a lot better, it currently looks a lot better. I'm not saying it actually is a lot better. But it looks a lot better, okay. I mean, I don't wanna claim victory yet, but I'm just saying we're looking a lot faster, at least in our upper bound.
+
+[00:00:57]
+In our lower bound, did we really make an improvement? 31 versus pretty much 31. I mean, that could be error. That could be a local host. I would just chalk that up to nothing, right? I would just say, that's not a W. I'd even be pretty hesitant to call this one a W, a 36 to a 32.
+
+[00:01:16]
+I'm pretty hesitant about that one because I don't know what the error rate is. We, again, this isn't a long test. Again, I have Chrome inspector window open. I have LSPs running. I don't know what percent different this could make. As far as this one goes, maybe we got something there on the upper end.
+
+[00:01:37]
+We're looking a bit healthier, cuz we went from 43, we went from 62, 63% to about 43. So probably something there, I think we can probably safely say that this optimization actually made a difference here. Now, I haven't been following along here and so I probably missed a bunch of things that I was supposed to say to you and these really great ideas such as you probably should have made this on a different branch.
+
+[00:02:03]
+All these changes. So we're gonna do that. We're gonna check out a different branch and make all those changes. You are probably impressed by my Vim skills by the way, if you wanna check out a super cool vim course on frontend masters.com not slash trial, this one's not free.
+
+[00:02:19]
+Check it out, it's there. It's how I approach Vim. It's still awesome, not free. We also did this. I even talk about how I really, really messed that one up, all right. And we check the performance tab. Everything's looking good. We check the practical one. We do see a slight win in the practical one potentially it looks like there's a there.
+
+[00:02:40]
+Again, we're not in production, but I'm confident to say that something probably is better. So there we go. Sorry, I forgot I did all this stuff. What do we do now? Bathroom break? I really feel like we gotta keep going for a moment because we're not quite there unless, if you guys really have to use the bathroom break.
+
+[00:02:57]
+No, okay. We gotta keep going, okay? I think we need to do more profiling, okay? I just feel it in my bones. So before we do that, I'm gonna jump over here and I'm gonna go like this. Get status, I'm gonna add these things here. I'm gonna check out fo for first optimization so I can kinda store it for later cuz I want to do the next optimization again off of our kinda base project.
+
+[00:03:19]
+And that way we can kind of try putting them together to see what happens and see is there some sort of multiplying effect? Are we actually perceiving a real win? Maybe one win causes another win to be way better. It just doesn't look better by itself. So let's find out, all right.
+
+[00:03:35]
+So get status, get commit. First W of the day, let's go. All right, get check out master, get check out dash p second option, there we go, we're are looking good. So now we're branched of master again and we can go back here and we can do that.
+
+[00:03:49]
+But before we go on I wanna give you a brief and entirely too short introduction into the garbage collector, okay. This is really important information that you should know. There's a really awesome blog post called Trash Talk on VA it goes over what is the name of the GC in my head I've lost the name of their they have code names for all their all their projects.
+
+[00:04:15]
+I know it ends in o n o I just can't remember the first part. It starts with an O, ends in an O. Anyways, so these are gonna be V8 specific features. These are not JSC specific features, which means that if you do this with BUN, you'll have slightly different results.
+
+[00:04:29]
+I assume they have the same style of garbage collector, but I don't really know. All right, so let's look at this following code right here. Which is just let a is an object, b is an array with a in it, c has a ref to a. Really what's happening underneath the hood is that there exists this object a.
+
+[00:04:48]
+And maybe the bookkeeping is attached in some sort of wrapper class to a, maybe it's allocated behind a and how they do their memory stuff. I'm I don't exactly know how they do it, but in some sense there is some amount of bookkeeping to be able to make sure that when a is created, they know a has a reference to it, or someone's pointing to it when they walk through the graph.
+
+[00:05:08]
+It has some sort of determined location somewhere in the memory, in the nursery really when it begins with, and so they're all pointing to it. Then at some point everyone should inherently understand this because we've all done something like this. We've set a property on a and it's reflected in b's first element in the array, in c's child item inside the object, you kind of understand inherently that there's pointers somewhere in here that everything is pointing to.
+
+[00:05:36]
+So now, but what happens when we do this? a becomes undefined. b, we execute pop. c, we delete a ref. What happens? Well, our dead b, our original addressed object, has been completely abandoned. Nothing is pointing to it. Well, GC needs to happen. So there's two types of GCs.
+
+[00:05:56]
+First, there is something called a major, which walks all of everything inside the heap, starting from the roots. It's typically considered slow. It's gonna check exhaustively. It also performs compaction in case pages get too fragmented. It does a lot of stuff. Then there's minors. Minors only walk from special roots to check for new objects, and so V8 has what is referred to as a generational GC.
+
+[00:06:22]
+Typically, the major one is called marking and sweeping. And so you can kinda think of it in this example. Say we have this little piece of HTML here, greatest programming language ever, and we create a and b. Those are actually attached the window object you may have forgot this.
+
+[00:06:40]
+A lot of people probably have forgot this but if you just raw dog a script in HTML, whatever variable you create actually get attached to the window object. It's kind of one of those things you forget when you've been working in this module system for so long, but this just happens.
+
+[00:06:53]
+So a and b are on the window and at some point we said to b to undefined. All right, so that means window has a reference to b and a. When a GC happens, before we set b to undefined, it will start at the window object, and it's gonna crawl all of its references, which means it eventually will say, hey, I'm gonna mark b.
+
+[00:07:13]
+I found b. Hey, I'm gonna mark a. I have found a. Okay, nothing I need to clean up. We set b to undefined and so now we start another GC. It goes to the window object. It's able to reach a, but b has been unmarked. It is able to be cleaned up.
+
+[00:07:27]
+It's able to be added to the free list. That's how they kinda keep track of all the little holes is they have something called a free list, which we will actually get back to. There's a really cool technique I haven't tried but I really want to try on making things faster.
+
+[00:07:40]
+All right, lastly, so that's kinda the basics of a major GC. Crawls finds objects that are still there and marks them. Everything else gets the sweep. Compaction, this is directly from the blog. A major GC also chooses to evacuate slash compact some pages based on fragmentation heuristics. You can think of compaction like hard disk defragmentation of an old PC.
+
+[00:08:01]
+Zoomers confused right now. I get it. We copy surviving objects into pages that are not currently being compacted using a free list. And that way we can make use of the small and scattered gaps within memory left behind by dead objects. Okay, so that's just directly from them.
+
+[00:08:16]
+If you don't know what that means, it just means that at some point, some pages are gonna have a bunch of just holes in them and so probably need to be cleaned up. So we can move all those objects out, put them into other pages so that way they start filling all the holes, and then now we have a clean page in which we can just start freshly allocating from.
+
+[00:08:33]
+All right, a minor GC, this one also called a scavenge. This is a second form of GC, and it follows the generational hypothesis, which basically states that most objects die young. In other words, JavaScript programmers create a lot of garbage. And most objects are allocated and then almost immediately become unreachable from the perspective of the GC.
+
+[00:08:54]
+This is, again, a direct quote from V8. It's trash talk, again, an amazing article to go read it goes quite detailed. There's also a YouTube video, which is really really good from EU 2018 I believe or no to you 2018. Very, very good talk about how the GC effectively works.
+
+[00:09:10]
+And so a minor GCs are pretty complicated in some sense, because they use a couple of techniques that are different. And so, one thing they do is they have a different set of roots to calculate, but only half of the memory is used in a minor GC. So they have something called a from space and something called a to space.
+
+[00:09:27]
+And so, what they do is every object they can reach in the from space or the place that they currently have been allocating objects in, they copy them over one at a time to the to space and update any pointers that refine the same object with a back ref to it.
+
+[00:09:40]
+It's pretty complicated and now the to space has all the live objects and all the ones that were unreachable are simply just deleted. Or really they just probably are just not referenced anymore and they get overwritten as new objects come in. And so they just do this thing back and forth where half the memory is used, half of it is for the next GC, so all live objects just keep on getting half between these two things.
+
+[00:10:04]
+So to recap GC is to stop the world one, crawl everything. They're typically more rare. They usually take significantly longer than a minor GC. They may have to do some compacting and other kind of memory management's stuff minors typically pretty fast. There's something called a nursery or young generation and they happen pretty frequently.
+
+[00:10:22]
+Like if we do a dash dash trace dash GC on our node process, you'll actually see it spit out scavenged GC pretty regularly. And so how does the generational one work? Effectively, when you have a bunch of objects in your from space and they get copied over to the to space they get marked with something and so they're considered an intermediate aged object.
+
+[00:10:41]
+When it does it again if they contain a mark they'll be moved into the old generation. The old generation is the one that's cleaned up by the major GC, the minor ones are all cleaned up with the young generation. And there's a whole bunch of multi-threading parallelism that is added to both minor and major that make it really fast.
+
+[00:10:58]
+So really think about what that means because if you have a garbage collector that is very, very multi-threaded and you're running on a two core machine that's also accepting a bunch of internet requests, you're probably gonna have some competition going on. You may not be able to achieve as good of performance cuz on my machine there's six cores, right?
+
+[00:11:18]
+On the EC2 instance that you're using, there might not be six cores and really amazing silicon and the latest technology. It might be pretty commodity-based and it may not run nearly as fast. So GCs can have a disproportional effect if you don't have as much freely available compute time.
+
+[00:11:34]
+That's why clients tend to experience little stutter from GCs, but you can see GCs disproportionately affecting servers, especially when you run in production. Some of the best changes I've ever made have been just less GCs on a server because it's just that the instance was small enough that it greatly affected how the network and everything interplayed with each other.
+
+[00:11:52]
+Here's a cool picture from the talk that's linked. You can actually see that it just spawns a whole bunch of background, marking threads before it does any of these activities so it can do them all in super parallel. So again, less availability you have probably the longer these things are gonna take.
+
+[00:12:09]
+All right, so there you go. That's like a brief introduction. So when you make two squiggly braces when you make a simple object hopefully that makes you go okay. I am having impact on my program, maybe not right where I'm doing it. It can be impacted somewhere completely different.
+

@@ -1,0 +1,96 @@
+[00:00:00]
+>> All right, next, we're gonna open up the Chrome debugger. And it's really important that we look at what's happening within our program, because we are going to first start off by doing what is referred to as hotspot optimizations. Now, hotspot optimizations are where you just simply look for the worst offender and you try to fix that.
+
+[00:00:20]
+Now, this isn't always the best way to go about things, but it can just be really easy, low hanging fruit that is pretty simple to fix, or it's gonna give you an idea into how you should change your program. But often, just fixing the function, you can just distribute the problem into many functions.
+
+[00:00:37]
+And then yes, your new function does look smaller, but you've just distributed the workload. So you don't always want to just simply try to fix every hotspot. You want to kind of think about what is the actual problem, and how can we solve the actual problem and not just make this one look smaller?
+
+[00:00:52]
+And so a good story about this is Yunong. If you don't know who Yunong is, great guy, used to work at Netflix, by the way, he was on my team, by the way. And I used to use IntelliJ with Vim motions and he convinced me to use Vim.
+
+[00:01:03]
+Yeah, Vim, I think that we were in version 6 back in the day or version 5. And so he was the catalyst for me using Vim, changed my life, love Yunong. And when he got there, he said, Hey, has anyone actually checked performance on our node servers? Because this is at the point where the website was heavily investing into node, and no one actually ran anything on the server.
+
+[00:01:24]
+So he just ran a simple perf on the server and 50% of the time in production, it turns out we were deep merging objects. Somebody accidentally use lodash deep merge instead of object dot assign. And that's the only thing we did. And so it instantaneously made everything faster.
+
+[00:01:44]
+So sometimes hotspot optimizations are absolutely a beautiful thing because you're like, Look at that. I'm dumb, that's bad, fix it. And so they can be really, really wonderful. But sometimes they can be misleading. So just something to always know about. All right, so we're gonna do the exact same thing we have been doing.
+
+[00:02:02]
+Make sure you have your log path correct. Again, you don't want to dirty any of your previous results. We're gonna open up our little server, but this time we're gonna add the inspect flag so that way we can actually open up Chrome debugger. And we're gonna look at both the performance and memory tab.
+
+[00:02:19]
+If you don't have the performance tab when you open it up, you probably aren't on node 20 and you're probably on an older version of Chrome. So make sure you are somewhat up to date and these things should be there. I think they've been there for the last six to eight months, somewhere right around in that timeframe.
+
+[00:02:36]
+For those that don't know the difference between deep merge and assign, assign does key level assignment. So if you had an object that has A, B, and C, and no matter what is on the right-hand side of those object keys, it just simply assigns A, B, C. The deep merge would go, Hey, what are you?
+
+[00:02:51]
+You're a string? Okay, we can assign you over. You're an object. What are all of your keys? You're an array. Let's go through every single value of your array. So it will deeply walk the object and try to merge it over one by one and take two different shaped objects and make them into one, doing rightmost objects having highest priority.
+
+[00:03:08]
+And so that's a lot more work than just simply being like, I'm going to assign your keys over one object at a time, and whoever had the last key in wins that key. So, obviously much more expensive. And usually deep merge is done in JavaScript. Whereas object dot assign is a C++ method for you get the speed of allowing JavaScript the engine to do the JavaScript the engine things, not you doing them.
+
+[00:03:34]
+You don't want to do them. If you can avoid, don't do it. All right, so I'm going to run these two things right here. Awesome. So I'm gonna take this, wait, actually I don't even need to take that whole thing. Really, I just need this inspect flag. So what I'm gonna do is I'm gonna jump over here.
+
+[00:03:47]
+I'm gonna make sure I just set it to testing, fix your log path, and I'm gonna go over to node and add the inspect flag. This will just allow the server to be created and we can attach to it. Awesome, so there you go. You get a little extra information out here.
+
+[00:04:00]
+This does slow down your server, so you don't really wanna look at the results. We don't wanna visualize these results cuz they'll just simply be worse. Cuz we are inspecting, it's running extra hooks, it's looking for extra data, so it's not a big deal. Second, I'm gonna run the test client.
+
+[00:04:15]
+I'll put a thousand clients on it for now. Cuz from our tests, it went 31, 36, and then sixty some. So I saw the failure started to happen right around 1,000, so we'll just go with 1,000. Pretty easy to look at. So there we go. Next, I'm going to open up a Chrome inspector.
+
+[00:04:30]
+So if you don't know, you can do chrome://inspect. I'm sure you might try to do this from VS Code, but I don't think they have all the tools in here. So I'm going to make sure that this is all zoomed in nicely. All right, beautiful. So there you go.
+
+[00:04:43]
+So now we have our dedicated node debugger. If you don't know about that, chrome://inspect works well and just select the dedicated. You can't really see this right here. There you go. Dedicated node dev tools for node. Easy peasy. And then you can close this tab. You don't need it open anymore.
+
+[00:05:03]
+We'll keep our original measurements still open. So we're running right now, it's been running for a while. And first, let's start out with the performance tab. This is pretty great. So what I'm gonna do is I'm going to open the performance tab and I'm gonna just hit record and I'm gonna let it record for about ten seconds.
+
+[00:05:18]
+You don't need a lot of data in the performance tab because it doesn't create a flame graph, it creates a timeline of what's happening. So we'll do that, ten seconds and it's gonna take a second and it's gonna look like that. So this is everything that's been happening.
+
+[00:05:32]
+Every single call going up and down. I'm sure there's some fudge factor that they do for speed purposes, but this is what you get. You can zoom in and you can like, right here, I'm gonna zoom in on this weird block. Look at that. For 14 milliseconds, we were collecting garbage.
+
+[00:05:48]
+So that's not very good. How many frames do you think were late because of this one garbage collection event? Probably a lot. If you click in the kind of, for me, it's dark blue. I don't know what color it's gonna be for you. If you click in the dark blue, it will just ensure that everything is selected and then you can back it all the way up so you have the full view in.
+
+[00:06:09]
+So there we go, I'm not zoomed in at all. And on this bottom panel, instead of having summary, look at bottom up. This is going to organize functions by name, who's had the most self time. Now there's always two times with something. So there's total time and self time.
+
+[00:06:25]
+Let me explain the difference. Let's go back down to one of those garbage collection events because it's actually really easy to show you what's happening here. All right, there you go. So right now we are in playGame function, it's 11.2 milliseconds. But playGame function didn't really add anything to the time, because you notice that it has no like plateaus on playGame itself.
+
+[00:06:44]
+It just has another function on top of it, update, which is literally saying it's doing the exact same amount of time. This one has its own small amount of self time. You can see right, right there. That's where update was doing its own execution, and then garbage collector happened, which notice that it's flat on the top.
+
+[00:07:05]
+There's nothing else that it's calling. So this is time that it's running. So update ran for just a moment, playGame effectively did not have any self time. And so that's kind of how you read that. The flat tops are where the time is being spent in your program.
+
+[00:07:19]
+Notice we're idle, we're idle for a half millisecond, nothing else is running during that time. We're garbage collecting for 11 milliseconds, nothing else is running for that time. We're updating for 0.31 milliseconds. Nothing else is running at that time other than update. So we go all the way back out, all the way back out.
+
+[00:07:37]
+And so this is where something cool happens. Is that we're gonna go and we're gonna pull this up and we're gonna look at that. So total time, remember, that's how much time it appears in this chart. Self time is how much time is it at the top of the chart actually executing.
+
+[00:07:51]
+And what do we see? Well, the first thing I see is that we're largely idle. Well, that's not awesome. That's not what we want to see. Second, we spent a lot of time in the update method. That sucks. Thirdly, we spent a lot of time collecting garbage. Fourth, we got registerDestroyHook, init, destroy, playGame, tickRunner, microtasks, listOnTimeout.
+
+[00:08:15]
+They get smaller and smaller. They become less and less important. But right away, the first thing that we can control I see, is update function. We know the function. Why is it taking time? We can try to go and look at it. Now, one thing you can do is you can like double-click on this thing or double-click on our, sorry, the game.
+
+[00:08:32]
+And it will try to, it'll put these times out. I am not convinced these times are correct because I just somehow doubt that adding two numbers together takes a huge portion of the time, whereas adding these two numbers together takes almost no portion of the time. I'm doubting hard right now, okay?
+
+[00:08:50]
+This one's saying that a lot of time is spent in the for loops. I've just never really used this as a good way to gauge what's happening because again, I just don't trust the numbers.
+

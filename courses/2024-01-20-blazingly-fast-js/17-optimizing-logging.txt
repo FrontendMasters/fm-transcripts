@@ -1,0 +1,91 @@
+[00:00:00]
+>> Something I see right away is that we're still creating arrays over and over again, is adding to the end and shifting off the front, is that a problem? Is that gonna cause a bunch of problems? Likely that is gonna cause a problem, cuz if V8 does something tricky, maybe it doesn't want to reorder all the indices.
+
+[00:00:23]
+Maybe it has some reasons when it doesn't reorder the indices, and you're literally growing one direction, maybe it's reallocating. We have no idea what's actually happening underneath the hood, and so a linked list test here could be really, really good. Should we create a linked list and actually remove off the front old fashion computer science style as opposed to using an array?
+
+[00:00:42]
+There could be something that's really good here, we can even use a singly linked list. So we're not doing a whole bunch of link breaking, we're only doing a singular link breaking every single time, which would just make it pretty fast, we could totally do that. This are just all the thoughts you gotta start thinking about when it comes to this level, because at this point, there's no more free lunches.
+
+[00:01:00]
+Everything is gonna be excessively difficult to try to win. And so that's something I would most certainly try is creating a linked list. The next thing, which is always pretty disappointing, there's just C in general, which is this right here. So do we ever consider our logging? I don't know, are you considering your logging?
+
+[00:01:22]
+Should you have a build step in which some servers just simply don't have logging? Some servers have logging, because every single time we get a collision, we're creating memory. We're creating strings, we're creating things all over the place, are they gonna be useful? Are they not useful? Are you mutating the thing?
+
+[00:01:39]
+So if I just take out all the logging, what happens now? And this isn't always a great idea to take out logging. I'm not saying you should do that, but you should potentially consider having a switch for when logging should and should not exist. And so we can most certainly take out this kind of stuff, and then see how does this affect things overall.
+
+[00:02:02]
+Really, it's very funny, I've seen logging make more impact than almost anything else. Here, actually, I'm also gonna just spring this up a little bit, let's go up to like 3,000. Let's just really try to generate more memory at this point.
+>> Is the logger, in this case, the thing that's writing to your temp directory?
+
+[00:02:22]
+
+>> Yeah, it's the thing that's writing to the temp directory, sort of, no, no. Well, the stuff that's writing the data to the temp directory is not that. That is going to be the data writer that's doing this extra kind of writing. This one that we're doing right now, this is just the Pino logger.
+
+[00:02:37]
+So this would be, I think pretty much every node.js application in the universe uses Pino for logging or some variant of that logger, Bunyan used to be the old one. So we're gonna let it run for a little bit longer and hopefully, we've made a difference. Also, one thing that you may not have noticed, when we go back here, you'll notice that there's always a small flat spot on run right here.
+
+[00:03:01]
+There's always a small flat spot on run. Well, then when we removed those arrays, the flat spot went away. So we did actually take out the memory that was being generated and run, which is shocking that 240,000 arrays had very little impact into our system. And so now as you can see, we have shrunk some things, because now, add player is becoming a larger section.
+
+[00:03:24]
+This before add player was this little teeny, tiniest, thin sliver, this teeniest, tiniest, thin sliver right here. And now, after us removing the logger, it's really, really thick. Which means proportionally, that little piece of memory which was like 1% of the total memory we were generating is now 20% of the total memory we're just generating.
+
+[00:03:48]
+Unfortunately, this is one of those unfortunate parts about flame graphs, you don't actually, or icicle charts, or however they call the ones that are upside down. You don't actually know the absolute difference here, you only see the relative difference. But the relative difference here is that we went from just, honestly, the tiniest amount right here, all the way to this, that's a big difference.
+
+[00:04:09]
+We are now producing very little memory, so that means fire. All that memory that was happening in fire probably came down, honestly, I bet we could go in here. And I'll undo all these changes, it probably was that line right there. Let's just take out that one line, And let's see what happens.
+
+[00:04:35]
+So I'm gonna give it a second to run, that way we get all the pools kinda generated, so we don't get any false positives in this memory. So now, once the pools have all been generated, we're feeling good, we're feeling fast, we're feeling froggy, we're feeling pooled. We'll let this thing record for a moment.
+
+[00:04:55]
+By the way, this is something that I genuinely do is that I'll start making guesses going, okay, I know this is generating memory, but I have no idea how much memory it generates, cuz it's behind no peg wall, it just exists. No one ever questions logging until you question logging, and then you realize, holy cow, how did logging cost this much?
+
+[00:05:12]
+I had no idea that it should cost this much, and it can be quite surprising when you discover these little tidbits along the way like, this is really expensive. My other one that I probably should have considered removing, but I didn't, was this one right here. So every single time we have a collision, which is a hundred times, 150 times per game, and we have thousands of games, we create these long form objects that I don't know how long they live.
+
+[00:05:35]
+So that one probably also could be something that maybe you want to make it a bit more compiled conditionally. Okay, so there we go, so now, we're back to here, so look at that. In fact, we actually never even caught that add, that's funny. So we never actually ended up catching that player add, that was this big last time.
+
+[00:06:00]
+We never even sought on this graph, it never even got a chance to be collected or sampled. So that's how big what we're doing with logging is. So I remove those other couple lines and apparently, it was just enough to cause it such that it is a significant portion on.
+
+[00:06:17]
+Let's go like this. Turn it back off, let's reproduce that result really quickly. Always good practice, reproduce your results, make sure there's not just some kind of oopsy-daisy. So I'm curious if this will make an actual frames per second or tick time went at this point. We're now pooling some objects, we're now disabling logging in, say, certain instances.
+
+[00:06:49]
+You could still imagine that if you're running your own stuff, you can have logging on some percentage of the time. Now, if you have an exceedingly rare event, this would be really, really sad, because then you have to wait for it to hit one of your logging instances.
+
+[00:07:00]
+But often you're not chasing such a rare event that it's causing the 0.0001% to crash, cuz the reality is that node crashes way more frequently than whatever that event is. [LAUGH] We've never had a problem trying to chase that event. So we'll let it go for a little bit longer.
+
+[00:07:22]
+
+>> There's a question about the frames per second, how do you suggest that's being calculated? The easy and not so good approach being using the frame time from the previous frame?
+>> So how we're doing the FPS? Yeah, the FPS is pretty straightforward how we're doing, I mean, I would not write home about this one.
+
+[00:07:43]
+It just simply takes the difference between the now time or it just simply takes the next time, next plus rate. So 16.666, so I always keep that extra decimal amount, cuz you wanna keep that decimal amount going, because it goes from 16.666 sleeping for 16 to 16.66 plus 16.66 is gonna be 33333, a bunch of 3s, which means the next leap is gonna be 17.
+
+[00:08:06]
+And then the next one, a bunch of 3s and bunch of 6s could equal a bunch of 9s or it equals 1, depending on which way we're gonna go here. So we could actually sleep for 15, cuz it'll be 15.09s, and so it's good to kind of keep track of these little bits.
+
+[00:08:18]
+I've been bitten by nanoseconds before, I had the right, kind of a little sync player for a real time video player for Netflix. And as I shoved in enough data at some point, me just ignoring milliseconds, it started causing tests to fail or not milliseconds, nanoseconds. Once you shove through hundreds of thousands of frames, all of a sudden nanos become milliseconds and now, you're just completely off.
+
+[00:08:45]
+And so it's always good to just keep track of everything, so is this the best way? Probably not the best way, but it's good enough, right? And if we accidentally go completely over, I do this, probably also not a good way. This is probably causing different results, I haven't measured this, I have no idea.
+
+[00:09:03]
+And there we go, okay, so this time we got a completely different result at this point. We didn't even measure anything going on. So I actually have no idea how much memory you're using anymore. So let's try doing a performance quick grab. So at this point, it looks like we're using effectively no memory as far as I can tell, I have no idea.
+
+[00:09:21]
+Again, those numbers are fake news numbers, I don't I read whatever numbers are associated with them, I just try to see what's happening. And still at this point at as fast as we're going, update is now, again, our biggest bottleneck. So I'm doing 3,000 games, so we're completely bottlenecked by update, which is rather shocking.
+
+[00:09:41]
+The function in which made no difference at all is now the function that is the slowest. So could we do a little bit better? Well, we potentially could.
+
