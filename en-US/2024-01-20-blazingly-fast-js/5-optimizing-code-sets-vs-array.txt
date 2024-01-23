@@ -1,104 +1,904 @@
-[00:00:00]
->> And so we're gonna go back here, and let's just stop this cuz we don't need the client and the server running. We can just stop those, and let's just look at the update function for a second. Or let me make sure that that's what I wanted to do.
+WEBVTT
 
-[00:00:14]
-I did a little bit of profiling, so let's look at the code. Yeah, let's look at the code. So I'm gonna navigate to game/game.ts, and I'm gonna look at update. So it is really this function right here that is taking the lion's share of our running time, from 71 to 117.
+1
+00:00:00.420 --> 00:00:02.654
+And so we're gonna go back here, and
 
-[00:00:33]
-So I can even zoom it out. It's really not that complicated. It's just a bunch of checking. So does anybody have some ideas of what we could do to make this code faster?
->> We're doing a lot of for loops. We're doing, We're iterating over the bullets several times, and we're adding it to an array, and then we're going back to that array to actually delete them out.
+2
+00:00:02.654 --> 00:00:07.260
+let's just stop this cuz we don't need
+the client and the server running.
 
-[00:00:59]
-And we could probably combine that into the same process so you're looping less.
->> Okay, I like that answer. So is looping the problem? It could actually very well be the problem. And later on, we will look at some looping techniques to make this faster. Or really, we'll be making specific updates to this code that really adhere to what the game is doing as opposed to just generally solving problems.
+3
+00:00:07.260 --> 00:00:12.190
+We can just stop those, and let's just
+look at the update function for a second.
 
-[00:01:22]
-But right now that is not where the big lion's share of time is being spent. So I'll just go on and I'll just tell you where it's going. It's not push. No, it's not push. It's not removing from the set, that's wrong. It's something a little bit different, okay?
+4
+00:00:12.190 --> 00:00:14.600
+Or let me make sure that
+that's what I wanted to do.
 
-[00:01:40]
-So we're gonna go to the next slide. So our first optimization, we're gonna take a look at update. Maps and sets aren't always the right answer. I know this may come as a bit of a shock, but here's a quote from Bjarne, okay? You may have heard of him, created C++, pretty smart guy.
+5
+00:00:14.600 --> 00:00:17.480
+I did a little bit of profiling,
+so let's look at the code.
 
-[00:01:57]
-Some people would say not a smart guy, but you're wrong, you're just upset because C++ hurts you. So let's just look at this. And yes, my recommendation is to use standard vector by default. More generally, use a contiguous representation unless there's good reason not to. So right now we're just using a set because it's easy to add to, it's O(1) to add, O(1) to remove.
+6
+00:00:17.480 --> 00:00:18.470
+Yeah, let's look at the code.
 
-[00:02:17]
-The problem is that O(1) is a lie, sort of. Meaning that if you add 1,000 elements to a set, it's amortized the same amount of time to add 1,000 elements. If you remove 1,000 elements from anywhere within the set, it's amortized constant time to remove them. In an array, that's not the case, right?
+7
+00:00:19.672 --> 00:00:24.392
+So I'm gonna navigate to game/game.ts,
+and I'm gonna look at update.
 
-[00:02:36]
-You add to an array, it may have to reallocate, but effectively, it's gonna have amortized push to the end, constant time. But when you remove, it may have to shift around stuff. So typically, you'd never remove from the middle of an array cuz you have to do some order of n operation.
+8
+00:00:24.392 --> 00:00:28.554
+So it is really this function
+right here that is taking
 
-[00:02:51]
-The thing about sets and maps is that that constant time has a big C in front of it. It's also gonna have difference in how the memory is laid out. Meaning that you're gonna also have memory in array is nice and packed, and your system can do really amazing things when memory is close together.
+9
+00:00:28.554 --> 00:00:33.272
+the lion's share of our running time,
+from 71 to 117.
 
-[00:03:10]
-Whereas with the set, your memory, who knows where it's at? It's gonna stored in an array that's also having a linked list for collisions, and there could be some very unique ways in which it's being stored. I don't know exactly how it's stored in V8, but typically, hash set is gonna be an array with linked lists inside of it for collision.
+10
+00:00:33.272 --> 00:00:34.383
+So I can even zoom it out.
 
-[00:03:26]
-And then it has to do a linear search through the linked list to see are you the thing, are you the thing, are you the thing? So it's not necessarily super fast. If you don't know the difference between array and set, hey, guess what? There's a free course on frontendmasters.com/trial that you can use forever.
+11
+00:00:34.383 --> 00:00:36.142
+It's really not that complicated.
 
-[00:03:42]
-And I made that course. And so it's called The Last Algorithm's Course You Need. I will be doing The Last Algorithm's Course You Want cuz the algorithms there are gonna be so complex, you'll never want to look at an algorithm again. It's gonna be fantastic. So let's try to prove this.
+12
+00:00:36.142 --> 00:00:37.542
+It's just a bunch of checking.
 
-[00:03:57]
-Let's try to see. That's not an ad, that was self-promotion. I think that was a beautiful blog. All right, so let's try to prove this out. Are sets slower or faster than arrays in some case? So I'm gonna go over some basic code that I have in this repository.
+13
+00:00:37.542 --> 00:00:44.625
+So does anybody have some ideas of what
+we could do to make this code faster?
 
-[00:04:17]
-So I'm gonna just kinda quit out of Shooter, back up up once, and go into set of a folder called set. So it's just in the root of the thing that you cloned down. And I'm gonna open it up here. And yes, I did write it using JSDoc, cuz honestly, JSDoc, it's shockingly great to use when you don't want to have a whole TypeScript thing.
+14
+00:00:44.625 --> 00:00:46.385
+&gt;&gt; We're doing a lot of for loops.
 
-[00:04:36]
-So I'm gonna go all the way down to right here, these two functions right here, findWithArray versus findWithSet. So all I'm gonna do here is I'm gonna create a new set. I'm gonna have some basic bookkeeping cuz I wanted to make sure I was actually getting the right thing and I printed out some values.
+15
+00:00:46.385 --> 00:00:52.374
+We're doing, We're
 
-[00:04:53]
-So these, we don't even technically need most of those anymore, but it doesn't really matter. And then I'm gonna to grab a single character from this iterator and I'm gonna save the previous size of the set. I'm gonna add that chat to the set. If the size did not change, meaning that when we added it, we already had that character in the set, I'm gonna reset and add that chat to the set.
+16
+00:00:52.374 --> 00:00:56.501
+iterating over the bullets several times,
+and we're adding it to an array, and
 
-[00:05:16]
-So that way we reset. Our goal is to find a count of unique characters in a row, and then report, hey, I found 14 unique in a row. That was my goal number. We found it. And so I'm gonna see how fast can sets do that versus an array.
+17
+00:00:56.501 --> 00:00:59.855
+then we're going back to that
+array to actually delete them out.
 
-[00:05:32]
-An array is literally the same thing. It's gonna have the same iterator that we're doing. We're gonna keep doing it while array.length is less than count. But if the array includes the character, now remember include is gonna have to linearly walk through the array, versus a set, we only just add it and see if the size is the same.
+18
+00:00:59.855 --> 00:01:06.201
+And we could probably combine that into
+the same process so you're looping less.
 
-[00:05:48]
-If it is included, we'll create a new array, and then we'll push the character to the end of the array. Sounds good? All right, so this is like a classic thing here. So I saw someone saying something about Advent of Code. Yes, this is actually an Advent of Code strategy to make something much faster is to stop using a set and start using an array.
+19
+00:01:06.201 --> 00:01:07.501
+&gt;&gt; Okay, I like that answer.
 
-[00:06:10]
-If you care about trying to make your Advent of Code faster, if you don't know what Advent of Code is, it's a really great way to learn a new language. I highly recommend you do it. You get great data structures and algorithms ideas. You get really cool performance tips from everybody else.
+20
+00:01:07.501 --> 00:01:08.891
+So is looping the problem?
 
-[00:06:22]
-And it's the only time in the world in which thousands of people, hundreds of thousands of people are all solving the same problems in languages they're unfamiliar with. So it's really easy to work with people and learn from everybody at the same time. Highly recommend it, great way to become a better programmer.
+21
+00:01:08.891 --> 00:01:10.481
+It could actually very
+well be the problem.
 
-[00:06:38]
-The createString function is really simple. All it does is until we hit this charsUntil, I return a substring that doesn't have that unique amount of counts. So we're always failing in worst case scenario. So if we're looking for 15, I'm gonna return 14 unique characters over and over and over again, which means it will fail every single time on the 15th one until we reach this charsUntil.
+22
+00:01:10.481 --> 00:01:14.564
+And later on, we will look at some
+looping techniques to make this faster.
 
-[00:07:00]
-So pretty simple, that charsUntil, I have it at 800,000. So it's nice, long amount of failure before we actually find something. And of course, the string is just one long string. I think there's 79 unique characters in here, so we can do up to 79. And then I simply just grab the count from process to and do that.
+23
+00:01:14.564 --> 00:01:18.636
+Or really, we'll be making specific
+updates to this code that really adhere to
 
-[00:07:19]
-So it's a pretty simple one. I also have one called a random createString, which is more kind of like how the world works, where sometimes you have maybe only 15 out of 30 were unique and then it fails. And only 3 out of 30 were unique, then 27.
+24
+00:01:18.636 --> 00:01:22.240
+what the game is doing as opposed
+to just generally solving problems.
 
-[00:07:34]
-So it tests more of what happens if you don't always add to the maximum. You're kind of fluctuating in between some goals, which one's faster. So when I take that and we go to set, and I simply go node src/index, it's going to run with the default amount.
+25
+00:01:22.240 --> 00:01:28.386
+But right now that is not where the big
+lion's share of time is being spent.
 
-[00:07:51]
-Which I didn't put the default amount in here, it's actually in data. The default amount is 10. So if we only do 10 characters, meaning that I'm gonna return 9 unique characters for 800,000 characters straight. And then afterwards, return ten unique characters. Once I find that unique characters, it's like, awesome.
+26
+00:01:28.386 --> 00:01:32.111
+So I'll just go on and
+I'll just tell you where it's going.
 
-[00:08:11]
-And it's gonna do that 40 times for set. It's gonna do that 40 times for array. And look at that, array took literally half the time as set in this micro benchmark. It's kind of shocking to see that array took 455 milliseconds, whereas set took 934 milliseconds. And we can run this over and over again, we'll get some variation of it.
+27
+00:01:32.111 --> 00:01:32.876
+It's not push.
 
-[00:08:31]
-But arrays are pretty much uniquely faster, at least on my machine, and on a lot of people's machines, for items under 10. Because the memory is close together, the lookups are really easy when you do includes how memory is laid out, it can just run through that really, really fast.
+28
+00:01:32.876 --> 00:01:35.216
+No, it's not push.
 
-[00:08:46]
-It's simple. And look at that. Huge wins here. So if I want to increase it, let's do 20 unique characters instead of 10. Shockingly, we still, at least on my machine, and probably on your machine, are still seeing it being arrays are faster. So 20 unique characters. A lot of people would not think that if you did an includes on an array, which is a linear search, is gonna be faster than doing a set check.
+29
+00:01:35.216 --> 00:01:37.855
+It's not removing from the set,
+that's wrong.
 
-[00:09:09]
-Well, it can be if you're constructing and removing and deleting and adding elements to an array versus a set. It's just unusual, right? At 30, usually, this is where I start seeing it kind of break down to where arrays and them are kind of operating in the same plane.
+30
+00:01:37.855 --> 00:01:40.284
+It's something a little bit different,
+okay?
 
-[00:09:24]
-So at this point it looks like arrays are slightly slower, and then it gets worse and worse and worse. Obviously, as the number goes higher, you start seeing sets really win. So there is a breakpoint in which you should use sets, but there's also a breakpoint in which you should use arrays.
+31
+00:01:40.284 --> 00:01:41.814
+So we're gonna go to the next slide.
 
-[00:09:39]
-And this is a really great optimization. Very few people take advantage of this in the JavaScript world. I'm sure right now that almost every single JavaScript library could take advantage of this idea that they use sets just naturally to look things up, when maybe you should just use an array until you exceed a certain size and then switch into a set.
+32
+00:01:41.814 --> 00:01:44.184
+So our first optimization,
+we're gonna take a look at update.
 
-[00:10:00]
-Really easy, simple way to make great performance wins.
+33
+00:01:45.574 --> 00:01:48.864
+Maps and
+sets aren't always the right answer.
+
+34
+00:01:48.864 --> 00:01:54.114
+I know this may come as a bit of a shock,
+but here's a quote from Bjarne, okay?
+
+35
+00:01:54.114 --> 00:01:57.300
+You may have heard of him,
+created C++, pretty smart guy.
+
+36
+00:01:57.300 --> 00:01:59.707
+Some people would say not a smart guy,
+but you're wrong,
+
+37
+00:01:59.707 --> 00:02:01.585
+you're just upset because C++ hurts you.
+
+38
+00:02:01.585 --> 00:02:03.583
+So let's just look at this.
+
+39
+00:02:03.583 --> 00:02:06.593
+And yes, my recommendation is to
+use standard vector by default.
+
+40
+00:02:06.593 --> 00:02:07.583
+More generally,
+
+41
+00:02:07.583 --> 00:02:11.478
+use a contiguous representation
+unless there's good reason not to.
+
+42
+00:02:11.478 --> 00:02:14.993
+So right now we're just using
+a set because it's easy to add to,
+
+43
+00:02:14.993 --> 00:02:17.349
+it's O(1) to add, O(1) to remove.
+
+44
+00:02:17.349 --> 00:02:22.507
+The problem is that O(1) is a lie,
+sort of.
+
+45
+00:02:22.507 --> 00:02:25.485
+Meaning that if you add
+1,000 elements to a set,
+
+46
+00:02:25.485 --> 00:02:29.339
+it's amortized the same amount
+of time to add 1,000 elements.
+
+47
+00:02:29.339 --> 00:02:32.445
+If you remove 1,000 elements
+from anywhere within the set,
+
+48
+00:02:32.445 --> 00:02:35.185
+it's amortized constant
+time to remove them.
+
+49
+00:02:35.185 --> 00:02:36.394
+In an array, that's not the case, right?
+
+50
+00:02:36.394 --> 00:02:39.670
+You add to an array, it may have
+to reallocate, but effectively,
+
+51
+00:02:39.670 --> 00:02:42.665
+it's gonna have amortized push to the end,
+constant time.
+
+52
+00:02:42.665 --> 00:02:46.319
+But when you remove,
+it may have to shift around stuff.
+
+53
+00:02:46.319 --> 00:02:49.965
+So typically, you'd never remove from
+the middle of an array cuz you have to do
+
+54
+00:02:49.965 --> 00:02:51.929
+some order of n operation.
+
+55
+00:02:51.929 --> 00:02:58.229
+The thing about sets and maps is that that
+constant time has a big C in front of it.
+
+56
+00:02:59.437 --> 00:03:02.961
+It's also gonna have difference
+in how the memory is laid out.
+
+57
+00:03:02.961 --> 00:03:06.693
+Meaning that you're gonna also have
+memory in array is nice and packed, and
+
+58
+00:03:06.693 --> 00:03:10.270
+your system can do really amazing
+things when memory is close together.
+
+59
+00:03:10.270 --> 00:03:12.761
+Whereas with the set, your memory,
+who knows where it's at?
+
+60
+00:03:12.761 --> 00:03:16.295
+It's gonna stored in an array that's also
+having a linked list for collisions, and
+
+61
+00:03:16.295 --> 00:03:19.052
+there could be some very unique
+ways in which it's being stored.
+
+62
+00:03:19.052 --> 00:03:22.311
+I don't know exactly how it's
+stored in V8, but typically,
+
+63
+00:03:22.311 --> 00:03:26.180
+hash set is gonna be an array with
+linked lists inside of it for collision.
+
+64
+00:03:26.180 --> 00:03:28.916
+And then it has to do a linear search
+through the linked list to see are you
+
+65
+00:03:28.916 --> 00:03:31.160
+the thing, are you the thing,
+are you the thing?
+
+66
+00:03:31.160 --> 00:03:33.530
+So it's not necessarily super fast.
+
+67
+00:03:33.530 --> 00:03:36.720
+If you don't know the difference
+between array and set, hey, guess what?
+
+68
+00:03:36.720 --> 00:03:41.436
+There's a free course on
+frontendmasters.com/trial that you can use
+
+69
+00:03:41.436 --> 00:03:42.246
+forever.
+
+70
+00:03:42.246 --> 00:03:44.086
+And I made that course.
+
+71
+00:03:44.086 --> 00:03:46.835
+And so it's called
+The Last Algorithm's Course You Need.
+
+72
+00:03:46.835 --> 00:03:50.412
+I will be doing The Last Algorithm's
+Course You Want cuz the algorithms there
+
+73
+00:03:50.412 --> 00:03:53.893
+are gonna be so complex, you'll never
+want to look at an algorithm again.
+
+74
+00:03:53.893 --> 00:03:56.926
+It's gonna be fantastic.
+
+75
+00:03:56.926 --> 00:03:57.861
+So let's try to prove this.
+
+76
+00:03:57.861 --> 00:04:00.526
+Let's try to see.
+
+77
+00:04:00.526 --> 00:04:04.266
+That's not an ad, that was self-promotion.
+
+78
+00:04:04.266 --> 00:04:06.336
+I think that was a beautiful blog.
+
+79
+00:04:06.336 --> 00:04:09.506
+All right, so let's try to prove this out.
+
+80
+00:04:09.506 --> 00:04:13.536
+Are sets slower or
+faster than arrays in some case?
+
+81
+00:04:13.536 --> 00:04:17.116
+So I'm gonna go over some basic code
+that I have in this repository.
+
+82
+00:04:17.116 --> 00:04:20.013
+So I'm gonna just kinda quit out
+of Shooter, back up up once,
+
+83
+00:04:20.013 --> 00:04:21.815
+and go into set of a folder called set.
+
+84
+00:04:22.855 --> 00:04:25.803
+So it's just in the root of
+the thing that you cloned down.
+
+85
+00:04:25.803 --> 00:04:27.418
+And I'm gonna open it up here.
+
+86
+00:04:27.418 --> 00:04:32.435
+And yes, I did write it using JSDoc,
+cuz honestly, JSDoc, it's shockingly
+
+87
+00:04:32.435 --> 00:04:36.855
+great to use when you don't want
+to have a whole TypeScript thing.
+
+88
+00:04:36.855 --> 00:04:39.919
+So I'm gonna go all the way
+down to right here,
+
+89
+00:04:39.919 --> 00:04:45.426
+these two functions right here,
+findWithArray versus findWithSet.
+
+90
+00:04:45.426 --> 00:04:48.965
+So all I'm gonna do here is
+I'm gonna create a new set.
+
+91
+00:04:48.965 --> 00:04:51.789
+I'm gonna have some basic bookkeeping
+cuz I wanted to make sure I was actually
+
+92
+00:04:51.789 --> 00:04:53.797
+getting the right thing and
+I printed out some values.
+
+93
+00:04:53.797 --> 00:04:56.604
+So these, we don't even technically
+need most of those anymore, but
+
+94
+00:04:56.604 --> 00:04:58.299
+it doesn't really matter.
+
+95
+00:04:58.299 --> 00:05:02.243
+And then I'm gonna to grab a single
+character from this iterator and
+
+96
+00:05:02.243 --> 00:05:05.259
+I'm gonna save the previous
+size of the set.
+
+97
+00:05:05.259 --> 00:05:07.509
+I'm gonna add that chat to the set.
+
+98
+00:05:07.509 --> 00:05:11.626
+If the size did not change, meaning
+that when we added it, we already had
+
+99
+00:05:11.626 --> 00:05:15.759
+that character in the set, I'm gonna
+reset and add that chat to the set.
+
+100
+00:05:16.839 --> 00:05:17.749
+So that way we reset.
+
+101
+00:05:17.749 --> 00:05:22.101
+Our goal is to find a count of
+unique characters in a row, and
+
+102
+00:05:22.101 --> 00:05:25.972
+then report, hey,
+I found 14 unique in a row.
+
+103
+00:05:25.972 --> 00:05:27.322
+That was my goal number.
+
+104
+00:05:27.322 --> 00:05:27.892
+We found it.
+
+105
+00:05:27.892 --> 00:05:32.142
+And so I'm gonna see how fast can
+sets do that versus an array.
+
+106
+00:05:32.142 --> 00:05:33.412
+An array is literally the same thing.
+
+107
+00:05:33.412 --> 00:05:35.882
+It's gonna have the same
+iterator that we're doing.
+
+108
+00:05:35.882 --> 00:05:39.103
+We're gonna keep doing it while
+array.length is less than count.
+
+109
+00:05:39.103 --> 00:05:41.296
+But if the array includes the character,
+
+110
+00:05:41.296 --> 00:05:45.057
+now remember include is gonna have
+to linearly walk through the array,
+
+111
+00:05:45.057 --> 00:05:48.983
+versus a set, we only just add it and
+see if the size is the same.
+
+112
+00:05:48.983 --> 00:05:51.782
+If it is included,
+we'll create a new array, and
+
+113
+00:05:51.782 --> 00:05:54.863
+then we'll push the character
+to the end of the array.
+
+114
+00:05:56.113 --> 00:05:56.740
+Sounds good?
+
+115
+00:05:56.740 --> 00:06:01.255
+All right, so
+this is like a classic thing here.
+
+116
+00:06:01.255 --> 00:06:03.692
+So I saw someone saying
+something about Advent of Code.
+
+117
+00:06:03.692 --> 00:06:07.790
+Yes, this is actually an Advent of Code
+strategy to make something much faster is
+
+118
+00:06:07.790 --> 00:06:10.032
+to stop using a set and
+start using an array.
+
+119
+00:06:10.032 --> 00:06:13.156
+If you care about trying to make your
+Advent of Code faster, if you don't know
+
+120
+00:06:13.156 --> 00:06:16.102
+what Advent of Code is, it's a really
+great way to learn a new language.
+
+121
+00:06:16.102 --> 00:06:17.532
+I highly recommend you do it.
+
+122
+00:06:17.532 --> 00:06:20.086
+You get great data structures and
+algorithms ideas.
+
+123
+00:06:20.086 --> 00:06:22.356
+You get really cool performance
+tips from everybody else.
+
+124
+00:06:22.356 --> 00:06:25.471
+And it's the only time in the world
+in which thousands of people,
+
+125
+00:06:25.471 --> 00:06:29.212
+hundreds of thousands of people are all
+solving the same problems in languages
+
+126
+00:06:29.212 --> 00:06:30.586
+they're unfamiliar with.
+
+127
+00:06:30.586 --> 00:06:35.506
+So it's really easy to work with people
+and learn from everybody at the same time.
+
+128
+00:06:35.506 --> 00:06:38.424
+Highly recommend it,
+great way to become a better programmer.
+
+129
+00:06:38.424 --> 00:06:40.758
+The createString function
+is really simple.
+
+130
+00:06:40.758 --> 00:06:43.668
+All it does is until we
+hit this charsUntil,
+
+131
+00:06:43.668 --> 00:06:48.318
+I return a substring that doesn't
+have that unique amount of counts.
+
+132
+00:06:48.318 --> 00:06:50.348
+So we're always failing
+in worst case scenario.
+
+133
+00:06:50.348 --> 00:06:54.245
+So if we're looking for 15, I'm gonna
+return 14 unique characters over and
+
+134
+00:06:54.245 --> 00:06:58.084
+over and over again, which means it will
+fail every single time on the 15th one
+
+135
+00:06:58.084 --> 00:07:00.462
+until we reach this charsUntil.
+
+136
+00:07:00.462 --> 00:07:03.962
+So pretty simple, that charsUntil,
+I have it at 800,000.
+
+137
+00:07:03.962 --> 00:07:08.112
+So it's nice, long amount of failure
+before we actually find something.
+
+138
+00:07:08.112 --> 00:07:10.672
+And of course,
+the string is just one long string.
+
+139
+00:07:10.672 --> 00:07:14.032
+I think there's 79 unique characters
+in here, so we can do up to 79.
+
+140
+00:07:14.032 --> 00:07:19.810
+And then I simply just grab the count
+from process to and do that.
+
+141
+00:07:19.810 --> 00:07:21.080
+So it's a pretty simple one.
+
+142
+00:07:21.080 --> 00:07:24.055
+I also have one called
+a random createString,
+
+143
+00:07:24.055 --> 00:07:27.027
+which is more kind of
+like how the world works,
+
+144
+00:07:27.027 --> 00:07:32.309
+where sometimes you have maybe only 15
+out of 30 were unique and then it fails.
+
+145
+00:07:32.309 --> 00:07:34.714
+And only 3 out of 30 were unique, then 27.
+
+146
+00:07:34.714 --> 00:07:38.596
+So it tests more of what happens if
+you don't always add to the maximum.
+
+147
+00:07:38.596 --> 00:07:42.220
+You're kind of fluctuating in between
+some goals, which one's faster.
+
+148
+00:07:42.220 --> 00:07:47.818
+So when I take that and we go to set,
+and I simply go node src/index,
+
+149
+00:07:47.818 --> 00:07:51.468
+it's going to run with the default amount.
+
+150
+00:07:51.468 --> 00:07:56.266
+Which I didn't put the default amount
+in here, it's actually in data.
+
+151
+00:07:56.266 --> 00:07:57.650
+The default amount is 10.
+
+152
+00:07:57.650 --> 00:08:02.482
+So if we only do 10 characters, meaning
+that I'm gonna return 9 unique characters
+
+153
+00:08:02.482 --> 00:08:05.206
+for 800,000 characters straight.
+
+154
+00:08:05.206 --> 00:08:09.196
+And then afterwards,
+return ten unique characters.
+
+155
+00:08:09.196 --> 00:08:11.716
+Once I find that unique characters,
+it's like, awesome.
+
+156
+00:08:11.716 --> 00:08:13.596
+And it's gonna do that 40 times for set.
+
+157
+00:08:13.596 --> 00:08:15.486
+It's gonna do that 40 times for array.
+
+158
+00:08:15.486 --> 00:08:16.536
+And look at that,
+
+159
+00:08:16.536 --> 00:08:20.464
+array took literally half the time
+as set in this micro benchmark.
+
+160
+00:08:20.464 --> 00:08:24.928
+It's kind of shocking to see that
+array took 455 milliseconds,
+
+161
+00:08:24.928 --> 00:08:27.604
+whereas set took 934 milliseconds.
+
+162
+00:08:27.604 --> 00:08:31.890
+And we can run this over and over again,
+we'll get some variation of it.
+
+163
+00:08:31.890 --> 00:08:36.099
+But arrays are pretty much uniquely
+faster, at least on my machine, and
+
+164
+00:08:36.099 --> 00:08:39.284
+on a lot of people's machines,
+for items under 10.
+
+165
+00:08:39.284 --> 00:08:42.953
+Because the memory is close together,
+the lookups are really easy when you do
+
+166
+00:08:42.953 --> 00:08:46.975
+includes how memory is laid out, it can
+just run through that really, really fast.
+
+167
+00:08:46.975 --> 00:08:48.177
+It's simple.
+
+168
+00:08:48.177 --> 00:08:49.227
+And look at that.
+
+169
+00:08:49.227 --> 00:08:50.227
+Huge wins here.
+
+170
+00:08:50.227 --> 00:08:54.877
+So if I want to increase it, let's do
+20 unique characters instead of 10.
+
+171
+00:08:54.877 --> 00:08:58.868
+Shockingly, we still, at least on my
+machine, and probably on your machine,
+
+172
+00:08:58.868 --> 00:09:01.142
+are still seeing it
+being arrays are faster.
+
+173
+00:09:01.142 --> 00:09:02.522
+So 20 unique characters.
+
+174
+00:09:02.522 --> 00:09:05.804
+A lot of people would not think that
+if you did an includes on an array,
+
+175
+00:09:05.804 --> 00:09:09.702
+which is a linear search,
+is gonna be faster than doing a set check.
+
+176
+00:09:09.702 --> 00:09:12.657
+Well, it can be if you're constructing and
+removing and deleting and
+
+177
+00:09:12.657 --> 00:09:15.062
+adding elements to an array versus a set.
+
+178
+00:09:15.062 --> 00:09:16.423
+It's just unusual, right?
+
+179
+00:09:16.423 --> 00:09:20.525
+At 30, usually, this is where I start
+seeing it kind of break down to where
+
+180
+00:09:20.525 --> 00:09:24.392
+arrays and them are kind of
+operating in the same plane.
+
+181
+00:09:24.392 --> 00:09:26.576
+So at this point it looks like
+arrays are slightly slower, and
+
+182
+00:09:26.576 --> 00:09:27.962
+then it gets worse and worse and worse.
+
+183
+00:09:27.962 --> 00:09:32.631
+Obviously, as the number goes higher,
+you start seeing sets really win.
+
+184
+00:09:32.631 --> 00:09:35.882
+So there is a breakpoint in
+which you should use sets, but
+
+185
+00:09:35.882 --> 00:09:39.292
+there's also a breakpoint in
+which you should use arrays.
+
+186
+00:09:39.292 --> 00:09:41.882
+And this is a really great optimization.
+
+187
+00:09:41.882 --> 00:09:46.085
+Very few people take advantage
+of this in the JavaScript world.
+
+188
+00:09:46.085 --> 00:09:50.272
+I'm sure right now that almost every
+single JavaScript library could take
+
+189
+00:09:50.272 --> 00:09:54.462
+advantage of this idea that they use
+sets just naturally to look things up,
+
+190
+00:09:54.462 --> 00:09:58.514
+when maybe you should just use an array
+until you exceed a certain size and
+
+191
+00:09:58.514 --> 00:10:00.625
+then switch into a set.
+
+192
+00:10:00.625 --> 00:10:03.435
+Really easy,
+simple way to make great performance wins.
 

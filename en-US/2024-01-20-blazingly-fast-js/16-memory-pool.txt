@@ -1,184 +1,1683 @@
-[00:00:00]
->> So how do we reduce memory usage? Well, we use something called a memory pool. So in JavaScript, you would never do this. This is just not a thing people typically do in JavaScript, but it has huge wins. So let me first show you what a memory pool is.
+WEBVTT
 
-[00:00:11]
-Cuz typically, whenever you're using JavaScript, you don't really think about memory, right? You don't, it's okay, you can be honest. I'm honest, I'm an honest man, we don't. All right, so let me first go. Yeah, I'm kidding, I actually think about it constantly, just makes me wild. You can imagine this is that you actually have a program in which you have the same object being created over and over again.
+1
+00:00:00.000 --> 00:00:01.120
+So how do we reduce memory usage?
 
-[00:00:37]
-And so what can we do with that information? Well, if you know enough about your system, you can do something pretty clever. So let's just say we need to create a handful of them. So I've just kind of created a few. I can hand out that object to whoever needs it.
+2
+00:00:01.120 --> 00:00:02.790
+Well, we use something
+called a memory pool.
 
-[00:00:53]
-They can reset its properties, put some various information on it, and use it for a while. When they ask for another one, we can give them another one. But then at some point in the future, they can hand me back that object, and I can now hold on to it.
+3
+00:00:02.790 --> 00:00:06.104
+So in JavaScript, you would never do this.
 
-[00:01:07]
-So what does this do? Well, one thing it does is that this object is no longer ever collected again. We just permanently hold on to it. It's ours forever, and that's that. Is there a scale issue here? Potentially. Maybe once you hit a certain scale, memory pools are no longer worth it, and it's better to have them lived as short-lived objects versus long-lived objects.
+4
+00:00:06.104 --> 00:00:09.693
+This is just not a thing people typically
+do in JavaScript, but it has huge wins.
 
-[00:01:26]
-That's gonna be like a whole GC Art that you're gonna have to probably measure over long periods of time to really see which one is more beneficial for the system. But in general it is nice to not have to recreate and destroy objects over and over again, cuz every time you do two squirrelly braces, something underneath the hood has to go get memory.
+5
+00:00:09.693 --> 00:00:11.938
+So let me first show you
+what a memory pool is.
 
-[00:01:45]
-Have that pointer point to somewhere, be able to fill in your properties, be able to fill in your values, have pointers to those values, because pretty much every value in JavaScript is yet another object. And then whenever we do these minor GCs, it's gonna have to call everything, point to everything.
+6
+00:00:11.938 --> 00:00:14.708
+Cuz typically,
+whenever you're using JavaScript,
 
-[00:01:58]
-There's a lot more effort that goes into these objects than you think. And so, they're not free. So with that kind of in mind, when do you use or when can you use one? Really, the only time you can use a memory pool is when you know when an object is being created, and you know when the program is now able to forget about the object.
+7
+00:00:14.708 --> 00:00:17.124
+you don't really think about memory,
+right?
 
-[00:02:20]
-You have to know both endpoints. If you don't know when an object is no longer being used, it's not worth it to use a memory pool unless if you can make that 100% the case. Cuz if you're wrong, you're gonna reset an object that someone else is using, and it's gonna screw up everything.
+8
+00:00:17.124 --> 00:00:19.816
+You don't, it's okay, you can be honest.
 
-[00:02:35]
-And so why would you use one? It's when you don't want to create a bunch of objects. Now, some objects you don't create a lot of. Some objects you create a whole bunch of. And so you should probably try to opportunity size out which ones are useful and which ones aren't useful.
+9
+00:00:19.816 --> 00:00:22.373
+I'm honest, I'm an honest man, we don't.
 
-[00:02:47]
-So we're gonna implement a very simple memory pool. Very, very, very simple, okay? I'm gonna create a pool.ts. I'm gonna export class. Yes, you love it. You know you love it, just say you do, and we're gonna have a constructor in here. And we're gonna have a private pool that is gonna be a T array in the pool.
+10
+00:00:22.373 --> 00:00:24.355
+All right, so let me first go.
 
-[00:03:04]
-this.pool will equal a new array. And in here, we're actually gonna take a constructor function, which does that. We'll have a private constructor function right there. That's an old C++ ism called constructor. There we go. And so we're gonna do something like this, this.pool.length if it's greater than 0, we're gonna return the last element in the pool, else we'll call the constructor function and get out a new T.
+11
+00:00:24.355 --> 00:00:27.181
+Yeah, I'm kidding, I actually think
+about it constantly, just makes me wild.
 
-[00:03:31]
-So this makes sense, if we have some in the tuck, use those, else create a new one. You have one question?
->> Is that the class name you wanna use?
->> Poot. Yeah, I didn't even see that. That is not the class name. Pool, we would have eventually discovered that, okay?
+12
+00:00:27.181 --> 00:00:32.305
+You can imagine this is that you
+actually have a program in which
 
-[00:03:48]
-We would have eventually discovered that. All right, so then we have public set, which will be t: T. There we go. this.pool.push (t), fantastic. This is as simple of one as we can get. You would have to do research to kinda determine if the order of the objects you're putting in matters, then you'd wanna use something like a ring buffer.
+13
+00:00:32.305 --> 00:00:37.151
+you have the same object being
+created over and over again.
 
-[00:04:11]
-If the order doesn't matter, typically relying as much as possible on C++ is always the best way to go in JavaScript. The more native methods you use, the better. So don't get too clever, don't get too clever by half, just use native methods. I've done some amount of testing here, and typically a pool that does this type of operation, just pushing and popping, will operate like an order of magnitude faster, but cause more minor GCs to happen.
+14
+00:00:37.151 --> 00:00:39.875
+And so
+what can we do with that information?
 
-[00:04:39]
-If you do one that is a pointer within the array, so we never actually adjust the size of the array, they're gonna be like 10x slower. These are all micro-benchmarks, so again, are they real? I don't know. 10x slower, but the amount of GCs over time, the minor GCs seem to be a lot less.
+15
+00:00:39.875 --> 00:00:43.605
+Well, if you know enough
+about your system,
 
-[00:04:56]
-So is it better, is it worse? It's very, very difficult. Ring buffers, so, meaning that you're actually having two pointers chasing each other, tend to be the slowest of them all. You're updating multiple pointers. I'm not sure if they're really worth it, other than if order matters. So long as order doesn't matter, I wouldn't use it.
+16
+00:00:43.605 --> 00:00:46.655
+you can do something pretty clever.
 
-[00:05:12]
-I just use as many native methods as possible. Always best advice, don't write your own left pad, use pad left, okay? Best piece of advice one can give. All right, so now we have a pool. So that's pretty neat. I like pools. So let's create ourself a little bit of a bullet pool.
+17
+00:00:46.655 --> 00:00:48.817
+So let's just say we need to
+create a handful of them.
 
-[00:05:28]
-So it shouldn't be too hard. So I'm gonna go like this. Let's go function createBullet. And this thing is simply going to take in a return, and we're gonna go as Bullet, and it's gonna return x as 0, direction as -1, why not? And id will be a ++id.
+18
+00:00:48.817 --> 00:00:50.499
+So I've just kind of created a few.
 
-[00:05:46]
-Where is id? I know you're somewhere around here, id. Let's bring it back up here because it's kind of weird to have it all the way down there. So there we go. We just create a random default value effective pool that we can, and we even increment the id every time we create a new one.
+19
+00:00:50.499 --> 00:00:53.653
+I can hand out that object
+to whoever needs it.
 
-[00:06:02]
-So if you started logging and inspecting and making sure you're not creating new ones, it should be pretty obvious if your id's don't increment at some point, all right? Now let's create the pool, bulletPool = new Pool. And we can put Bullet in here to really make it nice.
+20
+00:00:53.653 --> 00:00:57.934
+They can reset its properties, put some
+various information on it, and use it for
 
-[00:06:18]
-And we can just pass in createBullet. So every single time it needs to create a new bullet, it has a constructor function, and it can hand out bullets to us. So this should be pretty easy. And one more function just to make things a little bit easier, I'm gonna quit using this.
+21
+00:00:57.934 --> 00:00:58.440
+a while.
 
-[00:06:32]
-I know you guys may feel emotional about this, but I'm actually gonna convert this into a class. Yes, I am converting it into a class. So I can have a nice reset function on here that'll have x: number, direction: number, or actually will technically be 1 or -1.
+22
+00:00:58.440 --> 00:01:00.757
+When they ask for another one,
+we can give them another one.
 
-[00:06:47]
-And I'll go this.x = x, this.direction = direction, and then I'm gonna return this, all right? The reason why I actually really end up liking to do this, here, I'm just gonna go like that. Fantastic. Actually, the id is the only one I can't do it to. Constructor, =++id.
+23
+00:01:00.757 --> 00:01:05.720
+But then at some point in the future,
+they can hand me back that object,
 
-[00:07:18]
-Fantastic. Where are you id? Take that up, put it up here. I like it to just be above. I don't know, maybe it's the old programmer in me. And so this is really simple. It just makes it a little bit simpler to use, I think, when you kind of think of things this way.
+24
+00:01:05.720 --> 00:01:07.559
+and I can now hold on to it.
 
-[00:07:31]
-Could there be optimizations over using classes versus plain objects? I really do hope deep down that V8, when they see that it's a class, you can't really add properties to classes. I mean, technically you can. But if you add properties to classes, it could break into a slow path, but since it already knows all of its classes and its properties, I would hope that it'd give it some sort of fast path.
+25
+00:01:07.559 --> 00:01:09.208
+So what does this do?
 
-[00:07:52]
-That's nice, I don't think it does, but you would hope one day they could do that. Anyways, as I've stated upfront all my properties and their ordering. All right, anyways, so createBullet, we create this nice little bullet, which is gonna look something like this. newBullet, and we'll pass in the id, or we don't even pass in the id, and I'm gonna call reset.
+26
+00:01:09.208 --> 00:01:13.993
+Well, one thing it does is that this
+object is no longer ever collected again.
 
-[00:08:10]
-I don't even need to call reset cuz it's already done for me. Fantastic, there we go. We have our new little bullet, create little bullet does all this. Awesome, awesome, awesome. So now we're gonna go all the way down to fire. We need to change this. We want to start pooling these objects.
+27
+00:01:13.993 --> 00:01:15.465
+We just permanently hold on to it.
 
-[00:08:23]
-So I'm gonna go bulletPool, look at that, it already knows what to do, copilot. So I'm gonna get a bullet, and I'm gonna reset it with my new values. So there we go. This is why I like using classes, right? Sometimes, it makes writing code a little bit nicer.
+28
+00:01:15.465 --> 00:01:17.593
+It's ours forever, and that's that.
 
-[00:08:38]
-Again, I just want you guys to quit judging me. All right, so there we go. This is fantastic, this is beautiful, but where and when do we start letting go of bullets? That's kind of the big trick here. So the first thing is what comes out of shift?
+29
+00:01:17.593 --> 00:01:19.472
+Is there a scale issue here?
 
-[00:08:53]
-Shift returns a bullet or undefined technically. So I can go bulletPool.set. Get that old trick out. And there we go. So we have now just collected those two bullets. We already know they exist. So I'm just kind of forcing them to exist, but there's one other problem. When the game ends, I may have some amount of bullets and we want to also recollect those as well.
+30
+00:01:19.472 --> 00:01:20.125
+Potentially.
 
-[00:09:17]
-So that way they don't go out of style. So I'm gonna have something that's like, I'm gonna call this method reclaim cuz it just sounds awesome, and I'm gonna go for const b of this.b1. I don't know, sounds neat to me. And I'll go let's see, bulletPool set(b), bulletPool set(b).
+31
+00:01:20.125 --> 00:01:23.202
+Maybe once you hit a certain scale, memory
+pools are no longer worth it, and it's
 
-[00:09:34]
-There we go. So we will reclaim all of them at the end of our game. And now we're gonna jump back over to index. And at the very, very end of our time, we're gonna go game.reclaim. So give our game a chance to get every last bullet possible and have them all.
+32
+00:01:23.202 --> 00:01:26.245
+better to have them lived as short-lived
+objects versus long-lived objects.
 
-[00:09:53]
-So now we should really never recreate a bullet. Every time they collide, we get rid of them out of the list, and we reclaim them. When the game ends we reclaim any remaining bullets. So now once we hit some sort of medium, we'll just have ever running supply of bullets.
+33
+00:01:26.245 --> 00:01:30.546
+That's gonna be like a whole GC Art that
+you're gonna have to probably measure over
 
-[00:10:08]
-Now, if we really want to, if we stopped having as many games and there's certain amount of time, we could add heuristics to start letting go of all the bullets. So that way we're just not having some higher amounts of memory. But typically what I see is when you're creating destroying, creating destroying, creating destroying, your average memory is usually higher than if you're just holding on to some amount.
+34
+00:01:30.546 --> 00:01:34.615
+long periods of time to really see which
+one is more beneficial for the system.
 
-[00:10:26]
-That's been my basic observations, not always true. But that's been my usual observations. So there we go, this is looking good. npm run test, let's make sure that we haven't done something crazy here. Uh-oh, what have we done? Have we not done the right things here? So it looks like whatever we have done, we have broken something.
+35
+00:01:34.615 --> 00:01:39.124
+But in general it is nice to not have to
+recreate and destroy objects over and
 
-[00:10:51]
-Now the real question is, did we run this beforehand, before we did all of our previous stuff? Let's see, git status. Because how funny would that be if we made our previous change? Did we check to see if all the tests ran with our previous one? I think we did, don't you try to lie to me.
+36
+00:01:39.124 --> 00:01:42.633
+over again, cuz every time
+you do two squirrelly braces,
 
-[00:11:07]
-All right, anyway, so let's see what happens here. So obviously, something has gone awry with this. Yeah, this is totally wrong. I see the obvious problem that we've done wrong here. So I'm gonna jump over here, and go into our history, I'm gonna yank those two. And what I'm gonna do is I'm gonna paste them right here.
+37
+00:01:42.633 --> 00:01:45.801
+something underneath the hood
+has to go get memory.
 
-[00:11:32]
-Obvious part is that it's that. We didn't do this part right here. So kind of screwed up the game, games were lasting a little bit longer than normal. So let's take that, let's do that. Come on, why didn't you guys see that one? I mean, it was right in front of you this whole time.
+38
+00:01:45.801 --> 00:01:48.988
+Have that pointer point to somewhere,
+be able to fill in your properties,
 
-[00:11:53]
-There we go, beautiful. Look at that beautiful piece of code going right off the edge of the screen. That's how I really love code to look, just completely off the screen. All right, so fantastic. So if I'm not mistaken now this should be a lot nicer. Man, that was a great first try, was that just a great first try or what?
+39
+00:01:48.988 --> 00:01:51.668
+be able to fill in your values,
+have pointers to those values,
 
-[00:12:12]
-Copilot did cause that error, see the problem is that I did trust copilot. The AIs aren't gonna be very great at taking our jobs, okay? I mean, it really is painful when things aren't working out. And so I do this all the time where I'll just be like, good enough.
+40
+00:01:51.668 --> 00:01:54.678
+because pretty much every value in
+JavaScript is yet another object.
 
-[00:12:27]
-And then I'm like, see, the problem is that I'm just not reading. I'm going too fast, and I goof it up. Okay, so we are now cleaning up memory. So if we've done this correctly, we should be able to launch our testing right here. Launch cargo, and we should hopefully see a difference in that.
+41
+00:01:54.678 --> 00:01:57.516
+And then whenever we do these minor GCs,
+it's gonna have to call everything,
 
-[00:12:43]
-Right now, it's like exclusively in one area and nowhere else. So hopefully, proportionally it shrinks down. I never look at these numbers up here, by the way, they don't mean anything to me. Meaning that I don't look at flame graphs trying to gauge the exact running time, I try to gauge the proportion time.
+42
+00:01:57.516 --> 00:01:58.337
+point to everything.
 
-[00:13:06]
-And so this is very important, I'm just going, okay, fire is like 87% of the time. Can we make it down to 80% of the time? Can we make it down to 84% or maybe 75? Or like that's just way more important. So now we're just gonna have to wait.
+43
+00:01:58.337 --> 00:02:02.807
+There's a lot more effort that goes
+into these objects than you think.
 
-[00:13:27]
-We're gonna have to wait for quite some time. Awesome, so it doesn't look like we made pretty much any sort of visible change here. We tried to do something. So something else is going on here. Is it the arrays that we're allocating?. Is that the problem? Cuz if you think about it, now we're starting to get into a big problem with trying to manage your own memory.
+44
+00:02:02.807 --> 00:02:05.800
+And so, they're not free.
 
-[00:13:48]
-What is bullets? Well, bullets is something that we constantly increase and we're also constantly shrinking a little bit. Shifting is gonna cause some sort of memory change. Now, whether they do individual ones or not, we don't know. Next, we also have these ones right here. Every single time we're creating a game, we're just creating new arrays and then eventually growing them to be something.
+45
+00:02:05.800 --> 00:02:10.142
+So with that kind of in mind,
+when do you use or when can you use one?
 
-[00:14:08]
-And so is that a problem? I mean, probably, that's probably a problem. To fix this, that might require more and more thought, but I just wanted to show you that sometimes it's not as easy as you think it's gonna be. It's not just simply, boom, it's this one thing.
+46
+00:02:10.142 --> 00:02:15.095
+Really, the only time you can use a memory
+pool is when you know when an object is
 
-[00:14:24]
-It's just like, yeah, it's very easy. Just grab that single item and that's all you got to do, just go with the bullets. Well, you got to kind of really think about all the potential places in which you're using memory. Another very interesting spot about using memory is this one right here.
+47
+00:02:15.095 --> 00:02:16.371
+being created, and
 
-[00:14:39]
-You may not realize this, but this simple spot right here we're creating effectively 2 arrays every 16 milliseconds for all the games running. So at 2,000 games that's 4,000 arrays, 60 times a second. It's a lot of arrays, right? That's like 240,000 arrays per second. So can I just do this instead?
+48
+00:02:16.371 --> 00:02:20.441
+you know when the program is now
+able to forget about the object.
 
-[00:15:01]
-Why are we just allowing simple memory to be not just used over and over again? And so, luckily, the scavenger works really, really well. We don't have to worry too much about that. We're only creating a bunch of empty arrays. Does V8 make some really smart ideas about how to save memory?
+49
+00:02:20.441 --> 00:02:23.071
+You have to know both endpoints.
 
-[00:15:16]
-Probably, but these are things you should start looking for. And this is one thing that I really do enjoy just doing in general, which is when you're gonna be going from the obvious wins to not obvious wins. It is almost always a set of distributed small choices that you see over time that is the problem.
+50
+00:02:23.071 --> 00:02:26.123
+If you don't know when an object
+is no longer being used,
 
-[00:15:32]
-It's never just one big spot anymore. Now it's like, hey, how many different places are we using memory? Well, there's probably a lot. And so let's go over here. We'll just see, have we changed any sort of shape even with that, right? And so now your goal is to just measure, look, have we made a change?
+51
+00:02:26.123 --> 00:02:30.591
+it's not worth it to use a memory pool
+unless if you can make that 100% the case.
 
-[00:15:51]
-Measure, look, have we made a change? Cuz I also don't often trust the shape of this chart. It's like, yeah, it's generally correct, but is it always correct? I found that sometimes things that are problems show up little, and then they show up big, and then they show up a little bit littler, and then they show up a little bit bigger.
+52
+00:02:30.591 --> 00:02:34.243
+Cuz if you're wrong, you're gonna reset
+an object that someone else is using, and
 
-[00:16:06]
-Depends on how long you're measuring for, it depends on what's happening in the program.
->> What exactly is the idle time in the performance tab? For example, the new WebSocket we added are running during this time in C++ land, should we aim for bigger idle time?
->> Well, I mean, idle time, obviously, well, it can mean a couple of things.
+53
+00:02:34.243 --> 00:02:35.743
+it's gonna screw up everything.
 
-[00:16:24]
-And so if you go and even using something like a hex, which is like flame graphs light for Node written, I think, by NearForm. You can see that the idle time, there's a large gap of it, which is actually underneath the hood, which is glibc using epoll, you're epoll waiting.
+54
+00:02:35.743 --> 00:02:36.635
+And so why would you use one?
 
-[00:16:44]
-And so just nothing's happening inside your system. You're just doing nothing cuz we're waiting for data. We're not actually processing anything. So, I mean, obviously having more idle time means one of two things. A, you're using everything efficiently, and therefore you can have more load, which we probably can.
+55
+00:02:36.635 --> 00:02:39.329
+It's when you don't want to
+create a bunch of objects.
 
-[00:16:59]
-We could probably increase the amount of games running concurrently up to a thousand or another thousand go up to three thousand. Or b, your program is not using things efficiently. Where it's needed to be fast it's slow, and for the rest of the time it's doing nothing. You'll see that a lot as you're trying to make something run better is that you'll see that you'll have large amounts of idle time, and you should be able to use that time efficiently.
+56
+00:02:39.329 --> 00:02:41.165
+Now, some objects you
+don't create a lot of.
 
-[00:17:24]
-For us, we really don't have anything we can use efficiently right now. We don't have any other tasks that we could be doing. So if you had, say, monitoring tools, other stuff, you could be using idle callbacks to be able to execute extra code in your system. So that way you know you're always executing code off the beaten path instead of on it.
+57
+00:02:41.165 --> 00:02:43.205
+Some objects you create a whole bunch of.
 
-[00:17:45]
-There's a lot of extra things we could be doing. Unfortunately, I didn't have any really great ideas on how to work in some of these idle tasks. Where we can move them off the main thread that have no implication in the main thread or what you need to be doing into, hey, background processing.
+58
+00:02:43.205 --> 00:02:46.467
+And so you should probably try to
+opportunity size out which ones are useful
 
-[00:17:59]
-I couldn't come up with a good one. But yeah, so at this point you can see we still haven't really changed anything, we're still just here. We're still just using a ton of memory, and so at this point we'd have to kind of come up with some pretty good ideas of what to do at this point
+59
+00:02:46.467 --> 00:02:47.880
+and which ones aren't useful.
+
+60
+00:02:47.880 --> 00:02:51.590
+So we're gonna implement
+a very simple memory pool.
+
+61
+00:02:51.590 --> 00:02:52.652
+Very, very, very simple, okay?
+
+62
+00:02:52.652 --> 00:02:54.430
+I'm gonna create a pool.ts.
+
+63
+00:02:54.430 --> 00:02:55.055
+I'm gonna export class.
+
+64
+00:02:55.055 --> 00:02:56.097
+Yes, you love it.
+
+65
+00:02:56.097 --> 00:02:59.846
+You know you love it, just say you do, and
+we're gonna have a constructor in here.
+
+66
+00:02:59.846 --> 00:03:04.917
+And we're gonna have a private pool
+that is gonna be a T array in the pool.
+
+67
+00:03:04.917 --> 00:03:06.930
+this.pool will equal a new array.
+
+68
+00:03:06.930 --> 00:03:10.397
+And in here, we're actually gonna take
+a constructor function, which does that.
+
+69
+00:03:10.397 --> 00:03:14.617
+We'll have a private constructor
+function right there.
+
+70
+00:03:14.617 --> 00:03:17.835
+That's an old C++ ism called constructor.
+
+71
+00:03:17.835 --> 00:03:18.648
+There we go.
+
+72
+00:03:18.648 --> 00:03:24.465
+And so we're gonna do something like this,
+this.pool.length if it's greater than 0,
+
+73
+00:03:24.465 --> 00:03:27.636
+we're gonna return the last
+element in the pool,
+
+74
+00:03:27.636 --> 00:03:31.578
+else we'll call the constructor
+function and get out a new T.
+
+75
+00:03:31.578 --> 00:03:35.278
+So this makes sense,
+if we have some in the tuck, use those,
+
+76
+00:03:35.278 --> 00:03:36.665
+else create a new one.
+
+77
+00:03:36.665 --> 00:03:38.042
+You have one question?
+
+78
+00:03:38.042 --> 00:03:40.908
+&gt;&gt; Is that the class name you wanna use?
+
+79
+00:03:40.908 --> 00:03:41.587
+&gt;&gt; Poot.
+
+80
+00:03:41.587 --> 00:03:43.343
+Yeah, I didn't even see that.
+
+81
+00:03:43.343 --> 00:03:45.618
+That is not the class name.
+
+82
+00:03:45.618 --> 00:03:48.104
+Pool, we would have eventually
+discovered that, okay?
+
+83
+00:03:48.104 --> 00:03:51.470
+We would have eventually discovered that.
+
+84
+00:03:51.470 --> 00:03:56.267
+All right, so then we have public set,
+which will be t: T.
+
+85
+00:03:56.267 --> 00:03:56.839
+There we go.
+
+86
+00:03:56.839 --> 00:04:00.133
+this.pool.push (t), fantastic.
+
+87
+00:04:00.133 --> 00:04:03.562
+This is as simple of one as we can get.
+
+88
+00:04:03.562 --> 00:04:07.347
+You would have to do research to kinda
+determine if the order of the objects
+
+89
+00:04:07.347 --> 00:04:11.577
+you're putting in matters, then you'd
+wanna use something like a ring buffer.
+
+90
+00:04:11.577 --> 00:04:16.034
+If the order doesn't matter, typically
+relying as much as possible on C++ is
+
+91
+00:04:16.034 --> 00:04:18.306
+always the best way to go in JavaScript.
+
+92
+00:04:18.306 --> 00:04:21.578
+The more native methods you use,
+the better.
+
+93
+00:04:21.578 --> 00:04:26.091
+So don't get too clever, don't get too
+clever by half, just use native methods.
+
+94
+00:04:26.091 --> 00:04:28.959
+I've done some amount of testing here, and
+
+95
+00:04:28.959 --> 00:04:34.385
+typically a pool that does this type of
+operation, just pushing and popping, will
+
+96
+00:04:34.385 --> 00:04:39.600
+operate like an order of magnitude faster,
+but cause more minor GCs to happen.
+
+97
+00:04:39.600 --> 00:04:44.527
+If you do one that is a pointer within
+the array, so we never actually
+
+98
+00:04:44.527 --> 00:04:49.467
+adjust the size of the array,
+they're gonna be like 10x slower.
+
+99
+00:04:49.467 --> 00:04:51.824
+These are all micro-benchmarks,
+so again, are they real?
+
+100
+00:04:51.824 --> 00:04:52.657
+I don't know.
+
+101
+00:04:52.657 --> 00:04:56.827
+10x slower, but the amount of GCs over
+time, the minor GCs seem to be a lot less.
+
+102
+00:04:56.827 --> 00:04:59.680
+So is it better, is it worse?
+
+103
+00:04:59.680 --> 00:05:00.412
+It's very, very difficult.
+
+104
+00:05:00.412 --> 00:05:04.283
+Ring buffers, so, meaning that you're
+actually having two pointers chasing each
+
+105
+00:05:04.283 --> 00:05:06.254
+other, tend to be the slowest of them all.
+
+106
+00:05:06.254 --> 00:05:07.459
+You're updating multiple pointers.
+
+107
+00:05:07.459 --> 00:05:10.162
+I'm not sure if they're really worth it,
+other than if order matters.
+
+108
+00:05:10.162 --> 00:05:12.112
+So long as order doesn't matter,
+I wouldn't use it.
+
+109
+00:05:12.112 --> 00:05:14.697
+I just use as many native
+methods as possible.
+
+110
+00:05:14.697 --> 00:05:19.797
+Always best advice, don't write your
+own left pad, use pad left, okay?
+
+111
+00:05:19.797 --> 00:05:22.072
+Best piece of advice one can give.
+
+112
+00:05:22.072 --> 00:05:23.723
+All right, so now we have a pool.
+
+113
+00:05:23.723 --> 00:05:24.908
+So that's pretty neat.
+
+114
+00:05:24.908 --> 00:05:26.167
+I like pools.
+
+115
+00:05:26.167 --> 00:05:28.894
+So let's create ourself
+a little bit of a bullet pool.
+
+116
+00:05:28.894 --> 00:05:30.166
+So it shouldn't be too hard.
+
+117
+00:05:30.166 --> 00:05:31.535
+So I'm gonna go like this.
+
+118
+00:05:31.535 --> 00:05:33.375
+Let's go function createBullet.
+
+119
+00:05:33.375 --> 00:05:39.671
+And this thing is simply going to take in
+a return, and we're gonna go as Bullet,
+
+120
+00:05:39.671 --> 00:05:44.405
+and it's gonna return x as 0,
+direction as -1, why not?
+
+121
+00:05:44.405 --> 00:05:46.721
+And id will be a ++id.
+
+122
+00:05:46.721 --> 00:05:47.539
+Where is id?
+
+123
+00:05:47.539 --> 00:05:50.515
+I know you're somewhere around here, id.
+
+124
+00:05:50.515 --> 00:05:53.900
+Let's bring it back up here because it's
+kind of weird to have it all the way
+
+125
+00:05:53.900 --> 00:05:54.505
+down there.
+
+126
+00:05:54.505 --> 00:05:55.106
+So there we go.
+We just
+
+127
+00:05:55.106 --> 00:05:58.994
+create a random default value
+effective pool that we can, and
+
+128
+00:05:58.994 --> 00:06:02.455
+we even increment the id every
+time we create a new one.
+
+129
+00:06:02.455 --> 00:06:04.834
+So if you started logging and
+inspecting and
+
+130
+00:06:04.834 --> 00:06:07.213
+making sure you're not creating new ones,
+
+131
+00:06:07.213 --> 00:06:11.860
+it should be pretty obvious if your id's
+don't increment at some point, all right?
+
+132
+00:06:11.860 --> 00:06:15.599
+Now let's create the pool,
+bulletPool = new Pool.
+
+133
+00:06:15.599 --> 00:06:18.704
+And we can put Bullet in
+here to really make it nice.
+
+134
+00:06:18.704 --> 00:06:21.142
+And we can just pass in createBullet.
+
+135
+00:06:21.142 --> 00:06:24.066
+So every single time it needs
+to create a new bullet,
+
+136
+00:06:24.066 --> 00:06:27.727
+it has a constructor function, and
+it can hand out bullets to us.
+
+137
+00:06:27.727 --> 00:06:29.643
+So this should be pretty easy.
+
+138
+00:06:29.643 --> 00:06:31.696
+And one more function just to
+make things a little bit easier,
+
+139
+00:06:31.696 --> 00:06:32.655
+I'm gonna quit using this.
+
+140
+00:06:32.655 --> 00:06:35.175
+I know you guys may feel
+emotional about this, but
+
+141
+00:06:35.175 --> 00:06:37.580
+I'm actually gonna convert
+this into a class.
+
+142
+00:06:37.580 --> 00:06:39.361
+Yes, I am converting it into a class.
+
+143
+00:06:39.361 --> 00:06:43.503
+So I can have a nice reset function
+on here that'll have x: number,
+
+144
+00:06:43.503 --> 00:06:47.587
+direction: number, or
+actually will technically be 1 or -1.
+
+145
+00:06:47.587 --> 00:06:53.852
+And I'll go this.x = x,
+this.direction = direction,
+
+146
+00:06:53.852 --> 00:06:58.625
+and then I'm gonna return this, all right?
+
+147
+00:06:58.625 --> 00:07:01.897
+The reason why I actually really
+end up liking to do this, here,
+
+148
+00:07:01.897 --> 00:07:03.420
+I'm just gonna go like that.
+
+149
+00:07:07.107 --> 00:07:08.077
+Fantastic.
+
+150
+00:07:08.077 --> 00:07:11.991
+Actually, the id is the only
+one I can't do it to.
+
+151
+00:07:11.991 --> 00:07:18.269
+Constructor, =++id.
+
+152
+00:07:18.269 --> 00:07:19.038
+Fantastic.
+
+153
+00:07:19.038 --> 00:07:19.943
+Where are you id?
+
+154
+00:07:19.943 --> 00:07:21.000
+Take that up, put it up here.
+
+155
+00:07:21.000 --> 00:07:22.197
+I like it to just be above.
+
+156
+00:07:22.197 --> 00:07:24.370
+I don't know,
+maybe it's the old programmer in me.
+
+157
+00:07:24.370 --> 00:07:25.760
+And so this is really simple.
+
+158
+00:07:25.760 --> 00:07:28.935
+It just makes it a little
+bit simpler to use, I think,
+
+159
+00:07:28.935 --> 00:07:31.414
+when you kind of think of things this way.
+
+160
+00:07:31.414 --> 00:07:34.413
+Could there be optimizations over
+using classes versus plain objects?
+
+161
+00:07:34.413 --> 00:07:38.715
+I really do hope deep down that V8,
+when they see that it's a class,
+
+162
+00:07:38.715 --> 00:07:41.616
+you can't really add
+properties to classes.
+
+163
+00:07:41.616 --> 00:07:43.611
+I mean, technically you can.
+
+164
+00:07:43.611 --> 00:07:46.924
+But if you add properties to classes,
+it could break into a slow path, but
+
+165
+00:07:46.924 --> 00:07:49.702
+since it already knows all of
+its classes and its properties,
+
+166
+00:07:49.702 --> 00:07:52.123
+I would hope that it'd give
+it some sort of fast path.
+
+167
+00:07:52.123 --> 00:07:55.771
+That's nice, I don't think it does, but
+you would hope one day they could do that.
+
+168
+00:07:55.771 --> 00:07:59.923
+Anyways, as I've stated upfront all
+my properties and their ordering.
+
+169
+00:07:59.923 --> 00:08:02.757
+All right, anyways, so createBullet,
+we create this nice little bullet,
+
+170
+00:08:02.757 --> 00:08:04.293
+which is gonna look something like this.
+
+171
+00:08:04.293 --> 00:08:09.118
+newBullet, and we'll pass in the id,
+or we don't even pass in the id, and
+
+172
+00:08:09.118 --> 00:08:10.662
+I'm gonna call reset.
+
+173
+00:08:10.662 --> 00:08:12.639
+I don't even need to call reset
+cuz it's already done for me.
+
+174
+00:08:12.639 --> 00:08:15.086
+Fantastic, there we go.
+
+175
+00:08:15.086 --> 00:08:17.757
+We have our new little bullet,
+create little bullet does all this.
+
+176
+00:08:17.757 --> 00:08:18.328
+Awesome, awesome, awesome.
+So
+
+177
+00:08:18.328 --> 00:08:20.510
+now we're gonna go all
+the way down to fire.
+
+178
+00:08:20.510 --> 00:08:21.729
+We need to change this.
+
+179
+00:08:21.729 --> 00:08:23.847
+We want to start pooling these objects.
+
+180
+00:08:23.847 --> 00:08:29.827
+So I'm gonna go bulletPool, look at that,
+it already knows what to do, copilot.
+
+181
+00:08:29.827 --> 00:08:33.907
+So I'm gonna get a bullet, and
+I'm gonna reset it with my new values.
+
+182
+00:08:33.907 --> 00:08:35.596
+So there we go.
+This is why I like using classes, right?
+
+183
+00:08:35.596 --> 00:08:38.427
+Sometimes, it makes writing
+code a little bit nicer.
+
+184
+00:08:38.427 --> 00:08:40.536
+Again, I just want you
+guys to quit judging me.
+
+185
+00:08:40.536 --> 00:08:41.665
+All right, so there we go.
+
+186
+00:08:41.665 --> 00:08:45.546
+This is fantastic,
+this is beautiful, but where and
+
+187
+00:08:45.546 --> 00:08:48.401
+when do we start letting go of bullets?
+
+188
+00:08:48.401 --> 00:08:51.248
+That's kind of the big trick here.
+
+189
+00:08:51.248 --> 00:08:53.208
+So the first thing is
+what comes out of shift?
+
+190
+00:08:53.208 --> 00:08:56.615
+Shift returns a bullet or
+undefined technically.
+
+191
+00:08:56.615 --> 00:09:01.189
+So I can go bulletPool.set.
+
+192
+00:09:01.189 --> 00:09:03.680
+Get that old trick out.
+
+193
+00:09:03.680 --> 00:09:04.215
+And there we go.
+
+194
+00:09:04.215 --> 00:09:07.104
+So we have now just
+collected those two bullets.
+
+195
+00:09:07.104 --> 00:09:08.256
+We already know they exist.
+
+196
+00:09:08.256 --> 00:09:11.174
+So I'm just kind of forcing them to exist,
+but there's one other problem.
+
+197
+00:09:11.174 --> 00:09:14.665
+When the game ends,
+I may have some amount of bullets and
+
+198
+00:09:14.665 --> 00:09:17.205
+we want to also recollect those as well.
+
+199
+00:09:17.205 --> 00:09:18.305
+So that way they don't go out of style.
+
+200
+00:09:18.305 --> 00:09:23.435
+So I'm gonna have something that's like,
+I'm gonna call this method reclaim
+
+201
+00:09:23.435 --> 00:09:28.042
+cuz it just sounds awesome, and
+I'm gonna go for const b of this.b1.
+
+202
+00:09:28.042 --> 00:09:29.884
+I don't know, sounds neat to me.
+
+203
+00:09:29.884 --> 00:09:34.567
+And I'll go let's see,
+bulletPool set(b), bulletPool set(b).
+
+204
+00:09:34.567 --> 00:09:35.336
+There we go.
+
+205
+00:09:35.336 --> 00:09:38.537
+So we will reclaim all of
+them at the end of our game.
+
+206
+00:09:38.537 --> 00:09:42.148
+And now we're gonna jump
+back over to index.
+
+207
+00:09:42.148 --> 00:09:48.776
+And at the very, very end of our time,
+we're gonna go game.reclaim.
+
+208
+00:09:48.776 --> 00:09:53.981
+So give our game a chance to get every
+last bullet possible and have them all.
+
+209
+00:09:53.981 --> 00:09:56.770
+So now we should really
+never recreate a bullet.
+
+210
+00:09:56.770 --> 00:10:00.295
+Every time they collide, we get rid of
+them out of the list, and we reclaim them.
+
+211
+00:10:00.295 --> 00:10:02.386
+When the game ends we reclaim
+any remaining bullets.
+
+212
+00:10:02.386 --> 00:10:04.978
+So now once we hit some sort of medium,
+
+213
+00:10:04.978 --> 00:10:08.385
+we'll just have ever
+running supply of bullets.
+
+214
+00:10:08.385 --> 00:10:12.078
+Now, if we really want to, if we stopped
+having as many games and there's certain
+
+215
+00:10:12.078 --> 00:10:15.682
+amount of time, we could add heuristics
+to start letting go of all the bullets.
+
+216
+00:10:15.682 --> 00:10:18.829
+So that way we're just not having
+some higher amounts of memory.
+
+217
+00:10:18.829 --> 00:10:22.160
+But typically what I see is when you're
+creating destroying, creating destroying,
+
+218
+00:10:22.160 --> 00:10:23.073
+creating destroying,
+
+219
+00:10:23.073 --> 00:10:26.374
+your average memory is usually higher than
+if you're just holding on to some amount.
+
+220
+00:10:26.374 --> 00:10:29.410
+That's been my basic observations,
+not always true.
+
+221
+00:10:29.410 --> 00:10:31.691
+But that's been my usual observations.
+
+222
+00:10:31.691 --> 00:10:33.643
+So there we go, this is looking good.
+
+223
+00:10:33.643 --> 00:10:38.290
+npm run test, let's make sure that we
+haven't done something crazy here.
+
+224
+00:10:43.869 --> 00:10:45.974
+Uh-oh, what have we done?
+
+225
+00:10:45.974 --> 00:10:48.000
+Have we not done the right things here?
+
+226
+00:10:48.000 --> 00:10:51.820
+So it looks like whatever we have done,
+we have broken something.
+
+227
+00:10:51.820 --> 00:10:54.490
+Now the real question is,
+did we run this beforehand,
+
+228
+00:10:54.490 --> 00:10:56.471
+before we did all of our previous stuff?
+
+229
+00:10:56.471 --> 00:10:58.381
+Let's see, git status.
+
+230
+00:10:58.381 --> 00:11:00.808
+Because how funny would that be
+if we made our previous change?
+
+231
+00:11:00.808 --> 00:11:04.211
+Did we check to see if all the tests
+ran with our previous one?
+
+232
+00:11:04.211 --> 00:11:07.557
+I think we did,
+don't you try to lie to me.
+
+233
+00:11:07.557 --> 00:11:10.737
+All right, anyway, so
+let's see what happens here.
+
+234
+00:11:10.737 --> 00:11:15.901
+So obviously,
+something has gone awry with this.
+
+235
+00:11:15.901 --> 00:11:17.545
+Yeah, this is totally wrong.
+
+236
+00:11:17.545 --> 00:11:19.974
+I see the obvious problem
+that we've done wrong here.
+
+237
+00:11:19.974 --> 00:11:26.140
+So I'm gonna jump over here, and go into
+our history, I'm gonna yank those two.
+
+238
+00:11:30.388 --> 00:11:32.163
+And what I'm gonna do is I'm
+gonna paste them right here.
+
+239
+00:11:32.163 --> 00:11:37.204
+Obvious part is that it's that.
+
+240
+00:11:37.204 --> 00:11:38.831
+We didn't do this part right here.
+
+241
+00:11:38.831 --> 00:11:42.757
+So kind of screwed up the game, games were
+lasting a little bit longer than normal.
+
+242
+00:11:42.757 --> 00:11:45.930
+So let's take that, let's do that.
+
+243
+00:11:45.930 --> 00:11:47.767
+Come on, why didn't you guys see that one?
+
+244
+00:11:47.767 --> 00:11:51.853
+I mean, it was right in front
+of you this whole time.
+
+245
+00:11:53.091 --> 00:11:54.626
+There we go, beautiful.
+
+246
+00:11:54.626 --> 00:11:57.639
+Look at that beautiful piece of code
+going right off the edge of the screen.
+
+247
+00:11:57.639 --> 00:12:01.481
+That's how I really love code to look,
+just completely off the screen.
+
+248
+00:12:01.481 --> 00:12:03.092
+All right, so fantastic.
+
+249
+00:12:03.092 --> 00:12:07.109
+So if I'm not mistaken now
+this should be a lot nicer.
+
+250
+00:12:07.109 --> 00:12:12.124
+Man, that was a great first try,
+was that just a great first try or what?
+
+251
+00:12:12.124 --> 00:12:17.361
+Copilot did cause that error, see
+the problem is that I did trust copilot.
+
+252
+00:12:17.361 --> 00:12:19.718
+The AIs aren't gonna be very
+great at taking our jobs, okay?
+
+253
+00:12:19.718 --> 00:12:24.443
+I mean, it really is painful
+when things aren't working out.
+
+254
+00:12:24.443 --> 00:12:27.367
+And so I do this all the time where
+I'll just be like, good enough.
+
+255
+00:12:27.367 --> 00:12:30.437
+And then I'm like, see,
+the problem is that I'm just not reading.
+
+256
+00:12:30.437 --> 00:12:32.208
+I'm going too fast, and I goof it up.
+
+257
+00:12:32.208 --> 00:12:35.266
+Okay, so we are now cleaning up memory.
+
+258
+00:12:35.266 --> 00:12:39.918
+So if we've done this correctly, we should
+be able to launch our testing right here.
+
+259
+00:12:39.918 --> 00:12:43.505
+Launch cargo, and we should
+hopefully see a difference in that.
+
+260
+00:12:43.505 --> 00:12:47.748
+Right now, it's like exclusively
+in one area and nowhere else.
+
+261
+00:12:47.748 --> 00:12:50.728
+So hopefully,
+proportionally it shrinks down.
+
+262
+00:12:50.728 --> 00:12:54.486
+I never look at these numbers up here, by
+the way, they don't mean anything to me.
+
+263
+00:12:54.486 --> 00:12:59.575
+Meaning that I don't look
+at flame graphs trying
+
+264
+00:12:59.575 --> 00:13:06.786
+to gauge the exact running time,
+I try to gauge the proportion time.
+
+265
+00:13:06.786 --> 00:13:12.424
+And so this is very important, I'm just
+going, okay, fire is like 87% of the time.
+
+266
+00:13:12.424 --> 00:13:15.858
+Can we make it down to 80% of the time?
+
+267
+00:13:15.858 --> 00:13:19.346
+Can we make it down to 84% or maybe 75?
+
+268
+00:13:19.346 --> 00:13:21.081
+Or like that's just way more important.
+
+269
+00:13:26.119 --> 00:13:27.596
+So now we're just gonna have to wait.
+
+270
+00:13:27.596 --> 00:13:29.042
+We're gonna have to wait for
+quite some time.
+
+271
+00:13:29.042 --> 00:13:29.892
+Awesome, so
+
+272
+00:13:29.892 --> 00:13:34.696
+it doesn't look like we made pretty
+much any sort of visible change here.
+
+273
+00:13:34.696 --> 00:13:35.849
+We tried to do something.
+
+274
+00:13:35.849 --> 00:13:37.614
+So something else is going on here.
+
+275
+00:13:37.614 --> 00:13:40.565
+Is it the arrays that we're allocating?.
+
+276
+00:13:40.565 --> 00:13:41.284
+Is that the problem?
+
+277
+00:13:41.284 --> 00:13:46.040
+Cuz if you think about it, now we're
+starting to get into a big problem with
+
+278
+00:13:46.040 --> 00:13:48.244
+trying to manage your own memory.
+
+279
+00:13:48.244 --> 00:13:49.527
+What is bullets?
+
+280
+00:13:49.527 --> 00:13:52.387
+Well, bullets is something that
+we constantly increase and
+
+281
+00:13:52.387 --> 00:13:54.695
+we're also constantly
+shrinking a little bit.
+
+282
+00:13:54.695 --> 00:13:57.889
+Shifting is gonna cause
+some sort of memory change.
+
+283
+00:13:57.889 --> 00:14:00.810
+Now, whether they do individual ones or
+not, we don't know.
+
+284
+00:14:00.810 --> 00:14:02.525
+Next, we also have these ones right here.
+
+285
+00:14:02.525 --> 00:14:06.503
+Every single time we're creating a game,
+we're just creating new arrays and
+
+286
+00:14:06.503 --> 00:14:08.921
+then eventually growing
+them to be something.
+
+287
+00:14:08.921 --> 00:14:10.964
+And so is that a problem?
+
+288
+00:14:10.964 --> 00:14:14.546
+I mean, probably,
+that's probably a problem.
+
+289
+00:14:14.546 --> 00:14:18.310
+To fix this, that might require more and
+more thought, but I just wanted to show
+
+290
+00:14:18.310 --> 00:14:21.360
+you that sometimes it's not as
+easy as you think it's gonna be.
+
+291
+00:14:21.360 --> 00:14:24.972
+It's not just simply,
+boom, it's this one thing.
+
+292
+00:14:24.972 --> 00:14:26.813
+It's just like, yeah, it's very easy.
+
+293
+00:14:26.813 --> 00:14:30.057
+Just grab that single item and that's all
+you got to do, just go with the bullets.
+
+294
+00:14:30.057 --> 00:14:33.199
+Well, you got to kind of really think
+about all the potential places in which
+
+295
+00:14:33.199 --> 00:14:34.191
+you're using memory.
+
+296
+00:14:34.191 --> 00:14:39.234
+Another very interesting spot about
+using memory is this one right here.
+
+297
+00:14:39.234 --> 00:14:44.692
+You may not realize this, but
+this simple spot right here we're creating
+
+298
+00:14:44.692 --> 00:14:50.253
+effectively 2 arrays every 16
+milliseconds for all the games running.
+
+299
+00:14:50.253 --> 00:14:53.999
+So at 2,000 games that's 4,000 arrays,
+60 times a second.
+
+300
+00:14:53.999 --> 00:14:56.175
+It's a lot of arrays, right?
+
+301
+00:14:56.175 --> 00:14:59.050
+That's like 240,000 arrays per second.
+
+302
+00:14:59.050 --> 00:15:01.463
+So can I just do this instead?
+
+303
+00:15:01.463 --> 00:15:05.904
+Why are we just allowing simple memory
+to be not just used over and over again?
+
+304
+00:15:05.904 --> 00:15:09.335
+And so, luckily,
+the scavenger works really, really well.
+
+305
+00:15:09.335 --> 00:15:11.189
+We don't have to worry
+too much about that.
+
+306
+00:15:11.189 --> 00:15:13.174
+We're only creating
+a bunch of empty arrays.
+
+307
+00:15:13.174 --> 00:15:16.356
+Does V8 make some really smart
+ideas about how to save memory?
+
+308
+00:15:16.356 --> 00:15:19.525
+Probably, but these are things
+you should start looking for.
+
+309
+00:15:19.525 --> 00:15:22.621
+And this is one thing that I really
+do enjoy just doing in general,
+
+310
+00:15:22.621 --> 00:15:26.361
+which is when you're gonna be going from
+the obvious wins to not obvious wins.
+
+311
+00:15:26.361 --> 00:15:31.196
+It is almost always a set of distributed
+small choices that you see over time
+
+312
+00:15:31.196 --> 00:15:32.587
+that is the problem.
+
+313
+00:15:32.587 --> 00:15:35.598
+It's never just one big spot anymore.
+
+314
+00:15:35.598 --> 00:15:39.173
+Now it's like, hey, how many
+different places are we using memory?
+
+315
+00:15:39.173 --> 00:15:41.409
+Well, there's probably a lot.
+
+316
+00:15:41.409 --> 00:15:43.240
+And so let's go over here.
+
+317
+00:15:43.240 --> 00:15:47.699
+We'll just see, have we changed any
+sort of shape even with that, right?
+
+318
+00:15:47.699 --> 00:15:51.174
+And so now your goal is to just measure,
+look, have we made a change?
+
+319
+00:15:51.174 --> 00:15:52.918
+Measure, look, have we made a change?
+
+320
+00:15:52.918 --> 00:15:57.277
+Cuz I also don't often trust
+the shape of this chart.
+
+321
+00:15:57.277 --> 00:15:59.741
+It's like, yeah, it's generally correct,
+but is it always correct?
+
+322
+00:15:59.741 --> 00:16:02.437
+I found that sometimes things that
+are problems show up little, and
+
+323
+00:16:02.437 --> 00:16:05.178
+then they show up big, and then they
+show up a little bit littler, and
+
+324
+00:16:05.178 --> 00:16:06.713
+then they show up a little bit bigger.
+
+325
+00:16:06.713 --> 00:16:08.181
+Depends on how long you're measuring for,
+
+326
+00:16:08.181 --> 00:16:09.815
+it depends on what's
+happening in the program.
+
+327
+00:16:09.815 --> 00:16:13.837
+&gt;&gt; What exactly is the idle
+time in the performance tab?
+
+328
+00:16:13.837 --> 00:16:18.999
+For example, the new WebSocket we added
+are running during this time in C++ land,
+
+329
+00:16:18.999 --> 00:16:21.191
+should we aim for bigger idle time?
+
+330
+00:16:21.191 --> 00:16:24.530
+&gt;&gt; Well, I mean, idle time, obviously,
+well, it can mean a couple of things.
+
+331
+00:16:24.530 --> 00:16:28.726
+And so if you go and
+even using something like a hex,
+
+332
+00:16:28.726 --> 00:16:34.889
+which is like flame graphs light for
+Node written, I think, by NearForm.
+
+333
+00:16:34.889 --> 00:16:39.541
+You can see that the idle time, there's
+a large gap of it, which is actually
+
+334
+00:16:39.541 --> 00:16:44.209
+underneath the hood, which is glibc
+using epoll, you're epoll waiting.
+
+335
+00:16:44.209 --> 00:16:46.631
+And so just nothing's
+happening inside your system.
+
+336
+00:16:46.631 --> 00:16:48.940
+You're just doing nothing
+cuz we're waiting for data.
+
+337
+00:16:48.940 --> 00:16:50.838
+We're not actually processing anything.
+
+338
+00:16:50.838 --> 00:16:54.861
+So, I mean, obviously having more
+idle time means one of two things.
+
+339
+00:16:54.861 --> 00:16:58.405
+A, you're using everything efficiently,
+and therefore you can have more load,
+
+340
+00:16:58.405 --> 00:16:59.427
+which we probably can.
+
+341
+00:16:59.427 --> 00:17:01.579
+We could probably increase the amount
+of games running concurrently up to
+
+342
+00:17:01.579 --> 00:17:03.221
+a thousand or
+another thousand go up to three thousand.
+
+343
+00:17:03.221 --> 00:17:09.831
+Or b, your program is not
+using things efficiently.
+
+344
+00:17:09.831 --> 00:17:12.997
+Where it's needed to be fast it's slow,
+and for
+
+345
+00:17:12.997 --> 00:17:15.709
+the rest of the time it's doing nothing.
+
+346
+00:17:15.709 --> 00:17:19.053
+You'll see that a lot as you're trying
+to make something run better is
+
+347
+00:17:19.053 --> 00:17:22.059
+that you'll see that you'll have
+large amounts of idle time,
+
+348
+00:17:22.059 --> 00:17:24.573
+and you should be able to
+use that time efficiently.
+
+349
+00:17:24.573 --> 00:17:28.925
+For us, we really don't have anything
+we can use efficiently right now.
+
+350
+00:17:28.925 --> 00:17:30.688
+We don't have any other tasks
+that we could be doing.
+
+351
+00:17:30.688 --> 00:17:33.802
+So if you had, say,
+monitoring tools, other stuff,
+
+352
+00:17:33.802 --> 00:17:38.419
+you could be using idle callbacks to be
+able to execute extra code in your system.
+
+353
+00:17:38.419 --> 00:17:43.305
+So that way you know you're always
+executing code off the beaten
+
+354
+00:17:43.305 --> 00:17:45.033
+path instead of on it.
+
+355
+00:17:45.033 --> 00:17:46.724
+There's a lot of extra
+things we could be doing.
+
+356
+00:17:46.724 --> 00:17:50.640
+Unfortunately, I didn't have any really
+great ideas on how to work in some of
+
+357
+00:17:50.640 --> 00:17:51.616
+these idle tasks.
+
+358
+00:17:51.616 --> 00:17:55.486
+Where we can move them off the main thread
+that have no implication in the main
+
+359
+00:17:55.486 --> 00:17:59.189
+thread or what you need to be doing into,
+hey, background processing.
+
+360
+00:17:59.189 --> 00:18:01.436
+I couldn't come up with a good one.
+
+361
+00:18:01.436 --> 00:18:06.974
+But yeah, so at this point you can see we
+still haven't really changed anything,
+
+362
+00:18:06.974 --> 00:18:08.671
+we're still just here.
+
+363
+00:18:08.671 --> 00:18:12.021
+We're still just using a ton of memory,
+and so at this point we'd have to kind of
+
+364
+00:18:12.021 --> 00:18:14.540
+come up with some pretty good
+ideas of what to do at this point
 
