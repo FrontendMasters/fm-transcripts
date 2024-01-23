@@ -1,726 +1,80 @@
-WEBVTT
+[00:00:00]
+>> You'll also notice around here, look, update didn't even make it as the number one, garbage. Okay, so we have a garbage problem, yes. We aren't quite sure where the garbage is coming from. Looks like it's coming from a lot of places. So we know that all of these are contributing to this final number right here, right?
 
-1
-00:00:00.920 --> 00:00:02.477
-You'll also notice around here, look,
+[00:00:16]
+This is part of it. But what I see right here, right below update, is register destroy hook, okay? If you don't know that's more than we were getting into the idea of node internal async hooks. You want to guess what that's related to?
+>> Promises
+>> Promises. Node has a lot of stuff look at this a init, which is 4% of the time that's on top.
 
-2
-00:00:02.477 --> 00:00:04.660
-update didn't even make it
-as the number one, garbage.
+[00:00:39]
+Guess what it's linked to? More async hooks. Okay, what about destroy async hooks? Okay, play game. That's us. Okay, that's us. This run micro tasks. Also it's in some sort of task use probably not promises. Maybe that's something else.. List on time out. Okay, this is some sort of timers internal.
 
-3
-00:00:04.660 --> 00:00:06.900
-Okay, so we have a garbage problem, yes.
+[00:00:58]
+We are using a timeout. That's 2% of the time that it's doing something and that involves a timeout. We have these admit hooks again, async hooks, that's something we have a before async hooks. We have promise init hook destroy tracking 1% of the time. Again, promises, promises, async hook, async hook, async hook.
 
-4
-00:00:06.900 --> 00:00:09.920
-We aren't quite sure where
-the garbage is coming from.
+[00:01:17]
+So there's quite a bit of code in here that's actually looking to be, the majority of code that's executing is related to promises, and we also see a lot in memory being related to promises. So how much do you wanna bet that promises looking at both memory, which is like 20, 30% of the time.
 
-5
-00:00:09.920 --> 00:00:11.860
-Looks like it's coming
-from a lot of places.
+[00:01:35]
+And in the code, which is looking literally like 20, 30% of the time, this could be big W. I would say that this is probably gonna be a big W and I have no idea, cuz I've never done this before. So we're gonna find out now live, completely unpracticed.
 
-6
-00:00:11.860 --> 00:00:14.378
-So we know that all of
-these are contributing
+[00:01:55]
+All right, so where are we creating these promises at? How I'm going to make sure everything's all nice. Well, remember our tick function is creating a promise every time we do a tick. So let's just do a little bit of math here. Just a quick little bit of math.
 
-7
-00:00:14.378 --> 00:00:16.770
-to this final number right here, right?
+[00:02:12]
+We'll do it in bash to make bad cop happy. We have a tick approximately every 16 milliseconds or 60 frames a second. We had, say, 1,000 games running. So we're doing, and then we're going to do that. Let's see. So yeah, that's, yeah, that's pretty much it. So that's 60,000 promises a second, right?
 
-8
-00:00:16.770 --> 00:00:17.870
-This is part of it.
+[00:02:34]
+That's a lot of promises per second. We're creating a ton of promises per second, but wait, there's more. Remember that is this promise right here that we've created by awaiting. Oopsies, wrong one. But inside of here, if we sleep at all, we actually create another promise inside of that.
 
-9
-00:00:17.870 --> 00:00:22.483
-But what I see right here, right below
-update, is register destroy hook, okay?
+[00:02:52]
+So really we're looking at potentially about 120,000 promises per second. So that's a lot promises. That is a lot of things happening. And not only that, but promises have effects elsewhere. And so let's kind of look at those effects. Let's see, I wonder if I have yeah, let's talk about the event loop for one quick second.
 
-10
-00:00:22.483 --> 00:00:27.243
-If you don't know that's more than we were
-getting into the idea of node internal
+[00:03:14]
+So what I'm gonna do is I'm gonna kind of give us a basic intro into the event loop. You can imagine the event loop something like a loop, right? What ends up happening is that every single time there is something to execute it is added to a list, and this list could have several items in it, all right?
 
-11
-00:00:27.243 --> 00:00:28.084
-async hooks.
+[00:03:35]
+So we have a wake up from V8 saying, hey, you have data on your WebSocket, you need to handle this. It doesn't just exit. It doesn't just interrupt your program running. Because your program's running JavaScript. JavaScript is not multithreaded. It will never be multithreaded. It is never meant to be multi threaded.
 
-12
-00:00:28.084 --> 00:00:31.497
-You want to guess what that's related to?
+[00:03:52]
+It is just single execution. That's how it always has worked. And so even though there's things happening multithreaded underneath, such as reading the network, and doing all that, it doesn't mean JavaScript is multithreaded. Maybe we have some data out on the socket. Okay, we need to go read that.
 
-13
-00:00:31.497 --> 00:00:34.467
-&gt;&gt; Promises
-&gt;&gt; Promises.
+[00:04:07]
+Now we also have, say, one of those tick promises that need to be woken up from. We also have another tick promise that's gonna be woken up from, right? We can have a bunch of these and as we read one piece of data for us to be able to read that data nothing can be executing.
 
-14
-00:00:34.467 --> 00:00:36.764
-Node has a lot of stuff
-look at this a init,
+[00:04:22]
+And how you leave the process event loop or how you go back to the promise event loop is that whatever is running needs to stop running. And then once nothing else is running, execution is handed back to the process event loop. We grab the latest one off the list, and now this is the thing that's executing while we wait, and maybe much, much more.
 
-15
-00:00:36.764 --> 00:00:39.607
-which is 4% of the time that's on top.
+[00:04:41]
+Maybe some more ticks happened in between there while we're waiting. It reads this, the WS library reads in that data, kind of creates the frames, makes everything nice. And then, no some more data comes in but where is that more data at? Well it's going to be down here, right?
 
-16
-00:00:39.607 --> 00:00:41.386
-Guess what it's linked to?
+[00:04:56]
+It's gonna be somewhere else, it's going to be way down here. It has to wait for the other things to execute before it gets its chance to execute in JavaScript. So everything gets in this nice little line to execute. So maybe we didn't get a complete frame here.
 
-17
-00:00:41.386 --> 00:00:42.849
-More async hooks.
+[00:05:09]
+So we have to wait until the next piece of data. So that we're going to go here. We're going to execute. We're going to update the game, and then we get a chance in here to finally go and go, okay, now let's finish off this frame. Okay, we got a frame, now the player can shoot.
 
-18
-00:00:42.849 --> 00:00:44.949
-Okay, what about destroy async hooks?
+[00:05:25]
+We're gonna add it to the queue and we're gonna wait for the next tick to happen, so that it can shoot. And so you just got to always kind of keep that in your head is that it's not free, promises are not free because one thing that's really intense about promises is every single dot then or dot catch happens on the next cycle.
 
-19
-00:00:44.949 --> 00:00:45.669
-Okay, play game.
+[00:05:44]
+It adds itself back to the event queue. There is just not a way to execute through a promise chain synchronously. And so that has real impact. So if you go one, two, three, four, and you have four promises that are executing synchronously and you're getting thousands of requests, that one, two, three, four will be interleaved with everybody else's one, two, three, four despite the fact that maybe it is synchronous.
 
-20
-00:00:45.669 --> 00:00:46.169
-That's us.
+[00:06:06]
+And so maybe that one executes and then 1,000 other people's ones execute. Then you're two executes and 1,000 other people's two executes and then you're three executes, it can have adverse effects onto how things are performing. And it adds just more overhead. Not only that, but node, because it is older, it has had more time in the ecosystem, it has a lot more tools for introspection and being able to tell what's happening.
 
-21
-00:00:46.169 --> 00:00:47.279
-Okay, that's us.
+[00:06:30]
+Datadog, I know, does things with the async hooks. They're able to link into node and tell what's happening underneath the hood. Bun does not do that, does not have as comprehensive hooks. Therefore, theirs does appear, my goodness that's a weird phrase theirs does. Buns ability to process through promises it appears to be significantly faster.
 
-22
-00:00:47.279 --> 00:00:49.949
-This run micro tasks.
+[00:06:52]
+Is it actually faster or do they just not have as comprehensive hooks? I don't know yet. Time will tell. I'm sure over the course of the next year we should see a slowdown because as they add more and more ability, but is it gonna be an equal slowdown?
 
-23
-00:00:49.949 --> 00:00:53.999
-Also it's in some sort of task
-use probably not promises.
+[00:07:04]
+May be may be not, I have no idea. But for nodes, promise and async hooks just aren't super fast. They're working on it now I have seen a lot of people talking about it. So will this change? Probably. How much will it change?. I don't know, but it will change.
 
-24
-00:00:53.999 --> 00:00:55.430
-Maybe that's something else..
+[00:07:21]
+So there you go. That's kind of like some background knowledge you should have in your head whenever you're doing something. You should always imagine how concurrent program works in JavaScript that it's always stacking up against each other. So no promise is free. It is not a zero cost abstraction.
 
-25
-00:00:55.430 --> 00:00:56.639
-List on time out.
-
-26
-00:00:56.639 --> 00:00:58.569
-Okay, this is some sort
-of timers internal.
-
-27
-00:00:58.569 --> 00:01:00.278
-We are using a timeout.
-
-28
-00:01:00.278 --> 00:01:03.568
-That's 2% of the time that it's doing
-something and that involves a timeout.
-
-29
-00:01:03.568 --> 00:01:06.221
-We have these admit hooks again,
-async hooks,
-
-30
-00:01:06.221 --> 00:01:09.598
-that's something we have
-a before async hooks.
-
-31
-00:01:09.598 --> 00:01:13.918
-We have promise init hook
-destroy tracking 1% of the time.
-
-32
-00:01:13.918 --> 00:01:17.988
-Again, promises, promises,
-async hook, async hook, async hook.
-
-33
-00:01:17.988 --> 00:01:22.162
-So there's quite a bit of code in
-here that's actually looking to be,
-
-34
-00:01:22.162 --> 00:01:25.985
-the majority of code that's
-executing is related to promises,
-
-35
-00:01:25.985 --> 00:01:29.638
-and we also see a lot in memory
-being related to promises.
-
-36
-00:01:29.638 --> 00:01:33.847
-So how much do you wanna bet that promises
-looking at both memory, which is like 20,
-
-37
-00:01:33.847 --> 00:01:35.388
-30% of the time.
-
-38
-00:01:35.388 --> 00:01:39.144
-And in the code, which is looking
-literally like 20, 30% of the time,
-
-39
-00:01:39.144 --> 00:01:40.203
-this could be big W.
-
-40
-00:01:40.203 --> 00:01:44.736
-I would say that this is probably
-gonna be a big W and I have no idea,
-
-41
-00:01:44.736 --> 00:01:47.383
-cuz I've never done this before.
-
-42
-00:01:47.383 --> 00:01:51.348
-So we're gonna find out now live,
-completely unpracticed.
-
-43
-00:01:55.544 --> 00:02:02.625
-All right, so
-where are we creating these promises at?
-
-44
-00:02:02.625 --> 00:02:04.885
-How I'm going to make sure
-everything's all nice.
-
-45
-00:02:04.885 --> 00:02:09.431
-Well, remember our tick function is
-creating a promise every time we do
-
-46
-00:02:09.431 --> 00:02:09.975
-a tick.
-
-47
-00:02:09.975 --> 00:02:11.495
-So let's just do a little
-bit of math here.
-
-48
-00:02:11.495 --> 00:02:12.855
-Just a quick little bit of math.
-
-49
-00:02:12.855 --> 00:02:15.115
-We'll do it in bash to make bad cop happy.
-
-50
-00:02:15.115 --> 00:02:19.738
-We have a tick approximately every 16
-milliseconds or 60 frames a second.
-
-51
-00:02:20.949 --> 00:02:26.429
-We had, say, 1,000 games running.
-
-52
-00:02:26.429 --> 00:02:29.189
-So we're doing, and
-then we're going to do that.
-
-53
-00:02:29.189 --> 00:02:30.601
-Let's see.
-So yeah, that's, yeah,
-
-54
-00:02:30.601 --> 00:02:31.669
-that's pretty much it.
-
-55
-00:02:31.669 --> 00:02:33.169
-So that's 60,000 promises a second, right?
-
-56
-00:02:34.569 --> 00:02:36.119
-That's a lot of promises per second.
-
-57
-00:02:36.119 --> 00:02:39.681
-We're creating a ton of promises
-per second, but wait, there's more.
-
-58
-00:02:39.681 --> 00:02:45.657
-Remember that is this promise right
-here that we've created by awaiting.
-
-59
-00:02:45.657 --> 00:02:47.211
-Oopsies, wrong one.
-
-60
-00:02:47.211 --> 00:02:49.422
-But inside of here, if we sleep at all,
-
-61
-00:02:49.422 --> 00:02:52.851
-we actually create another
-promise inside of that.
-
-62
-00:02:52.851 --> 00:02:58.541
-So really we're looking at potentially
-about 120,000 promises per second.
-
-63
-00:02:58.541 --> 00:03:00.212
-So that's a lot promises.
-
-64
-00:03:00.212 --> 00:03:02.472
-That is a lot of things happening.
-
-65
-00:03:02.472 --> 00:03:06.032
-And not only that, but
-promises have effects elsewhere.
-
-66
-00:03:06.032 --> 00:03:07.962
-And so
-let's kind of look at those effects.
-
-67
-00:03:07.962 --> 00:03:10.583
-Let's see, I wonder if I have yeah,
-
-68
-00:03:10.583 --> 00:03:14.592
-let's talk about the event loop for
-one quick second.
-
-69
-00:03:14.592 --> 00:03:19.342
-So what I'm gonna do is I'm gonna kind of
-give us a basic intro into the event loop.
-
-70
-00:03:19.342 --> 00:03:23.476
-You can imagine the event loop
-something like a loop, right?
-
-71
-00:03:23.476 --> 00:03:29.235
-What ends up happening is that every
-single time there is something to execute
-
-72
-00:03:29.235 --> 00:03:35.318
-it is added to a list, and this list could
-have several items in it, all right?
-
-73
-00:03:35.318 --> 00:03:38.316
-So we have a wake up from V8 saying, hey,
-
-74
-00:03:38.316 --> 00:03:42.709
-you have data on your WebSocket,
-you need to handle this.
-
-75
-00:03:42.709 --> 00:03:44.009
-It doesn't just exit.
-
-76
-00:03:44.009 --> 00:03:46.429
-It doesn't just interrupt
-your program running.
-
-77
-00:03:46.429 --> 00:03:48.070
-Because your program's running JavaScript.
-
-78
-00:03:48.070 --> 00:03:49.359
-JavaScript is not multithreaded.
-
-79
-00:03:49.359 --> 00:03:50.789
-It will never be multithreaded.
-
-80
-00:03:50.789 --> 00:03:52.779
-It is never meant to be multi threaded.
-
-81
-00:03:52.779 --> 00:03:54.589
-It is just single execution.
-
-82
-00:03:54.589 --> 00:03:56.219
-That's how it always has worked.
-
-83
-00:03:56.219 --> 00:03:59.359
-And so even though there's things
-happening multithreaded underneath,
-
-84
-00:03:59.359 --> 00:04:01.448
-such as reading the network,
-and doing all that,
-
-85
-00:04:01.448 --> 00:04:03.854
-it doesn't mean JavaScript
-is multithreaded.
-
-86
-00:04:03.854 --> 00:04:05.964
-Maybe we have some data out on the socket.
-
-87
-00:04:05.964 --> 00:04:07.904
-Okay, we need to go read that.
-
-88
-00:04:07.904 --> 00:04:12.034
-Now we also have, say, one of those tick
-promises that need to be woken up from.
-
-89
-00:04:12.034 --> 00:04:16.194
-We also have another tick promise
-that's gonna be woken up from, right?
-
-90
-00:04:16.194 --> 00:04:19.344
-We can have a bunch of these and
-as we read one piece of data for
-
-91
-00:04:19.344 --> 00:04:22.320
-us to be able to read that
-data nothing can be executing.
-
-92
-00:04:22.320 --> 00:04:26.463
-And how you leave the process event loop
-or how you go back to the promise event
-
-93
-00:04:26.463 --> 00:04:29.860
-loop is that whatever is
-running needs to stop running.
-
-94
-00:04:29.860 --> 00:04:31.644
-And then once nothing else is running,
-
-95
-00:04:31.644 --> 00:04:34.250
-execution is handed back
-to the process event loop.
-
-96
-00:04:34.250 --> 00:04:36.418
-We grab the latest one off the list, and
-
-97
-00:04:36.418 --> 00:04:41.040
-now this is the thing that's executing
-while we wait, and maybe much, much more.
-
-98
-00:04:41.040 --> 00:04:44.856
-Maybe some more ticks happened in
-between there while we're waiting.
-
-99
-00:04:44.856 --> 00:04:45.681
-It reads this,
-
-100
-00:04:45.681 --> 00:04:50.382
-the WS library reads in that data, kind of
-creates the frames, makes everything nice.
-
-101
-00:04:50.382 --> 00:04:54.347
-And then, no some more data comes in but
-where is that more data at?
-
-102
-00:04:54.347 --> 00:04:56.514
-Well it's going to be down here, right?
-
-103
-00:04:56.514 --> 00:04:59.765
-It's gonna be somewhere else,
-it's going to be way down here.
-
-104
-00:04:59.765 --> 00:05:00.737
-It has to wait for
-
-105
-00:05:00.737 --> 00:05:05.400
-the other things to execute before it
-gets its chance to execute in JavaScript.
-
-106
-00:05:05.400 --> 00:05:07.710
-So everything gets in this
-nice little line to execute.
-
-107
-00:05:07.710 --> 00:05:09.650
-So maybe we didn't get
-a complete frame here.
-
-108
-00:05:09.650 --> 00:05:12.129
-So we have to wait until
-the next piece of data.
-
-109
-00:05:12.129 --> 00:05:13.840
-So that we're going to go here.
-
-110
-00:05:13.840 --> 00:05:16.290
-We're going to execute.
-
-111
-00:05:16.290 --> 00:05:20.342
-We're going to update the game, and then
-we get a chance in here to finally go and
-
-112
-00:05:20.342 --> 00:05:22.714
-go, okay, now let's finish off this frame.
-
-113
-00:05:22.714 --> 00:05:25.136
-Okay, we got a frame,
-now the player can shoot.
-
-114
-00:05:25.136 --> 00:05:29.448
-We're gonna add it to the queue and we're
-gonna wait for the next tick to happen, so
-
-115
-00:05:29.448 --> 00:05:30.445
-that it can shoot.
-
-116
-00:05:30.445 --> 00:05:35.537
-And so you just got to always kind of keep
-that in your head is that it's not free,
-
-117
-00:05:35.537 --> 00:05:39.945
-promises are not free because one
-thing that's really intense about
-
-118
-00:05:39.945 --> 00:05:44.601
-promises is every single dot then or
-dot catch happens on the next cycle.
-
-119
-00:05:44.601 --> 00:05:47.221
-It adds itself back to the event queue.
-
-120
-00:05:47.221 --> 00:05:51.191
-There is just not a way to execute
-through a promise chain synchronously.
-
-121
-00:05:51.191 --> 00:05:52.421
-And so that has real impact.
-
-122
-00:05:52.421 --> 00:05:56.413
-So if you go one, two, three, four, and
-you have four promises that are executing
-
-123
-00:05:56.413 --> 00:06:00.522
-synchronously and you're getting thousands
-of requests, that one, two, three,
-
-124
-00:06:00.522 --> 00:06:03.432
-four will be interleaved with
-everybody else's one, two,
-
-125
-00:06:03.432 --> 00:06:06.715
-three, four despite the fact
-that maybe it is synchronous.
-
-126
-00:06:06.715 --> 00:06:10.615
-And so maybe that one executes and
-then 1,000 other people's ones execute.
-
-127
-00:06:10.615 --> 00:06:15.359
-Then you're two executes and 1,000 other
-people's two executes and then you're
-
-128
-00:06:15.359 --> 00:06:19.605
-three executes, it can have adverse
-effects onto how things are performing.
-
-129
-00:06:19.605 --> 00:06:21.240
-And it adds just more overhead.
-
-130
-00:06:21.240 --> 00:06:23.761
-Not only that, but node,
-because it is older,
-
-131
-00:06:23.761 --> 00:06:28.111
-it has had more time in the ecosystem, it
-has a lot more tools for introspection and
-
-132
-00:06:28.111 --> 00:06:30.210
-being able to tell what's happening.
-
-133
-00:06:30.210 --> 00:06:33.490
-Datadog, I know,
-does things with the async hooks.
-
-134
-00:06:33.490 --> 00:06:37.380
-They're able to link into node and
-tell what's happening underneath the hood.
-
-135
-00:06:37.380 --> 00:06:40.220
-Bun does not do that,
-does not have as comprehensive hooks.
-
-136
-00:06:40.220 --> 00:06:46.091
-Therefore, theirs does appear, my goodness
-that's a weird phrase theirs does.
-
-137
-00:06:46.091 --> 00:06:52.248
-Buns ability to process through promises
-it appears to be significantly faster.
-
-138
-00:06:52.248 --> 00:06:56.048
-Is it actually faster or do they just
-not have as comprehensive hooks?
-
-139
-00:06:56.048 --> 00:06:56.788
-I don't know yet.
-
-140
-00:06:56.788 --> 00:06:57.488
-Time will tell.
-
-141
-00:06:57.488 --> 00:07:00.970
-I'm sure over the course of the next
-year we should see a slowdown because as
-
-142
-00:07:00.970 --> 00:07:04.350
-they add more and more ability, but
-is it gonna be an equal slowdown?
-
-143
-00:07:04.350 --> 00:07:06.444
-May be may be not, I have no idea.
-
-144
-00:07:06.444 --> 00:07:10.180
-But for nodes, promise and
-async hooks just aren't super fast.
-
-145
-00:07:10.180 --> 00:07:14.355
-They're working on it now I have seen
-a lot of people talking about it.
-
-146
-00:07:14.355 --> 00:07:15.531
-So will this change?
-
-147
-00:07:15.531 --> 00:07:16.060
-Probably.
-
-148
-00:07:16.060 --> 00:07:18.490
-How much will it change?.
-
-149
-00:07:18.490 --> 00:07:21.500
-I don't know, but it will change.
-
-150
-00:07:21.500 --> 00:07:23.452
-So there you go.
-That's kind of like some background
-
-151
-00:07:23.452 --> 00:07:26.559
-knowledge you should have in your
-head whenever you're doing something.
-
-152
-00:07:26.559 --> 00:07:29.928
-You should always imagine how concurrent
-program works in JavaScript that it's
-
-153
-00:07:29.928 --> 00:07:31.620
-always stacking up against each other.
-
-154
-00:07:31.620 --> 00:07:33.610
-So no promise is free.
-
-155
-00:07:33.610 --> 00:07:36.250
-It is not a zero cost abstraction.
-
-156
-00:07:36.250 --> 00:07:37.706
-It's a Rust call out, by the way,
-
-157
-00:07:37.706 --> 00:07:40.278
-do you know, I have a Rust
-course on Frontend Masters, man.
-
-158
-00:07:40.278 --> 00:07:43.310
-I'm so good at this, the self promotion,
-definitely not an ad, though.
+[00:07:36]
+It's a Rust call out, by the way, do you know, I have a Rust course on Frontend Masters, man. I'm so good at this, the self promotion, definitely not an ad, though.
 
