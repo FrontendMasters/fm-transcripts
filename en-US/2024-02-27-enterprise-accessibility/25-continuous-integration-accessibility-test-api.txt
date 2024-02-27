@@ -1,0 +1,97 @@
+[00:00:00]
+>> CI, continuous integration. So this is a DevOps software development practice. I mean, we're probably all familiar with it, I just wanted to define it in case. So it where developers merge code together into a central place, we run builds automatically and the tests are run. So these tests could be all kinds of things, linters, TypeScript, type checks, automated tests for features.
+
+[00:00:27]
+We wanna make sure we aren't breaking other people's stuff. And this has become very commonplace. We don't have to use third party services anymore, even Circle CI or Travis. I think it's happening directly on GitHub, GitLab, Azure DevOps, wherever your code repository is. CI is just part of how we work most of the time now, it's really easy to set up.
+
+[00:00:51]
+So with hosted CI, at least there's on premise stuff, and this goes deep into DevOps. But in a nutshell, we write code and tests. There's an integration in our source repository to run some sort of checks, GitHub actions or however you hook this up. We enable CI builds for the project and then when we push our code, bam, it's gonna run all the tests.
+
+[00:01:19]
+You can run it when you submit a pull request, you can run it when you're doing a build pipeline, so we do all of those things in my work. And some platforms are easier than others, like Azure DevOps, not my fave. Jenkins, I tried setting up Jenkins a few times, that one was also a bit difficult.
+
+[00:01:39]
+CircleCI and Travis were just so much easier, I think they came later. But some tools are easier. I really miss GitHub, I have to be honest. [LAUGH] It's amazing. The pull request reviews are awesome, Azure DevOps could use some love. So I do have a screenshot of a pull request with some checks on it, and every repo is gonna have different tools.
+
+[00:02:04]
+These ones have some GitHub Actions looks like. This is Microsoft's Fluent UI component library. But for contributing to things, it is so nice to see checks, it just feels kind of comfy when you can satisfy some of those checks. It's caught me from adding some pain that my co-workers would have to deal with.
+
+[00:02:26]
+I work in an agency, so we're like, our merge strategy is the most complex I've ever seen, it's wild. So we have to really be on guard, so that we're not breaking things because of how our merge strategy works. So CI checks are everything in that environment. So CI can really help if you have some accessibility testing built-in, you can fail a build if you want, or at least have your coworkers know that something has broken.
+
+[00:02:58]
+So we can kind of spread that testing and awareness around when our team members are involved and you can track who broke the build. I've seen some teams will have it up on a monitor in their office, they kind of make a team thing out of it. I was lucky enough to have been in Mountain View in the angular office when I broke the build once, [LAUGH] and they had it on their monitor, it was kind of a badge of honor.
+
+[00:03:21]
+[LAUGH] But it is helpful for accountability, not only can you get blame on things, but in the moment, you can keep things from breaking, which is really nice. So should accessibility issues fail a build or not? It depends, it depends on what the accessibility issues are. If they're your feature tests that you wrote for your own components, yeah, those should probably fail a build.
+
+[00:03:48]
+If somebody changed an element, so it's not focusable anymore, or they deleted some code, or just something broke that used to work. If you have test coverage for it, and it broke, that should fail a build. If you have say, Cypress X or one of the accessibility test APIs running, you probably don't want that to fail a build.
+
+[00:04:12]
+Maybe in your first environment. But at least for us, we submit code, and then it has to go to a staging environment and then to UAT. I mean, it goes to like multiple steps of the way. So we don't really want things that are page level accessibility issues that may not even be in scope for what we just shipped, cropping up in a later environment.
+
+[00:04:34]
+We really need those to get handled earlier. So we wanna test it, we might wanna be more choosy and selective about when we run those. So linters and CI builds, I've seen type checks fail builds, and whether accessibility link rules should fail builds, that's another question. So it's worth experimenting, configuring your rules, add something that has just the right amount of friction and doesn't make everyone want it to turn it off, [LAUGH] like snapshots.
+
+[00:05:04]
+
+>> So I guess going back to CI, are there any types of tests that commonly flake out? Because I know at least my company, that's something we're trying to wrangle a little bit right now. And I wasn't sure if there were just some tests that sometimes they work, sometimes they don't, or if they're generally reliable, and as long as you have the test itself set up properly, it'll pass when it should be.
+
+[00:05:32]
+
+>> Yes, flaky tests, those are challenging. I have seen flaky tests where the test runs too quickly, and it hasn't had enough time to wait for things. Yeah, sometimes we need to use test Apis to wait, or we need to make our test more asynchronous or something. So I think the tooling's gotten a little bit better for that.
+
+[00:05:57]
+For things in accessibility, focus management can actually be the cause of flaky tests sometimes. Because you're trying to send focus to something, and well, for one in a CI environment depending on what tool you're running, it might be using virtual dom in memory. So, there might be some weirdness there.
+
+[00:06:17]
+But then the timing of things, when things are flaky, that means that they pass sometimes and fail others. If it passes locally, but always fails in CI or it only fails in CI part of the time, that's double flaky. Then you kind of have to think about, well, what's happening there?
+
+[00:06:34]
+It's something about the way that that test is being run, something about the way the UI is set up. Do I need to just wait for things more, or use use effect more, or something that's gonna put some guard rails around when that focus event will happen. I've had to do stuff as detailed as putting event listeners on CSS transitions to make sure stuff is ready.
+
+[00:07:02]
+So kinda dig into why it's failing and that might help narrow it down. Flaky tests are some of the hardest things though, it's like you just wanna punt on it and not think about it. [LAUGH] question?
+>> Flaky tests, in my opinion, mostly happen in end-to-end tests
+>> Yeah, there's more going on, there's more variables, things are slower.
+
+[00:07:27]
+So definitely the accessibility test APIs that we're gonna talk about now, they're slower. So things like Axe-Core, particularly the algorithm for color contrast, it's doing a lot. It's looking at the get-computed style of elements, which is very expensive as a check. And if you have to call it multiple times, that's even more computationally expensive.
+
+[00:07:53]
+And so for running things like axe, we probably only wanna run it at a page level, we're not gonna want to invoke it in every unit test or that's gonna be a very slow test suite. You can scope axe to only look at certain elements using the API, but it's still a big API to call in a unit test environment.
+
+[00:08:15]
+So my first bit of advice for using Axe-Core is to probably use it in Cypress. There's a bunch of different flavors though, and if you find it works in anywhere in your test suite without being too slow, go for it. But end-to-end tests can be kind of flaky.
+
+[00:08:33]
+So yeah, at least they have the wait for API in Cypress and in testing library. I think I always have to remember is that is that in Jest or in testing library? Sometimes it's hard to tell. So let's talk about using an accessibility testing API like Axe-Core. So we've seen Axe-Core in the browser extensions.
+
+[00:08:55]
+Axe-Core is a JavaScript library that you can call anywhere, really, but it's great for page-level accessibility tests. So when we run it in the Chrome extension or Firefox extension, we hear about things like color contrast, and the document language, and all of the markup on the page. So in an automated environment, we can mimic that by having a computer run it instead of us, manually pushing that button in the browser, we can run it with things like Cypress.
+
+[00:09:27]
+And it's pretty awesome. So what's nice about these APIs is that you don't have to write all of those accessibility tests. We're trying to get budget and support for doing the things we know most about, which are the features that are in our apps. Leadership probably doesn't wanna fund us to write accessibility testing rules at companies when that's not what we do.
+
+[00:09:51]
+So you can benefit from a lot of these rules by pulling in an accessibility testing API. And the accessibility companies like WebAiM and DQ, and there are many others, but they are dealing with accessibility compliance in the real world every day and they bake that knowledge into these libraries.
+
+[00:10:11]
+So if ARIA isn't working right somewhere or there's some detail, this folds into a concept of what's called accessibility supported. And so that's a big thing that these libraries are looking at, it's not just is it theoretically possible? They look at what's really working for people, so that's pretty cool.
+
+[00:10:31]
+And they keep really close track of WCAG and ARIA, they're in the W3Cs conformance task, accessibility conformance testing rules group. So there's a lot going on with these APIs. So for Axe and automated tests, there is an Axe-Core React library you could check out, but watch the performance of it.
+
+[00:10:57]
+Like I was saying, I think it could be a bit heavy-handed. There is just axe, if you have just testing and it would be hard to get Cypress or anything else, but you're like, but we have that right now. You could try out just axe, it's maintained by a community member as is Cypress Axe.
+
+[00:11:15]
+So I think there's even a fork of Cypress Axe just because people were having issues with it. So some of these are more well maintained than others, but I haven't had issues with Cypress X, so it's been pretty great. So these APIs can help you with things like HTML nesting and structuring issues, label and name computation that we really dug into earlier, incorrect ARIA usage which can be highly detailed.
+
+[00:11:41]
+If you grab one ARIA attribute, did you happen to get all of the other things that go with it like an ARIA menu role? They can really help with that, because they can be like, you forgot the required property that goes along with it. So that's nice. Color contrast, data table markup, they can look at that programmatically.
+
+[00:12:01]
+And then some viewport and zooming problems, if you've disabled page zooming or something, they can point that out.
+
