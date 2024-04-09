@@ -1,0 +1,96 @@
+[00:00:00]
+>> So when you have a legacy application, you kind of start with this idea of like, hey, let's do test, I want to automate this stuff. And so a natural thing to do is to say, well great, I'm just gonna pretend I'm a user and I will poke at the application as a user, right?
+
+[00:00:22]
+That's what end-to-end testing is. And this is basically your scenario test or your large test, right? Where you are pretending to be user and you're using something like playwright to poke on your system, you're creating a large end-to-end test. And so what you discover is that these tests are A slow and are flaky, right?
+
+[00:00:49]
+Because if you're using a real, if you're planning to be user, you are probably talking to GitHub. And maybe the GitHub goes down sometimes, it has happened. Or you're talking to a database or something of that and maybe the database is currently under load and it doesn't return fast enough.
+
+[00:01:07]
+And so, all of these end-to-end testing frameworks, when they click on a button and they don't see anything happens, is it because nothing has happened? Something's broken or because they just haven't waited long enough? You just don't know. It's a fundamentally unanswerable question. And so all of these, testing framework have some kind of retries and automatic back offs where they like, click a button, see if the result is what they expect it should be.
+
+[00:01:32]
+And if it isn't, they wait, try again later. Is it now, because maybe the time has enough passed? And so this basically produce both slow tests, because you're depending on I/O, but also flaky tests, because from time to time, it doesn't work. So in like the initial thing that you initially try, you just assume that you are the user, right?
+
+[00:01:57]
+And so the nice thing about these kinds of tests is that you have a high confidence. That the happy paths are okay, right? So if you, if in your end-to-end test, you were able to log in and see a list of clusters or whatever, then you have a high confidence that that probably works.
+
+[00:02:15]
+You also get a lot of code executed for the initial tests. So by executing a single end-to-end test, you probably cover 20% of your code base. To cover the next 20%, you're probably gonna need a lot more tests, right? Because each test covers a lot, but there's a huge amount of overlaps.
+
+[00:02:36]
+So to get into the corner cases might be extremely difficult. For example, when we had a GitHub API, we were asserting that if the GitHub API is slow, you would get a separate response. How would you do that in an end-to-end test? It's no good way to do that, right?
+
+[00:02:55]
+Because you don't control the other side, how do you tell GitHub or whatever you're talking to that you wanna make sure that the response is now slow. Do you put some kind of a proxy server in between, and then how do you configure the proxy server? Just adding complexity to it won't solve it right?
+
+[00:03:15]
+It is also hard to reproduce failures, meaning that in a hard end-to-end test, when you have some kind of a flaky situation. For example, service A responds before service B everything works, but service B responds before service A, it breaks, all right? How do you simulate that in an end-to-end test when you're user?
+
+[00:03:35]
+The answer is you can't really, because it's the same exact thing. When things go wrong, there's no easy way for you to identify like this is right here, this is the problem because really anything inside of your application can cause this. So it's a pretty big thing. So, when you have this, the next thing you realize, okay, I should probably break the application down into pieces.
+
+[00:04:05]
+And instead of trying to test the whole application end-to-end, I should probably test it in submodules. Maybe I can test the authentication separate. This is what we did with things like Storybook, right? We took a portion of the app, and you can see how you could rebuild inside of the storybook maybe just the login page and then poke at it to make sure that the login page works.
+
+[00:04:31]
+Or you rebuild the configuration page of your application. And you can see that you can easily reproduce things inside of that state. So the act of breaking it up is what allows you to, go to kinda the lower level of functional medium level test. And there you are forced to being able to control the dependencies, right?
+
+[00:04:52]
+If you wanna have a configuration test, you're gonna be forced to somehow A, figure out how to instantiate the configuration page independently from all other pages. That in itself Is gonna force you to break the creation logic and a business logic into two pieces. And when you do that, you're also going to have to be able to control what the current configuration of the current user is.
+
+[00:05:15]
+Presumably you're not actually locked in, cuz you're faking that. And so now you need to be able to also control the database or whatever the database is over there, right? So notice what's happening. We're just taking the whole thing and breaking it down into smaller and smaller pieces.
+
+[00:05:34]
+And so, what we're getting here is, we're getting higher confidence that we are now focusing on individual subsystems of the application. It is much harder to get coverage now because we're not running the whole thing end-to-end, instead you're running individual pieces and so you have to do a lot more of it.
+
+[00:05:55]
+But, now your tests become a lot more focused. It's not just this high level, user logs in, clicks on this button and everything works. It's a lot more focused and like, this is a configuration page. I can change these settings, but this thing should be red and this should be blue.
+
+[00:06:10]
+This should be producing this error message if I don't fill this out or something of that sort. And so you can just repeat this over and over again, until you have you end up with things that are fundamentally from your point of view units. The thing is, nothing ever is a unit, right?
+
+[00:06:32]
+Because you can always break down stuff further. For example, when you are running your code, you trust that the computer is doing its stuff. Essentially you're running an end-to-end test on top of the computer and you're hoping that the computer does the right thing for you right? So the unit test from your point of view is the code you've written.
+
+[00:06:52]
+But as far as the computer is concerned, it's the actual end-to-end test for everything the computer has to work in order to deliver the output that you want. Right? So, there is no hard line of what the test is. It's from your perspective as a developer, what is it that you control?
+
+[00:07:10]
+And again, all of these tests are important because they test different things, right? An end-to-end test, make sure that all of the pieces communicate together. A unit test, make sure that individual pieces do the right thing. So the way I explain it is, let's say you have a stereo system at home.
+
+[00:07:27]
+You have your TV, you have your amplifier, you have your remote control, right? An end-to-end test is you sitting behind a TV hitting the power button on and expecting that the TV comes on, your amplifier comes on, and you hear the sound of the TV, right? That's an end-to-end test because everything's being tested together.
+
+[00:07:45]
+A unit test would be, does the amplifier work correctly? Does the TV show pixels at the right locations, right? So the kind of thing that you would test with an end-to-end test is, I didn't plug the HDMI cable in the correct output. That's a configuration level error. You misconfigured the system.
+
+[00:08:07]
+It's not that the TV's broken, it's not that the amplifier's broken, it's not that speakers don't work. It's like you wired up the whole thing in the wrong way, right? That's what end-to-end tests are good for, to kind of verify that the cabling, the wiring of the stuff is done in the right way.
+
+[00:08:22]
+When the wiring could either mean the shape of objects you're passing across are correct, or the order of calls is correct. But it's not really testing the actual behavior of the lower level thing. For example, sorting function. A sort would be more of a unit level thing. So let's say you have a flashlight, and you want to unit test it, or rather you wanted to test it.
+
+[00:08:48]
+So you push the power button and the flashlight either turns on or doesn't turn on, right? The thing is, if you push the power button and it doesn't turn on, you have really no idea why. Is the switch broken, is the battery dead? Is the light bulb burnt out, right?
+
+[00:09:09]
+All of those things are possible answers. But on the other hand, if it does turn on, you know that everything must be working. You must have a new battery, you must have a switch is working, the light bulb is not burned out, right? Everything works. Whereas as you go lower, you can say, hey maybe I'll just test the battery by itself.
+
+[00:09:27]
+Maybe I'm just gonna remove the battery and put it in the tester. And now I've eliminated a piece that I know isn't the problem. Can I test a switch by itself? And each of these have probabilities, right? Usually a battery is not working. Sometimes the switch is broken but that's pretty rare.
+
+[00:09:43]
+Sometimes the connectors get rusty, but that's also pretty rare. And sometimes the bulb goes out, right? So you kind of have probabilities to these things. And what you wanna do with the unit test, is you wanna test individual parts so that you can easily say, is the battery good, yes or no?
+
+[00:10:00]
+Is the light bulb good, yes or no? Is the switch working, yes or no? So then when you put it all together, and it works or doesn't work, you have eliminated a lot of different paths. So that's the way I think about the end-to-end test versus unit test.
+
+[00:10:15]
+Is that end-to-end test is the system wired together in the correct way. Is the information flowing through the system in a correct way, right? For example, is my application configured with the correct credentials so that it can talk to the database,right? That you cannot really verify in a unit test.
+
+[00:10:39]
+But a single end-to-end test will easily verify that, and bazillion other things like, are you connected to the database? Are you talking to a caching server, to Redis, to all the pieces that are required to make the application run. That's an extremely high level test.
+
