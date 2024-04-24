@@ -1,0 +1,99 @@
+[00:00:00]
+>> All right, moving along, I want to now just quickly create our last package middleware. Middleware, and in here I'm gonna make a middleware.go, okay? And this is gonna be a package middleware, and it's gonna take a few things. So this package middleware is gonna be basically responsible for A, extracting the request headers, extracting our claims, and then lastly validating.
+
+[00:00:36]
+Okay? So I'm gonna go kinda fast, cuz it's a pretty long and nasty function, because it's basically going to be on top of our existing routers, and we're basically chaining what function to call next. So basically our method signature here is gonna pass in the next function to call on the method chain, but we have to define the arguments and the return type.
+
+[00:00:57]
+So that's where it can get kinda messy. So I'm gonna do func validate JWT middleware. I'm gonna do next func, okay? Next func is gonna basically take in the request, which is event.APIGatewayProxyRequest, okay? It's then gonna respond with events.APIGatewayProxyResponse and an error, Okay? And the return for the first function call, okay?
+
+[00:01:43]
+They're still gonna be the exact same. So we're gonna basically duplicate this events.APIGatewayProxyRequest. Go here the events.APIGatewayProxyResponse and error, okay? And I'm gonna open up the function call. Let me see that put in the error here. Yeah. And the first thing that you wanna do is actually return that first function in a method change to return func.
+
+[00:02:13]
+It's gonna take in the exact same thing. So last time, request events.APIGatewayProxyRequest, okay? Here events.API, GatewayProxyReques and error, okay? Let's go over here. Cool. And now we can start working on this middleware validation logic. So the first thing we wanna do is extract the token. We can do this in line, but I'm gonna make a quick little helper function, it's gonna parse request headers, and it's gonna split the string.
+
+[00:03:00]
+That's all it's going to do. So I'm gonna do extract the headers, and then let's make another function func extractTokenFromHeaders. And this is gonna be, I'm gonna say headers, it's gonna be a map string to string, and this is going to return a string as well. And all it's going to do is gonna take our headers and see, does it have an authorization header.
+
+[00:03:28]
+And we'll know it will because our proxy is set up that way, but just to be extra safe, we'll do authheader, okay? It's going to be the headers, and we're gonna see, does it have authorization, okay? And if not okay, meaning if this does not exist on this map, we're gonna return empty string.
+
+[00:03:55]
+Okay? Otherwise we know we're accepting and getting this header. So now we can do split token, let's see split token is going to be strings.split, and we're gonna be splitting our authheader on there, okay? So if you're gonna send a authorization token, or a JWT, the typical process you have an authheader, that's called authorization, and the values to be bearer space and the actual token.
+
+[00:04:27]
+So this split is going to allow us to extract the actual token string, the hash token representation of our JSON Web Token, okay? Again, I'm gonna say if the length of split token does not equal to two, it should just be the bearer and the token. We're gonna return an empty string, and in here we're gonna return split token at the first index.
+
+[00:04:57]
+Okay? So then here we can do is actually call this extract token function. So we can call it tokenString. It's gonna be extract token from headers, and the value we put here is gonna request.headers. All right? And we don't have an explicit error, but what we can do is if token string equals an empty string.
+
+[00:05:24]
+What we're gonna return is return events.APIGatewayProxyResponse, our body is gonna say missing authtoken cuz that's what we've basically short circuiting. If we see a non authorized header, we're just gonna return an empty string. So we're gonna say missing our authtoken. I'm gonna do a status code, HTTP unauthorized, okay?
+
+[00:05:52]
+And then for the error, we could just return no. So here we've extracted the token, next, we need to actually parse it. We need to parse our token for its claims. And there's a lot of ways to go about this. The article that we will attach as a resource kind of goes into a very simple approach, but you can basically validate on, is the algorithm correct?
+
+[00:06:18]
+Doesn't have the expected payload? There's a bunch of different things that you can validate your your token on. I'm gonna keep it fairly simple. So we're gonna create a function called func parse token is going to take in a token string of type string, and it's going to return two things.
+
+[00:06:38]
+One, the JWT .MAP claim. So this is the same JWT package we use to create our token. Remember when we also hashed our passwords, we had the same logic to hash the passwords and the same package to unhash it. Same concept here, right? And it's gonna return an error.
+
+[00:06:56]
+And the error here is for the purpose on, if our token is not properly claimed, if it doesn't come from us, if it has a different algorithm, then we want to return an error and handle that error upstream saying, hey, you're unauthorized to be calling this or calling this protected route.
+
+[00:07:15]
+So that's the point of the error here. Question. Cool. Okay, so next up, we're actually gonna start using our token. Actually, we're gonna create a callback function to the built in JWT parse function that this library has a jwt.Parse, okay? I mean, we're gonna do our token string, okay?
+
+[00:07:41]
+I'm gonna do a callback, and it's gonna take token which is type JWT.token, all right? It's gonna return a naked interface. So could be whatever. And the reason why this is the way it, is because when you make your claims and you create that payload again, this has no idea what that payload is.
+
+[00:08:03]
+It could be 19 things, it could be like two things. So this naked interface allows us to return almost this any type, if you will, all right? And so what this callback function is going to do, is we're gonna call the parse function, but also remember that secret that we created.
+
+[00:08:23]
+So this secret we're gonna append right here. It's gonna be secret. I'm gonna actually double check that in my types that go it's just secret get good, cuz it has too match. If it doesn't, you're gonna be in trouble or actually return this place of bite from the secret.
+
+[00:08:46]
+So what this jwt.Parse function is going to do is we're setting this callback function to jwt.Parse. And we're saying, hey, it does a bunch of things under the hood, but one of the things it does and one of the things we kind of just craft in these two lines is we're sending back the Byte representation of our secret and JWT parts is then going to investigate and say, hey, yes, this is like the right signing method for the token that I'm receiving.
+
+[00:09:15]
+Cool. Anyone have any questions? Cool. All right. Yeah, next up, we have to do our lovely error handling. If our error does not equal to nil, we can return token as is, or we can return h, the empty string or we can even return nil. We can do a format error f, and we can say just unauthorized.
+
+[00:09:43]
+I am probably gonna have a typo and unauthorized in one of these. So, if you see it, it's all right just ignore it. It's not there. Then we can say if our token is not valid, this innate property that the JWT package gives us, in that callback function right above relative line 10.
+
+[00:09:58]
+It will append the property of being valid or not into the token struck, okay? Or into the token returned from JWT parse. So we're saying if it's not valid, what I'm gonna do is return nil? I'm gonna do format error f token is not valid, right? Token is not valid, unauthorized, okay?
+
+[00:10:25]
+We can do one more. So the whole purpose of this function is to return our claims, and we have yet to really touch on those claims at all, but they do exist and they exist in the to claims field. So what we can do is claims, okay, I'm gonna check if they're even there by doing Token.claims.
+
+[00:10:43]
+There's that property, and I want to make sure that these claims are of type JWT map claims. So when we created back in types.go, we created our claims with this struct definition here, with this struct type. And so we wanna make sure because this evil doers are crafty, that the claims that's actually in this token match the JWT claims type, okay?
+
+[00:11:09]
+I'm gonna say if not OK, we're gonna type in, we can just return nil and say fmt.error f claims of on. Something like that. Otherwise, let's just return our claims and nil. Okay? So these are two functions that we really need in our definition here. Cuz now we're just gonna roll the punches.
+
+[00:11:42]
+We basically have everything we need. Because we have the token string from the previous function we just defined, we're not gonna put that in to our parse function. We're gonna get our claims, we're gonna validate the claims on the expires field and if everything passes, then we know we can show this route to the user calling it or to the client calling it.
+
+[00:12:02]
+Let's go with it. Claims error is going to be a part of token. We're gonna pass in our token string if error does not equal to nil, return events are API proxy response. The body is gonna be pretty simple, pretty straight forward, you're unauthorized. So user unauthorized, okay?
+
+[00:12:23]
+And a status code is gonna be, HTTP unauthorized, okay? And we can return our error, we can surface our error up, I should say. But if we have our claims, this is where we can actually extract one particular field that we're really interested in our case, which is the expires field.
+
+[00:12:43]
+So we can do expires is claims expires, right? But what we wanna do is when we put in expires over in types.go, we put it as a Unix timestamp, right? We've converted it as Valid, so time.now we've added one hour of convert to Unix. So what we need to do is here, I wanna make sure that's the right type and then convert it, because we're gonna compare it to the time.now.
+
+[00:13:13]
+So basically, I'm gonna leave this error here, but what I wanna do is, if expires, is greater than time dot now, right? Then what I wanna do is say this is invalid, this is just the kinda pseudocode but here what we're gonna do is expires is claims I'm gonna do map that to float 64 and then around here I'm gonna make this into int 64, cuz that's the proper time to compare from the native time.now function.
+
+[00:13:46]
+Okay, we got an error. What's going on? Let's see. Where'd he go? Okay, weird. Okay, now we're seeing if time.now.unix, okay? Is greater than expires, okay? Meaning this token has expired. It's no longer good to return our events, API Gateway Proxy Response, the body is gonna be token expired.
+
+[00:14:19]
+Status code. There's probably one for expired tokens, I'm gonna keep it as unauthorized and then we're gonna return nil, cuz it's kind of a controlled response, okay? Otherwise return next, Request.
+

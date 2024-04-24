@@ -1,0 +1,79 @@
+[00:00:00]
+>> So this is a very juicy kind of function here. We've created our own middleware in a very brute sense, that's what we did. And now what I want to do is apply this middleware into a protected function. And it will process if that user can hit that protected function based on the token that we get provided.
+
+[00:00:23]
+So we go back up here, let's go ahead and create a protected function here. So we'll just do func protected handler, it will be request events.API gateway proxy request. It's gonna return the events API proxy response and the error. Okay, and I have a typo and it's gonna be super simple, just we're gonna return right away.
+
+[00:00:58]
+Yeah, there it is, response, I'm gonna say body. This is a secret path, I don't know. I mean, we could just keep it like that, status code is gonna be HTTP status, okay, and then no. Okay, and now I'm gonna bring in our, so case, when do instead of log in, it's gonna be protected, okay.
+
+[00:01:27]
+And instead of having all this, what I'm going to do is return first middleware, so let's bring that in. So lambda-func/middleware, okay, cool. And now we're going to wrap our handler, that handler function with our middleware. So we're going to return middleware.validatejwtmiddleware. We're going to pass in that protected handler, and then here we're going to pass in request.
+
+[00:01:55]
+And this syntax notation in go, this kind of function and another request being beside it is how we chain functions and go. So you saw when we defined a jwt middleware, it had that next keyword. This is how we call the next function in the chain method. And we're basically finished.
+
+[00:02:15]
+The only thing we have to do is add one more line to our cdk deployment, because we've now added a new route. We're gonna deploy it, I'm gonna check if it works. I don't wanna say like in middleware and authentication I'm any expert. This is mostly from the research I found doing this a few times.
+
+[00:02:31]
+But this is a generic flow and there's also back in go frameworks that do a lot of the heavy lifting for you. So for example chi, it's a very popular HTTP framework on go that has the middleware. That you can do and it'll do a lot of this work for you as well.
+
+[00:02:48]
+Okay, so that's cool, while we're in our lambda let's go ahead and make a build, do not forget to do that. Let's jump out into our cdk and let's go into cdk.go, and I'm basically just gonna yoink doodle this. Go here, and instead of login resource, I'm gonna do protected resource.
+
+[00:03:11]
+Instead of /login, let's do /protected, and instead of post, it's gonna be a get. Okay, that's one thing that has been in me, it's making sure I get the right method attached and will be protected. All right, moment of truth, let's hit it with the cdk diff. Alright, so let's see what are we doing here.
+
+[00:03:43]
+So we are modifying our lambda function because we've added more functionality, cool, it's a different hash associate to it. And we're modifying our API gateway deployment. We're adding a new res resource protected, there you go, so that looks good, let's go ahead and deploy this. And, I actually forgot to do something, I got ahead of myself.
+
+[00:04:17]
+We do not need to deploy just yet, what we can do instead, and the one thing we have to include is in our API. When we log in, we have to include that create token because right now, we have no method of creating that token. So this is the one part I forgot, but it's super quick.
+
+[00:04:33]
+After we validated the password, we know this user exists and we're about to send, hey, HTTP status 500. We need to do an access token session. Access token is gonna be types.createtoken passing our user, okay. And now once we have this access token, we're gonna do, success message is going to be, format.Sprint F.
+
+[00:04:58]
+I always read a sprint F, but som people don't like that going to backticks. I'm going to do curly braces and the first field here is going to be access underscore token. Okay, I'm going to do into this we're going to do modulo s at the end. We're gonna just append our access token, and then here we're gonna just say body is gonna be success message.
+
+[00:05:31]
+All right, so if you're gonna copy that down, that's fine. I'm gonna go ahead and go back to our lambda, I'm gonna re build the artifacts. I'm gonna head back to the cdk and hit it with the cdk deploy, it'd be nice to spell. So now what the expectation is, before we call it, I'm gonna go through the whole flow again of registering login.
+
+[00:05:54]
+And then hitting this protected route, but we're gonna register a new user. That new user is going to basically be registered in our database. Then we're gonna right away log in with that user. We're gonna get back the access token, and we're gonna hit the protected route, and then it's done.
+
+[00:06:13]
+
+>> While this is deploying, when you created a token, you specified a signing method.
+>> Yes.
+>> In the parsing logic, you didn't, is the jwt package smart enough to parse it without telling it which signing method was used or create a jwt token?
+>> No, so the jwt parsing method is not smart enough to understand what algorithm that parses.
+
+[00:06:36]
+You have to add that extra logic, I chose to omit that for constraints of time and such. However, there is a portion where you can actually hit the headers endpoint with the alg, like we saw in the definition jwt tokens. So if I go back here and go back a slide, you can actually access the alg property here from the token string.
+
+[00:06:59]
+And compared it to the signature method that you expect versus the signature method or the algorithm you expect. Versus the algorithm that's used in the token you're receiving. But it would be added in the callback function. So a callback on when we do jwt parse, when we're returning that secret shrink, that's when you add that logic.
+
+[00:07:17]
+And I have the code on Github has that implemented so. Okay, cool moment of truth, so let's go ahead and register a new user, instead of Mark G, I don't know. Let's go prime g, I only know four people. So prime G the passwords can be I love prime fitting.
+
+[00:07:39]
+We're going to register that, I'm joking, I love you, prime. Successfully registered a user, I think we've already validated that we're going to have a login, a method for that, or an entry for that in our database. Now we're going to log in. And before when we logged in, we got the same strings that successfully logged in our user.
+
+[00:07:56]
+Here, what we expect is when we log in, we will see a access token appended, there you go, we got an access token. It says beautiful string all the way at the bottom, so it's actually users. So don't clear console, we're gonna find there's gonna be few things, so first, let's copy this endpoint.
+
+[00:08:14]
+Well, you know what, I'm going to write from scratch just because it's already getting kind of messy. So we're going to do curl- x get, remember, we specify the protected method to be a get instead of a post. We're going to paste the endpoint, my endpoint is going to look different than your endpoint.
+
+[00:08:31]
+And it's going to be /protected, okay, because that's the route we've defined it. And then we're going to do two headers. So one is going to be the header for content type, application/json. Okay, and then we have a second header that we're going to add, which is going to be authorization.
+
+[00:08:55]
+And this authorization is going to be bearer, B E A R E R. And we're gonna then copy and paste this generated token that we've created, I'm gonna append it here, okay. And then we're gonna close this, and if we send this, this is a secret path, so it works.
+
+[00:09:18]
+This literally is how our jwt nuller works. And you may be asking yourself, well, what's the big deal? If I just change one from capital A to Q, and I send this, internal server error. You're unauthorized, right?
+

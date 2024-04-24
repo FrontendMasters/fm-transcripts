@@ -1,0 +1,107 @@
+[00:00:00]
+>> We just deployed our first lambda, it's pretty exciting, and that's kind of Chapter 0. So if you're following along with the git project that's hosted on mulkydev/frontendmasters, that's gonna be the code that's on Chapter 0 branch. And I think I like kind of breaking up the chapters.
+
+[00:00:18]
+They're not really like, core chapters in terms of introducing anything novel, but I just think it's a good timestamp that now, okay, we've deployed a very slight baby functional lambda. Let's pause here, let's figure out the next piece of infrastructure that we wanna deploy. And I'm gonna talk about what we're gonna do in this chapter.
+
+[00:00:38]
+We're gonna add better project structure, number one. Right now we just have a main file, a bunch of bootstraps, some executables, it's kind of a mess. We're gonna create an API handler, we're gonna create a database handler, an app struct, and we're gonna register our users. So that's the goal of this chapter, we're gonna actually now register the users into DynamoDB.
+
+[00:00:59]
+Cool, let's head back into our function, just go right into it. And actually, the very first thing I wanna do is running the goBuild command and zipping it every time you make a change. I mean, it's not the best experience, right? So let's actually make something that makes all that helps us do it.
+
+[00:01:26]
+So let's seed back into our lambda, and I want you to make a file called MakeFile. If you ever used MakeFiles, I personally like them. I really like MakeFiles. They basically allow you to run code with your own alias for the command. So I'm gonna put build, cuz that's what this code is going to do.
+
+[00:01:45]
+I'm going to do @GOOS, I'm gonna put the exact same command, Linux, and GOARCH is going to be amd64, and it's gonna go build -o for output, and then bootstrap. And right underneath there, we're gonna call that zip function in line. So zip, function.zip bootstrap. Make sure you don't get any typos there in bootstrap or the function zip that we're deploying, okay?
+
+[00:02:13]
+Yes.
+>> Quick question on the build process, do you commit the outputs to version control, or should those be ignored?
+>> Those should be ignored.
+>> The cdk.out?
+>> Yeah, you can ignore the cdk.out, you can also, if you're manually deploying, you can ignore the bootstrap and the function.zip as well.
+
+[00:02:34]
+And your doc get ignored over there. Yeah, all right, so now you can see here, if I add ls, we have our bootstrap in function.zip, I'm gonna be kind of wild and remove the bootstrap rm -rf function.zip, right? So now they're no longer there. And if you wanna rebuild everything, instead of doing those two commands, all you have to do is go, make build.
+
+[00:02:53]
+And now we have both of them. So a nice little nifty, I don't know, should I say quoi, to help you deploy this? Whatever, save you some time. Okay, so like I said earlier, I want to start with a better project structure, I actually wanna start giving this project some meat.
+
+[00:03:13]
+So first, I'm gonna make a bunch of directories. First one would be types, and in types, I would like you to make it a types.go file. We're gonna make another directory called database, okay? In this database, we're gonna make a database.go file. You're gonna make another one called api, api.go.
+
+[00:03:36]
+And we're gonna make one more called app as the folder, and then within app, we're going to make app.go.
+>> Are these all subfolders of the lambda folder?
+>> Yes, they're all subfolders, let me make it a little bit more obvious here. So, these are all within the lambda but they're each individual.
+
+[00:03:50]
+So it's going to be lambda, then lambda/api, lambda/app, lambda/database, and lambda/types. And each of those directories is gonna have the name directory.go file, api.go, database.go, app.go, types.go. And we have a bunch of errors, don't worry, that's the compiler yelling at us, it likes to do that. So let's go into types.go.
+
+[00:04:13]
+Types.go is gonna be the file we're gonna have, can you guess what it is? All of our type definitions. That's not really true, I'm also gonna use it as a miscellaneous function bed, something, I don't know. I'm gonna write code in here, too. But the first step I wanna define is, like I said, the goal is to register users.
+
+[00:04:33]
+And we know that we can control the struct that we could unmartial the payload for registering a user. So let's go ahead and do that. So we're gonna type RegisterUser. It's gonna be a struct. And what do we need when you register a user? Username, right? Let's back tick, we need our json tags here.
+
+[00:04:55]
+It would put username, okay? And then, unlike the previous event, we're also gonna have password. And this can be a string, and this can be json:"password". Cool, we have this new struct, it's a type, we're good, we're laughing. Cuz we expect our payload or client, let's say we have a controlled client experience where the form is gonna send us a username json and a password json with the value associated to those keys.
+
+[00:05:21]
+We'd have a really good way to unmarshal and handle all that. Okay, and now this is where it becomes a little dicey. Let's go into our database.go, make a package database. The way we're going to set up a project is, we're gonna have the highest layer being app.
+
+[00:05:44]
+Our app.go file is gonna basically house the app struct, all right? And that is going to have primarily one field, which is our API layer. Our API layer is gonna basically process the logic that we're getting from our invocations, do some cleaning, do some register, whatever, and then it's gonna communicate to our database layer.
+
+[00:06:10]
+So this is where we're gonna define everything for our database layer. API layer, call database layer. So they're nested within each other. Cool. So for now, what I want you to do is create a new type, let's call it DynamoDBClient. It's gonna be a struct. It's gonna have one field.
+
+[00:06:31]
+This field, we're gonna call it databaseStore. And for now, just make it a string. I'll explain my zaniness and wackiness in a little bit, okay? I promise. And down here, make a new func, right? Cuz I like making new DynamoDBClient functions. This is gonna take pretty much nothing and it's gonna return the DynamoDBClient struct we just defined, okay?
+
+[00:06:53]
+And then we're just gonna say, return DynamoDBClient, and for a databaseStore, put just database store. We're gonna change this all up. Just put any string here, it doesn't really matter. You can't call any substantial logic on a string, this is just for architecturing our app. So this is the lowest level, right?
+
+[00:07:15]
+In our application, the lowest level we're gonna communicate is our database layer. The level right above that is going to be our API layer, okay? And our API layer, it's gonna follow familiar structure. So package api, and we're gonna create a type. So type, we're gonna make this ApiHandler, it's gonna be a struct, okay?
+
+[00:07:37]
+And this ApiHandler struct is going to contain, what do you guys think it's gonna contain? If we have this kind of organization of app, ApiHandler, DBStore, It's gonna-
+>> Host methods or something here.
+>> It's going to contain the struct that we just defined in database.go, okay? So, if it's a little confusing, it should be.
+
+[00:08:03]
+What we're gonna do here is put database store, we're gonna import, okay? Remember how imports work. Lambda-func, why is it lambda-func? Cuz that's what we named our module, /database. If you did it right, you should be complaining it's unused. And then in here, we're gonna put database right there, DBClient.
+
+[00:08:28]
+What does this mean? This means when we call our API functions and we handle our API layer, we have an easy way to hit right into our dbStore, our database store, where we can separate our logic. Contain it, and not have any mixed match or spaghetti code. Cool, obviously we're not done, let's create func NewApiHandler.
+
+[00:08:53]
+ApiHandler is gonna take an argument, it's gonna be dbStore. It's gonna be type string, cuz that's what we defined our DynamoDBClient, remember, string, right over there. And it's going to return the APIHandler type, okay? So we do return APIHandler, dbStore as dbStore. There is a way to kinda do this with a string.
+
+[00:09:23]
+I want to first execute it with just a string, but I think I've probably confused myself a little bit. If we just go back to our database, we just kinda do it correctly from the beginning, instead. I think the string parameter is kind of messing me up a little bit.
+
+[00:09:38]
+But essentially, instead of having this string type, we could just have this actual data type that it's expecting, which is the DynamoDBClient here. Here, we'll just instantiate and we'll have to pull in the DynamoDBSDK. Instead of doing the string, we're gonna pass the actual expectation what Dynamo expects to interact with our DynamoDB DB layer.
+
+[00:10:00]
+So we'll do, go get github.com/aws/aws/sdk-go, and then we will do service/dynamodb. Gonna take some time to download. Okay, cool. And there's gonna be something else that we'll need for DynamoDB. Go AWS has this concept when you interact with different infrastructure, they're going to have something called a session.
+
+[00:10:34]
+And this session, it's basically a live method to interact with our DB and it associates our DB with our live session client that we're executing. So when we first execute this lambda, we first call our NewDynamoDB function, we're gonna pass it a new session that we're creating. And basically, every time we wanna interact with our DynamoDB, we use this session.
+
+[00:10:58]
+And this kinda handles closing the DB in case you have it open, and all that kind of stuff. So it does all that for you under the hood. So here, we're gonna import our DynamoDB. So here, we'll go github.com/aws/aws-sdk-go/service/ dynamodb. Okay, and then we will essentially also need to pull in another package for that session I just mentioned.
+
+[00:11:31]
+So we'll do go get github.com/aws/aws-sdk-go/aws/session. Cool. And now, in this client, instead of DBClient struct being a database store to a string, what we're actually gonna do is pull it for a DynamoDB. So we're gonna do DynamoDBClient, okay? And now we have this error saying, hey, our database store, we can't actually, like, it's not expecting anything.
+
+[00:12:10]
+Or it's not expecting that this is a string, we actually need to create that DB instance. And now I understand why the previous example did not work, we did not instantiate. It has come full circle. But that's okay. Instead, we'll do a dbSession we can do new dbSession as session.Must.
+
+[00:12:30]
+And I'm gonna put a session.NewSession. Cool, I'm gonna call this function. Awesome, and now we're going to put, db is going to be dynamodb.New, and it just expects our session to create that, looking at what I talked about, of instantiating a proper session and passing it down. Okay, so instead of a string here, I'm gonna do a db.
+

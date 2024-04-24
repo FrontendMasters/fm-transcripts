@@ -1,0 +1,76 @@
+[00:00:00]
+>> Chapter 2, it's a fun chapter in my opinion, because we start going away from the infrastructure portion. We have this last piece of info that we're gonna deploy, which is the API gateway. I'm explaining what that is. We also introduced an interface for the first time. We wrote so much code, we didn't even talk about interfaces.
+
+[00:00:20]
+We're gonna show an interface, we're going to hash the user passwords, and we're going to have to do some refactoring. A lot of people are not gonna be happy with that, but because we're introducing our API gateway, we're gonna have to change the function that we wrote. So if you're excited, let's go.
+
+[00:00:36]
+[LAUGH] All right, so the first thing I wanna do is actually head to our database DB. This is a nice little function we've got going on. We have some constants, we have a bunch of cool stuff. And it revolves around our star, which are our DynamoDBClient struct. But let me ask everyone here a question, what if one day we decide not to use DynamoDB?
+
+[00:00:59]
+Yeah, we don't. No, let's go back to Postgres, right? In our example here, the implication isn't too bad, right? We can make a do, we can kind of fix it. However, where you have tightly coupled logic with your table can cause some real pain moving forward. And what I wanna introduce here is an interface.
+
+[00:01:22]
+And what an interface is, is a collection of method signatures. That's all it is. It's a type that has functions defined. And those functions quite literally don't do anything cuz you're just defining a function there. And why is this important? Well, this interface we are gonna use, instead of our DynamoDB client, we're gonna pass it down and we're not gonna no longer depend on our DynamoDB client to be passed up from our API layer, okay?
+
+[00:01:55]
+So I'm gonna show you what this actually looks like. So right above our DynamoDB client. And one thing to note, you typically wouldn't define your interface in the actual file that you're gonna essentially abstract from. You define your interface where you're gonna call the DB, but I'm putting it here just as an example to showcase the method signatures with the defined methods and how we're no longer depending on a direct DynamoDB client.
+
+[00:02:22]
+So do type typically, interfaces in Go they have very general names and are very specific. It's not like DynamoDB interface or interface, they have to be very specific or very general cuz that's what they do. They generalize the interacting with. So I'm gonna call this one user store cuz what we're gonna be inserting into our user database.
+
+[00:02:48]
+It's gonna be interface, okay? And like I said, this doesn't have fields. You don't put name string I should say or anything like that. You actually define functions, and here in the UserStore we're gonna find a function we should already using. So we have two functions in our client now, we have DoesUserExist, okay?
+
+[00:03:11]
+And the way we can define this is if you go down here, DoesUserExist, takes in a username, string and returns a Boolean and an error. So that's we're gonna right, it's gonna be username, oops. Okay, guess it did not like that. DoesUserExist(username string), and it's gonna return bool and error, and that's it.
+
+[00:03:37]
+Next it's gonna be the second function we have, InsertUser, okay? This InsertUser is going to be user types.RegisterUser, and it's gonna return an error. And why is that? Well, that's actually what is happening in the InsertUser function. Takes in a user of types RegisterUser, and it returns an error.
+
+[00:04:00]
+All right, so this is what the interface is. To be honest, so far, our interface hasn't done much. It's just a collection of methods. The logic still remains as is, we're not gonna get any errors, not gonna to gain any compilation errors, nothing is gonna go bad with this interface.
+
+[00:04:18]
+But now the real magic happens when we actually are expecting the type for our database layer. So you can see here we're explicitly saying this is gonna be a DynamoDB client. Let's remove that and just put UserStore. We're gonna get yelled at in just a second. Wait for it but, if you go here, we change this to now a UserStore, okay?
+
+[00:04:53]
+We basically now removed and decoupled our database from the rest of our code cuz now we have this interface. So what does this mean? What does it truly mean that we've done this? If we go to our database.go, what I'm saying here is any struct, so now we have a specific DynamoDB client.
+
+[00:05:13]
+But what if we create a Postgres DB client and that Postgres DB client has a DoesUserExist and an insert user function? If we do that and we go all the way back to our app.go and we call it, we can pass that as the type to satisfy the UserStore interface.
+
+[00:05:36]
+Because look, we are still calling DB on line 15. From new DB client, we are getting a DB client as the return here, we're not getting a UserStore return, so when we're instantiating our DB, it's explicitly returning this type. But the new API handler is expecting a UserStore type, not the Dynamo DB client type.
+
+[00:06:03]
+And the reason for that is because the Dynamo DB client, the methods on that struct, are satisfying the method signature of the interface. So now, in practical use case, you can swap out your DB. And the only part you really need to make the change besides the actual database.go file is right here.
+
+[00:06:30]
+Instead of calling NewDynamoDBClient, you can call new Postgres client, whatever DB you want. If it satisfies the interface, your business logic, your API logic stays the same. So I think that's really cool [LAUGH] I think it's super powerful thing. This is called like decoupling our database. And it gives us more kind of flexibility.
+
+[00:06:48]
+And this is why organizing your code in Go has a lot of like merit to it because you can start using things like interfaces and start throwing around different ways to pass things down into your structs. Any questions on interfaces on what we just did?
+>> So it's structural typing versus nominals typing, where the names in TypeScript if the names don't match up, even though the objects are the same
+
+[00:07:21]
+
+>> Yeah.
+>> You get an error but and go if the objects look the same, they satisfy
+>> No so great point. If, let's say our interface here, right? Well, we only care about the types. So we can change this username to be whatever you whatever we want.
+
+[00:07:40]
+But if we change this to an int, okay, our interface is gonna be good, but look at all the red that just happened on our code. And the reason for this, if we go back down to app, we're getting this error. Does user exist has, we have a string returns bool error, but we want is an integer in a bool error, right?
+
+[00:08:03]
+So the type is really what is constraining the binding of a struct definition to the interface expectation. And the name of the function also matters, so the name of the function does matter actually. Because you can have another function that's exactly the same, but if it's not called DoesUserExist, and like DoesUserExists with a plural or typo.
+
+[00:08:24]
+You're gonna get the same error that you cannot satisfy the constraint of this method of this type. Cool, let's make sure we go back to a string here. So those are kind of interfaces in a more practical sense. There's a lot more use case of interfaces, a lot more.
+
+[00:08:41]
+You can have a naked interface which is kind of the any type equivalent. So if you come from Typescript and you have the any type, the naked interface, so it's basically just interface like this is considered the naked interface and you can pass any parameter in here. You can pass any type in here.
+
+[00:08:59]
+Don't satisfy that. Because the underlying data structure on the majority, if not all things in Go is the interface.
+
