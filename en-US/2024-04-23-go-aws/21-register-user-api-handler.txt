@@ -1,0 +1,91 @@
+[00:00:00]
+>> Since we worked on the database layer, the next step logically is to actually work on the register layer. It's gonna follow the exact same suite, so we're gonna do func, we're gonna have a receiver. This is gonna be to our ApiHandler, and we're gonna call RegisterUserHandler, okay?
+
+[00:00:19]
+And this RegisterUserHandler is gonna take an event of types.RegisterUser, because we've specified that before, we have the JSON tags. So when we get a request from a client with a username and password as JSON tags, we know exactly what we wanna do with this. Okay, and now we just basically can do some logic to check, if an event.Username is blank or empty, or event.Password, same thing.
+
+[00:00:49]
+And what we can do is we have to return error, so we're gonna return. Let's add that return statement over here. I'm gonna return fmt.Errorf. I'm gonna say request, Has empty parameters, or something like that. You can get spicy with how you want to create your error statements.
+
+[00:01:15]
+But these get bubbled back to the client, so this should be kind of helpful. And the first thing we wanna do is call that first function we define. Does a user with this username already exist? Okay, so what we can do is we can call api.dbStore.DoesUserExist. So that is where we're using that piping down, right?
+
+[00:01:41]
+We can just call these methods on our ApiHandler directly to our dbHandler. And now our dbHandler is gonna handle all the logic we just wrote without really getting into the weeds of our API letter here, okay? You can put in the event.Username, cuz that's what it expects. And we know that DoesUserExists returns two values, a Boolean and an error.
+
+[00:02:04]
+So what we can do is userExists, error, okay? It's gonna complain these are unused. So what we can do is if error does not equal to nil, we can again just return fmt.Errorf. And again, you can make a bunch of helper functions to do this, I wanna be just more explicit for this workshop.
+
+[00:02:26]
+So a user with that username already exists, okay? And in here, we can say, does the user exist? So if userExists, right, meaning true, our return statement is going to be true. Actually, this should go down here. And this error statement should just be return fmt.Errorf. And you can put internal server error, you can do whatever you want.
+
+[00:02:55]
+What I like to do, if there's an error that stems, so I didn't create the error, if it comes from a third-party library, I'd like to surface that error up. And the way you can do that is the exact same thing with format specifiers. Remember the modular string, modular float, modular int, there's a specific one for wrapping an error.
+
+[00:03:11]
+So here, we can put there was an error checking if user exists, which is a really bad error message. I don't know what happened, how is the developer going to know what happened, right, or anyone? So what you can do is put this module w and put the error.
+
+[00:03:28]
+And now we're basically gonna wrap that error that we get from the call to DynamoDB up, we're gonna wrap it. If there's an error, check if the user exists, see what we add, and this all gets surfaced up. Cool, and here, if the user exists, let's return a user with that username already exists.
+
+[00:03:47]
+And if we hit this point in our code, we know that a user does not exist, right, does not exist with this username. So the next logical step will be to insert this user. So we're gonna be api.dbStore.InsertUser. We're gonna put in our entire event, cuz it's a type register user, and then all we need to do is error, okay?
+
+[00:04:11]
+And if our error does not equal to nil, we're gonna say return fmt.Errorf. Again, we can put another, there was an error inserting the user or registering the user, whatever you wanna say. So we can put error registering the user, we can wrap that error, and we can wrap here, otherwise we can just return nil.
+
+[00:04:42]
+Okay, so it's a pretty straightforward function, just some layer to check if it's empty. We check if that user exists, and then we check if we can insert that user. We're gonna do some basic level error handling, okay? And that's all we have to do for our Go portion.
+
+[00:05:02]
+The only part that remains is actually writing the code that defines our DynamoDB, cuz again, that has yet to be constructed, that has yet to be built. So what I like to do is at this point, I like to just do make build. I'm gonna create a new artifact files for our lambda and the zip.
+
+[00:05:23]
+And if we go back down to our go_cdk_test, or just go_cdk file, we're gonna just basically create a new table, create DB table here, okay? And so what we need is not the aws lambda, I just like to use this print statement or this input statement. We can awsdynamodb, okay?
+
+[00:05:46]
+If you go back down, we can define our table, okay? It's gonna be awsdynamodb, I'm gonna put NewTable. And again, it's gonna take a very familiar set of properties and arguments that we define in the lambda function. So we're gonna take our stack, cuz it's all gonna exist in one stack, and then the name.
+
+[00:06:08]
+So we can do jsii.String, we can put myUserTable. Remove that, okay? And put a reference to awsdynamodb.TableProps. And the real nice thing is when you get these table props, you can just dive into them and see exactly what they expect for values to input, right? As you can see here, we have the partition key, which is an attribute.
+
+[00:06:33]
+And that's the kind of main key, that main identifier for inserting values into DynamoDB, taking values out, and then also the table name itself, what we're gonna name our table. So I always recommend if there's a new piece of info that you're going to be using, always check these prop structs, or these props if you're using it in a CDK in a different language.
+
+[00:06:53]
+
+>> Did you have to do another import to get that to work?
+>> Yes, I think I missed that part. Yep, sorry, right here. Yep, so it comes from the exact same awscdk/v2, but it's not AWS lambda, it's AWS DynamoDB. And then the last piece of info is gonna follow the similar suit, it's gonna come from v2.
+
+[00:07:16]
+Cool, all right, so let's go ahead and build this partition key. So this partition key, it's gonna obviously, yes, question?
+>> Before we move on, is there a relationship between myUserTable and the const that you defined in the other one, or is it a completely unique ID?
+>> This user table will define the table as it stands in terms of resources for your cloud formation, but the actual table name is where we're gonna use that const.
+
+[00:07:41]
+But to answer your question, there is no strong relationship. You typically maybe pull those from .env file to share them across. In this case, we're just gonna basically re-declare that user table from the previous file. Cool, so here it's gonna take an AWS DynamoDB attribute, which we saw from the table props, and then it's gonna be the name of the key.
+
+[00:08:04]
+And this is pretty important, right? String, it has to be username, cuz that's what we base our logic to do. We base our logic with the primary key as username. When we check if a user exists or if we wanna enter a user, we're checking by this username, okay?
+
+[00:08:18]
+And the type, AWS just expects a type from here. So we can do AWS, you can put a binary number string. I'm gonna put a string, okay, and the last value is the table name. So TableName: jsii.String, and this is gonna be userTable. And this is exactly what that question was earlier.
+
+[00:08:38]
+Typically, you'd probably wanna put a .env that's puling that value so you can share so you don't have this case, or maybe Amazon secrets or whatever it is. But right now we're just kinda hard coding these values. We wanna make sure that userTable is, in fact, the constant we have declared here.
+
+[00:08:53]
+So userTable, right, userTable, go back, userTable, so it definitely matches. Okay, now there's one more thing. So you can see here, there's something different between our lambda and our table. Our table, we're returning this value, this table variable, right? But we didn't do that for the lambda. And the reason for that is cuz we didn't have to, there was no need.
+
+[00:09:17]
+But here there is a need. And the need for that is because our table as is has no way of being communicated by our lambda function. Yes, they exist in the same stack, but in terms of actual infrastructure, our lambda has no idea that the Dynamo DB table even exists.
+
+[00:09:34]
+It doesn't have the right permission to communicate with it. So what I wanna do is you can put myFunction, you can declare that from awslambda function. And in here, we're gonna do table.GrantReadWriteData to myFunction. And what we're saying here is our DynamoDB table has a method that we're gonna call.
+
+[00:09:59]
+I'm basically saying the role that our lambda has, it's gonna have permissions to read that data and grant that data, or read that data and write that data, my apologies. Cuz if you don't have this and you try to call a function, you're gonna get permission denied, and permission issues are a nightmare.
+
+[00:10:16]
+So this is an important step into making sure it works correctly.
+
