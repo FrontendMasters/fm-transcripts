@@ -1,0 +1,315 @@
+WEBVTT
+
+1
+00:00:00.250 --> 00:00:01.129
+All right, so
+
+2
+00:00:01.129 --> 00:00:05.529
+I wanna start with the very first
+thing which is kinda the lowest layer,
+
+3
+00:00:05.529 --> 00:00:10.570
+which is actually inserting users into
+the database and I wanna work our way up.
+
+4
+00:00:10.570 --> 00:00:14.535
+So, I wanna get all the logic to insert
+users, go up to our API handler how
+
+5
+00:00:14.535 --> 00:00:18.841
+we're gonna call those functions, and
+then route them into our main go file.
+
+6
+00:00:18.841 --> 00:00:23.881
+But before we do that, I think it's
+important to talk a little bit about
+
+7
+00:00:23.881 --> 00:00:29.005
+what DynamoDB is, and for those who've
+used DynamoDB I think it's fair
+
+8
+00:00:29.005 --> 00:00:35.070
+to say it's kinda polarizing you either
+really love it or you really like it.
+
+9
+00:00:35.070 --> 00:00:40.055
+A lot of people at Amazon and
+at AWS obviously really like,
+
+10
+00:00:40.055 --> 00:00:42.691
+it no surprise there.
+
+11
+00:00:42.691 --> 00:00:46.553
+But what DynamoDB is,
+it's a fully managed NoSQL database, and
+
+12
+00:00:46.553 --> 00:00:51.609
+what that means is if you're familiar with
+Postgres or that kinda relational style,
+
+13
+00:00:51.609 --> 00:00:55.563
+it doesn't have that there's no
+this column expects this value.
+
+14
+00:00:55.563 --> 00:01:02.024
+That concept does not exist in DynamoDB,
+because it's a key value store, right?
+
+15
+00:01:02.024 --> 00:01:06.393
+That's simply just putting keys and
+has a value associated to it, but
+
+16
+00:01:06.393 --> 00:01:10.254
+those values can be not just one
+it could be an array of values.
+
+17
+00:01:10.254 --> 00:01:12.753
+So, you can input the width of your entry,
+
+18
+00:01:12.753 --> 00:01:17.197
+the width of your row with all these
+different columns into DynamoDB without
+
+19
+00:01:17.197 --> 00:01:21.514
+necessarily specifying
+the schema associated to that.
+
+20
+00:01:21.514 --> 00:01:26.624
+So you work with MongoDB, it's very
+similar Redis also fairly similar.
+
+21
+00:01:26.624 --> 00:01:29.953
+So it's not that concept of
+a relational schema for DynamoDB, but
+
+22
+00:01:29.953 --> 00:01:33.698
+there is one main constraint and
+there's a lot of different constraints,
+
+23
+00:01:33.698 --> 00:01:37.664
+you have foreign key relationships
+you have different relationships.
+
+24
+00:01:37.664 --> 00:01:41.937
+The main one is the primary key
+relationship or the main entry for
+
+25
+00:01:41.937 --> 00:01:46.290
+the key in DynamoDB, cause this
+acts as the unique identifier for
+
+26
+00:01:46.290 --> 00:01:49.785
+retrieving the items and
+for inserting items.
+
+27
+00:01:49.785 --> 00:01:54.672
+This is how we can have like, O1 speed
+with DynamoDB in theory, because we can
+
+28
+00:01:54.672 --> 00:01:59.264
+map all the entries to one particular
+key that we can retrieve things by and
+
+29
+00:01:59.264 --> 00:02:01.652
+insert good things by as well, okay.
+
+30
+00:02:01.652 --> 00:02:05.524
+And this key this constraint
+key has to be unique.
+
+31
+00:02:05.524 --> 00:02:09.125
+And in our case, that key is gonna use
+your names because we don't want multiple
+
+32
+00:02:09.125 --> 00:02:12.434
+usernames, we didn't want like
+two to use the same username.
+
+33
+00:02:12.434 --> 00:02:14.562
+You can also concatenate
+different keys as well, so,
+
+34
+00:02:14.562 --> 00:02:17.664
+you could be username plus something else
+that could act as one primary key, for
+
+35
+00:02:17.664 --> 00:02:19.544
+our case we're gonna keep it simple.
+
+36
+00:02:19.544 --> 00:02:24.032
+The main key is going to be the username,
+that's gonna help to see like, hey,
+
+37
+00:02:24.032 --> 00:02:26.901
+there's this user already exists or
+not as well.
+
+38
+00:02:28.691 --> 00:02:33.298
+A lot of different things like it's fast,
+it's scalable, it really is fast and
+
+39
+00:02:33.298 --> 00:02:37.951
+it does scale like a lambda, it's
+a really nice piece of infrastructure.
+
+40
+00:02:37.951 --> 00:02:41.937
+And this diagram I thought was very
+kinda exactly what we're gonna do,
+
+41
+00:02:41.937 --> 00:02:44.392
+we're gonna have our import data.
+
+42
+00:02:44.392 --> 00:02:47.547
+So we're not importing anything
+necessarily, but we're gonna get JSON data
+
+43
+00:02:47.547 --> 00:02:50.052
+from our clients, and
+then we're gonna take that JSON data.
+
+44
+00:02:50.052 --> 00:02:53.061
+We're gonna have some transformation
+logic, which is what our Lambda,
+
+45
+00:02:53.061 --> 00:02:54.565
+our backend service is gonna do, and
+
+46
+00:02:54.565 --> 00:02:56.662
+then we're gonna upload
+that data into DynamoDB.
+
+47
+00:02:57.952 --> 00:03:01.886
+This process is more machinerized we gonna
+get a bunch of data, we gonna batch input,
+
+48
+00:03:01.886 --> 00:03:05.003
+but we can do one by one through
+this diagram here, all right?
+
+49
+00:03:05.003 --> 00:03:08.991
+So TLDR, this is our database,
+our lambda function does some logic and
+
+50
+00:03:08.991 --> 00:03:11.463
+we have a request coming
+in from our client.
+
+51
+00:03:13.553 --> 00:03:14.977
+Yeah, question.
+
+52
+00:03:14.977 --> 00:03:18.427
+&gt;&gt; A bit more of a general question,
+but how do you test the lambdas and
+
+53
+00:03:18.427 --> 00:03:19.978
+the database stuff locally?
+
+54
+00:03:19.978 --> 00:03:24.598
+&gt;&gt; Yeah, so
+testing locally is a I would say it's
+
+55
+00:03:24.598 --> 00:03:28.528
+a difficult thing to do seamlessly.
+
+56
+00:03:28.528 --> 00:03:33.270
+It has a bit more of the initial
+investment to stop your local computer
+
+57
+00:03:33.270 --> 00:03:34.508
+to test locally.
+
+58
+00:03:34.508 --> 00:03:38.348
+There's different things to offer services
+that do that like SST being one of them.
+
+59
+00:03:38.348 --> 00:03:41.060
+You can have like SAM stacks,
+deploying stuff,
+
+60
+00:03:41.060 --> 00:03:45.288
+there's other opportunities to do
+local development with lambdas.
+
+61
+00:03:45.288 --> 00:03:49.161
+It's just a bit of a trickier concept
+because you are deploying artifacts to
+
+62
+00:03:49.161 --> 00:03:50.311
+the lambda function,
+
+63
+00:03:50.311 --> 00:03:54.348
+you are trying to base connections
+with an actual DynamoDB client.
+
+64
+00:03:54.348 --> 00:03:56.816
+So testing locally is
+a bit of a pain point, but
+
+65
+00:03:56.816 --> 00:03:59.677
+you can set up an environment
+to test locally as well.
+

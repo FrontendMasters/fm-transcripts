@@ -1,0 +1,75 @@
+[00:00:00]
+>> Hi, I'm Mike North, I'm a principal staff engineer at Stripe, and welcome to Enterprise-Scale TypeScript. This course is a great course for those looking to lead, or help lead, a team of developers who are working on a sizeable codebase. What does the word enterprise mean in the course title here?
+
+[00:00:19]
+Well, just think of it as a project that's grown large enough that no one person could sort of keep their entire codebase in their head. Remember all of the different conventions and nuances in all of the different areas. Once it grows beyond a certain size, you can't have the person that knows everything, no one person can hold that all.
+
+[00:00:44]
+Another thing that sort of indicates you've reached enterprise scale is you have multiple teams that are involved in the evolution of a project. So sometimes when a company gets big enough, they'll have sort of an infrastructure team that deals with sort of the nuts and bolts of how the project is built and how things are tested.
+
+[00:01:03]
+And maybe they're also worried about performance a little bit. And then you have product teams that are looking to add features to something. And when you have multiple teams working in one codebase like that, you've taken on more scale. And there are new challenges that start to emerge as a result of that.
+
+[00:01:22]
+And the third thing is, you know you've reached kind of a sizable project when you get the sense that if everybody does their own thing and if people are left without helpful guardrails, the codebase will become inconsistent and unmanageable, right? If everyone can add their own dependencies at a whim, or if you end up with lots of duplicate code all over the place, things can become a little bit gnarly.
+
+[00:01:51]
+And it's tough to solve that problem once you already have that problem. And inevitably, you will have some degree of that problem when you have a sizable project. But that's how you know you're not dealing with a small project anymore, right? So in the spirit of that, we're gonna talk about a couple things we're sort of optimizing for when we think about larger scale TypeScript projects.
+
+[00:02:18]
+Productivity is really important, right? If a build is broken, if nobody can work on the project, and you have 30 or 50 or 100 or several hundred people contributing to a thing, that's a big deal to stop progress for all of the developers, that's pretty costly. When you're trying to sort of put helpful guardrails in place around your project, you have to think about bouncing opinions about how things should be done.
+
+[00:02:50]
+But not be so rigid that the developers that are contributing to a project, they feel like they have no flexibility, right? You can't take away artistic license. Sometimes when things are so constrained and so opinionated, people feel like they have to wrestle against the constraints. As opposed to them sort of being there in a helpful way, but you sort of still have room to maneuver.
+
+[00:03:13]
+Enterprises care a lot about designing for a long shelf life, right? Rewrites are incredibly expensive, and projects evolve over time, right? It's very common for a large-scale project to sort of exist for a period of time, where new technologies come and go. And maybe a web framework becomes no longer workable, and you sort of have to adopt a new framework in pieces across a project.
+
+[00:03:42]
+We wanna make sure we design for that, because with the large-scale project, that's a massive investment for a company sometimes. Not just in terms of the work it took to get there, but just the number of people operating on it, it's much more sizable. And then finally, managing complexity is a big deal.
+
+[00:04:00]
+Because when you have more code, more contributors, all of the sort of combinations of different things start to become interesting. And so, the ability to sort of have encapsulated chunks of an app that you can sort of build and test on their own. And then compose those together to make a larger project.
+
+[00:04:24]
+That lets you have nice boundaries around things and nice testable units of code, not just everything lumped together in one big project. So the course goals, so we're going to create a library together from scratch. It's gonna be right inside the course repo, and we're gonna go through where the repo is and how to install it in a moment.
+
+[00:04:46]
+But we're gonna create it from scratch because I'd like to share kind of how I approach setting something like that up. With a minimal set of libraries that gets us linting, testing, API docs, all of the basics for a library. Without having to opt into a bunch of sort of heavyweight, high-complexity tools.
+
+[00:05:08]
+So we'll go through that process. We'll migrate a non-trivial JavaScript codebase from JavaScript to TypeScript. In this case, it's going to be like a simplified version of Slack, where right now the current state in the repo, it's all JavaScript. There are missing @types packages, if you're familiar with what those are.
+
+[00:05:31]
+I have a particular process that I'm gonna teach you for going through that migration. And there are a couple deliberate things that we end up fixing each step along the way. So we can appreciate the kind of things you would take on in that process. We'll look at how to keep pace with new TypeScript compiler versions as they come out.
+
+[00:05:51]
+So TypeScript does not follow semantic versioning. And it's understandable, maintaining a project like TypeScript, where people depend on existing behavior of the compiler. And there's no denoting, like, well, this is a public API thing that you're seeing, versus this is just behavior that happens to work this way.
+
+[00:06:14]
+So every middle digit release of TypeScript comes with a list of breaking changes. In practice, this doesn't hurt so much, right? But the larger your project gets and the more of TypeScript's capabilities you start using, the greater your exposure is to breakage. So it's important to know how to keep pace, or how to know when a breaking change is coming in.
+
+[00:06:44]
+And how to address it, or decide that you wanna stay on a particular compiler version. We'll develop an in-depth understanding of strictness. This means both your TSConfig and a linter, which is ESLint that we're gonna be using. How can we sort of start in a very flexible mode, and then incrementally ratchet up strictness, so that we're not trying to sort of flip a big switch.
+
+[00:07:09]
+And say we're going from very flexible, almost any piece of JavaScript would work mode. To I wrote this from the beginning in TypeScript, and I have all the settings cranked up as high as they can go. There is value in being able to sort of slowly ratchet it up.
+
+[00:07:29]
+So we'll talk about all of those options there. I'm gonna skip that bullet point up here, cuz we're not gonna get to that. But we'll use Yarn's built-in support for workspaces. So anyone here work on a monorepo before, where you have multiple packages in a project? Anyone use Lerna for a monorepo?
+
+[00:07:51]
+So with modern Yarn, you don't really need Lerna for all of the things anymore. I find I only reach for Lerna if I need to version packages automatically, right? In lockstep sort of step up the versions of everything. If you're just building an app and you wanna have just various chunks of code that sort of operate like libraries within the app's Git repo, Yarn does everything you need, and we're gonna explore how that works.
+
+[00:08:20]
+How you can start to take chunks of an app and sort of factor it out into a little library-like thing, which is treated like a dependency, but it's all sort of wired up in your one Git repo. So what should you already know when taking this course? Well, first, you should have a good understanding of modern JavaScript.
+
+[00:08:41]
+I strongly recommend taking the TypeScript Fundamentals course. That will make sure you know, I'm gonna be throwing around types today, and I'll explain what they're doing. But I'm not gonna explain the why or necessarily go too deep into the syntax. So you should understand that. You should understand how to manage dependencies with a tool like NPM or Yarn.
+
+[00:09:06]
+You should conceptually understand how linting works. We'll go through every single step of setting up ESLint. But we won't go in depth into sort of what a linter does and why you would need to include one in your app, those kinds of things. You should understand semantic versioning and the concept of how the number of a dependency might change, in order to communicate a level of risk that people are taking as they take in a package.
+
+[00:09:40]
+And then finally, you should be familiar working with some basic shell scripts. We're gonna be doing a little bit of work in NPM scripts, right? The scripts object in package.json, and it's helpful to know how to and two scripts together, that kind of thing.
+

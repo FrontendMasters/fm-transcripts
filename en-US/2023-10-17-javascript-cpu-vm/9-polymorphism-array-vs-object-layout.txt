@@ -1,0 +1,152 @@
+[00:00:00]
+>> The next one is what we call polymorphic behavior, right, or inline caching, or property reads. In other words, if you're reading a property on an object, and we do that a lot, right, it could be fast. In other words, it could take almost instant to up to 60 times slower.
+
+[00:00:26]
+This is not 60%, this is 60X slower, right? So there's a huge difference in performance between a fast path and an unhappy path. So let's see what the test looks like. And then let's see what's actually happening under the hood. But actually before I do that, we need to talk about, how does a VM layout object, right?
+
+[00:00:49]
+So we talked about the physical machine. And the reason I talked about the physical machine, because I wanna tie it to how VMs actually work internally. And so let's talk about how VMs layout an array. So let's say you do something very simple and you say, myArray 1, 4, a bunch of numbers into it.
+
+[00:01:10]
+And then you wanna access the array using some index, right? So the way this would translate is that, well, VM would, inside of the data section, would create array with different values inside of it, right? And you can think of it as an object, right? So this object at the location 0 would have a special hiddenClassId.
+
+[00:01:29]
+I'll explain it in a second. It needs to know about a prototype chain. We can talk about it later. It will have a pointer to an actual array which is stored somewhere else. The reason why it's stored somewhere else is because arrays can grow in size, but your reference to the array stays the same.
+
+[00:01:46]
+So in other words, there has to be a level of indirection. I cannot give you a reference to a memory location that later I decide is too small for me to store the value. And then I will have to go back and somehow change all the pointers, which is kind of nonsensical, right?
+
+[00:02:00]
+So instead, I give you a pointer to an intermediary object. And that intermediary object will point to the actual location. Now I'm free to allocate more or less stuff. Now, not only that, if you ask for an array of three, I'm not gonna create an array of three, because chances are, you're gonna push into it.
+
+[00:02:16]
+And so I'm gonna create a bigger array. And if I don't use it, I don't use it, I'm gonna waste a little bit of time. But then if you push stuff into it, I won't have to copy the array every single time you push into it. So I'm always gonna allocate a little more so that pushes can be fast.
+
+[00:02:32]
+And every once in a while, you're gonna overblow my optimistic guess, that's fine. I'll copy it into a new location where I have space. I'll copy all the values, I'll update the pointer and make everybody happy. And finally, I'm gonna keep the actual length property in the system so that I know what the actual length is, because the thing I actually store is typically bigger.
+
+[00:02:55]
+And yeah.
+>> In other languages where you have to specify the length of an array and it can't really change, is it following that same system of Java, for example?
+>> I don't believe you can have a fixed array in Java. I think in Java you can specify initial array size.
+
+[00:03:12]
+I don't believe you can have a fixed one. But different languages can choose different things. I don't know what other languages will do because there's bajillion different languages. These are the choices that typically are made, but doesn't mean that everybody has to make these choices, right? I believe, I don't know, I'm not an expert in Rust.
+
+[00:03:37]
+But I would imagine that Rust would probably have an array that is fixed size because that would kind of make sense. But I'm purely speculating and guessing, so I don't know. Okay, so what is this hiddenClassId? This contains a internal data structure that the VM uses for different tricks.
+
+[00:03:56]
+We'll talk about it later in it, but basically there is more stuff that VM needs to know. In order to make these things work, we're gonna keep setting internal data structure. And what's interesting about it is that the pointer to the internal data structure is always the first thing in an array, right?
+
+[00:04:13]
+So if you think about these objects in memory, you can think of it as in like, it's just a contiguous block of memory somewhere. And as long as I have a pointer to the beginning of the memory, I know how much offset I need to get into it, and therefore I know what to read out of it, right?
+
+[00:04:32]
+And so to perform the operation like reading a particular value out of memory, a simplified version, not the real thing, simplified version in terms of instruction would be like, you load the address of the myRawArray into the A0. You load the someIndex into AE0, and then you perform the read operation.
+
+[00:04:57]
+This is what's happening underneath in the physical machine, right? And as you can see, this is a pretty straightforward thing, it's easy to map these things through, and CPUs are pretty good at accessing it. And even though the arrays in JavaScript are more complicated versions of memory access in CPU, there's enough similarities where you're like, yeah, I can see how that maps pretty neatly over, right?
+
+[00:05:25]
+There is couple of levels of indirections in there. There might be, this is incorrect because it has to do a check. It has to check the size of someIndex to make sure you're not reading past the length of the array, etc. So this is simplified code here. But fundamentally, that maps pretty cleanly to what the CPU does internally.
+
+[00:05:46]
+And because it maps cleanly, I am going to argue that VMs are extremely, sorry, arrays, for the most part, some exceptions we'll talk about later, are extremely predictable in terms of the performance, right? The way you access things in an array, it's gonna be pretty fast and predictable.
+
+[00:06:05]
+There isn't gonna be surprise, surprise, all of a sudden you're slow. I'll show you a bunch of examples later where, surprise, you're slow, in here. So the way this works, right, is as long as the someIndex is between 0 and the length value here, the operation is extremely fast because all you do is load a 0 into here, load the offset into AE0, and then read the value and you're done.
+
+[00:06:35]
+So it's extremely fast operations. So what do we do with objects? And this is where things get complicated. So at this point, hopefully I'm convincing or I'm kind of getting you to understand that everything on a physical machine is just an array access, right? CPUs are good at that.
+
+[00:06:56]
+They have index registers. They know how to do index plus offset. It's just a memory access in terms of array. Okay, so let's say we are going to do now a object which has a person and a name, right? And if you think about it, an object is really just an array, except that instead of number indices, you have names, right?
+
+[00:07:24]
+And then you can just say person.name. Okay, so what happens underneath? What happens underneath is that when you wanna create a person, what you do is, you create actually two separate object. One is this hidden class, which the VA calls hidden classes. I don't know why they're called hidden classes, but that's what it's called.
+
+[00:07:42]
+It's an internal data structure that you as a developer do not have access to. There's nothing you can do to peek into it. And the way to think about it, this is not actually how the VM stores it. But for the simplicity sake, the way to think about it is, let's say that the hidden array is just a index, it's just an array with the strings inside of it.
+
+[00:08:07]
+So that when you store the actual person, you will create an array that contains the first location is always gonna be the hidden class, and then you store the values. In this case, you will store Jack and 30, right? And now if you wanna do person.name, what you actually gonna do is you're gonna say, I know that the zeroeth location is always the special thing reserved for me, right?
+
+[00:08:34]
+So I know it's safe to do person 0. And I know it's an array of strings. Again, the actual relation's a little more complicated. And therefore, I can basically do the equivalent of, give me the indexOf name. And so in this case, it runs through the index and it says, name is on location 1.
+
+[00:08:53]
+And so now you can use that to access the person. And now you get a person lookup. Now looking at this, you should be going like, really? That's what's going on under the hood. This seems awfully inefficient. Yes, that is what's going on under the hood. Now there's couple of differences.
+
+[00:09:12]
+First of all, the indexOf is a linear search. The actual implementation is more of a hash. And so it's a fixed cost, not a linear search. But bearing the difference, fundamentally, this is what's going on. Now there are languages like Java or C, etc, where this lookup, this conversion of a property to an offset can be done during compile time.
+
+[00:09:45]
+So if you have a static languages where the shape of objects is known ahead of time, like C or Java, then you can do this translation at compile time. And therefore, you know how things point ahead of time, and so this operation becomes inexpensive. JavaScript is not one of those languages, because JavaScript is dynamic.
+
+[00:10:08]
+You can create new properties all the time to change things etc, etc, etc. Okay, so this is expensive, and this is slow. What can a VM do to make this faster? Okay, before we actually go to this, let's talk about a second scenario. Second scenario is, let's say I have two objects, person1 and person2.
+
+[00:10:31]
+And Jack was 30, now let's add Mary, 28. Notice that the two objects share their hidden class. I didn't create two separate hidden classes, it's the same one. And the terminology we use is that the shape of these two objects is the same. And this will matter later, okay?
+
+[00:10:53]
+So the shape of person1 and the shape of person2 is the same thing. And so what you end up with are two arrays which store the underlying data, with their hidden classes pointing to the internal data structure that describes the shape of the object, okay? So that's what's happening under the hood.
+
+[00:11:14]
+And you can see that doesn't matter whether you pass in person1 or person2 in this location. The right thing will happen in here. Because you're just looking up the index, in this case, both of them have the same exact index, will both return 1. And so whether you're using person1 or person2, you know that the name is on the location 1 inside of the array.
+
+[00:11:36]
+
+>> So another hidden class isn't created cuz they have the same shape?
+>> Right, it should basically now show the next thing which is, what happens if the hidden class is different? Another situation where, let's say you would reverse the order, you would say age first and then the name, or you would say, maybe there is another property called children or whatever.
+
+[00:12:02]
+The moment you have an additional property, you have a different shape, right? And the moment you have a different shape, you have to create a new hidden class. And the weird thing in JavaScript is that the hidden classes can actually change. So you can have an object that has a hidden class, and just by adding a property onto it, you can transition it to a new hidden class, right?
+
+[00:12:23]
+And the VM is pretty good about tracking the transitions. So as long as you add the properties in the same order, that hidden class transitions will be the same, and you will end up in the same shape of the object. So from the perspective of the virtual machine, it's gonna be the same exact thing.
+
+[00:12:47]
+
+>> Do you ever lose the original hidden class?
+>> Even in terms of memory pressure?
+>> Just in terms of being able to access it again.
+>> I don't know, I believe that original versions of V8, this is my speculation, could be wrong. I believe the original versions of V8 did not release hidden classes as the application ran, and so it was possible to run out of memory.
+
+[00:13:11]
+I believe the newer versions are smart enough to release the old hidden classes that I no longer use. But don't quote me on this, I am not 100% Sure.
+>> Is there a difference in methods of making objects then, like object literal versus create or something?
+>> No, but the thing you should be thinking about, we'll talk about it later, now next is, the way you create the object matters.
+
+[00:13:37]
+And so it probably is a good idea to have a single dedicated function for creating the object so that you can guarantee that no matter which code path you take, you end up with the same hidden class. That's one thing. The other thing that's a good idea is to don't add properties after the fact.
+
+[00:13:56]
+So if you have a property that may or may not be there, just make it and set it to undefined, right? Because that allocates the space for it and gives it a hidden class. And then later on when you write into the property, you're not going to be transitioning the object to a different hidden class or anything like that.
+
+[00:14:16]
+So in general, a good rule of thumb is, always Have a single place where you allocate the function, the object. So have a factory function or something like that. And the second good rule is, always initialize all the possible properties. So one of the things I tell people is, in TypeScript you can say, property question mark equals whatever I say, don't do that.
+
+[00:14:43]
+Say, property colon, undefined, or whatever value you want, right? Because that one says, you have to have this property, it just might be undefined. Versus the question mark says, you may or may not have this property, right? It's a minor thing. In many cases it doesn't matter, but sometimes it does, yes?
+
+[00:15:03]
+
+>> So this applies to classes and class constructors as well? And then constructor?
+>> Yes.
+>> Adding every property, setting it to undefined?
+>> Yes, so if you have a class and a class constructor, the good rule of thumb would be to initialize all the properties ahead of time.
+
+[00:15:18]
+If you can initialize it to actual value, great. If not, initialize it to undefined, and then set the property later. Because underneath it all, there's gonna be a storm of hidden classes that will be happening, and you wanna avoid that. The thing that the VM can do is that when it's running a function, within that function, it can see all the operations that you're doing.
+
+[00:15:42]
+And therefore, it knows that, I know if I come in with this hidden class, by the time all the operations are done, the class that gonna exit is either this class or that class. And so all the, if you've read property A and then you've read a property B and property C, is not like the VM is, okay, hidden class A, B, and then C, right?
+
+[00:16:02]
+It knows how to co-locate it all together and be like, okay, you go from here to there, and then do all the other operations together. So in general, it's a good idea to put everything together in a single function where the optimizer can look at it and be like, right, so you're just gonna add the six properties now to the object.
+
+[00:16:18]
+Therefore I'm gonna transition from here to here, and then add the properties.
+

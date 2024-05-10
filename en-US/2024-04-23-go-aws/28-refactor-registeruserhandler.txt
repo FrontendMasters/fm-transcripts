@@ -1,0 +1,89 @@
+[00:00:00]
+>> Now, I think it's a good time to start that refactor that was kind of drilling about. So you can see here, we have this one function, registerUserHandler. And what I really wanna do is not have my lambda function only be invoked by one thing. And there's an easy way to do this, it's just kind of a pain.
+
+[00:00:20]
+So we're gonna take the aws-lambda-go. Instead of lambda, we're gonna put events. And events is something that directly understands that it comes from some sorta proxy, some sort of gateway, if you will. And that is how we can extract the request, we can extract paths, we can do a lot of stuff with it.
+
+[00:00:42]
+But we need to kind of refactor this. So here, what I'm gonna do is I'm gonna completely wipe our start function. What I'm gonna do is pass a func, and this is gonna take a request, okay? And it's going to be of events.APIGatewayProxyRequest, all right? And this is gonna return an events.APIGatewayProxy, oops, ProxyResponse and an error.
+
+[00:01:20]
+And this is basically hook up your lambda function, bare bone to your AWS API Gateway, because we're gonna pass in these new requests coming in from users. The gateway's gonna proxy them, and we're gonna pass that into our lambda function and vice versa. When we respond, we're also gonna make sure that they are transformed to the API proxy response type as well.
+
+[00:01:47]
+Now, how do we still switch between paths? We're gonna use a switch statement. So switch based on request.Path, okay? And we're gonna change it on basically what path we invoke. So we know those two paths, cuz we just assembled them in CDK. We do case/register, Okay, and here, what I'm going to write is we're gonna return our myApp.ApiuserRegisterUserHandler, but this time it's going to take a request.
+
+[00:02:21]
+Because this is the request that we're processing, it's the request we're getting from our clients, okay? And every time you do switch them in Go, you have to have this default as well. As the default base said, okay, you didn't hit any path that we know of, so we're gonna return the events API proxy response.
+
+[00:02:41]
+And the body of this is gonna be Not found. And you have to append the StatusCode as well, and the http-StatusNotFound. So there's a big issue going on, right? We are expecting our registered user to essentially accept this request path, even though right now it's written to only accept our events, so we have to go and change that.
+
+[00:03:11]
+And it's a little painful, I can't lie, but it's not the end of the world. And I did it on purpose, so you can hate me. But if I go back, if I copy this and we go to our Types here and paste it, cuz we're gonna expect that same type structure from our events lamda here.
+
+[00:03:28]
+And let's just go ahead and pull the bandit off. So first this is gonna accept a request from events.APIGatewayProxyRequest, and we're gonna return events.APIGatewayProxyResponse and an error. And we get a lot of errors, which is fine, we can help them, nothing too crazy, okay? So you may be thinking to yourself, well, how am I gonna process the username and the password, because it's not request.username, it's not request.password.
+
+[00:04:06]
+We're gonna do something we just looked at in database. We're gonna use the initialized variable for a register user. So here, we're gonna var registerUser is gonna be a types RegisterUser. Okay, Question?
+>> In the routes, so reason we did slash register this time instead of just register as we defined earlier?
+
+[00:04:32]
+
+>> Yeah, because in the CDK code, you don't need to specify the slash route registered, it appends it automatically. It kind of knows how to do that. But because our switch statement here, our switch statement here has no logic of anything. So we have to be very specific on what path we're gonna invoke.
+
+[00:04:52]
+So we can't just say register, it has to be slash register, cuz that's where invocations are gonna come to. Okay, so here, before we use registerUser, we have to use another library built in called the JSON library. And this is a very popular library in Go, and this is actually the first instance where we're going to make use of those JSON tags, okay?
+
+[00:05:16]
+So I'm gonna do err, put JSON, I'm gonna unmarshal this request. So we're gonna unmarshal it. So first, we're gonna take in our request.Body. So this is what we get from our front-end, or from our client, I should say, more specific. We're gonna unmarshal that to our registerUser.
+
+[00:05:45]
+And the reason why this works is because our JSON payload is gonna have those keys, username and password, and we don't need to specify anything else because our types registerUser has those tags, username and password. So the unmartialed library implicitly undersdands, okay, you're adjacent with this key, I'm gonna unmarshal to distruct where you have that tag associated with it, with that field.
+
+[00:06:08]
+Okay, you guys know what's next. Errors, baby, errors all day. We're gonna return events.APIProxyResponse. The body of this is gonna be Invalid Request, right? They sent us something that we don't know, the http.Status, what is it, BadRequest? Cool, and here, we're actually going to just feed that error up.
+
+[00:06:33]
+So this error, the second parameter is what we will see in our lambda CloudWatch logs, where that first one, the APIGatewayProxyResponse is what callers are going to see. I just wanna make that distinction, and why there's kind of essentially two errors being surfaced, okay? One is for developers to understand like, wait, what?
+
+[00:06:54]
+Why did that error out? The other one's like, wait, why did my call error out? Okay, and we can keep the similar logic here. So instead of event, it's going to be, what do we call it? Register user, so registerUser.Username. And then over here, it's gonna be registeruser.Password.
+
+[00:07:19]
+We're gonna do return events.APIGatewayProxyResponse. Again, we could make the same body, so we could do invalid request, Invalid request, or we could just, fields empty, something like that, right? StatusCode is gonna be http.StatusBadRequest and an error. Oops, not a dot and an error, okay? Cool, now, here to modify, this is not event.Username.
+
+[00:08:01]
+This is instead registerUser.Username, return. And I'm being implicit on the returns on purpose. You can obviously make a helper function that does this all for you, but we're gonna return a body internal server error, meaning something on our backend crapped out on us. Something on our backend stopped working successfully, right?
+
+[00:08:27]
+So we can do StatusInternal, Okay, and then we can surface that error back to our published logs. If the user exists, same thing. return events, proxy response, Body "User already exists". StatusCode is gonna be http.StatusConflict. There might be better StatusCodes there, not fully sure. And then lastly, or I guess not fully last, there's a few things we got to do.
+
+[00:09:03]
+We added two more return statements here, but instead of event, we're gonna put registerUser. And here, if we have an error entering the user in our database, we're gonna return events.APIGatewayProxyResponse, and we're gonna do our Body as Internal server error. It depends if you want to surface more information to your caller or not, that's an engineering decision.
+
+[00:09:30]
+There's risks to that, but also, it could make debugging easier for your client. So that's up to you to decide. We'll do http.StatusInternalServerError. And then here, let's just send that error back. Kind of lazy error handling, I won't lie, but it's up to you how you wanna decide what makes it easy for you to debug.
+
+[00:09:52]
+You can always wrap these two, right? Again, let's not forget that we have this tool, this fmt.Errorf, and we can wrap our error, right? error inserting user, right, and then we could wrap the error. Cool, and instead of returning nil, we still have to be very specific with our return statements.
+
+[00:10:15]
+Now, so we're gonna return events.APIGatewayProxyResponse, the Body, we can just say, Successfully registered user. The StatusCode is gonna be http.StatusOK, and then nil. So I know that was a ton of code we just wrote from everything holistically. But it's just how we have to do it. There's also another portion.
+
+[00:10:52]
+So remember, we were working on this types, and we have this new user. I think now's a good time to implement this new user function, cuz we're already dabbling in the registerUser API function here, okay? So before we register or insert the user, I should say, we need to create that new user.
+
+[00:11:10]
+So here, user, error is going to be types.NewUser and put in the registerUser here if the error does not equal to nil. And again, you can ignore these errors, you can just ignore them. And that's totally up to you if you want to do that. We can do events.APIProxy, APIGatewayProxyResponse, excuse me, yhen we can say Body.
+
+[00:11:35]
+Again, we can put internal server error, cuz it is what that issue is, Internal server error, to be more specific. StatusCode is going to be http.StatusInternalServerError. And in here, let's just say, I'm gonna be more specific on this error. I'm gonna say, could not create new user and we're gonna wrap that with our error.
+
+[00:12:02]
+And now, when we call insert user, instead of specifying registerUser, we specify user, okay? Now, if we go back to where we defined the InsertUser, if they change this from type registerUser to just type.User. And it is gonna be an issue, and this highlights kind of interfaces. If you go down here, InsertUser types.registerUser, we want types.user, right?
+
+[00:12:32]
+So again, a nice little feature of interfaces. I guess it could be annoying. And that's because our DynamoDBClient here implement InsertUser with the type.registerUser, but it should be now user. And then down here relative .line 68, so it's gonna be user.Passwordhash
+

@@ -1,0 +1,78 @@
+[00:00:00]
+>> What happens if we combine these things together? Now we've got like an all-in-one machine, it's the producer-packager, and let's pretend like we need to be able to use the packaging and the producing side independently, it's not one thing that handles everything for us. So we have a new interface that describes this.
+
+[00:00:17]
+And let's, as before, create one for a snack, arbitrary snack, and one for cookies. So here's my cookieProducerPackager. Here's it producing a cookie, packaging it. It's doing something in here. And then here's the snack equivalent. Well, it's gonna flip a coin and give us a cookie or a pretzel, so we can't depend on what it's gonna give us, right?
+
+[00:00:42]
+And then if we look at the package side, well, this the same implementation we had above, where it's gonna be able to handle any kind of snack. It can handle a cookie, it can handle a pretzel, it can handle anything else. And let's check our assignments again. Are we type equivalent in one direction or both?
+
+[00:01:00]
+It turns out neither. What we have created here, this scenario, we would say, we've created invariants. Because we have a place where we're accepting an argument in and we're returning a thing. Nobody's happy, right? So in this side for this first assignment, we're trying to have a snack, you produce your packagers standing in for the cookie one.
+
+[00:01:27]
+The produce side is unhappy. It's saying, look I need this thing over here on the left, it needs a function that's guaranteed to spit out cookies and you're spitting out pretzels sometimes, I can't live with that. And then down here, snackProducerPackager, it's saying, hey, look, I have this function package, which needs to be able to take in cookies and pretzels, and you only accept cookies.
+
+[00:01:55]
+I'm not happy with that either. So what we have now is that we can't establish any sort of relationship between ProducerPackager between two different type params that have a relationship with each other. So effectively now, we would say ProducerPackager is invariant over its type parameter. Now you you can do this, although it's the default, it's what happens if you don't say anything at all.
+
+[00:02:26]
+You could do that, there's not much point. This is implicitly present before every single type param that does not have one of these explicit notations. Some of you are probably wondering why would you do this? What are the benefits for denoting this? We will get to that in a moment.
+
+[00:02:39]
+Okay, we have one more thing we have to model in our cookie factory, quality control. We have two employees we've hired, one very seasoned employee, they know how to do quality control over cookies and pretzels. And they can inspect any kind of snack, and the whole factory, and they just really know what they're doing.
+
+[00:02:58]
+We also have somebody that we just hired, they know the cookie business, they can inspect a cookie. But they've never seen a pretzel before in their life, they can't do quality control over pretzels. So here are two functions that represent those quality control checks. We've got the one that only works on cookies and then the one that works on an arbitrary snack, right?
+
+[00:03:18]
+And we see here, it's doing the cookie check and more, it's even calling into the cookie quality control check. Now, we'll take these quality control checks, and let's create a type that describes the act of checking a bunch of cookies, or snacks, or whatever and preparing them for shipment.
+
+[00:03:45]
+And what we have here is a call signature, right? We take in a group of unchecked items and a quality check function, and presumably we're going to return the things that pass the quality check. So this is our new type that has a type param that we're exploring.
+
+[00:04:06]
+So as before, we're gonna create one for cookies and one for snacks. So, here we've got prepareSnacks, and we're saying it's a prepareFoodPackage with snack as the type param. We've taken the unchecked items and the callback, and we're going to just like array.filter over the array. Implementation here is the same, they're just of different types.
+
+[00:04:33]
+So let's see how it turns out. We've got an array of cookies and an array of snacks just to use as test values. So look at this. We can say prepareSnacks, pass in the array of cookies or the array of snacks, and it works with the cookie quality control check.
+
+[00:04:53]
+This is that inexperienced employee who only knows how to check the cookies. This is working. And then prepareCookies, that work with the snack quality control check. What we're seeing here is bi variants where it's not just things are interchangeable in one direction. They're interchangeable in both directions to the same good, prepareSnacks and we've got this, this check that only handles cookies.
+
+[00:05:27]
+That seems problematic, right? What I did in my tsconfig is I turned strict function types off. So if I turn it back on, there we go. Good. There's the type checking we were looking for. If you've ever wondered what strict function types do beyond adding more strictness to the checking of functions somehow, this is specifically what it does.
+
+[00:05:54]
+Without this compiler setting turned on, it allows for bivariance in function types. It allows things to be used interchangeably where it's not desirable for that to happen. As long as strict function types are true, you get covariance over function types, which is how it should work. In fact, yeah, that's what we're seeing here, right?
+
+[00:06:21]
+The experienced employee that can check cookies and pretzels, it's totally fine for them to prepare the cookies, they can stand in for anything, cuz they can check anything here There are a couple other places where you might see bivariant behavior in TypeScript, but they all involve combining things, they don't involve type params.
+
+[00:06:45]
+Bivariants in general is undesirable, because it's not very sound when used in this particular context when talking about a type parameter and a generic type. So, what do variance helpers do for you? Why do we care? I've just created a new, clean example here so we can work in isolation.
+
+[00:07:19]
+Well, one thing they do is they keep you honest, right? You can say I can live within a certain constraint, I want to be alerted if I ever deviate from that. You can see, all right, we've got in T, which means I am contravariant over type parameter T.
+
+[00:07:39]
+And this works, right? This is just like the cookie packaging machine, it's the equivalent. But if I add the produce side here, it's gonna say hey, hey, hey, you can't do this. You can see it's even saying Example<super-T> and Example<sub-T>. I need to be able to assign a super T to a sub T, and it should work out cuz that's what contravariants means.
+
+[00:08:07]
+The types returned by produce are incompatible between these types, so it objects to produce. It objects to produce because this is not returning a type T is not contravariant behavior. Similarly, if we did this. Well, we're saying this is a covariant. Example is covariant over its type parameter, and here it's gonna say, package is not using T in a covariant way.
+
+[00:08:46]
+So you can sort of set up a constraint here that ensures that. Type equivalence between subtypes and supertypes works in a particular direction. More importantly, I mean it's good to have these constraints, I wouldn't advise putting these all over the place in your code. Cuz especially for more complicated types, you'll end up changing these and you end up in a, you have to break out of this at some point anyway.
+
+[00:09:20]
+But if you're building highly recursive types, or if you're building types that are used incredibly frequently in type checking. It's some little very atomic thing where you've got hundreds of thousands of values that are all type checking, providing an in or out variance hint greatly speeds up type checking.
+
+[00:09:44]
+TypeScript literally can skip over a bunch of stuff, because the way it works by default, it assumes that it could work either way. It has to check all of the different possibilities, supertypes and subtypes. And if this variant hint is here, it can literally skip over a very large chunk of that work and extremely efficiently performed type checking.
+
+[00:10:12]
+So if you're working on a large project and your type checking is getting slow, and where you would see this is the code hints in VS Code would be popping up very slowly. There's a lot of lag maybe when you run yarn type check which in this project would just without emitting JavaScript, it would compile and see if there are any errors.
+
+[00:10:34]
+If that's getting slow, this is one of the things that you can start to look at. But variance is also a useful thing to understand in terms of how generic types relate to each other and how that is aligned with the relationships between their type params.
+

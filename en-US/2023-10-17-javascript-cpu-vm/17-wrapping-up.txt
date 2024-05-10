@@ -1,0 +1,111 @@
+[00:00:00]
+>> That kind of was all of it, hope you enjoyed it. I always find these things super fascinating, and I really enjoy going deep down into the rabbit holes of how things work. And again, for me it's not about performance for me it's about just understanding how the system works.
+
+[00:00:14]
+I feel better when I understand
+>> Its shifting is a good idea, right? Sometimes it is
+>> Makes it more clear
+>> Yes [LAUGH]
+>> It's a question here on chat, what other tools for static analysis and performance should we look into
+>> It's a good question. I don't know that many out there, I know there are tools that try to just say what are the best practices and kind of linters will scream at you if you don't do the best practice, etc.
+
+[00:00:54]
+But that's more like make it easy for the human to read rather than make it easy for the computer to execute I think in terms of what is easy for the computer, you really only have one choice and that is to ask the VM itself, right? There are special flags you can pass into the VM, so the VM will tell you what's actually happening underneath it.
+
+[00:01:14]
+Because VMs change this all the time, the way things used to work and the way things work now, what are the kinds of optimizations VMs used to deal with change over time. So for example, the holey arrays used to be an extreme penalty for doing that. Not so much anymore, I think we showed that it was like twice as slow, it's not that big of a deal, right?
+
+[00:01:34]
+Unless you do holey arrays and then also do a prototype chain mess up, then you're really in a world of pain. But for the most part, it's not so bad. So these are all kinds of tricks that change over the years. And so really the only way to know is to to ask the VM using the special flags and say, hey, tell me the stuff.
+
+[00:01:53]
+Yes
+>> So should we basically try to avoid touching prototypes altogether?
+>> I think that's a good good idea in general, yes. Out outside of defining classes, right, but even that, we have a special syntax for right now, there should be very little reason to go and mess with prototype chains.
+
+[00:02:15]
+And yeah, and you can see how, if you mess with the prototype chains, you kind of ruin it for the VM because VM makes assumptions that the prototype chains have not been messed with. And if it can make that assumption that it can short circuit a whole bunch of work
+>> Where can we learn more?
+
+[00:02:38]
+
+>> Where can you learn more? I've never seen kind of a comprehensive place where you can learn about all these tricks I wish, V8 would, or like the V8 team would do a better job kind of sharing this information. They have tech talks they've done, there is pieces of these.
+
+[00:02:54]
+This information is kind of scattered all over the internet, but I never really seen it, put it in one exact location where all the pieces are there. I think part of the problem is that these tricks, as I said, they change over versions. The way things work kind of changes, and it's not always the same.
+
+[00:03:14]
+I think you had a question?
+>> Yeah, you mentioned multiple times about micro-benchmarking and being very cautious with it.
+>> Yes,
+>> So when it gets what's your approach when you see wow, 60x improvement? Well, in the real world, it's just not gonna be that good, but it might be better or do you have to do something more to sort of make a reasonable assumption that it'll be a little bit better?
+
+[00:03:31]
+
+>> So I mean, if you have two benchmarks and one shows better numbers, probably it's a encouraging result, right? So I think I would say that you have to look at it overall. You have to take all your knowledge and be, okay, so the benchmarks show in the right direction.
+
+[00:03:46]
+I've changed this code and I think it's making it better, etc. And by putting it all together, you can have a good feel for it. The caching is, is tricky because there's two kinds of caches, right? There's the cache for the properties, which we talked about, and then when it's fixed to 1024.
+
+[00:04:05]
+But then the CPU also has an L0 and L1 cache, and those are also tricky because, [COUGH] what happens is if you run code in a tight loop, the caches get primed, and everything is a cache hit. But now if you start executing code all over your code base, then you are a lot more likely to have evictions and have cache misses.
+
+[00:04:27]
+And so just by the fact that your benchmark is small, and therefore all the code is on one pile, that alone is making it faster, right? Then in reality, when you have code spread across a huge codebase, that action alone, that the fact that you spread it everywhere, that alone will probably cause it to perform slower.
+
+[00:04:48]
+Even though like in theory, it shouldn't make any difference, right, because memory access memory access doesn't matter where it is. But the fact that it's together, makes it much more likely that you'll have a L0 and L1 cache hit, Plus there's tricks you can do. For example, one of the things that modern CPUs want to do is, they wanna make sure that their instruction processing pipeline, they call it a pipeline cuz they really doing multiple instructions all at once, it doesn't stall.
+
+[00:05:16]
+Stall basically means that, I don't know what to do next, because the memory hasn't gotten back to me, or I don't know, there's an if statement, and therefore I don't know which way to go, or something like that, it's a stall. And you wanna avoid stall, right? You wanna just keep the CPU crunching through numbers as much as possible.
+
+[00:05:31]
+And so, to keep the CPU from stalling, there's two tricks it does, right? One is, I said, it does branch prediction where it just says, if statement, I don't know which way I should go, I don't care. Let's just choose one and keep going cuz I have a pretty good chance that I will guess the correct branch, and then I can reuse this work, I can commit the work as being good.
+
+[00:05:51]
+The other way they do is they tell the O0 cache to prefetch instructions. They know that, if I fetch an instruction here, there's a good chance that I'm gonna fetch the next one, right? Unless there's a jump or go subroutine, there's an extremely high chance that the next instruction is what I'm gonna go after.
+
+[00:06:07]
+And so when they issue these L2 caches to fetch us, they start fetching ahead of time. They wanna make sure that the CPU's always busy, right? And so, this only typically works better if the code is together. Once you spread the code all over the place and introduce other things, that makes it much more likely that won't work.
+
+[00:06:29]
+So it's modern CPUs and modern compilers have turned the whole thing into a bit of a black magic. In theory, this instruction should be faster than this other instruction. But what does it do in real life? There's only one way to know, let's build a whole bunch of benchmarks, which I probably meant microbenchmark, and try to guess and kind of see which one it is.
+
+[00:06:55]
+That compiler optimization is a whole separate thing that I don't know enough about, but I think it'd be super fascinating talk.
+>> So a lot of this is like optimizing and it seems this sort of optimization is really good for libraries and such. When it comes to web applications, what sort of things, because of your experience with the Qwik usage.
+
+[00:07:18]
+
+>> So for frameworks, right, this makes a lot of sense because for example, React has to do JSX different, right?
+>> Yeah.
+>> So it better be as performant as possible. For you as a developer may be a little less if you're just building an application, but still there might be cases in your app, which are performance sensitive in which cases, these things matter and think about them.
+
+[00:07:41]
+And on some level, as I said, some of these things are just good ideas, just don't pollute prototype. Don't create a holey arrays, and just don't do these things because the code is actually easier to deal with, right? If you have a class, make sure you initialize all of the properties, even if you don't need them right now, right?
+
+[00:08:01]
+It's just a good idea, I would argue that makes for better code.
+>> Yeah, and with the double equals, you don't get any false positives.
+>> You don't get false positives, yes.
+>> You use using triple equals.
+>> Yes, so you can see, if somebody goes and pollutes the prototype chain and messes with the valueOf, you can see how that has a huge implication through the code base.
+
+[00:08:23]
+Because all of a sudden, all the double equals, they might actually follow different rules because you made them different. So, go change object.prototype.valueOf and see what happens in your performance of, [LAUGH] your app.
+>> Thank you for the eye-opening class, Arga says. Aaron says thank you. Amitar says thanks as well.
+
+[00:08:45]
+On Twitch, fantastic chat, class has been amazing. Several fantastic class, fantastic class really interesting. Great job, thank you and with that, good job.
+>> [APPLAUSE]
+>> Thank you for listening to my bad dad jokes for, [LAUGH] for this morning anyways.
+>> Tweet @mhevery-
+>> Yes mhevery is-
+>> [CROSSTALK]
+
+[00:09:12]
+
+>> If you have a dad joke, please send them.
+>> Yes, you can send me dad jokes. Actually a lot of people get a kick when you install the Quick, the CLI will tell you a dad joke when you install it.
+>> [LAUGH]
+

@@ -1,0 +1,91 @@
+[00:00:00]
+>> I wanna revisit an exercise that we kind of started in TypeScript Fundamentals v4. We discussed this when we were talking about type queries and specifically an indexed access type. And we were attempting to build the data layer that would allow us to kind of fetch a record and state the name of the record that we're trying to fetch and an ID for that record.
+
+[00:00:29]
+And the hope was eventually you could get a promise that would resolve to the right type here. But in TypeScript Fundamentals v4, we didn't really have all the tools that we've now covered in order to do all of those things. All we could really do was make sure that the type param for the first argument, sorry, not the type param, but the argument type for this first argument was either book or magazine.
+
+[00:00:58]
+And we accomplished that through, and I'll scroll down here, we accomplished that through declaration merging. And I have a copy of this locally, and I'll switch to VS Code here in a second. But we did get some good things out of that, right? We saw that we could create new TypeScript files that would define a class representing a new record type.
+
+[00:01:19]
+And we could kind of register those types, register book in the DataTypeRegistry, and, sure enough, when we went back to call this fetch record function, if we looked at this argument type, here it is, we could see book or magazine. So it's an example of open interfaces, letting us inject something into an interface, module declarations, like this, allowing us to sort of add type information as if it was defined in this other file.
+
+[00:01:57]
+We also see evidence that there is one and only one DataTypeRegistry type. So if we modify it, it's modified everywhere that type is used, including in your node modules folder. Again, type checking is a holistic operation that sort of operates on all of your code including its dependencies at the same time, and there's only one DataTypeRegistry.
+
+[00:02:22]
+So what I'd like us to do is pick up where we left off effectively. So I'm just gonna walk through the structure here, in case some of you did not attend TypeScript Fundamentals before. Our project contains a data folder. The contents of each file in the data folder, they represent a record type, something we could retrieve with this fetch record function, which we hope to be able to use.
+
+[00:02:50]
+This lib/registry file looks like this. We have an empty interface which record files like book.ts and magazine.ts. They will register themselves in the DataTypeRegistry. And then we have a fetchRecord function which requires that the argument be an intersection type between string and key of DataTypeRegistry. So here's what the record types look like.
+
+[00:03:23]
+And then here is kind of as far as we got, we were able to get DataTypeRegistry, it had the keys book and magazine. Now, I want us to take on a task of fleshing this example out a little more fully. I want us to make this nicer, more ergonomic, do some more cool things.
+
+[00:03:51]
+So we're gonna use a mapped type to make fetch record return a promise that resolves to the correct record type. Meaning, if we say fetchRecord("book"), we had better see a book type coming back. My book should be a book. If we call magazine, if that's the first argument here, this had better be a magazine type.
+
+[00:04:17]
+I'm also introducing a plural, fetchRecords, and I'm providing a list of IDs here, an array of IDs, and these should be arrays of books, an array of magazines. So that's these two requirements effectively. Here I am imposing a constraint on the shape of the ID. Book IDs must begin with book_.
+
+[00:04:47]
+Magazine IDs must begin with magazine_. So we have a starting point for our code in our notes folder, sorry, this should be a dash. That's my typo here. Notes-intermediate-ts-v2-src/10-type-registry-revisited/index.ts. So I'm gonna go over to that file. If you're following along from home if you wanna try this yourself, this is a big time to pause cuz we're gonna go walk through the solution together.
+
+[00:05:23]
+It's also worth noting, and I have this in the website so people can spot it. Everything you need to do is in lib/registry.ts, shouldn't have to touch any other file. But I'm gonna keep this other file open, index.ts, cuz that's kind of like our test suite a little bit.
+
+[00:05:46]
+I'm gonna uncomment these, and we're gonna start coding until it passes. So okay, the first thing we're gonna wanna do is we're going to need a type parameter here. Key, so I'll make this K for key. K extends keyof DataTypeRegistry. And we can say arg is now of type K.
+
+[00:06:27]
+And we can look back and see fetchRecord, okay, look, it's generic over the string literal type, magazine. The arguments it takes in are fine. If I try to use a string that is not present in the DataTypeRegistry just as it should just as before, it won't accept invalid record names, so that's looking good.
+
+[00:06:55]
+Sorry, just to make it easier on folks, can I do this? Yeah, we'll do that. Cuz code is wide and this is probably easier to see. Okay, so okay, that's great. And I'm gonna actually kinda copy that down cuz I suspect we'll want the same thing for the array case.
+
+[00:07:20]
+Great, what are we going to return? Well, we know we can use an indexed access type here. DataTypeRegistry[K]. What's the problem here? We're not returning. That's fine. We'll do that just to suppress that error. We're not actually running this code. Just have to return something. We'll make sure we return something at the bottom too.
+
+[00:07:51]
+We're just solving for the types here. So here we're returning DataTypeRegistry[K], array. So let's look back here. Look at that. We fetch a record of type book, we get a book. We fetch a record of type magazine, we get a magazine. Here we get an array of books.
+
+[00:08:19]
+An array of magazines, pretty cool, right? You could imagine writing a library or something that has no knowledge of a book or a magazine. One user of this library could be writing code for a library, another could be writing code for a pharmacy, and they could have totally different kinds of records, but they're able to register them centrally.
+
+[00:08:42]
+All of the code dealing with specificity of the records, that could live in the app. And then this record fetching system is implemented in a very reusable and generic way, where it's typed in a reusable generic way, its not implemented at all, but still. All right, we're still not erroring in places where we should error.
+
+[00:09:10]
+And that's because, I think in all of these cases, they deal with IDs that don't match the convention. I asked us to match where book IDs should start with book_. Magazine IDs should start with magazine_. So let's go ahead and work with these ID types. So here, what we can do is say, K string.
+
+[00:09:44]
+Here we can say, an array of K_strings. K, in this case, is gonna be book or magazine, and then an underscore, and then we'll take any string, any completion of the string after that. So if you wanna look at the diffs here, now that everything is passing in this top file, I'm just gonna close it, And I'll show you the diff.
+
+[00:10:18]
+Actually, this is probably better.
+>> Someone just said, wow, that's nice.
+>> [LAUGH]
+>> Nice.
+>> Nice, so this was our starting point in red. And you see we had no type parameter. We still had a constraint that ensured only things in the DataTypeRegistry, only key names were passed in.
+
+[00:10:42]
+But we've extracted that out, used a type parameter with the constraint, right? It must be in keyof DataTypeRegistry. Here we're using a string literal type. And we're saying, for this key name, which we're gonna be able to infer based on that first argument, the ID must also start with that word.
+
+[00:11:10]
+And then here we have this indexed access type, which says, give me the value of the type. That DataTypeRegistry with key K has, right? The string book should go to book. There you go. This is starting to become a nice little data layer. Yeah, LJ says this is more clear than what we had in the fundamentals course, for some reason.
+
+[00:11:42]
+Some candidate reasons are, we have covered a lot of material since then, so I'm glad it's more clear. Also, this probably makes more sense, now that we've seen how valuable this can be, maybe it clicks. All right, we've now finished the DataTypeRegistry. We met all of the requirements.
+
+[00:12:03]
+It's a much cooler thing that we can use now. And there are some sort of client-side ORMs that behave in this way, but one of the key benefits is if we wanted to add like a, let's copy and paste, audiobook. And here's audiobook. Make this lowercase just to stick with our convention and we'll call this, DurationInMinutes.
+
+[00:12:39]
+Now we've just created this class. Now we can do this. Look at that, audiobook pops out. Whoa, this is interesting. Why is it allowing us to do that? FetchRecord, Magazine, it's inferred that it could be magazine or audiobook. It's sort of double inferring here. That's curious. Not type checking.
+
+[00:13:15]
+So it's a valid ID, this would be caught cuz it doesn't match any conventions. We'll leave that as an exercise for the next course, maybe. We can do that, and we get audiobook back. So you could just add more and more and more record types, and that reusable fetchRecord piece of code, it's just going to keep adapting and adapting and adapting.
+
+[00:13:39]
+And we get really nice typed promises coming back.
+

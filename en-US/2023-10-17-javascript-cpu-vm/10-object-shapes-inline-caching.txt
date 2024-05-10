@@ -1,0 +1,170 @@
+[00:00:00]
+>> VMs do something called inline caching. To make this thing go faster, I'll explain all of this in a second. But first, let's run a benchmark. The benchmark is that something, and I'll explain in a second, the fastest is 13 microseconds. And as it goes down, you can see that the slowest operation is 75 microseconds, which is 55 times slower.
+
+[00:00:27]
+Is that 55 times? Yeah, 55. Yeah, I think so, 55 times slower than the original operation. So there's a huge difference in performance. Okay, so let's dive into this particular test. What is this test doing? Okay, I'm gonna create bunch of arrays. You can see array1, 2, 3, 4, 5, all the way to 10.
+
+[00:00:48]
+All of these arrays get filled with objects. All of these objects have a property called value 0. And the benchmarks, all it does is it iterates over the items in the array and adds the value to it, right? So it takes the value property and increments the sum, and it does that for every single one of these arrays, right?
+
+[00:01:12]
+So we start with an array of 10,000 objects. All arrays have 10,000 objects. All objects have a value property, all of them try to sum up all these value properties, and yet somehow this first array runs fast and this last array runs horribly slow. What is going on under the hood?
+
+[00:01:38]
+That's the question that we should be asking, right? Okay, so the kind of objects that I have put inside of this array are not the same, okay? So the array1 will contain an object that contains value and a prop_0. And the next object is gonna be value and prop_0, and the next one's gonna be value and prop_0, value, prop_0, and so on and so forth.
+
+[00:01:59]
+10,000 of them, right? So you can see that all of these objects have the same shape. In the next array, so this one here means this contains an array of one shape. array2 will contain two shapes, it's gonna contain a value, prop_0, but also contain a value, prop_1.
+
+[00:02:19]
+And then goes back to value, prop_0, value, prop_1. The third one will contain prop_0, prop_1, prop_2, go back to 0, 1, 2 3, 0, 1, 2, 3. The fourth one, you can imagine, will be 1, 2 3, 0, 1 2 3, 0, 1 2 3, and so on and so forth, right?
+
+[00:02:34]
+So this number here really talks about how many different shapes of objects have I put in there. And the way I do that is that I create the value and I say, give me uniqueName. And this uniqueName just gives me a prop_0, and it's the shapesCount, right? So I do a modular shape count.
+
+[00:02:55]
+So you can see how all I've done is I created bunch of arrays that have, they all have value 0, But they are all different shapes of the system, okay? So then the question becomes, why should this matter here? Why should the shapes have such a significant impact in terms of performance?
+
+[00:03:18]
+And it's not just a significant impact, if you look at this graph, notice 1, 2, 3, 4, about the same, and something happens at 5, right? You just see that, 1, it's like we're getting slower bit, bit, bit, bam, big jump. And now, we're reasonably slow, reasonably slow, reasonably slow, and then big jump right here.
+
+[00:03:42]
+What just happened? What's going on in here? And so let's kind of dwell deeper into this particular thing. So let's talk about inline caches. Okay, So let's go back into our particular case, right? We have our person, which has two properties, name and age, and so we wanna print this out.
+
+[00:04:08]
+Pretty straightforward, right? Do you have a question?
+>> No.
+>> Okay, so what's actually happening underneath? What's happening underneath is that this person here, right, gets converted into a hidden class 0, which contains, as I said, name and age. And then the actual person which contains the values, as you can see over here, right?
+
+[00:04:34]
+And so when we wanna then do the console.log of person_name, age is whatever, the VM has to get a hold of the hidden class. It has to then look up the index of name and index of age. And then it can perform the operation, right? And so the index lookup happens right here.
+
+[00:04:59]
+Make sense? Okay, so that's kind of to set the stage. Now, let's introduce inline caches. So what happens when we have two different objects and we're running inside of a loop like this, right? And then we're basically trying to figure out the Average age, right? So we're just summing up the ages and we figure this out.
+
+[00:05:15]
+So what's happening in here? So what's happening in here is that we need to go and look up the hidden class. We're inside of this loop, and this person_age right here basically says give me the person in the array, then I'm gonna be looking up the hidden class.
+
+[00:05:35]
+Then I am going to get the index of the hidden class and add it over here. Now, the thing you should be thinking to yourself is wait, we all know that the hidden classes are the same, but how will the compiler know? Can the compiler observe somehow the fact that it's always the same hidden class going through the system?
+
+[00:05:54]
+And can it use that to its advantage? And the answer is yes, the compiler can observe this. And so, sorry, before we jump there, I just wanna show is that here we have a situation where we have three different hidden classes. Because one has an extra thing called the school and one has the properties written in the opposite order, right?
+
+[00:06:17]
+So we have three different situations in here. So this code will still work just fine because we're looking this up every single time. And because we're doing a lookup every single time, there is no problem. The fact that the shapes are megamorphic, right, there are different shapes, isn't the problem because the system can just work as you would expect.
+
+[00:06:38]
+Make sense? Okay, so let's introduce an inline cache. And the inline cache works something like this. After the compiler runs this code for a while, it basically notices that, hey, I keep seeing HC_0 all the time, HC_1 and HC_2. And so what I know from experience is that if I see HC_0, the property is at index 2.
+
+[00:07:03]
+If I see HC_1, it's also on index 2. If I see HC_2, the property is on index 1, okay? Otherwise, I give up, just go look it up. And it turns out that the compilers are willing to do this up to four times, okay? All of a sudden, this should make sense.
+
+[00:07:22]
+I know what's happening here. The reason why up to four they're relatively the same speed is because the inline check, right, the inline comparison is super cheap. Because to see if two numbers are the same, you just subtract them and see if you get 0, right? CPUs are really good at that.
+
+[00:07:40]
+So you have an address of this thing, and you have an address of what you expect, you subtract the numbers, and you get a 0. You know that the answer is 3, because over the time, you've seen the code run. And you've seen that this property gets read over and over again, and you've seen this particular shape of the object, right?
+
+[00:07:55]
+So you can see that up to four times, the things go fast. The fifth time, it becomes slow because it has to call this other index of function. So that explains this step over here. What's up with this step over here, right? There's a huge difference in performance between 10,000 and then 100,000.
+
+[00:08:15]
+What's going on in there? Sorry, 1,000 and 10,000. Well, I said the actual implementation is a little more complicated. And so the place where this breaks down is this indexOf is not a linear search. Instead, it's more like a hash map lookup, but even that is oversimplification. What it actually is, is that you write the word age as a string.
+
+[00:08:43]
+But during the initial parsing, all of these things got converted into numbers. Somewhere, there is a map that says age property is actually 37. So from now on, I'm just only gonna talk about 37, forget the age. Age doesn't exist, right? And so the thing you wanna know is, at which location is property 37 at?
+
+[00:09:06]
+And because you're comparing just numbers rather than strings, the problem gets a lot better, right? Because number comparisons are way cheaper than string comparisons. So now you go in and you actually have two levels of cache. One level of cache, which is like a table look-aside buffer. Sorry, what that means is imagine you have a table of 1024 entries.
+
+[00:09:32]
+You can take your age and use it as an index into that 1024 entries. If you happen to have a number that's bigger than 1024, then you just module it, and you get it into a number that's between 0 and 1024. And now, inside of that, it's essentially a hash map, you get a location and memory.
+
+[00:09:55]
+You read that location in the memory, and you get two numbers. One is a hidden class and the other one is the answer you're looking for. And if the hidden class number is the one that you happen to be looking up, then the answer is 3, and you can continue.
+
+[00:10:09]
+And this is the reason why this is relatively efficient, because it's couple of more comparisons in kind of secondary cache, and everything works. But this cache is 1024 entries long. And so if you create more than 1000 entries, now you busted that cache, and now the VM is completely lost and says, sorry, I gotta do the expensive bit.
+
+[00:10:34]
+And the expensive bit is go into the hidden class data structure, and look around, see which one is the index. Go find it and figure out what the property happens to be, and then go and return it. And this is a perfect place to get yourself shot in microbenchmarks.
+
+[00:10:55]
+Because in microbenchmarks, you wanna show somebody look how fast my function is processing something, right? What do you do? You create bogus data, and chances are very good that bogus data is gonna be all the same shape, right? The system runs through it, and the V8 looks at it and says, look at this.
+
+[00:11:16]
+All of these things are the same performance, same numbers, etc., therefore, I know what the answers are. Your hands is up, no?
+>> Yeah.
+>> Yes.
+>> Does the compiler update the person_HC hash lookup on demand?
+>> So the hidden class gets updated whenever a write could possibly result in a change of shape, right?
+
+[00:11:44]
+Let's go back to here. So if I have a person and I write into the name, no shape has changed, right, because it already contains name. But if I go in right now school, then school is a new property. And so what now happens is that you now have to allocate more space to the object, and then you change the hiddenClassId to have a different data structure.
+
+[00:12:13]
+Now, that explains the fact, this one also contain the extra information. And then by the way, notice a particular problem. You can write into objects at any point in time, which means you can extend their set of properties any point in time. This creates a problem, because where exactly are you gonna put it?
+
+[00:12:34]
+When VM originally allocated the object, it allocated a certain size to it. And so now where do I put it if you add it later on, right? And so with arrays, array added a level of indirection. We don't have a level of indirection here. Instead, there is a special location called an expander, where additional properties can be attached and grow forever.
+
+[00:12:58]
+And this is another reason why you wanna make sure that your property is on the main object, not on the expander object. Because you wanna make sure that it's a direct kind of a read kind of a thing, right? So this is another reason why you wanna preallocate all of the properties ahead of time so that the hidden class is fixed and no later do you actually go and use it.
+
+[00:13:21]
+Nice trick that sometimes people see do is after the object's allocated, they freeze it so that you can't add new properties. Sorry, there's freeze and seal, so you wanna seal the object, I think. Freeze means you can't change the properties, seal means you can't add the properties. So you wanna seal it so that new properties cannot be added.
+
+[00:13:41]
+And then in production, you don't seal it cuz it's extra code that you don't need.
+>> So to go back to the benchmark, where you had the different objects in the array, there's just a bunch of undefines on the objects where there's no value.
+>> That's fine.
+>> It will increase the performance for this.
+
+[00:14:02]
+
+>> Sorry, undefine's where? It's not about the value that's over here, it's about the fact that the property name is changing. It's about the fact that this one is value and prop_0, but this one is value and prop_1. Now, there's two of them in there.
+>> Yeah, so if you made each of those objects instead of only having one prop.
+
+[00:14:28]
+
+>> If I made all of the objects have prop_0, prop_1, prop through all the way through 10,000 across, then it would be fine, it would run fast. Yes, because then it would be the same shape.
+>> Yeah, well, that was great.
+>> Right, and so the thing to kinda think about for yourself is like, hey, when I look at my code, again, you as a human had more knowledge, is the shape of the object going underneath here always gonna be the same, right?
+
+[00:14:59]
+This value read right here, is my shape gonna be always the same? And if the answer for you is, no, it's always a different kind of shape of an object, then this is a problem. It's gonna have a negative impact in terms of performance. Objects have always different shape.
+
+[00:15:16]
+Does that sound familiar to JSX? JSX have props, right, that are your properties, and it's always a different shape. So JSX is actually the worst possible way of structuring your data because it wreaks havoc on the actual code running. And it has the worst property that if you create a microbenchmark, if you're not careful and you don't create sufficient amount of shapes, the microbenchmarks go through the roof.
+
+[00:15:44]
+They're like, look how fast I am. And then in reality, things don't go so fast, right? The other thing to kind of point out is that the other place you can get yourself confused is here. This is inline cache, these first four copies, right, which is why they're fast.
+
+[00:16:00]
+The second one, you're like, but that's not so bad because I have 1024 different shapes, right? But in the real world, you don't just run your code, you run your code and the framework code and all this other stuff. And so in the benchmark, the contention for that cache is very low because it's just your benchmark running.
+
+[00:16:21]
+In real world, the contention for that cache is much, much higher. Because when you run the framework, the framework is pushing all kinds of stuff into the cache inadvertently. Then you run the JSX code, that's pushing a whole bunch of stuff into the cache inadvertently. And now, you realize your performance suffers even more.
+
+[00:16:38]
+So these numbers right here, the middle numbers, the 45 to 50, that is a very optimistic benchmark lie. In real world, I would expect these numbers to be a lot worse, because these numbers only apply if there is a cache hit, right? And the reason why there's cache hits here is because all we're doing is a tight loop that just goes over these shapes over and over again.
+
+[00:17:02]
+Of course, there's no other reads, of course, there's gonna be no other cash misses, not true in the real world. Okay, so we, again, ran this through the optimizer, and so we asked the benchmark to produce all this extra information. So we can go into our code here, And we can ask for the inline-cache.log.
+
+[00:17:30]
+It's gonna chug on it for a while. How long did the program run for? For a while. That joke was not long enough. [LAUGH]
+>> What kinda computer syncs the best?
+>> What kinda computer syncs the best?
+>> A Dell?
+>> Syncs. [LAUGH]
+>> There's a question. So large object with over 124 props can't hash and cache properly?
+
+[00:18:06]
+
+>> Sorry, first of all, the cache is 1024 in V8. Different VMs can have different caches. Typically, the objects will go into inline caches so they don't affect the intermediary cache. Only the objects that don't have inline caches, and you do actually read all these extra properties, only then would you put pressure on your secondary cache.
+
+[00:18:33]
+And yes, if you had an object that had over 1024 properties, and you try to read them all, then you would basically bust through that cache, and you would end up in the slow world.
+

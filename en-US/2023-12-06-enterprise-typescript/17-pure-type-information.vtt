@@ -1,0 +1,1182 @@
+WEBVTT
+
+1
+00:00:00.130 --> 00:00:04.050
+Next, we're gonna be dealing
+with pure type information.
+
+2
+00:00:04.050 --> 00:00:07.540
+And what I mean is really
+two types of things.
+
+3
+00:00:07.540 --> 00:00:10.193
+One is we're gonna define interfaces for
+
+4
+00:00:10.193 --> 00:00:13.530
+things that are important
+to our Slack app.
+
+5
+00:00:13.530 --> 00:00:15.050
+Message, a channel,
+
+6
+00:00:15.050 --> 00:00:19.620
+a team, which is like a group of channels,
+and then a user, right?
+
+7
+00:00:19.620 --> 00:00:24.350
+Users write messages, so their
+pictures' associated with the message.
+
+8
+00:00:25.570 --> 00:00:30.331
+We're also going to look at a case where,
+so we just talked about definitely typed
+
+9
+00:00:30.331 --> 00:00:35.660
+and bringing published type information
+in from the definitely-typed package.
+
+10
+00:00:35.660 --> 00:00:41.104
+We'll look at what it would take to
+locally write some type information.
+
+11
+00:00:41.104 --> 00:00:43.683
+Maybe you just wanna make a few
+adjustments within your project.
+
+12
+00:00:43.683 --> 00:00:48.510
+You don't wanna worry about getting a pull
+request merged, indefinitely typed.
+
+13
+00:00:48.510 --> 00:00:52.728
+And to be honest, any fixes that
+you make to types that you consume,
+
+14
+00:00:52.728 --> 00:00:55.550
+they usually start out
+within your project.
+
+15
+00:00:55.550 --> 00:00:58.610
+And once you sort of get a feel for
+them being broadly useful,
+
+16
+00:00:58.610 --> 00:01:02.093
+that's when you'll sort of bring
+it into definitely typed anyway.
+
+17
+00:01:02.093 --> 00:01:04.230
+So we'll do both of those things.
+
+18
+00:01:04.230 --> 00:01:08.372
+Types that relate to our own code and
+are part of our API surface, and
+
+19
+00:01:08.372 --> 00:01:11.787
+I'm using that,
+maybe not part of our API surface, but
+
+20
+00:01:11.787 --> 00:01:16.210
+part of the domain modeling of
+the problem we're trying to solve.
+
+21
+00:01:16.210 --> 00:01:18.740
+They could be part of
+your API surface too.
+
+22
+00:01:18.740 --> 00:01:23.872
+And then fixes and customizations for
+dependencies that you consume.
+
+23
+00:01:23.872 --> 00:01:28.210
+So, here's my little diagram of
+kind of the relationships between
+
+24
+00:01:28.210 --> 00:01:29.665
+things in a Slack app.
+
+25
+00:01:29.665 --> 00:01:33.227
+Teams have many channels
+which have many messages, and
+
+26
+00:01:33.227 --> 00:01:35.280
+each message relates to a user.
+
+27
+00:01:35.280 --> 00:01:38.680
+The user is the author of a message.
+
+28
+00:01:38.680 --> 00:01:41.580
+We're gonna model that in types.
+
+29
+00:01:41.580 --> 00:01:44.650
+And here are the interfaces
+we'll end up with.
+
+30
+00:01:44.650 --> 00:01:49.709
+I'm following, I think it's a C#
+convention, although I'm not super
+
+31
+00:01:49.709 --> 00:01:54.783
+prolific with C# using a capital I to
+indicate that this is an interface.
+
+32
+00:01:54.783 --> 00:01:57.668
+I like doing this because it's very
+obvious when you import things,
+
+33
+00:01:57.668 --> 00:01:59.020
+you know what you're getting.
+
+34
+00:01:59.020 --> 00:02:01.780
+You know that this is just an interface,
+it's not a class.
+
+35
+00:02:01.780 --> 00:02:04.040
+You shouldn't be calling new on it.
+
+36
+00:02:04.040 --> 00:02:05.570
+Some people hate this.
+
+37
+00:02:05.570 --> 00:02:09.845
+It's really a taste thing,
+but it's my course, and
+
+38
+00:02:09.845 --> 00:02:12.601
+I get to decide what I prefer to do.
+
+39
+00:02:12.601 --> 00:02:13.369
+&gt;&gt; [LAUGH].
+
+40
+00:02:13.369 --> 00:02:19.229
+&gt;&gt; [LAUGH] So- [INAUDIBLE]
+&gt;&gt; [LAUGH] So let's grab these files and
+
+41
+00:02:19.229 --> 00:02:24.104
+we're going to create
+a new place to put these.
+
+42
+00:02:24.104 --> 00:02:29.912
+It's right inside our source folder,
+types.ts.
+
+43
+00:02:29.912 --> 00:02:32.236
+So just making sure that I'm
+in the right package here.
+
+44
+00:02:32.236 --> 00:02:38.588
+So here's chat, here's source, types.ts.
+
+45
+00:02:41.117 --> 00:02:43.630
+This is not a declaration file.
+
+46
+00:02:43.630 --> 00:02:45.264
+This is a TS file.
+
+47
+00:02:49.275 --> 00:02:54.616
+Part of why I want it to be a TS
+file is I want this potentially
+
+48
+00:02:54.616 --> 00:02:58.867
+to be if I were exporting
+this from my project,
+
+49
+00:02:58.867 --> 00:03:05.563
+I would want it to just be like any
+other thing that I'm exporting.
+
+50
+00:03:05.563 --> 00:03:10.494
+Okay, this is where I'm
+touching the TS file.
+
+51
+00:03:10.494 --> 00:03:15.790
+We're gonna bring this into a couple
+different parts of the code base.
+
+52
+00:03:15.790 --> 00:03:20.442
+So within our data folder,
+there are a bunch of
+
+53
+00:03:20.442 --> 00:03:25.573
+things that are intending
+to sorta hold channels,
+
+54
+00:03:25.573 --> 00:03:31.230
+hold a cached list of channels or
+messages or teams.
+
+55
+00:03:31.230 --> 00:03:34.650
+So we're gonna go and
+apply this interface in those places.
+
+56
+00:03:34.650 --> 00:03:38.619
+And we're also gonna apply them
+through our React components.
+
+57
+00:03:38.619 --> 00:03:41.099
+Now I want you to pay
+attention to this technique.
+
+58
+00:03:41.099 --> 00:03:45.706
+We're using the Pick built-in
+TypeScript utility type,
+
+59
+00:03:45.706 --> 00:03:51.600
+which basically lets us, in this case,
+just grab a couple of properties and
+
+60
+00:03:51.600 --> 00:03:56.350
+their respective types off
+of something like channel.
+
+61
+00:03:56.350 --> 00:04:01.515
+So this even, though channel has
+a teamId and a messages array,
+
+62
+00:04:01.515 --> 00:04:07.010
+we're just saying, grab from channel,
+the name and the ID.
+
+63
+00:04:07.010 --> 00:04:10.860
+So you'll get a new object type that's
+just got like name, a string, an ID.
+
+64
+00:04:10.860 --> 00:04:12.330
+I think it's, is it a number?
+
+65
+00:04:12.330 --> 00:04:12.830
+It's a number.
+
+66
+00:04:15.342 --> 00:04:19.005
+So part of why I do
+this is I don't really,
+
+67
+00:04:19.005 --> 00:04:25.290
+I still value encapsulation when
+treading these types through.
+
+68
+00:04:25.290 --> 00:04:29.644
+And I like to be very deliberate about
+what each component that includes
+
+69
+00:04:29.644 --> 00:04:33.680
+information relating to a channel,
+what it can access.
+
+70
+00:04:33.680 --> 00:04:38.850
+And right now as our code stands today, we
+don't have any formalized concept of this.
+
+71
+00:04:38.850 --> 00:04:43.437
+But what I can get as a benefit
+with TypeScript here is I can say,
+
+72
+00:04:43.437 --> 00:04:47.690
+this is just a sidebar that
+should show names of channels.
+
+73
+00:04:47.690 --> 00:04:50.085
+It doesn't need all
+the messages of those channels.
+
+74
+00:04:50.085 --> 00:04:53.745
+And by defining the type
+in a narrow way like this,
+
+75
+00:04:53.745 --> 00:04:58.627
+I can sort of be deliberate about
+what I think this component should
+
+76
+00:04:58.627 --> 00:05:03.510
+know about channel, rather than
+just threading IChannel through
+
+77
+00:05:03.510 --> 00:05:07.889
+anywhere anyone needs to know
+about a channel in any sense.
+
+78
+00:05:07.889 --> 00:05:08.850
+Does that make sense?
+
+79
+00:05:09.930 --> 00:05:12.630
+And in defining your type this way,
+
+80
+00:05:12.630 --> 00:05:17.320
+you still have a centrally
+defined IChannel interface.
+
+81
+00:05:17.320 --> 00:05:21.066
+So this is much better than sort of
+in lining a bunch of object types,
+
+82
+00:05:21.066 --> 00:05:24.036
+which might, at this moment,
+align with IChannel.
+
+83
+00:05:24.036 --> 00:05:26.826
+But if you refactor,
+you gotta go through and
+
+84
+00:05:26.826 --> 00:05:30.652
+catch all of those things and
+it becomes a little burdensome.
+
+85
+00:05:30.652 --> 00:05:35.600
+And this is an example where maybe we
+use this particular pair of properties
+
+86
+00:05:35.600 --> 00:05:36.866
+very frequently.
+
+87
+00:05:36.866 --> 00:05:41.110
+We could create a type alias for it, just
+to make things a little bit more semantic.
+
+88
+00:05:43.210 --> 00:05:49.950
+So, let's go ahead and look through our
+React components and the data folder.
+
+89
+00:05:49.950 --> 00:05:53.518
+And again, starting lowest level first.
+
+90
+00:05:53.518 --> 00:05:57.027
+So I'm gonna go to channels.ts.
+
+91
+00:05:57.027 --> 00:06:00.261
+The name of this function
+is getChannelById.
+
+92
+00:06:00.261 --> 00:06:02.803
+I see that it returns a Promise&lt;any&gt;.
+
+93
+00:06:02.803 --> 00:06:07.680
+It seems like it should return
+a promise that resolves to an IChannel.
+
+94
+00:06:07.680 --> 00:06:10.070
+This seems like we're
+retrieving a channel.
+
+95
+00:06:10.070 --> 00:06:15.079
+So I will want to use the IChannel
+interface in its full glory.
+
+96
+00:06:15.079 --> 00:06:17.106
+So let's put a return type on this.
+
+97
+00:06:22.593 --> 00:06:26.007
+And auto-importing is helpful here.
+
+98
+00:06:26.007 --> 00:06:33.282
+While we're here, id looks like
+it could be a string or number.
+
+99
+00:06:35.897 --> 00:06:39.253
+We could do keyof any, right?
+
+100
+00:06:39.253 --> 00:06:43.750
+It's any valid thing that could be
+a property key, number, string, symbol.
+
+101
+00:06:45.494 --> 00:06:47.191
+And here we're passing in,
+
+102
+00:06:47.191 --> 00:06:51.204
+it's an implicit conversion of a symbol
+to a string that will fail at runtime.
+
+103
+00:06:51.204 --> 00:06:57.994
+All right,
+we're gonna go with number or string.
+
+104
+00:06:57.994 --> 00:07:02.940
+Great, okay and while I'm here,
+
+105
+00:07:02.940 --> 00:07:07.213
+gosh, the API call returns.
+
+106
+00:07:07.213 --> 00:07:11.190
+Just judging by this path, it's like
+a promise that resolves to the channel.
+
+107
+00:07:12.680 --> 00:07:15.330
+Man, I wanna change that,
+I'm gonna resist.
+
+108
+00:07:15.330 --> 00:07:16.520
+We're not here for that right now.
+
+109
+00:07:18.160 --> 00:07:21.890
+All right, messages,
+let's do the same thing here,
+
+110
+00:07:21.890 --> 00:07:25.390
+teamId, channelId,
+returns channel messages.
+
+111
+00:07:27.010 --> 00:07:28.305
+It does return a promise.
+
+112
+00:07:28.305 --> 00:07:36.236
+I think it's a promise that
+resolves to an array of IMessage.
+
+113
+00:07:41.943 --> 00:07:46.506
+Cool, all right?
+
+114
+00:07:46.506 --> 00:07:48.790
+Teams, let's look at that one.
+
+115
+00:07:50.070 --> 00:07:53.441
+All right, we got getAllTeams,
+returns a promise.
+
+116
+00:07:53.441 --> 00:07:54.196
+This returns a promise.
+
+117
+00:07:54.196 --> 00:07:58.252
+So this is a promise that
+resolves to an array of teams.
+
+118
+00:08:00.388 --> 00:08:03.298
+Get that auto import working.
+
+119
+00:08:03.298 --> 00:08:07.915
+And getTeamById, that seems like
+a promise that resolves to a single team.
+
+120
+00:08:13.492 --> 00:08:17.947
+Fantastic, and we could do the same
+
+121
+00:08:17.947 --> 00:08:22.559
+thing with this ID number or string.
+
+122
+00:08:22.559 --> 00:08:24.510
+It's really the only thing it could be.
+
+123
+00:08:24.510 --> 00:08:28.723
+I'd know it's a number, I do know, but
+we're pretending like I don't know.
+
+124
+00:08:31.787 --> 00:08:34.736
+Well, no, let's be real about this.
+
+125
+00:08:34.736 --> 00:08:38.413
+I can look in my database.
+
+126
+00:08:38.413 --> 00:08:41.625
+This is what I would do.
+
+127
+00:08:41.625 --> 00:08:43.330
+What really can this thing be?
+
+128
+00:08:44.370 --> 00:08:48.490
+Whoa, okay, look,
+it's just strings that's for teams.
+
+129
+00:08:49.560 --> 00:08:56.846
+Users have numbers, channels have strings,
+messages have strings.
+
+130
+00:08:56.846 --> 00:09:02.684
+So, let's go back, users have numbers,
+everything else has strings.
+
+131
+00:09:02.684 --> 00:09:05.082
+So teams, can say that's a string.
+
+132
+00:09:08.089 --> 00:09:13.423
+Messages, it just takes in a teamId and
+a channelId, both strings.
+
+133
+00:09:17.978 --> 00:09:24.416
+Channels, strings, doesn't really matter,
+but this is an example,
+
+134
+00:09:24.416 --> 00:09:30.340
+I access, I go get information
+about what could this actually be?
+
+135
+00:09:30.340 --> 00:09:35.949
+And if I were more rigorous here,
+I would actually look at my API and
+
+136
+00:09:35.949 --> 00:09:40.070
+see, is it coercing a string
+to a number or what?
+
+137
+00:09:42.020 --> 00:09:46.654
+It's all just getting put into a path
+param here to make the API call.
+
+138
+00:09:46.654 --> 00:09:50.063
+Ans so even if it comes in as a number,
+it'll end up becoming a string.
+
+139
+00:09:50.063 --> 00:09:52.901
+This is where it's used, right?
+
+140
+00:09:52.901 --> 00:09:54.848
+Ends up being a string,
+it's part of the URL.
+
+141
+00:09:57.516 --> 00:10:00.771
+All right,
+let's look at our React components.
+
+142
+00:10:00.771 --> 00:10:02.934
+We can run a type check real quick to see,
+
+143
+00:10:04.965 --> 00:10:09.740
+We're not gonna see a type check yet
+cuz everything compiles already.
+
+144
+00:10:09.740 --> 00:10:11.979
+We're just gonna go and
+start threading things through.
+
+145
+00:10:11.979 --> 00:10:19.084
+All right, we have a channel,
+we're gonna start lower.
+
+146
+00:10:21.019 --> 00:10:22.513
+Let's look at the footer.
+
+147
+00:10:22.513 --> 00:10:23.307
+Whoa, interesting.
+
+148
+00:10:23.307 --> 00:10:27.570
+Okay, we have a property name
+here called channel, and
+
+149
+00:10:27.570 --> 00:10:30.120
+it's got name and channelName.
+
+150
+00:10:30.120 --> 00:10:33.930
+This tells me that we want
+something with a name on it.
+
+151
+00:10:33.930 --> 00:10:35.760
+Now I'm not really
+improving the type here.
+
+152
+00:10:35.760 --> 00:10:40.170
+It's still just a name
+with a property here.
+
+153
+00:10:40.170 --> 00:10:43.310
+This is of type any,
+I guess I am improving that.
+
+154
+00:10:43.310 --> 00:10:50.252
+So I would say this is
+a React functional component,
+
+155
+00:10:51.506 --> 00:10:57.069
+And it's gonna be a Pick&lt;IChannel,
+'string'&gt;.
+
+156
+00:10:58.950 --> 00:11:00.160
+Oop, but not in quotes.
+
+157
+00:11:02.340 --> 00:11:04.180
+My brain thought string,
+and I made a string.
+
+158
+00:11:06.970 --> 00:11:08.855
+Nope, it is in quotes, sorry.
+
+159
+00:11:08.855 --> 00:11:14.688
+[LAUGH] Okay, that's interesting.
+
+160
+00:11:14.688 --> 00:11:16.249
+It's not actually that shape.
+
+161
+00:11:18.190 --> 00:11:22.464
+It's this shape, Right?
+
+162
+00:11:22.464 --> 00:11:26.085
+Here is the outer object.
+
+163
+00:11:26.085 --> 00:11:30.150
+Channel is the property, I'm gonna move
+this to a new line so we can see it.
+
+164
+00:11:30.150 --> 00:11:31.760
+And what's going on here?
+
+165
+00:11:31.760 --> 00:11:38.310
+This brace I don't need, there's a brace,
+out here we need the brace.
+
+166
+00:11:38.310 --> 00:11:40.094
+There we go, just a syntax error.
+
+167
+00:11:40.094 --> 00:11:41.345
+Here's our object type.
+
+168
+00:11:41.345 --> 00:11:43.530
+This is our props type effectively.
+
+169
+00:11:45.590 --> 00:11:48.921
+At some point it makes sense to break
+this out into its own interface,
+
+170
+00:11:48.921 --> 00:11:52.600
+especially when things get any
+more complicated than this.
+
+171
+00:11:52.600 --> 00:11:58.048
+But look, we've improved our type,
+that's a string now, channelName.
+
+172
+00:11:58.048 --> 00:12:02.501
+We could go to the footer, sorry,
+the header, okay, I see here a title and
+
+173
+00:12:02.501 --> 00:12:03.511
+a description.
+
+174
+00:12:05.594 --> 00:12:07.683
+I could put a more meaningful type here.
+
+175
+00:12:17.857 --> 00:12:18.878
+There we go.
+
+176
+00:12:18.878 --> 00:12:20.744
+Title is not an any anymore.
+
+177
+00:12:23.483 --> 00:12:25.799
+We could have left this alone, too.
+
+178
+00:12:25.799 --> 00:12:31.160
+We're just trying to provide some specific
+type of information where it makes sense.
+
+179
+00:12:31.160 --> 00:12:35.080
+Message, okay, this is an interesting one.
+
+180
+00:12:35.080 --> 00:12:40.120
+Just looking at, okay,
+we're consuming some of user here.
+
+181
+00:12:40.120 --> 00:12:44.240
+We certainly are plucking the body and
+the date and the user off of the message.
+
+182
+00:12:45.330 --> 00:12:49.031
+I've deliberately created a little
+bit of a misalignment here, just so
+
+183
+00:12:49.031 --> 00:12:50.919
+that we can learn how to deal with it.
+
+184
+00:12:50.919 --> 00:12:52.186
+So let's try this.
+
+185
+00:12:58.399 --> 00:13:00.128
+And we might look at IMessage.
+
+186
+00:13:00.128 --> 00:13:04.720
+And we'd look at this interface and we
+say, okay, this has the user and the body.
+
+187
+00:13:04.720 --> 00:13:07.590
+But it has a createdAt field here.
+
+188
+00:13:08.720 --> 00:13:10.940
+There's a createdAt field
+here that's a string.
+
+189
+00:13:10.940 --> 00:13:14.720
+Maybe it's like a ISO 8601 timestamp.
+
+190
+00:13:15.970 --> 00:13:19.878
+And this component, sorry, it's not.
+
+191
+00:13:19.878 --> 00:13:20.538
+Is it this one?
+
+192
+00:13:20.538 --> 00:13:21.512
+Yeah, it is this one.
+
+193
+00:13:21.512 --> 00:13:24.524
+This component kind of wants a date.
+
+194
+00:13:27.342 --> 00:13:29.070
+No, it wasn't this one.
+
+195
+00:13:29.070 --> 00:13:30.980
+Although this also wants a date.
+
+196
+00:13:30.980 --> 00:13:34.340
+Here it is.
+Message.tsx, that's the right file.
+
+197
+00:13:34.340 --> 00:13:37.318
+This wants a date, but we don't have that.
+
+198
+00:13:37.318 --> 00:13:40.627
+And again,
+I don't wanna perturb code too much here.
+
+199
+00:13:40.627 --> 00:13:45.210
+So what I would do in this situation,
+I'd say createdAt.
+
+200
+00:13:45.210 --> 00:13:48.625
+We're not gonna just return
+this JSX fragment as it is.
+
+201
+00:13:51.624 --> 00:13:52.592
+We'll return that.
+
+202
+00:13:52.592 --> 00:13:54.458
+You get a closed brace at the end.
+
+203
+00:13:57.824 --> 00:13:59.562
+And then I would create a date here.
+
+204
+00:14:05.533 --> 00:14:08.758
+Something like that, that we don't need.
+
+205
+00:14:11.308 --> 00:14:16.399
+Trying not to change the way the code
+works while we're improving the types.
+
+206
+00:14:16.399 --> 00:14:20.007
+And I get a different thing in here,
+I end up with this,
+
+207
+00:14:20.007 --> 00:14:22.606
+which means down here, we're happy.
+
+208
+00:14:30.623 --> 00:14:35.408
+Now I have changed the contract that this
+component has with the component above it.
+
+209
+00:14:35.408 --> 00:14:39.400
+I expect I'll need to sort of thread
+it through a little bit differently.
+
+210
+00:14:39.400 --> 00:14:45.840
+Oops, and it turns out, Channel is
+probably what renders a bunch of messages.
+
+211
+00:14:45.840 --> 00:14:47.720
+So, let's type this.
+
+212
+00:14:47.720 --> 00:14:55.561
+A component that's called Channel probably
+needs the whole IChannel interface.
+
+213
+00:14:55.561 --> 00:14:59.876
+Its reason for existence is to
+render a channel in its entirety.
+
+214
+00:14:59.876 --> 00:15:03.644
+If I were to look into this,
+I would see we've got the header,
+
+215
+00:15:03.644 --> 00:15:07.503
+we've got a messages.map, and
+here are all of the messages.
+
+216
+00:15:07.503 --> 00:15:12.043
+So we can go ahead and
+assume that this needs full
+
+217
+00:15:12.043 --> 00:15:15.683
+exposure to the IChannel interface.
+
+218
+00:15:21.499 --> 00:15:29.967
+And again, rep, Just makes it a little
+easier to pass it in as a prop.
+
+219
+00:15:29.967 --> 00:15:31.952
+All right, and down here we have an error.
+
+220
+00:15:31.952 --> 00:15:36.583
+It looks like we're just moving
+where the state conversion occurred.
+
+221
+00:15:36.583 --> 00:15:40.073
+I kind of like that we're
+making this change.
+
+222
+00:15:40.073 --> 00:15:45.135
+I like that we pushed it down
+into the inner channel message
+
+223
+00:15:45.135 --> 00:15:51.040
+component because this lets us pass
+in a message in a different way.
+
+224
+00:15:51.040 --> 00:15:57.302
+So we can actually, let's just see if
+this takes in the whole message, it does.
+
+225
+00:15:57.302 --> 00:15:59.389
+That's its prop type,
+it's the whole message.
+
+226
+00:15:59.389 --> 00:16:03.515
+Now we could actually take this and
+
+227
+00:16:03.515 --> 00:16:10.034
+do something like that,
+are we allowed to do that?
+
+228
+00:16:10.034 --> 00:16:13.698
+We need a key as we're
+iterating over this.
+
+229
+00:16:13.698 --> 00:16:16.955
+So we could use the message ID as the key.
+
+230
+00:16:16.955 --> 00:16:20.633
+This is something that React needs in
+order to understand that an individual
+
+231
+00:16:20.633 --> 00:16:22.126
+item and the list was updated,
+
+232
+00:16:22.126 --> 00:16:25.408
+saves it from having to sort of
+re-render an entire list of things.
+
+233
+00:16:25.408 --> 00:16:29.740
+Which, if you imagine we're building Slack
+and we have a infinite scrolling list
+
+234
+00:16:29.740 --> 00:16:33.320
+of historical messages,
+you don't wanna be re-rendering that,
+
+235
+00:16:33.320 --> 00:16:37.230
+losing the user's scroll position,
+that kind of thing.
+
+236
+00:16:37.230 --> 00:16:40.530
+But this is a different way
+to pass this interface in.
+
+237
+00:16:41.770 --> 00:16:46.297
+My preference would be to do
+it kind of as a named prop,
+
+238
+00:16:46.297 --> 00:16:49.632
+kind of like what we're doing up here.
+
+239
+00:16:49.632 --> 00:16:51.664
+But this was already the contract, right?
+
+240
+00:16:51.664 --> 00:16:55.887
+This channel message,
+it was having us peel apart the individual
+
+241
+00:16:55.887 --> 00:16:59.591
+properties of a message and
+pass them straight through.
+
+242
+00:16:59.591 --> 00:17:02.711
+And we're effectively doing this now.
+
+243
+00:17:02.711 --> 00:17:08.008
+Now this is an any type,
+I think we can do better.
+
+244
+00:17:08.008 --> 00:17:13.595
+We can get rid of this thing,
+that little workaround from earlier,
+
+245
+00:17:13.595 --> 00:17:17.525
+and even get rid of this thing,
+and this thing.
+
+246
+00:17:17.525 --> 00:17:23.967
+And what we can do here is say, We're
+
+247
+00:17:23.967 --> 00:17:29.797
+saying useState in my state
+is an IMessage array.
+
+248
+00:17:29.797 --> 00:17:31.880
+There's my array of messages.
+
+249
+00:17:31.880 --> 00:17:36.089
+When I set messages,
+I'm taking in as an argument,
+
+250
+00:17:36.089 --> 00:17:40.202
+it's not giving me a nice
+function signature, but
+
+251
+00:17:40.202 --> 00:17:45.765
+I'm passing in an array of messages
+when an API response comes back.
+
+252
+00:17:45.765 --> 00:17:50.016
+So what we get here is down here,
+a lot more type safety.
+
+253
+00:17:50.016 --> 00:17:51.660
+There's IMessage.
+
+254
+00:17:51.660 --> 00:17:54.881
+There's my message ID.
+
+255
+00:17:54.881 --> 00:17:57.094
+My map function works a lot nicer now.
+

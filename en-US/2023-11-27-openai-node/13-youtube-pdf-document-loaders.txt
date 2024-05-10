@@ -1,0 +1,89 @@
+[00:00:00]
+>> Okay, now we're able to create our store. What we want to do is let's just work on the YouTube loader for now. So the way this works is it's going to take in that video URL, it's gonna use the loader.createFromUrl, parsing the URL. You can add in some extra options here.
+
+[00:00:16]
+And then we're gonna do something called load and split. I'm going to talk about that in a second. So create YouTube, or what did I call it? Docs from YouTube video. Let's do that. Doc from YouTube video. Takes in a video. And then, yeah, I think this is gonna be, I think this needs to be async, or does it?
+
+[00:00:42]
+It actually doesn't. I put async on there, but we're not doing any 08s in here, so we're good. So first, we'll make the loader, which is a non-async thing. So we can say loader = YouTubeLoader. And then we can say, yeah, .createsFromUrl, which is the video that we parsed in.
+
+[00:01:01]
+We have some extra options here. We just wanna make sure it's in English, obviously. And then I want to add the video info to the metadata, right? So remember when we created the documents on the search, you can add the metadata. I want to add the video information to that metadata object so when I get because eventually what we're going to do is when this QA system responds, I want it to respond back with the source.
+
+[00:01:28]
+So I know where it got it from. It's proof. It's like citing your work. I want this system to cite where it got the information from. So having this video metadata is helpful. So I can see that like, yeah, it came from this YouTube video. Here's the link, here's the title, here's the ID, etc, etc.
+
+[00:01:43]
+Otherwise, it sounds like, how do I know that's accurate? Where's the source? Where'd you come up with this? This is the source. So the more metadata here is the more helpful. And then we want to return the loader loadAndSplit. So what does that mean? Okay, loadAndSplit, so if you call a load on a loader and link chain basically, it will go do the thing.
+
+[00:02:08]
+So in the case of YouTube, it'll go to YouTube, get the transcripts, load them up, convert them to those documents that we have to do manually on the search side. And then return that, that's what the loader is gonna do. The problem is that YouTube transcript is, I don't know 1000s of tokens.
+
+[00:02:27]
+So imagine if just one if we made the whole YouTube transcript one entity, one thing inside of an index. That wouldn't scale. I mean, that could be the whole database, just that one thing. So we want to split up the transcript into different chunks, right, for a lot of reasons.
+
+[00:02:47]
+The big reason is, that whole YouTube transcript probably won't fit in a prompt and GPT. And the difference between QA and searches and search, we didn't have to do a prompt, we just compared vectors together. We never actually made a call to open AI, if you go look at the search beyond getting the embeds and stuff, but we never did like a chat completion.
+
+[00:03:10]
+Here we have to do a chat completion. The only difference is we're saying, hey, use this information. Well, if the information is the entire YouTube script, ChatGPT is like, I can't, that's too much. That's too many tokens. I ran out a token context. So we have to split it up.
+
+[00:03:26]
+So we have to split that script up on some part of chunking. That way when we go do the search, we only pick the chunk that has the information needed based off the query to answer that question. So it's like, you don't need this whole transcript just to answer the part where like, it tells you how to turn on your Xbox.
+
+[00:03:43]
+All I needed was the part that tells you how to turn on your Xbox. That's the one chunk that I needed. Okay, that's what I'm gonna send to ChatGPT. I'm not gonna send a whole PDF just so GPT can answer the question on how to turn on your Xbox.
+
+[00:03:55]
+All right, so I need to chunk it, split it up. So I'm not sending the whole thing. So avoid the context limit hit. Does that make sense? Okay, so same thing with a YouTube video. It's just too massive. So we need to split it. How you split it?
+
+[00:04:09]
+That's the science is, it depends on the data. You just you just got to figure out the type of data and how you do that. The way that I did it here is making a new CharacterTextSplitter. And for the separator I looked at the transcript data and it's not like a story someone wrote so there isn't like proper punctuation, it's always gonna be a period and it ends the space.
+
+[00:04:35]
+So I just decided to split it on a word or like an empty space like this sounds like, all right, split on an empty word basically. And then what is the chunk size? So the chunk size is like how many tokens per chunk? I played around with this on this transcript before and like 2500 seems to be like, big enough that like there's enough context and a chunk but not so small that there's a lot of these chunks.
+
+[00:05:00]
+So I did that. And then overlap is, how many tokens should these overlap? So, let's say I made three chunks out of this whole thing. You're not just gonna cut it in three pieces, you're gonna cut one into a third. And then like the last 200, if I put 200 here, the last 200 of those tokens at the end of that chunk are gonna be the first 200 tokens or the big beginning of the next chunk.
+
+[00:05:23]
+So there's some overlap there. And then that kind of helps it search better. If those things just like cut off that way, you might cut off something in the middle of the context that's needed to answer the question. So like, imagine it got split right in the middle of the sentence where it decides to like teach you how to turn off an Xbox.
+
+[00:05:43]
+So if you said, okay, how do I turn off an Xbox? Well, it doesn't actually know the full way because you split it right on that part and it only knows part of it, so it can't give you a right answer. But if you did a overlap, it might find that like, I need this chunk and this chunk to answer this question because the beginning part is at the end of this chunk.
+
+[00:06:03]
+And the end part is the beginning of this chunk. So combine them together and then send that. So it's pretty complicated, but it's basically we're trying to find a way to only send the information that's needed to answer the question and nothing more. And it's just like a pseudoscience.
+
+[00:06:18]
+So you can play around with these numbers, but this is what I found that worked good for this transcript. There's probably a better way. Okay, I guess 100 there. Let's do 100. Okay, so we have that. That's our docs from YouTube. The next thing, yes.
+>> How does our local code know what chunk to send based on the prompt?
+
+[00:06:40]
+Would that already require some interpretation of the prompt like running through a model?
+>> You already know how to do this. This is what is the same process that the semantic search did. We're gonna take those chunks, convert them the vectors. We're gonna take the question that someone's asking, convert that to a vector and we're gonna find the chunks in the vector database that most likely sounds similar to the question vector that you're asking.
+
+[00:07:03]
+And those are the ones we're going to return to the completion. So that's what this is for. That's why I said it's very similar to searching, as in we turn everything to vectors. It's just instead of finding the search results, we're finding the closest chunks, and only the chunks that are necessary to answer this question.
+
+[00:07:19]
+That's basically what we're doing. Okay, cool. So let's do the same thing, but for the PDF. So we'll say docsFromPDF, And we'll say a loader is a new PDFLoader like this and it takes in a path. In this case, it's just xbox.pdf. That's on the root of this file.
+
+[00:07:50]
+So I can just type that in. Okay, and then same thing, loadAndSplit. I think this one is, this one was written with intent to be read. So the punctuation is a little different. So I can actually just like, I looked at it and it's like, you can probably safely split on a period and a space, which means the sentence is over.
+
+[00:08:12]
+A new sentence is about to start. So you should never be splitting in the middle of a sentence. Whereas like with a transcript, there was really no good way to do that because [LAUGH] the punctuation was just like all over the place. So like I said, it's, it's always different depending on the data so and then loadAndSplit, you got a new CharacterTextSplitter.
+
+[00:08:33]
+We have a separator, which I did a period like that and then chunk size I had 2500 and 200. So 2500 on this. It's a lot of data on this PDF actually. And then chunkOverlap, 200. Cool, now what we wanna do is we wanna create our store and parse in all those docs, because right now this is going to create a list of docs, just like we did on the search.
+
+[00:09:11]
+This is going to create a list of docs, just like we did on the search. So, let's parse those in. And before that, I'll kind of log them out. So you can kind of see what they look like. I think it'll be interesting. So let's do that. So let's make a store loadStore, that's gonna be async because we got to await these things.
+
+[00:09:31]
+We can do them in parallel too but it's not a big deal. So I'll say, how do I do it here, videoDocs, pdfDocs. Okay, so videoDocs = await docsFromYTVideo, I parse in the video there. And then pdfDocs is await docsFromPDF, like that. And I'm just going to return, CreateStore with a new array, parse in those videoDocs, and then parse in those pdfDocs.
+
+[00:10:15]
+Order doesn't really matter cuz once they get inside the store and index and put on that multidimensional plane, it doesn't matter what order they are in this array.
+

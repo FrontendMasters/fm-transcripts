@@ -1,0 +1,184 @@
+[00:00:00]
+>> So how do we reduce memory usage? Well, we use something called a memory pool. So in JavaScript, you would never do this. This is just not a thing people typically do in JavaScript, but it has huge wins. So let me first show you what a memory pool is.
+
+[00:00:11]
+Cuz typically, whenever you're using JavaScript, you don't really think about memory, right? You don't, it's okay, you can be honest. I'm honest, I'm an honest man, we don't. All right, so let me first go. Yeah, I'm kidding, I actually think about it constantly, just makes me wild. You can imagine this is that you actually have a program in which you have the same object being created over and over again.
+
+[00:00:37]
+And so what can we do with that information? Well, if you know enough about your system, you can do something pretty clever. So let's just say we need to create a handful of them. So I've just kind of created a few. I can hand out that object to whoever needs it.
+
+[00:00:53]
+They can reset its properties, put some various information on it, and use it for a while. When they ask for another one, we can give them another one. But then at some point in the future, they can hand me back that object, and I can now hold on to it.
+
+[00:01:07]
+So what does this do? Well, one thing it does is that this object is no longer ever collected again. We just permanently hold on to it. It's ours forever, and that's that. Is there a scale issue here? Potentially. Maybe once you hit a certain scale, memory pools are no longer worth it, and it's better to have them lived as short-lived objects versus long-lived objects.
+
+[00:01:26]
+That's gonna be like a whole GC Art that you're gonna have to probably measure over long periods of time to really see which one is more beneficial for the system. But in general it is nice to not have to recreate and destroy objects over and over again, cuz every time you do two squirrelly braces, something underneath the hood has to go get memory.
+
+[00:01:45]
+Have that pointer point to somewhere, be able to fill in your properties, be able to fill in your values, have pointers to those values, because pretty much every value in JavaScript is yet another object. And then whenever we do these minor GCs, it's gonna have to call everything, point to everything.
+
+[00:01:58]
+There's a lot more effort that goes into these objects than you think. And so, they're not free. So with that kind of in mind, when do you use or when can you use one? Really, the only time you can use a memory pool is when you know when an object is being created, and you know when the program is now able to forget about the object.
+
+[00:02:20]
+You have to know both endpoints. If you don't know when an object is no longer being used, it's not worth it to use a memory pool unless if you can make that 100% the case. Cuz if you're wrong, you're gonna reset an object that someone else is using, and it's gonna screw up everything.
+
+[00:02:35]
+And so why would you use one? It's when you don't want to create a bunch of objects. Now, some objects you don't create a lot of. Some objects you create a whole bunch of. And so you should probably try to opportunity size out which ones are useful and which ones aren't useful.
+
+[00:02:47]
+So we're gonna implement a very simple memory pool. Very, very, very simple, okay? I'm gonna create a pool.ts. I'm gonna export class. Yes, you love it. You know you love it, just say you do, and we're gonna have a constructor in here. And we're gonna have a private pool that is gonna be a T array in the pool.
+
+[00:03:04]
+this.pool will equal a new array. And in here, we're actually gonna take a constructor function, which does that. We'll have a private constructor function right there. That's an old C++ ism called constructor. There we go. And so we're gonna do something like this, this.pool.length if it's greater than 0, we're gonna return the last element in the pool, else we'll call the constructor function and get out a new T.
+
+[00:03:31]
+So this makes sense, if we have some in the tuck, use those, else create a new one. You have one question?
+>> Is that the class name you wanna use?
+>> Poot. Yeah, I didn't even see that. That is not the class name. Pool, we would have eventually discovered that, okay?
+
+[00:03:48]
+We would have eventually discovered that. All right, so then we have public set, which will be t: T. There we go. this.pool.push (t), fantastic. This is as simple of one as we can get. You would have to do research to kinda determine if the order of the objects you're putting in matters, then you'd wanna use something like a ring buffer.
+
+[00:04:11]
+If the order doesn't matter, typically relying as much as possible on C++ is always the best way to go in JavaScript. The more native methods you use, the better. So don't get too clever, don't get too clever by half, just use native methods. I've done some amount of testing here, and typically a pool that does this type of operation, just pushing and popping, will operate like an order of magnitude faster, but cause more minor GCs to happen.
+
+[00:04:39]
+If you do one that is a pointer within the array, so we never actually adjust the size of the array, they're gonna be like 10x slower. These are all micro-benchmarks, so again, are they real? I don't know. 10x slower, but the amount of GCs over time, the minor GCs seem to be a lot less.
+
+[00:04:56]
+So is it better, is it worse? It's very, very difficult. Ring buffers, so, meaning that you're actually having two pointers chasing each other, tend to be the slowest of them all. You're updating multiple pointers. I'm not sure if they're really worth it, other than if order matters. So long as order doesn't matter, I wouldn't use it.
+
+[00:05:12]
+I just use as many native methods as possible. Always best advice, don't write your own left pad, use pad left, okay? Best piece of advice one can give. All right, so now we have a pool. So that's pretty neat. I like pools. So let's create ourself a little bit of a bullet pool.
+
+[00:05:28]
+So it shouldn't be too hard. So I'm gonna go like this. Let's go function createBullet. And this thing is simply going to take in a return, and we're gonna go as Bullet, and it's gonna return x as 0, direction as -1, why not? And id will be a ++id.
+
+[00:05:46]
+Where is id? I know you're somewhere around here, id. Let's bring it back up here because it's kind of weird to have it all the way down there. So there we go. We just create a random default value effective pool that we can, and we even increment the id every time we create a new one.
+
+[00:06:02]
+So if you started logging and inspecting and making sure you're not creating new ones, it should be pretty obvious if your id's don't increment at some point, all right? Now let's create the pool, bulletPool = new Pool. And we can put Bullet in here to really make it nice.
+
+[00:06:18]
+And we can just pass in createBullet. So every single time it needs to create a new bullet, it has a constructor function, and it can hand out bullets to us. So this should be pretty easy. And one more function just to make things a little bit easier, I'm gonna quit using this.
+
+[00:06:32]
+I know you guys may feel emotional about this, but I'm actually gonna convert this into a class. Yes, I am converting it into a class. So I can have a nice reset function on here that'll have x: number, direction: number, or actually will technically be 1 or -1.
+
+[00:06:47]
+And I'll go this.x = x, this.direction = direction, and then I'm gonna return this, all right? The reason why I actually really end up liking to do this, here, I'm just gonna go like that. Fantastic. Actually, the id is the only one I can't do it to. Constructor, =++id.
+
+[00:07:18]
+Fantastic. Where are you id? Take that up, put it up here. I like it to just be above. I don't know, maybe it's the old programmer in me. And so this is really simple. It just makes it a little bit simpler to use, I think, when you kind of think of things this way.
+
+[00:07:31]
+Could there be optimizations over using classes versus plain objects? I really do hope deep down that V8, when they see that it's a class, you can't really add properties to classes. I mean, technically you can. But if you add properties to classes, it could break into a slow path, but since it already knows all of its classes and its properties, I would hope that it'd give it some sort of fast path.
+
+[00:07:52]
+That's nice, I don't think it does, but you would hope one day they could do that. Anyways, as I've stated upfront all my properties and their ordering. All right, anyways, so createBullet, we create this nice little bullet, which is gonna look something like this. newBullet, and we'll pass in the id, or we don't even pass in the id, and I'm gonna call reset.
+
+[00:08:10]
+I don't even need to call reset cuz it's already done for me. Fantastic, there we go. We have our new little bullet, create little bullet does all this. Awesome, awesome, awesome. So now we're gonna go all the way down to fire. We need to change this. We want to start pooling these objects.
+
+[00:08:23]
+So I'm gonna go bulletPool, look at that, it already knows what to do, copilot. So I'm gonna get a bullet, and I'm gonna reset it with my new values. So there we go. This is why I like using classes, right? Sometimes, it makes writing code a little bit nicer.
+
+[00:08:38]
+Again, I just want you guys to quit judging me. All right, so there we go. This is fantastic, this is beautiful, but where and when do we start letting go of bullets? That's kind of the big trick here. So the first thing is what comes out of shift?
+
+[00:08:53]
+Shift returns a bullet or undefined technically. So I can go bulletPool.set. Get that old trick out. And there we go. So we have now just collected those two bullets. We already know they exist. So I'm just kind of forcing them to exist, but there's one other problem. When the game ends, I may have some amount of bullets and we want to also recollect those as well.
+
+[00:09:17]
+So that way they don't go out of style. So I'm gonna have something that's like, I'm gonna call this method reclaim cuz it just sounds awesome, and I'm gonna go for const b of this.b1. I don't know, sounds neat to me. And I'll go let's see, bulletPool set(b), bulletPool set(b).
+
+[00:09:34]
+There we go. So we will reclaim all of them at the end of our game. And now we're gonna jump back over to index. And at the very, very end of our time, we're gonna go game.reclaim. So give our game a chance to get every last bullet possible and have them all.
+
+[00:09:53]
+So now we should really never recreate a bullet. Every time they collide, we get rid of them out of the list, and we reclaim them. When the game ends we reclaim any remaining bullets. So now once we hit some sort of medium, we'll just have ever running supply of bullets.
+
+[00:10:08]
+Now, if we really want to, if we stopped having as many games and there's certain amount of time, we could add heuristics to start letting go of all the bullets. So that way we're just not having some higher amounts of memory. But typically what I see is when you're creating destroying, creating destroying, creating destroying, your average memory is usually higher than if you're just holding on to some amount.
+
+[00:10:26]
+That's been my basic observations, not always true. But that's been my usual observations. So there we go, this is looking good. npm run test, let's make sure that we haven't done something crazy here. Uh-oh, what have we done? Have we not done the right things here? So it looks like whatever we have done, we have broken something.
+
+[00:10:51]
+Now the real question is, did we run this beforehand, before we did all of our previous stuff? Let's see, git status. Because how funny would that be if we made our previous change? Did we check to see if all the tests ran with our previous one? I think we did, don't you try to lie to me.
+
+[00:11:07]
+All right, anyway, so let's see what happens here. So obviously, something has gone awry with this. Yeah, this is totally wrong. I see the obvious problem that we've done wrong here. So I'm gonna jump over here, and go into our history, I'm gonna yank those two. And what I'm gonna do is I'm gonna paste them right here.
+
+[00:11:32]
+Obvious part is that it's that. We didn't do this part right here. So kind of screwed up the game, games were lasting a little bit longer than normal. So let's take that, let's do that. Come on, why didn't you guys see that one? I mean, it was right in front of you this whole time.
+
+[00:11:53]
+There we go, beautiful. Look at that beautiful piece of code going right off the edge of the screen. That's how I really love code to look, just completely off the screen. All right, so fantastic. So if I'm not mistaken now this should be a lot nicer. Man, that was a great first try, was that just a great first try or what?
+
+[00:12:12]
+Copilot did cause that error, see the problem is that I did trust copilot. The AIs aren't gonna be very great at taking our jobs, okay? I mean, it really is painful when things aren't working out. And so I do this all the time where I'll just be like, good enough.
+
+[00:12:27]
+And then I'm like, see, the problem is that I'm just not reading. I'm going too fast, and I goof it up. Okay, so we are now cleaning up memory. So if we've done this correctly, we should be able to launch our testing right here. Launch cargo, and we should hopefully see a difference in that.
+
+[00:12:43]
+Right now, it's like exclusively in one area and nowhere else. So hopefully, proportionally it shrinks down. I never look at these numbers up here, by the way, they don't mean anything to me. Meaning that I don't look at flame graphs trying to gauge the exact running time, I try to gauge the proportion time.
+
+[00:13:06]
+And so this is very important, I'm just going, okay, fire is like 87% of the time. Can we make it down to 80% of the time? Can we make it down to 84% or maybe 75? Or like that's just way more important. So now we're just gonna have to wait.
+
+[00:13:27]
+We're gonna have to wait for quite some time. Awesome, so it doesn't look like we made pretty much any sort of visible change here. We tried to do something. So something else is going on here. Is it the arrays that we're allocating?. Is that the problem? Cuz if you think about it, now we're starting to get into a big problem with trying to manage your own memory.
+
+[00:13:48]
+What is bullets? Well, bullets is something that we constantly increase and we're also constantly shrinking a little bit. Shifting is gonna cause some sort of memory change. Now, whether they do individual ones or not, we don't know. Next, we also have these ones right here. Every single time we're creating a game, we're just creating new arrays and then eventually growing them to be something.
+
+[00:14:08]
+And so is that a problem? I mean, probably, that's probably a problem. To fix this, that might require more and more thought, but I just wanted to show you that sometimes it's not as easy as you think it's gonna be. It's not just simply, boom, it's this one thing.
+
+[00:14:24]
+It's just like, yeah, it's very easy. Just grab that single item and that's all you got to do, just go with the bullets. Well, you got to kind of really think about all the potential places in which you're using memory. Another very interesting spot about using memory is this one right here.
+
+[00:14:39]
+You may not realize this, but this simple spot right here we're creating effectively 2 arrays every 16 milliseconds for all the games running. So at 2,000 games that's 4,000 arrays, 60 times a second. It's a lot of arrays, right? That's like 240,000 arrays per second. So can I just do this instead?
+
+[00:15:01]
+Why are we just allowing simple memory to be not just used over and over again? And so, luckily, the scavenger works really, really well. We don't have to worry too much about that. We're only creating a bunch of empty arrays. Does V8 make some really smart ideas about how to save memory?
+
+[00:15:16]
+Probably, but these are things you should start looking for. And this is one thing that I really do enjoy just doing in general, which is when you're gonna be going from the obvious wins to not obvious wins. It is almost always a set of distributed small choices that you see over time that is the problem.
+
+[00:15:32]
+It's never just one big spot anymore. Now it's like, hey, how many different places are we using memory? Well, there's probably a lot. And so let's go over here. We'll just see, have we changed any sort of shape even with that, right? And so now your goal is to just measure, look, have we made a change?
+
+[00:15:51]
+Measure, look, have we made a change? Cuz I also don't often trust the shape of this chart. It's like, yeah, it's generally correct, but is it always correct? I found that sometimes things that are problems show up little, and then they show up big, and then they show up a little bit littler, and then they show up a little bit bigger.
+
+[00:16:06]
+Depends on how long you're measuring for, it depends on what's happening in the program.
+>> What exactly is the idle time in the performance tab? For example, the new WebSocket we added are running during this time in C++ land, should we aim for bigger idle time?
+>> Well, I mean, idle time, obviously, well, it can mean a couple of things.
+
+[00:16:24]
+And so if you go and even using something like a hex, which is like flame graphs light for Node written, I think, by NearForm. You can see that the idle time, there's a large gap of it, which is actually underneath the hood, which is glibc using epoll, you're epoll waiting.
+
+[00:16:44]
+And so just nothing's happening inside your system. You're just doing nothing cuz we're waiting for data. We're not actually processing anything. So, I mean, obviously having more idle time means one of two things. A, you're using everything efficiently, and therefore you can have more load, which we probably can.
+
+[00:16:59]
+We could probably increase the amount of games running concurrently up to a thousand or another thousand go up to three thousand. Or b, your program is not using things efficiently. Where it's needed to be fast it's slow, and for the rest of the time it's doing nothing. You'll see that a lot as you're trying to make something run better is that you'll see that you'll have large amounts of idle time, and you should be able to use that time efficiently.
+
+[00:17:24]
+For us, we really don't have anything we can use efficiently right now. We don't have any other tasks that we could be doing. So if you had, say, monitoring tools, other stuff, you could be using idle callbacks to be able to execute extra code in your system. So that way you know you're always executing code off the beaten path instead of on it.
+
+[00:17:45]
+There's a lot of extra things we could be doing. Unfortunately, I didn't have any really great ideas on how to work in some of these idle tasks. Where we can move them off the main thread that have no implication in the main thread or what you need to be doing into, hey, background processing.
+
+[00:17:59]
+I couldn't come up with a good one. But yeah, so at this point you can see we still haven't really changed anything, we're still just here. We're still just using a ton of memory, and so at this point we'd have to kind of come up with some pretty good ideas of what to do at this point
+

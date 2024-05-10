@@ -1,0 +1,90 @@
+[00:00:00]
+>> So yeah, there's other notes in the video but the kind of the one other major thing that I think it's tricky like, do you need to write a plugin tomorrow? No, you do not need to write a plugin tomorrow. When you know that you need to, is it nice to know that you can write?
+
+[00:00:16]
+Yes, and writing a plug in is one of those things that particularly in Vite, it's a little gnarly because Vite is like a set of extra abstractions over Rollup plugins. So one kind of needs to read both docs, and there are a shocking number of like hooks that most of which you do not need, right?
+
+[00:00:39]
+And the reason that you need to build a plugin will be, in your heart of hearts, when you need a plugin and amongst all of the rollup plugins and all of the Vite plugins, the plugin you need does not exist. What you need to do will be so specific, we're gonna go over the general high level piece, but there are, if we looked at like awesome Vite and awesome Rollup, there are hundreds of plugins, right?
+
+[00:01:08]
+So by the time you've exhausted all of the community plugins and none of them do what you want, you are a little bit in terra incognita at that point. But we will kinda talk about like just some basic examples that we can use. And sometimes like there's little niceties, right, that you can add to your own development experience that are somewhat helpful, and I think that there's a lot of value in that as well.
+
+[00:01:38]
+The nice part about a Vite plugin is effectively it's just a function, right? It's just a function that conforms to a certain shape, but beyond that it's not like really like some real crazy magic. And there are some conventions I think are interesting. The plugins we've seen so far, like React, that's just basically taking probably, it might just be JSX, I'm pretty sure it'll take any JavaScript file, cuz React has always been a little loosey-goosey on whether or not you have to do a .jsx or a .js and either will work.
+
+[00:02:15]
+But basically, you say, when you have a plugin, effectively, every single module that you import is flowing through that function, right? The plugin is just a function, every module flows through it. There are lots of these different hooks, you can do, okay, we're about to finish the build.
+
+[00:02:38]
+Okay, I've just got the what are we trying to import? Okay, we're about to load the file from the file system, you could go in there and hot swap it with something else. There's a transform hook which is like we've parsed it into an ASD and now I wanna mutate the ASD, right?
+
+[00:02:57]
+There are various points in the process in the lifecycle of your code going from file-on-file system to build a thing where you can interject your thought process and say, I would like to do something now, right? And we saw before, that could be run it through sharp, which is Vite image tools did, which is the ability to resize the image, so on and so forth.
+
+[00:03:20]
+The React plug-in is simply taking it and saying, okay, I wanna run it through the JSX parser. Whether that's SWC or Babel, or depending on the plugin you're using, something in the way that's always been done, right? We could say, hey, if this ends in .yaml, I just wanna take a any of the libraries that will translate YAML into JSON, and take the YAML file, shove it in there, and spit me out JSON file, right, anything.
+
+[00:03:51]
+If you have a bespoke file type at your company and you have some library to parse it, right, you could theoretically parse it into a JavaScript object and then be able to have it and access it, right? And one of the conventions I do think is kinda cool, though, is a term from Rollup but Vite is taking its bundling from Rollup called virtual modules.
+
+[00:04:17]
+What is a virtual module? Virtual module is this idea of, it's not actually on your file system, right? It is a file that doesn't really exist, but then you can import it and use it and your plugin will go, you gonna try to Import whatever from virtual colon, and the virtual is optional but like let's say virtual is the convention, virtual colon, whatever it's called.
+
+[00:04:44]
+You say like, Vite's like, okay, I'm gonna go try to resolve this module you go, hey, virtual colon workspace, which is one that I have in the code base, I'll just show you in a second. It will say like let me let me tell you what the file system would have told you.
+
+[00:05:00]
+Don't read the file system, I'm going to give you the contents of a file and you deal with it. I should show you, I showed you in the development version of the website. I have this open in Visual Studio code so I can like click on any given file as I'm like working on this course and see it.
+
+[00:05:20]
+And then as I'm reading through it, like, I see typo, I can go and just hit this button and opens that file, and just to make my life easier. And so, here is the plugin, right? That is a use case I'm using for a virtual module. And so, I have this module called virtual:workspace.
+
+[00:05:44]
+And all it really does is it's giving me the directory that this project is based out of, right? And so, if you look at this link, it's really small down there, it's vscode://file on my file system, and that's what it does. But I need to know the first part of that file path, right, or actually, a lot of it.
+
+[00:06:07]
+So what it allows me to do is I can kind of go and there is no virtual:workspace in my project. But when Vite says, we're importing something from virtual:workspace I step in with that load hook there and I say, yo, if you are virtual:workspace, don't load anything from the file system.
+
+[00:06:29]
+Don't even go looking for anything from the file system, right? What I want you to do is I literally just give it a string of JavaScript that I wanted to pretend this is what you found on the file system, right? And so in this case when the project loads, this gives me the path of the actual project itself.
+
+[00:06:50]
+And I basically say, hey, if you're the one we're looking for, go ahead and pull this one. There's a \0 in here, let's pull it up in the real code. No, that one, I'll find it for you in a second. There's a \0 here, it's just I think got stripped out of the rendered file, we'll grab it in a second.
+
+[00:07:25]
+And that's just a convention that is like totally not a valid module name that tells the rest of Rollup ignore this thing, right? It's a totally bogus one, but then I don't have to type it. And so we turn it into that so that every other plugin will ignore it and we'll say, hey, if you're the module I'm looking for, never load it from the file system, right, give it this file.
+
+[00:07:47]
+You could write this in another file, for me it's a one-liner where it just basically gives me a function that takes the current file and prefixes it wherever this project is on my file system, right? And you can do this for a whole bunch of things. We had a request in our app where we have a bunch of companies who have sensitive data, and we are technically an open source app, and we actually, on our server, encrypt all their data, but they can look it in the UI.
+
+[00:08:18]
+So what they want to do is they wanted some way to know what SHA of the UI that we had. So in case somebody from security wanted to audit the code to make sure we weren't secretly waiting for it to render on the DOM and report it back, they could see what SHA was and audit the code.
+
+[00:08:33]
+And so I could theoretically have a virtual:gitSha, right, that would then get the latest commit, right? Even at build time, right, when you go to the GitHub actions, and then interpolate it into my application, even though that's not written on the file system anywhere, right? And so, the nice part about this plugin is that it is very small, all right?
+
+[00:08:57]
+It is effectively we've got the name of this, we are just kind of resolving the ID instead of looking for it in the file system or anything like that to one that like it is known shouldn't be anywhere. And then I am basically saying this is what you would have found on the file system, right?
+
+[00:09:13]
+And there's a whole bunch of other ones that you can do like white two together, there's a Million markdown plugins for Vite, right? We'll write one real quick cuz I think it will demonstrate how this works, and then maybe do one to inline critical CSS if we needed to, or something along those lines.
+
+[00:09:35]
+Just to kind of demonstrate what these things will look like. So, which one are we more interested in? You wanna do a markdown? Yeah, there's nodding. Cool, let's do the markdown one, and take a look at that. And just see that, they are not that scary. And again, whatever use case you need, will probably be somewhat esoteric.
+
+[00:10:02]
+But then I was just annoyed by switching back and forth between my browser and my code editor and jumping to the right file as I was working on this, so I wrote this plugin. But then I was thinking to myself, it would be cool if in my app, since you can see both the module you're importing and the importing module everywhere.
+
+[00:10:22]
+I could even in development have, if I double click or shift click open any given component in my app, that component jumped directly to that file, right? There's little things, not to say you should do all these things you like, but there's little things you can add depending on your use case that you might need.
+
+[00:10:41]
+The virtual modules are cool if you use something like contentful and you have your data in a CMS somewhere and you wanna just pull it at build time, right? That's another option, right, that you can go for and do that as well. There's a bunch of, it's one of those things where it's just most of the common cases that you can think off the top of your head, somebody did think of that and there's a plug in.
+
+[00:11:01]
+But for the very unique case that you will come across at some point in the next year, two years, whatever, it's a powerful pattern. And we'll go through some basic ones just to show that it's not nearly as scary as you think it is, right? You can make a scary, you can get very involved, I'm sure that image tools one is a pretty large plugin.
+
+[00:11:21]
+But for most of the little things that you might need to do that like make your life easier, and this is kind of like act for Vite is extensible, it's pretty straightforward.
+

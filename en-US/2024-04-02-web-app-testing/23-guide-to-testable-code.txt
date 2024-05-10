@@ -1,0 +1,96 @@
+[00:00:00]
+>> So we spend a lot of time talking a lot of theory about code. But it turns out at some point in my career and together a bunch of other engineers, I put together something called a guide to testable code. And I wanna kinda show you some of these things because I think it's useful.
+
+[00:00:17]
+Now, these examples were done back in the Java days, but I think the ideas are still applicable and useful in the JavaScript world as well. So the examples of what we have here is we identified when we were building code with other engineers, there are four main things that people got into trouble with, which made the code hard to test.
+
+[00:00:42]
+And again, hopefully what I've tried to convince you of in the last few hours is that it's all about being able to take control over the dependencies, right? You wanna be able to control the dependencies so that you can unit test your code. And so there are four main flaws that we identified, constructor does real work.
+
+[00:01:03]
+Digging into collaborators, brittle global state and singletons, and class does too much. And so I wanna go over most of these, and by the way, these are available on their website. So you can take your time kind of to go over it in a leisurely format. What do we mean by constructor does real work?
+
+[00:01:25]
+Let's find a piece of code. Let's say you have a house, and a house comes with a bedroom. Notice what's happening inside of the constructor of the house. The house is constructing itself with a bedroom, which means that in a unit test, you can never, ever replace the bedroom with a mock, or anything you want.
+
+[00:01:44]
+So if you wanted to write a test, you would end up with like, you make a new house inside of your code base, and darn. I'm stuck with the kitchen, bedroom objects, and everything else that was created as the component decided it to be created. Instead, what you wanna do is you don't wanna do any work inside a constructor.
+
+[00:02:05]
+You just wanna take the values and store them in so that you can later say, I have a dummy kitchen. I have a dummy bedroom. And so now when I instantiate the house with dummy kitchen, dummy bedroom, I can control these things and I can build any kind of code that I want with it.
+
+[00:02:24]
+And again, this comes down to being able to control the dependencies. So let's look at another example. We do work over here because in this case, the constructor of the garden configures the gardener to do specific kind of things. For example, in this case, it configures it with a 12-hour workday, and some set of boots that it assigns to the gardener.
+
+[00:02:54]
+And so as a result, if you wanted to write a test, all of a sudden, you are stuck with this slow moving unit test because you can't control how it was configured. And so what you want is you wanna have a constructor that doesn't do anything. Your constructor should just ask for, look, I need a gardener and I expect the gardener to be already configured so that I don't have to do any configuration myself.
+
+[00:03:21]
+The end result of that is that now you can configure the gardener with, for example, one minute workday so that you can go through the tests quickly, right? And you don't have to set up complicated things. And maybe this mock gardener doesn't even need boots, and you can skip over that.
+
+[00:03:40]
+And so this is a way of making your test easier to read and reason about because you are controlling things around them. Now, you might say, constructors, that's only for Java. I don't really have constructors because I'm doing functional programming in JavaScript. But again, I'm gonna argue that a lot of your functions close over other things.
+
+[00:04:02]
+And when you close over other things, it's the same exact thing as if you had a constructor that you're closing over, right? So the work that you're closing over should be something that can be easily worked over. Let's go digging into the collaborators. So that's another example of what you wanna avoid.
+
+[00:04:21]
+So, what are the warning signs? So, objects are passed in, but never used directly, instead, we get a hold of some secondary object on that primary object. And we are violating the law of Demeter, which basically means we're using a whole bunch of dots to get a hold of stuff that we want.
+
+[00:04:37]
+And typically, things have these suspicious names, like context, environment, principle, container, manager, something that's very generic, right? So let's have a look to what we mean. Here's an example of a tax calculator. Notice the constructor does not work, so that's good. But now we wanted to compute sales tax, and what we get passed in is a user and an invoice.
+
+[00:05:02]
+But notice that it doesn't really want the user, it just wants to get address, sorry about the strong, that shouldn't be here, that's a typo. It just wants the address, and the reason why it wants address is because it wants to know the locality, and based on the locality, it will determine what tax rate to apply, right?
+
+[00:05:23]
+And notice it doesn't want the invoice, it really just wants the amount. So really what we wanna write is just that the tax table needs to get a taxable rate from the address to compute the amount. And so a preferred way to do this, is to pass in the address and the amount.
+
+[00:05:41]
+Because if you're passing it, user and invoice, then your test is complicated because you have to make a bogus address, you need to make a bogus user, you need to make a bogus invoice. Invoice needs to have probably a bunch of products inside of it to make it work, just so you can call the compute cell stacks on the user and invoice.
+
+[00:06:08]
+Whereas if you don't have a law of Demeter, or if you don't violate the law of Demeter, notice you can just create the address and you can call the compute cell stacks directly because you're comparing just the stuff that you actually need, right? So whenever you see functions that look for other things, right, this particular case, we are not using what we were given, instead, we were looking for what we actually need.
+
+[00:06:37]
+What you're asking for is more complicated than what you actually need. And because you're asking for something that's more complicated than what you actually need, the mocking code that you end up writing for becomes a lot more complicated as well. And so it makes your life harder. Here is another example where you're passing a client and a request.
+
+[00:06:58]
+And then when you call login you're saying, hey, from the request give me a cookie, and from the authenticator, call the authenticate on a cookie, right? So better thing to do would be to pass in the cookie and the authenticator, rather than passing in something generic. But then later you look up what you want, you pass in something specific, the cookie and the authenticator, cuz that's the only thing that you need for the login, right?
+
+[00:07:25]
+And so the test here is complicated because you have to create a lots of mocks that mock out the RPCClient and then mock up the ServletRequest. Whereas in this case the test is straightforward because you just create a bogus cookie and a fake authenticator, call it and assert that it did actually get called.
+
+[00:07:47]
+So that's an example of how law of demeter kinda makes the situation a lot worse for you. Global state, typically, you have some global variable like this, private static, cuz that's typically the way it's done, and now you have a login service. And then whenever the login service is actually needed, people get hold of it.
+
+[00:08:07]
+So for example, you have a method called getInstance(). And this getInstance creates your log in service on as needed basis, right? And so then typically you need to start testing it, and now you have to have a way of resetting the global instance. You typically create these methods for reset for testing and set for testing so that you can work on it.
+
+[00:08:31]
+And a typical place you would use it is you would say, let's say I wanna say, isAuthenticatedAdminUser, I'm gonna say loginService.getInstance, right? And this creates a really complicated test because you can't just say, do this because you have the wrong singleton in there. Or maybe you forgot to clean up the singleton from the previous run, and you have the wrong one in there, right?
+
+[00:08:51]
+So you really wanna avoid that, and instead, you just wanna say, hey look, you have your LoginService which does the implementation not as a singleton. And then in your dashboard, you just wanna pass in the loginService. So you pass it in explicitly rather than having the code look it up at runtime.
+
+[00:09:12]
+And by passing it in explicitly, now writing tests become really easy because you can just say new AdminDashboard, and I can pass in the mock login service, and I can assert whatever I want. Notice, this all repeats the same thing. We wanna be able to get hold of our dependencies, and we wanna be able to do it in a way that's very predictable, right?
+
+[00:09:36]
+And that's what kind of allows us to do that. The global stuff, like for example, setting flags globally, produces the same exact problem. Because when you wanna write a test, it's extremely difficult for you to make sure that you have gone to every singleton and set it to the correct state.
+
+[00:10:00]
+And also you're always running the risk that if you add a new singleton, then the subsequent tests will be failing because the tests weren't aware of them and didn't reset them properly. And so now you can have a leakage of information from one test to the next test.
+
+[00:10:17]
+And of course, if these tests are to be run concurrently, that's another set of problems, because concurrency also creates work. And finally, this is just a good practice of keep your code modular and simple, and every single piece of code should do something that's individual and it's not complex.
+
+[00:10:35]
+Basically, you don't wanna have things that have the word and inside of it. Because that implies that there's multiple responsibilities for this component. What does it do? This component logs you in and makes sure that your user is created. Those should be two separate things. You shouldn't mix it together.
+
+[00:10:55]
+Because when you mix it together, your unit test become complicated because your mock can't just mock whether or not you're logged in. It now has to mock that you can be logged in and that you could create a user if it doesn't exist. And so all of these things become a problem.
+
+[00:11:12]
+And so we put together this set of things which we think are useful, that you can share with your co-workers and say, hey, look, this is what a good testable code looks like.
+

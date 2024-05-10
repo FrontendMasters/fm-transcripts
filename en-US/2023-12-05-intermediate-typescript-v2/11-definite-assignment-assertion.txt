@@ -1,0 +1,88 @@
+[00:00:00]
+>> The next thing we're gonna talk about is definite assignment assertion. It also involves an exclamation mark and to do this part, this exercise, we're going to need to go into our tsconfig for this notes project and we're gonna turn on strictPropertyInitialization and set it to true. You should see some errors pop up on the left, and we do, perfect.
+
+[00:00:26]
+So make sure you turn that on, we're gonna talk about what that is, and how we deal with it. So it's strictPropertyInitialization. So I have a class here and it's called ThingWithAsyncSetup and I've done something that's a little odd here, I have something async inside of a constructor and some might argue I'm already doing something a bit weird.
+
+[00:00:53]
+But I might pushback against that and say, well look, I'm kinda just kicking off the promise. I'm doing nothing in the constructor that depends on the promise being resolved, and it looks like I have some state I can have in place where I can from the outside observe whether whatever this setup promise does I can observe that it is successfully, has successfully completed, right?
+
+[00:01:21]
+The dot then will be called and then I'll see this flip. And I have here isSetup as a class field set to a boolean but I'm getting an error, and the error is that is set up has no initializer, and it's not definitely assigned in the constructor. So if I were to take this one line here and move it up into the constructor, the error goes away, and that's because TypeScript analyzes the constructor, it looks at all the class fields that don't have an initializer which would look like this, right?
+
+[00:01:54]
+I mean, you might argue in this scenario, I should do this, but this is a good example here. The problem here is Typescript saying, I don't know, it doesn't seem like, at least in the general case isSetup, like by the time we return an instance, is that actually gonna be a Boolean?
+
+[00:02:16]
+It seems like it might be undefined. And why do we think that it's saying that? Does anyone have any hypotheses? Any guesses? I mean, I'm setting it in here.
+>> Is that run after the constructor?
+>> Typescript sees a callback here, and it's like, callbacks. I don't know when promise invokes this callback, I don't know if, by the time this promise function, the constructor for promise, by the time it returns, how do I know that this callback has been completed?
+
+[00:02:58]
+It doesn't know effectively that once we advance beyond line 49, whether isSetup will be set, and in the general case, that is a perfectly valid thing to be concerned about, right? You could get an instance of thing with AsyncSetup, and it claims to have a boolean value for setup, but it could be undefined, except this callback here, we would call this like the promise executor, right?
+
+[00:03:29]
+It's the thing you use to, it's the function that represents sort of the work or the beginning of the work that could be async, right? This is invoked synchronously within the promise constructor. So I know that by the time we assign the promise to setupPromise, this function's already done, it has been completed.
+
+[00:03:55]
+I know, definitely, that isSetup, this line of code on line 50, that will have been run, I know for a fact. Now, I also know that TypeScript, there's no way to articulate that in TypeScript and to say, this is a synchronous function, you should assume that this is completed before, like chill out TypeScript, this has been run, there's no way to say that.
+
+[00:04:19]
+But I can say, look, I know about this particular callback, and I'm gonna say, isSetup is definitely going to have been assigned by the time the constructor completes. Now what I've given you here, it's actually a very, this is a true example, and it does actually guarantee that by the time you get an instance of ThingWithAsyncSetup, it's gonna have a boolean value there, that is true.
+
+[00:04:53]
+Sometimes you might know something else, like you might know that look, this object is gonna be created, but no one's gonna be working with it or using it until this thing is done to it. Maybe you're initializing objects and you're collecting them, and then after they're already initialized, you set some stuff up on them, and you want downstream consumers to not have to deal with the possibility that a bunch of things could be undefined.
+
+[00:05:23]
+And so you might blur the lines here and say, okay, technically TypeScript, you're correct, these fields might not have been initialized, but I'll take care of initializing them myself from the outside. And the thing I wanna be sure of is that whoever is working with isSetup, they don't have to deal with this type here, they don't have to deal with the truly honest state of where it is after instantiation.
+
+[00:05:51]
+You might wanna say, look, right after I create it, I'm doing this thing to it, and I'm always doing that, and I'll take responsibility for making sure that that's true and that no one gets a hold of these things before. So an example of where you might see this is like framework level code, where objects are created, not by invoking the constructor, but by some other process like they're created as a side effect of doing something.
+
+[00:06:17]
+And then you can be assured that, whenever we go through this pathway where these things are created. I'm grabbing that instance and I'm doing a bunch of stuff to it, and then when I hand it off, I want it to be represented as if the stuff was always there.
+
+[00:06:35]
+You're taking on risk there, but sometimes it's a valid pattern. Sometimes it's preferable over modeling an interface, or a class that represents, the partially set up thing, and then you have another class that you have to deserialize and serialize into so you get the fully set up thing, it can get complicated if you try to stick very rigidly to the rules.
+
+[00:07:00]
+Those are two use cases for definitely assignment operator.
+>> Is it a good practice to use the non-knowledge assertion operator in production code?
+>> Non-null assertion operator.
+>> The exclamation point.
+>> The exclamation point, so what I said before, and I'll stick to it here. I use this all the time in my tests.
+
+[00:07:23]
+I try to not use it in applications, in libraries, in any code that's actually running and the reason is the mode of failure is usually unacceptable to me, it'll just throw your codes interrupted, and it'll fail however, it's gonna fail. And I usually like to, like I would say, if you want this equivalent thing in production, what you should really do is this.
+
+[00:08:03]
+Do this. And then write something explicit, like how to handle, the case where it's not there, just use a type card. In tests, this will get very messy cuz I might, on every single line, I get a big JSON object like back that has tons of properties and things on it.
+
+[00:08:27]
+My test would be three quarters, like by line count. Type guards and safely finding if things are there and throwing very specific errors, it's not just that the outer object wasn't there, but the inner object too and the inner inner inner object. And that's where using this non-null assertion operator, it's valuable cuz all I want is to throw the, as I try to probe into this object, drill into this object, and this is a very concise way of doing that, it's easier to maintain, your test remains a lot more readable, but I don't use this.
+
+[00:09:10]
+I'm not gonna speak in absolutes here, it would have to be exceptional case for me to use this in production code, not even a production code, any code that's outside of the testing sphere. Cuz you can always do this and this is much more graceful error handling, this is okay when throwing is the desired outcome, that is an absolute statement I'll make because that's exactly what I'm near it'll throw
+>> Is there a difference between [COUGH] using the exclamation point on 53 and using the declare keyword?
+
+[00:09:55]
+
+>> Like this? That's interesting. I wouldn't necessarily do this. I'm actually surprised that this works. I use declare mostly in ambient type information, or when I'm making a mod, like a type declaration, which we'll see later, where you can do that, you can augment types in other modules or in the global scope, but I generally don't use this.
+
+[00:10:30]
+It does appear to work, it appears to work. I would be kind of, if I saw this in a poll request, I would comment on it and say, you're asking people to understand that you can do this and there's an equally effective way to do this and it's much more common and people will know it when they come across it.
+
+[00:10:53]
+But that's interesting, you taught me something here. I guess we're saying what we're doing there with declare, if I had to guess, I don't know this for a fact, but I'll explain how my mental model is processing that. When we say declare, we might be stating that, this is a boolean, it's of type boolean, and it's sort of a different thing then checking for definite assignment, right?
+
+[00:11:24]
+You're really, yeah, that's the best way I can articulate it. I'd recommend using this, I don't think I've ever seen the use of declare before field unless it's in a declaration file, like a DTS file.
+>> I've ended up having to use it like in a number of projects where I'm injecting, setting that to a bad service, using that decorator.
+
+[00:11:50]
+And it's probably cause like my TS config wasn't set up right or something, but it would complain about the exclamation point there but it wouldn't complain about the declares.
+>> I see like a collision of syntax. Yeah, I would use declare there given that it works, but man, is that uncommon and please file a bug report because I think that's odd.
+
+[00:12:13]
+It's odd to the point where I'm not sure it will continue to work that way, it's that unusual. It'll work in declaration files, all of definitelytyped like that's declared everywhere but in this space, I've never seen that, interesting. I believe you though, there are all sorts of typescript syntax things that sort of collide with other things like this, this is a when you mix this with JSX, it's quite interesting here, this is why we don't write arrays like, This is popular for a long time, but this makes it complicated in JSX, where the parsers get overwhelmed with the same kind of syntax, meaning different things in different spaces.
+

@@ -1,0 +1,80 @@
+[00:00:00]
+>> You'll also notice around here, look, update didn't even make it as the number one, garbage. Okay, so we have a garbage problem, yes. We aren't quite sure where the garbage is coming from. Looks like it's coming from a lot of places. So we know that all of these are contributing to this final number right here, right?
+
+[00:00:16]
+This is part of it. But what I see right here, right below update, is register destroy hook, okay? If you don't know that's more than we were getting into the idea of node internal async hooks. You want to guess what that's related to?
+>> Promises
+>> Promises. Node has a lot of stuff look at this a init, which is 4% of the time that's on top.
+
+[00:00:39]
+Guess what it's linked to? More async hooks. Okay, what about destroy async hooks? Okay, play game. That's us. Okay, that's us. This run micro tasks. Also it's in some sort of task use probably not promises. Maybe that's something else.. List on time out. Okay, this is some sort of timers internal.
+
+[00:00:58]
+We are using a timeout. That's 2% of the time that it's doing something and that involves a timeout. We have these admit hooks again, async hooks, that's something we have a before async hooks. We have promise init hook destroy tracking 1% of the time. Again, promises, promises, async hook, async hook, async hook.
+
+[00:01:17]
+So there's quite a bit of code in here that's actually looking to be, the majority of code that's executing is related to promises, and we also see a lot in memory being related to promises. So how much do you wanna bet that promises looking at both memory, which is like 20, 30% of the time.
+
+[00:01:35]
+And in the code, which is looking literally like 20, 30% of the time, this could be big W. I would say that this is probably gonna be a big W and I have no idea, cuz I've never done this before. So we're gonna find out now live, completely unpracticed.
+
+[00:01:55]
+All right, so where are we creating these promises at? How I'm going to make sure everything's all nice. Well, remember our tick function is creating a promise every time we do a tick. So let's just do a little bit of math here. Just a quick little bit of math.
+
+[00:02:12]
+We'll do it in bash to make bad cop happy. We have a tick approximately every 16 milliseconds or 60 frames a second. We had, say, 1,000 games running. So we're doing, and then we're going to do that. Let's see. So yeah, that's, yeah, that's pretty much it. So that's 60,000 promises a second, right?
+
+[00:02:34]
+That's a lot of promises per second. We're creating a ton of promises per second, but wait, there's more. Remember that is this promise right here that we've created by awaiting. Oopsies, wrong one. But inside of here, if we sleep at all, we actually create another promise inside of that.
+
+[00:02:52]
+So really we're looking at potentially about 120,000 promises per second. So that's a lot promises. That is a lot of things happening. And not only that, but promises have effects elsewhere. And so let's kind of look at those effects. Let's see, I wonder if I have yeah, let's talk about the event loop for one quick second.
+
+[00:03:14]
+So what I'm gonna do is I'm gonna kind of give us a basic intro into the event loop. You can imagine the event loop something like a loop, right? What ends up happening is that every single time there is something to execute it is added to a list, and this list could have several items in it, all right?
+
+[00:03:35]
+So we have a wake up from V8 saying, hey, you have data on your WebSocket, you need to handle this. It doesn't just exit. It doesn't just interrupt your program running. Because your program's running JavaScript. JavaScript is not multithreaded. It will never be multithreaded. It is never meant to be multi threaded.
+
+[00:03:52]
+It is just single execution. That's how it always has worked. And so even though there's things happening multithreaded underneath, such as reading the network, and doing all that, it doesn't mean JavaScript is multithreaded. Maybe we have some data out on the socket. Okay, we need to go read that.
+
+[00:04:07]
+Now we also have, say, one of those tick promises that need to be woken up from. We also have another tick promise that's gonna be woken up from, right? We can have a bunch of these and as we read one piece of data for us to be able to read that data nothing can be executing.
+
+[00:04:22]
+And how you leave the process event loop or how you go back to the promise event loop is that whatever is running needs to stop running. And then once nothing else is running, execution is handed back to the process event loop. We grab the latest one off the list, and now this is the thing that's executing while we wait, and maybe much, much more.
+
+[00:04:41]
+Maybe some more ticks happened in between there while we're waiting. It reads this, the WS library reads in that data, kind of creates the frames, makes everything nice. And then, no some more data comes in but where is that more data at? Well it's going to be down here, right?
+
+[00:04:56]
+It's gonna be somewhere else, it's going to be way down here. It has to wait for the other things to execute before it gets its chance to execute in JavaScript. So everything gets in this nice little line to execute. So maybe we didn't get a complete frame here.
+
+[00:05:09]
+So we have to wait until the next piece of data. So that we're going to go here. We're going to execute. We're going to update the game, and then we get a chance in here to finally go and go, okay, now let's finish off this frame. Okay, we got a frame, now the player can shoot.
+
+[00:05:25]
+We're gonna add it to the queue and we're gonna wait for the next tick to happen, so that it can shoot. And so you just got to always kind of keep that in your head is that it's not free, promises are not free because one thing that's really intense about promises is every single dot then or dot catch happens on the next cycle.
+
+[00:05:44]
+It adds itself back to the event queue. There is just not a way to execute through a promise chain synchronously. And so that has real impact. So if you go one, two, three, four, and you have four promises that are executing synchronously and you're getting thousands of requests, that one, two, three, four will be interleaved with everybody else's one, two, three, four despite the fact that maybe it is synchronous.
+
+[00:06:06]
+And so maybe that one executes and then 1,000 other people's ones execute. Then you're two executes and 1,000 other people's two executes and then you're three executes, it can have adverse effects onto how things are performing. And it adds just more overhead. Not only that, but node, because it is older, it has had more time in the ecosystem, it has a lot more tools for introspection and being able to tell what's happening.
+
+[00:06:30]
+Datadog, I know, does things with the async hooks. They're able to link into node and tell what's happening underneath the hood. Bun does not do that, does not have as comprehensive hooks. Therefore, theirs does appear, my goodness that's a weird phrase theirs does. Buns ability to process through promises it appears to be significantly faster.
+
+[00:06:52]
+Is it actually faster or do they just not have as comprehensive hooks? I don't know yet. Time will tell. I'm sure over the course of the next year we should see a slowdown because as they add more and more ability, but is it gonna be an equal slowdown?
+
+[00:07:04]
+May be may be not, I have no idea. But for nodes, promise and async hooks just aren't super fast. They're working on it now I have seen a lot of people talking about it. So will this change? Probably. How much will it change?. I don't know, but it will change.
+
+[00:07:21]
+So there you go. That's kind of like some background knowledge you should have in your head whenever you're doing something. You should always imagine how concurrent program works in JavaScript that it's always stacking up against each other. So no promise is free. It is not a zero cost abstraction.
+
+[00:07:36]
+It's a Rust call out, by the way, do you know, I have a Rust course on Frontend Masters, man. I'm so good at this, the self promotion, definitely not an ad, though.
+

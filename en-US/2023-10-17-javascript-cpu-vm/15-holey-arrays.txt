@@ -1,0 +1,170 @@
+[00:00:00]
+>> So let's go to one more thing. So let's talk about holey arrays. These are my favorite because they're not holy as in religious, they're holey, as in they have holes inside of them. Okay, and okay, so let's talk about them first. So imagine you write something like this.
+
+[00:00:22]
+You say array, 1, 2, and then you leave a space over there and put three. Now, you would think so if you read the, let's see, so 0, 1, 2. If you read location 2, you'd get undefined. And you might think that what actually happened was that you have undefined in this location.
+
+[00:00:42]
+But that is not what's actually happening. What's happening is that you have a hole. And if you try to read that location, you will go up the prototype chain to the object array and see what's at the location 2. And if there is some value at location 2, then you will get something other than undefined.
+
+[00:01:05]
+Now you can see how arrays with holes might be a problem for the optimizer, right? Because if you know ahead of time that you have just an array of numbers, the access and manipulation is so much cheaper. Cuz if you've to add things together, you know it's perfectly safe to read the value and put it on the register and add it to something and move on with your life.
+
+[00:01:30]
+On the other hand, if you have an array that can have many different shapes inside of it, then you can't just read the value and do this. First of all, you know that if you read the value between 0 and the length of the array, it is safe to go and access out of the memory.
+
+[00:01:47]
+But if you read outside of the length, then you need to use prototype chain to resolve it to undefined. And this is the weird part, you actually have to go through a prototype chain. Because if you don't, there could be something in a prototype on location 7, and then you read 7 and your array is only six size.
+
+[00:02:05]
+So you think you'd get on the you don't. You get whatever is at the prototype of 7. And so it kind of becomes, basically, this particular operation becomes tricky. This adding, because you might get, sorry, the reading part becomes tricky because you might get weird values out of the system.
+
+[00:02:23]
+So when you do something like this, when you say that you're gonna put -3 at location 2, when you go and read this particular bit right here, you're gonna get -3. And you can see how it ruins the day for the optimizer. So, what happens in JavaScript is that even though you have one exact type of array, right?
+
+[00:02:47]
+There's only one thing called an array as far as you're concerned. Internally the V8 has lots of different types for arrays. It basically tracks things and says, hey, is this an array of nothing but integers? If so, there's a special subclass for it. You can't see it as a developer, but the the VM does because it knows that it can do all kinds of optimization.
+
+[00:03:08]
+If you can promise me that that particular array will have nothing but numbers inside of it, I can do a bunch of other things. There are specified arrays for numbers, specified arrays for floating point numbers. There is specified arrays for mixed types, so that meaning you can have objects and/or numbers inside of it.
+
+[00:03:30]
+And everything else has also additional subclass called the holey arrays, which is the array that could have a hole inside of it, okay? And these holey arrays are bane of your existence in terms of performance, because they will cause all kinds of problems. And the reason why they cause problems is because the generated code can't just assume that if I read the value, I'm good.
+
+[00:03:53]
+It has to be like, I read the value, I got the special undefined value here. I better check the prototype chain just in case there is something in there. And so prototype access will become so much slower. And so, how can this possibly work? So the way this works is that, again, you have this hidden class for an array, right?
+
+[00:04:17]
+And this hidden class kinda has an index of as before, and you have a special symbol called a HOLE. It's a special value that you recognize like, that's not a real value, that's a hole, right? There's no holes in memory, you can't do that. But you can put special values that you will recognize, like, yeah, that's actually pretend to be a hole over here, right?
+
+[00:04:37]
+And so then you can create your objects. You can fill it with values, right? And then you can also fill it with holes. Where is a hole here? A hole, where am I using it? I don't know, right? But hey, the point is, the code that you kind of have to create is something like this, where you iterate over the values, and then you see, is it a hole?
+
+[00:05:02]
+If so, then you have to go down the rabbit hole of the prototype chain, right? So you read the value. If the value you get is a hole, then you have to do all this complicated stuff about going up the prototype chain to try to resolve it. Otherwise, the value is just undefined, right?
+
+[00:05:17]
+Do you see how it gets complicated with this? So holey arrays are kind of a nice complication. Now, how do you get holey arrays? Well, I showed you. The most obvious way is this way. But you can also get holey arrays by doing code like this. You can say array = new Array(10).
+
+[00:05:41]
+That creates a holey array with 10 holes in it. And guess what? Once the array is holey, all of the derived arrays, if you perform a map operation or something like that, they will all be holey all the way down. Holes all over them, yes?
+>> If you do a new Array(10).fill and fil it with undefined, is that then a new?
+
+[00:06:03]
+
+>> So, good question. I know in the past it was holey for the rest of its life. I don't know what new VMs do, whether they're smart enough to kinda recognize this particular thing or not. But there is a way to figure this out. And let's do this, let's run a benchmark.
+
+[00:06:22]
+I have a benchmark on holey arrays. What does the benchmark do? Let's see, Let me remind myself. All right, so I have just array with numbers. I have arrays of strings, and what am I trying to do here? For each one of them, I am just trying to read the value, right?
+
+[00:06:47]
+So I'm just reading the value and comparing it to the false. Notice I'm using triple equals so that we don't have any surprises. So I have an array of numbers and I'm just trying to iterate over it. So iterating over numbers, as you can see, is faster than iterating over strings.
+
+[00:07:01]
+Now I also have tried to subclass array to create a different prototype chain. And it looks like in the past, this used to have a performance difference, now it seems like they perform just as well. Good job V8, you seem to have fixed this particular performance issue. Mixed array, as you can see, is about 70.
+
+[00:07:21]
+Arrays with holes, look at that. Now we're slower at iterating over these things. And arrays with holes that have things on a prototype, bam, you get hit. So it turns out that, and so here, the way we've created this is I created a subclass called MyArray. And then in this subclass, I messed with the prototype.
+
+[00:07:47]
+So not only does the VM keep track of the fact whether or not the array has holes, it also keeps track of the fact, is the prototype chain pure? In other words, didn't anybody mess with it, right? Because if nobody messed with it, then it can just answer the question, right?
+
+[00:08:06]
+So in this particular case, I've messed with the prototype chain by putting something on it. I put it on a 0th location. But just by putting it anywhere, I have basically made the whole thing dirty. And so now when I deal with MyArray, let's see, when I create myArrayHoles prototype right here.
+
+[00:08:23]
+When I put holes into it, so that's another way of putting holes into it, is you can directly set a value, right? If you set a value past the end you create a hole in the middle. So if you have an empty array and you say array value 10, then you just have 10 holes and then position 10, which is really 11th is now a value, and so you made yourself a holey array, congratulations.
+
+[00:08:55]
+So this is why, in general, you should be using .push, unless you're really really sure that this is gonna work just fine. And so just by the fact that I've, yeah, and this creates holes here because I do it only every other one. See now I have every other one is a hole, right?
+
+[00:09:13]
+And so most of the times when it reads the value, it will just go to prototype chain will receive undefined, right? Except in the case of 0 it will get 0. And so that alone is enough to confuse the optimizer and the V8 so much that it basically gives up and generates these super slow code that it knows is safe, right?
+
+[00:09:36]
+And so the reason in performance that you see here is what you're looking at are different assumptions that were violated for the optimizer, right? So the code right here, the super slow code that was generated here, this is where all the assumptions are off the table, and the V8 actually has to do everything by the book to get you the answer, right?
+
+[00:09:58]
+All the other ones that you see here are tricks that the V8 knows it is safe to play as long as certain invariants are true. And so this is why you can have a different performance in it. And if you compare this to, that's what, like, that's a 10x difference in performance of iteration speed.
+
+[00:10:15]
+That's big, right? Now, luckily, the the Deopt Explorer will tell you about this. Mark question, yes?
+>> Yeah, online they're asking about, why did the engine implement it this way with holes instead of filling it with undefined?
+>> Because that's what the spec says, right? The spec of JavaScript says that this is the bizarre behavior you need to get.
+
+[00:10:43]
+So the, [SOUND] Memory, no, not this memory. This memory, holding memory. Here, the spec says that in this situation where you have a holey array and on prototype you put the value 2. If you try to access array 2, if you say array, If I can type, where you say this, then the answer should be -3.
+
+[00:11:15]
+That's what the spec says, right? So the VM has to implement this bizarre behavior. Now, you should never write code like this. If you do, and I'm your manager, we probably should have a chat. [LAUGH] You're trying to be a little little too clever, but the VM has no choice, right?
+
+[00:11:34]
+It has to follow the spec. And if you remember, for a while, we had this thing called MooTools, which went viled, I guess, before jQuery days. So maybe this was a long time ago. This is ancient history, archeology. But MooTools would modify prototypes left and right all over the place.
+
+[00:11:55]
+
+>> And there was a library before that called prototype.
+>> Well, there was a prototype before that, right? They would just modify these things. And so the VMs, to this day, need to implement the correct behavior. Because, what if you come to a website that still uses one of these old things, and I'm sure there are websites out there that still use this thing, right?
+
+[00:12:13]
+And so you have to behave correctly. And so the answer is here is -3 if you do array of 2, even though there's a hole, right? That's sort of why we call it a hole, not an undefined, because you can see through it to the other side. And the thing that's on the other side is a prototype.
+
+[00:12:27]
+Now the fun thing is, the way the Javascript is implemented is that even though you are reading the value 2, it gets converted to a string 2. Everything is a string as if it was a string. So all these reads pretend to be strings. And so array of 2 really gives you this string 2.
+
+[00:12:57]
+Crazy, right? So the VMs basically have to do it because that's what the spec says they have to do, right? That's kind of the thing about JavaScript, right? Is there a lot of ugly parts to it that nobody in their right mind should be using. But these ugly parts kind of define what is and isn't possible for the VMs to do.
+
+[00:13:20]
+And VMs, for the most part, cheat in a sense that they hope that you won't do those bad things. And they have flags that basically say, did you do the bad thing? You didn't? Good, I can do the short circuit code, right? Which is why it is possible to do a bad thing in one place in the codebase, and ruin the performance of some other piece of code somewhere else, right?
+
+[00:13:45]
+You're thinking, I'm gonna add something to prototype chain. Let's add to the prototype chain. And all of a sudden the VM's like, I can't do all these optimizations that I did. And the code over there becomes slow. And somebody then screams at you and says, why is the code slow, right?
+
+[00:14:01]
+Like, I just added this completely unrelated to your code. Well, it could be related. So this is kind of the the downfall of kind of the JavaScript VMs is that, the kind of tricks VMs use changes over time. And the tricks they use are really driven by the patterns that the developers use in their codebase, right?
+
+[00:14:25]
+So if you use a particular pattern long enough and becomes popular enough in the web, then it's likely that some optimization trick will be inside of the VM to kind of take advantage of that. The performance of dynamic systems like JavaScript is basically unknown until you have the whole program, right?
+
+[00:14:50]
+We showed you how deoptimization can mess with you. For example, you could read a property off of a prototype like map. And so map is now inlinable because it's always the same map that you're getting all the time. Until you run MooTools and in monkey patches map to do something else and all of a sudden your code is like, I thought it was constant, it isn't, deopt, and all kinds of things change.
+
+[00:15:17]
+Okay, so but let's look at the Deopt Explorer. And let's go into, why is holey, because it's not recent. Okay, open file, Profile > holey-arrays, here we go. So this thing should tell us about the holey arrays, let's see how good it is. Okay, so here's our benchmark and Here we go.
+
+[00:16:03]
+Here it is, this is the moment, see how it's read? It's really not liking this. And so if you hover over it, you can see the classes that go underneath it. And you can see that it's the same one, and you should be able to see the fact that it has holes.
+
+[00:16:29]
+Okay, here we go, the element type it's HOLEY_ELEMENTS, right? So you can actually see this information in the system. And so you can see the performance, the de-optimization system basically tells you, hey, I saw this particular thing, this is what you actually have over here. And so you wanna avoid anything that is of kind holey anything, because that creates problems for the system.
+
+[00:16:59]
+I'm wondering if there's more stuff here. So these are the maps, right? The maps basically show the kinda objects that are in the system. And you can see, this is because we created our own array, this is our own array, this was our own instance, right? This is what it is.
+
+[00:17:13]
+You can see how many functions are in the system, how many object shapes existed. In this particular case there was only one object shape. But it gives you an idea. So the maps are V8's way of calling it the object shapes. So hidden classes basically translates to what they call now maps.
+
+[00:17:30]
+Originally it was called hidden classes, then I guess they changed it to maps. And the tool actually gives you a pretty good view of what happened and where it happened. So, you can, for example, see here when the transitions are happening, right? You can see specific location in the codebase where this particular class decided, nope, I am no longer a regular array, I am now a holey array.
+
+[00:17:49]
+It was on line 20 of the code, right? And you can see the transitioning that are happening in your system. So this is a way kind of to debug and kind of figure out, if you really wanna go deep onto it. Normally, I would not go here until I have a piece of code that I really know is hot piece of code that really needs every single point of performance extracted out of it.
+
+[00:18:12]
+Then I would kinda look into these tools, usually I would not. Questions, yes?
+>> What sort of hot pieces of code that you really need to dig into would you find yourself using this for most often, when you're?
+>> So in Angular we transition to something called Ivy, I don't know if you, some of you have Angular backgrounds.
+
+[00:18:36]
+Okay, so Ivy was basically kind of a rewrite of the runtime and compile time, specifically to make sure that the code we generate would be monomorphic in all cases. And the reasoning was actually twofold. One is, first of all, I showed you why you don't wanna have megamorphic code.
+
+[00:18:54]
+But also if you end up with megamorphic code, you are putting pressure on the second level cache. And if you're putting pressure on second level cache, that means the your application code now runs slower, right? And so the idea was that by doing something like Ivy, not only do you get better performance in terms of executing all these data bindings, but you also get better performance because you're no longer putting pressure on the second level cache, and now that cache can make your application code actually go faster.
+
+[00:19:25]
+And we have seen, pretty over the cross the board performance improvements with Ivy. So there's a lot of benefits to it. It was a humongous undertaking, though, and I wouldn't wanna do it ever again. But that's a place where all of these things mattered, right? So we would look with these tools and be like, okay, are we generating code that could potentially produce a megamorphic reads, which means inline caching can't be used or anything like that.
+
+[00:19:54]
+And so these are the tricks that we would use.
+

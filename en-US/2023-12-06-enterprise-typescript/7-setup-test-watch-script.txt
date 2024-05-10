@@ -1,0 +1,134 @@
+[00:00:00]
+>> Would you recommend adding a build step to the test script in package.json?
+>> Yeah, I might. So your question is, would I add a build script before running tests in my package.json? I could, that seems like a good idea. There you go. Yeah, this is a nice little ergonomic improvement where I can run yarn test.
+
+[00:00:25]
+Now, if I've already done a build, for example, this will do a double build, but it's pretty quick, given that we have this tsbuildinfo file here. It'll look at the source code. It'll compare all of the hashes it has for the various files. And that'll let it avoid doing too much work.
+
+[00:00:48]
+It's not starting from scratch. This is sort of, think of it like a build cache where it knows the current builds represents a certain checksum on the source files. It's a great suggestion.
+>> Is there a way to get watch working with this, like test watching? Or is that kind of lost with the need to transpile the tests?
+
+[00:01:13]
+
+>> You mean like incremental compiles?
+>> Yeah, like jest watch.
+>> You could. You'd need to do two things, though. I'll show you the two parts. I could try to do this live here. Let's try it. Let's try it. So, I would break this up. I'd say, I'd have two commands.
+
+[00:01:46]
+Now, by the way, let me first say, we're getting a little bit beyond the simplest possible library setup. But this is an interesting direction we can go in here. I'll take this side trip for sure. Okay, so what we wanna do is have two commands here. We wanna watch the build.
+
+[00:02:05]
+And we wanna watch tests. So I think what we would end up doing is, here, we'd say yarn tsc --watch. And I actually like to do this too, preserveWatchOutput. Without this, well, let's face the problem first, and I think we might all agree to add it back in.
+
+[00:02:33]
+So what's happening here is we're watching for file changes. So if I were to go to my index.ts, and let's say I rename this class. And I hit Save. I want something that'll cause an error, how about this? So you're gonna see some type checking errors here, they look a lot like linting errors.
+
+[00:03:00]
+And it's telling us that this type checking failed. And then we could reverse this change, and we could hit Save. And it'll be happy again. But every time I save, I lose. It's like clearing out the terminal and you're starting fresh. And I prefer to keep that around.
+
+[00:03:17]
+So I add preserveWatchOutput, which will help this. Or you can see we delete this and hit Save, and put it back and hit Save. And you can see here we can still scroll up and see this stuff, right? I don't like tools that get rid of my terminal buffer.
+
+[00:03:34]
+That's useful stuff. Please don't throw it away. So that's one thing we would need to do. And then, why don't you, so you've used jest watch mode before? What's the command I would use for that? yarn jest --watch? Co-pilot thinks so too. Okay, now let's try that. Hey, okay, no tests related to files.
+
+[00:04:05]
+So I'm gonna make a change. There it goes, it's running my tests. I touched my tests and they end up saving. So we have two things. We're watching our build source code. And we're watching our tests and running jest, whenever we touch our tests. We could do something like this.
+
+[00:04:32]
+We could split our terminal and say like, yarn watch-build, and then hit Enter. And yarn, watch-tests. And this will be okay. You're gonna hit race conditions here where you touch a file and then change your tests really quickly. And maybe the build hasn't finished yet on the left side or the right side.
+
+[00:04:56]
+But they're both working for you here, right? If we change this, there are tests running. And if we were to go back here, let me save that again. Go back here, and let's change function name, like that. Jest hasn't picked up on it again. Hasn't picked up on it yet.
+
+[00:05:16]
+I'm getting a type checking error here. I'm sure there's a way to set this up, but. Was that test failing before? Let's change it back. And change it again. All right, hitting Save. No tests found related to files changed since last commit. You know what we probably need to do here.
+
+[00:05:53]
+I bet there's a way to tell Jest to watch, A set of files. Watch files for changes. Watch all. How do we tell it what to watch? I think that's pretty much all you would need. But I would look at the docs here. I'm not really super prepared to discuss this.
+
+[00:06:22]
+But I'll tell you what I would look for here. If you can tell jest to watch a certain set of files, and that includes the dist folder, then you get away from that nasty race condition. So what would happen is anytime something in the dist folder or the tests change, jest would sort of bump.
+
+[00:06:43]
+It would automatically run the tests again. Right now, the functions underneath the tests have changed. Jest is not watching for that, it hasn't run the tests again. But if we were to go in here and just, I'm not watching anymore. We would hit Save here, or we're running the tests now.
+
+[00:07:08]
+It'll fail, right? The next time it attempts to run the tests, it'll fail. So, let's put that aside. I'm sure there's a configure option there, but I don't wanna spend your time looking for it. Let's talk about how we can get all of this working with one command.
+
+[00:07:22]
+That, that I can certainly talk about. So I'll kill this, and I'll kill this. We're gonna install another package here, yarn add -D concurrently. This is a great little CLI. Okay, the way concurrently works is you give it, I'll close this one on the left so we can see the terminal output more clearly.
+
+[00:08:00]
+You give it a couple CLI commands to run, and it will sort of run them in parallel. So, here's an example, let's see. Yeah, we'll follow this example here. So, we give it a couple of arguments, we'll start basic here. In our package.json, we can create a new script called watch.
+
+[00:08:33]
+Does it have an example with a dash here? There we go. So, we're just gonna list commands that we wanted to run. We're gonna put them in single quotes, cuz you want a string of five Es. So it's yarn concurrently, and then this is one thing that you would type in your terminal.
+
+[00:09:03]
+Another thing you would type in your terminal. We're gonna call right back out to the individual watch commands here. There's a convention you could use, like, npm: watch stars, like this, right? It's gonna kind of cause a little bit of a mess, if we keep them separate like this.
+
+[00:09:26]
+What I'm about to do is I'll have them render in different colors. We can give them titles, but if you say run everything that's dev- *, you lose the ability to sort of sort them in a particular order and so on. So let's see what happens. Oops, yarn, I didn't save.
+
+[00:09:50]
+yarn watch. And here's concurrently doing its thing. You see the 0 and the 1, this is watch build. This is watch test. And if we look back at the CLI output here. If we go back to Help, we can name these things. Where's the example of names? -c for colors, we could add that real quick while we're here.
+
+[00:10:27]
+So I'll just do that. Single quotes again. So I'll just do red and blue. And then I think it's -n for name. Just wanna make sure there's names. So we'll add this just as is. Probably -n will work too. We'll just call it TS and JEST in caps.
+
+[00:10:50]
+So they look real nice in square brackets. So just to show you the whole string here, yeah, that's it. So it looks like a lot of different stuff going on, but it's concurrently. And then at the end, it takes as many arguments as you want for commands to run in parallel, even if they don't return, right?
+
+[00:11:10]
+That's part of the point of concurrently. You can run things that return, if you wanted to. I don't know, if you do a build and then you have multiple test suites and you want them to spin up on a bunch of different cores, you could do that. And then as long as these things are of the same length, splitting by comma, as the number of scripts you provide, it should all work.
+
+[00:11:32]
+So let's run yarn watch one more time. Hey, look at that. We've got TS and we've got jest. And it's super clear what's happening here. Concurrently is a great little tool for this kind of thing. There are other options you can use so that you can control at what point does this yarn watch command exit.
+
+[00:11:54]
+Is it when any one of the commands I tried to invoke fails and blows up? Or is there a primary thing that, I look to that primary task as that's what I should watch? That's what I should consider to be, if that exits 0 or 1, I will exit 0 or 1.
+
+[00:12:11]
+A lot of different options here. And this has been an incredibly stable tool over quite a few years where it's sort of, it does this simple thing that it is very good at doing. And it hasn't changed much, but it's super useful. I use this all the time.
+
+[00:12:26]
+So now you could throw other things in here if you wanted to, as many other scripts. You could have linting working, every time you hit Save, it would lint as well. We have a question from online.
+>> What is your thoughts on using Prettier to fix some of these formatting issues?
+
+[00:12:47]
+
+>> Prettier is good for fixing some of these formatting issues. I wanna see whether Prettier was actually the root cause here for my problem. Yep, I would recommend Prettier. I was looking to see whether this indent hopped back in. Let's see what VS Code's, Regular formatter does. Yep, I don't know how that space got in there.
+
+[00:13:18]
+I love using Prettier for this kind of thing. You could also put Prettier in concurrently, by the way. You save a file, it'll rewrite the file. Now, careful there, because you might have unsaved changes and other files. It can get a little weird, so use it tastefully. But it's great for sort of inlining a bunch of things.
+
+[00:13:39]
+And just tying back to the idea of working with large teams, enterprise scale TypeScript, this lets you help people. If you had a dozen people contributing to a project, you would get them used to running yarn watch. And if you're sort of the maintainer that's deciding like, here's how we're building, here's how we're linting.
+
+[00:13:59]
+We're dropping TypeScript as the compile tool. Maybe we're trying SWC, which is a Rust equivalent here. You could do all of that and everyone's still running yarn watch at a sort of a platform level, Change what's being watched, or when do we terminate the command? That kind of thing.
+
+[00:14:23]
+
+>> Someone is recommending using TS node-
+>> Yeah.
+>> To watch both at the same time.
+>> You could run TS node to watch both at the same time. What you would lose there is referring to the actual dist folder. You'd be testing against sort of the individual modules of your source folder there.
+
+[00:14:42]
+That's the approach I've seen with TS node. I think what you really want, to get all of the benefits I've described here, you just want jest to be able to rerun the tests whenever anything in the dist folder changes. If you get that, I don't think there's much of a downside here.
+
+[00:15:00]
+TS node would let you have no build, right? It will have nothing to do with that dist folder. And remember how I told you, we strip internal, right? This file here, this function here, this should not be visible to consumers of this library. If we look at our declaration file here, Stringify error value is not here.
+
+[00:15:28]
+It has been stripped out. So, we wanna maintain that. Let's see if I'm actually right about this. Can I grab this? See, look at that. If you're using TS node, you would be able to import this. You're running tests against secret internal things within the library. So, I'm not saying it's a bad solution.
+
+[00:15:54]
+I'm saying it is substantively different than what we're setting up here. I want to test only those things that my library consumers will be able to access. And what I'm seeing here is I get that. But if I'm running tests that take all of the source files in my src folder, and that's the approach.
+
+[00:16:13]
+Usually with TS node, right, you just run all of that node stuff directly, of the TypeScript directly. You'd be able to import this and someone will write a test for it. And now, you start having a lot of sensitivity around your tests to internals, which you should be able to evolve those and change those, cuz they're not gonna necessarily affect your customers, and not have to update tons and tons of your tests.
+

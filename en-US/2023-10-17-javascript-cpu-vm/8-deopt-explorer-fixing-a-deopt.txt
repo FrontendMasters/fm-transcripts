@@ -1,0 +1,80 @@
+[00:00:00]
+>> There is a tool called, Deopt Explorer, this is a tool that Microsoft has written so let's back up a second, It is possible to run the node with a special set of options. It tells the V8 to tell us about all of these events when it's compiling, what is it compiling, what is doing, etc.
+
+[00:00:28]
+And so what I did is I ran it with a special way and you get this thing called get this log and so for us, we got this deopt log, let's open it up and it has basically these long list. These are human readable but good luck reading this, it's ridiculously long in here, but the nice thing about it is that when you have this deopt explore you can open up the log.
+
+[00:01:05]
+And when you open up the log, it tells you about what the VM was doing, so first of all you can see, let's make this bigger First of all, I am not an expert at this, I think I know more than an average person about how all this stuff works, but I wouldn't consider myself an expert, this rabbit hole goes very deep.
+
+[00:01:28]
+What it shows is this program ran for 2 and a half seconds, out of that time, almost all of that time was spent inside of my code. A small fraction was spent inside of the program. Program is the V8, V8 is called the Program, I don't know why they call it that way, it would be better to call it V8 or something like that.
+
+[00:01:48]
+None of the time we'll spend idling and there were no GC events,right? So out of the total time running, you can see that by far the most time was spent inside of my code, and the virtual machine itself took some amount of time to compile my code and process it.
+
+[00:02:03]
+Obviously, these numbers are super tiny because the code we fed it is super small. The next thing you can see here is you can see what code ran when and for how much time and using which which processor, so you can see that at the beginning, things go interpreted.
+
+[00:02:23]
+And at some point it transitions over to turbofan, which is the new optimized system. Over the years V8 had many different compilers they had something called turbofans and of crankshaft I, forget all the names it's just different internal implementations that they have iterated over the years I believe turbofan is the the latest iteration that they have.
+
+[00:02:52]
+Again, most of these things work the same on high enough level, it's the details that are different that you should worry about. What I find it interesting though, is you can actually see what's going on. Now notice what it's saying to you, optimized functions that have been deoptimized multiple times, in other words, this function when it was running, got deoptimized 3 times, 3 times the V8 tried to compile this thing, and twice it got it got it wrong or 3 times it got it wrong?
+
+[00:03:24]
+I don't know, it depends on how you count it, right? Basically, it kept trying to compile this thing, and the invariants kept changing on it and so it had to recompile it over and over and over again, right? Until it finally got to the last one, which was happy to, the first one was fast, because it was compiled using invariants that were incorrect and then it got a little slower but it was good for the remainder of the things.
+
+[00:03:47]
+And so if you can click on it you can see which function it is now it used to be that this thing got highlighted I don't know what happened I'm sorry. When I originally was exploring this thing, it would nicely highlight the function that's offending for some reason, it no longer does so, and I don't know how to fix it.
+
+[00:04:04]
+But it does a couple of things for you, it highlights things as you can see, you can see that this is highlighted. We will talk about monomorphic reads, etc, but these are basically good things that are happening here, this thing should have been highlighted in red, saying like, this is the problem here, this is why I deoptimized.
+
+[00:04:21]
+I don't know why it no longer does it, it should also be listed under the deopts over here, it says that it deopts benchmark, but it doesn't list the function as being the cause. So I apologize I don't know why this is no longer the case, but I'll show you a more complicated example where the thing works as it's supposed to, yes?
+
+[00:04:42]
+
+>> Did it maybe get deoptimized 3 times cuz you run it with four different functions and the fourth one?
+>> No, it will give the same number even if I just did it once, I think the other times the deoptimization was for different reasons. It's supposed to list the reasons here and you notice it only lists one reason, it says insufficient type feedback and if you click on this, it was something not happy with performance now, and we can zoom in into it what's going on.
+
+[00:05:09]
+So first reasons why it got deopt was because of these other reasons and then later it deopt because of the function and I really wish this would be highlighted. And I saw it highlighted before, but it stopped, I don't know whether the node updated or what, something changed, and it no longer highlights, sorry about that.
+
+[00:05:28]
+But I'll show you other examples where you can get kind of the insights. So the thing to show you is V8 may be a black box but it turns out it's not totally a black box, there's a set of flags you can pass into it right? And again, the team behind the Deopt explorer actually made this invoke this tool called dexnode..
+
+[00:05:54]
+What it is is different versions of node have different versions of V8 and because of that you have to pass in different flags to it in order to get the right information out of it, okay? So to simplify the whole world they have this tool called dexnode that figures all this stuff out for you, and then just passes the right set of flags right?
+
+[00:06:15]
+So this is basically node with an extra thing, and I you can specify where you wanna put the trace information out into the system before you run the piece of code, okay? So with this, function,you get this log, and this log can be opened up in the dependency explorer, and you can explore things inside of it, so I think this is kind of cool.
+
+[00:06:36]
+We'll drive deeper into it, but first, let's go back to our code. And let's talk about what could we do to fix it, the thing to fix it is to realize that this benchmark is wrong. The way this benchmark is implemented is it assumes that the code will be in line and it doesn't really work so I have a second version of this exact thing which I called the deopt fix.
+
+[00:07:06]
+Where again I have the the same function as matter of fact I import the functions from the other file, but instead of having the benchmark being a single function that gets different function passed into it. Notice now the benchmark is a function that I can call as part of a while loop, and this function internally does the counting and also returns false at the right moment when it says I'm done, right?
+
+[00:07:35]
+And so now the benchmark A and benchmark B have separate call sites. And because the call sites are separate, it is now safe for the VM to inline benchmark A into the call site A, an inline benchmark B into the call site B, right? And not only does it inline benchmark A here, it will also inline the time A into this location and time B into this location, and so on and so forth, right?
+
+[00:08:02]
+So now, because we're not running the same benchmark in the same location, the VM is free to inline everything and will not have deopt events. I see confused faces.
+>> Could we take a look at the create Benchmark function?
+>> Yeah, this one?
+>> Yeah, just
+>> It's just a counter internally, and it runs the performance now every once in a while.
+
+[00:08:31]
+The way it works is usually when you call it, the benchmark just increments a counter. Every once in a while, the benchmark says okay, you've I've done enough loops let me look at the time see if the time is enough. And eventually it says when it like has enough of a time difference then it says, okay, I think you ran enough, let me shut you down and the return is false.
+
+[00:08:52]
+
+>> Before it was running like a certain number of times, now it's running for a certain period of time?
+>> It runs it for a certain period of time until it decides yeah that there has run enough time. And so now if I run the dopt -fix, I should get about 4.6 microseconds for every single one well, no, it gets the faster one, right?
+
+[00:09:17]
+The faster one was 1.7, so now it gets 1.7 or 1.9, approximately the same thing consistently across the board because it doesn't get into the deoptimization thing, right? In other words, there is no call site where the VM could have optimized and later realized, oops, that was the wrong thing to do.
+
