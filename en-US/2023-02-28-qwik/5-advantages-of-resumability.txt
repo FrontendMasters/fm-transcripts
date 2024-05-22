@@ -1,0 +1,105 @@
+[00:00:00]
+>> Let's talk about Qwik and basically the two properties that it has. So it's resumable and it's progressive. So what do we mean by resumable? So when I first heard about virtual machines, my mind was blown away. And specifically was the fact that, let's say you had a Windows machine you could boot up a Linux inside of your Windows machine, right?
+
+[00:00:25]
+That was kind of cool but then, inside of the Linux machine you would actually watch it boot, you would actually see the BIOS run again. And then the whole boot up process would run and then you get to the login page and you could log in and then open up an application like spreadsheet and start working on your spreadsheet, right?
+
+[00:00:44]
+But the thing that really blew my mind is the fact that you could now pause the application, to pause the virtual machine and you would save it to a file. You could take this file to a different machine, physical machine, and there you could open it and there you would skip the boot up process, right?
+
+[00:01:01]
+You would literally just open it where you left off and there would be no boot up, right? There would be no watching the boot up system go or login page or anything like you literally started where you left off. And that's what the resumability is, right? If you have the full information of the system, then you can skip, the boot up.
+
+[00:01:21]
+And if you think about it, hydration is the boot up process that's happening. And so instead of saving the state of the system into the file, we can save the system into the HTML. And this is what the resumability is. Is that on a server, when we do pre-rendering, right?
+
+[00:01:40]
+When we pre-render the application, we go through the full boot up process, there we don't have a choice, we have to run all the code. But then at some point we serialize everything into the HTML. And once we serialize the HTML, the HTML can be either shipped to a different client or it could be saved in a CDN or it could be a pre-rendered content, it doesn't matter.
+
+[00:02:04]
+Once you get the HTML, you can just continue where you left off. And the continuing of the left off, the the real value there is not necessarily the amount of JavaScript that you download, it is the fact that you don't have to execute all the JavaScript again, right?
+
+[00:02:20]
+The real value is lazy execution of the code that you don't need. And so if you think about it, what's happening in the hydration is that in the server, you execute the whole application, then you have to serialize the application, then you download the HTML, right? And then guess what, you have to replay all of the application again, right?
+
+[00:02:43]
+This big box here, this code and this code are the same thing. You are redoing the work that the server already did. And this what makes hydration slower because you are doing stuff unnecessarily twice, right? And so the user interaction is pushed down over here. And so in the case of resumability, you still have to do this stuff on a server.
+
+[00:03:05]
+You do the serialization, which we call the pause. And then on the client, you don't have to do anything, because you just continue where you left off on a server. But that requires that the client can serialize not just the state of the application. The HTML serializes also the component boundaries, the listeners, it serializes the reactivity graphs so that it understands that if you modify data here, what other component needs to get re-rendered.
+
+[00:03:39]
+And if you can you serialize all of these things then hydration becomes unnecessary. Because what hydration is, is a way for the framework to recover information about the application by executing the application, right? Resumability is basically saying, I don't need to recover it by re-executing everything. I can recover it by just reading a bunch of stuff out of the JSON.
+
+[00:04:02]
+And because it's just reading out of the JSON and JSON deserialization is extremely fast, the hydration cost is extremely cheap, right? Sorry, the resumability cost is very cheap because you can just wait until the user clicks. It's only at that point that you need to actually deserialize the JSON.
+
+[00:04:20]
+Because the JSON deserialization is very, very quick. I think we have some numbers that basically says that for the most applications you would build, the initial JSON deserialization adds something like the 20 millisecond range on initial click, which basically is nothing, right? But the real reason why it's so little is because you don't have to execute any application code, right?
+
+[00:04:46]
+You literally just have to do JSON.parse nothing else. So the big difference between hydration and resumability is that the resumability doesn't require execution of the application code to continue where I left off, and that's the key, right? Because if you don't require application code to be present or executed, that's how you can get the real improvements in speed, right?
+
+[00:05:10]
+Because frameworks like solid are better at executing code that improve that, we just don't even do it. And it's hard to make something faster than doing nothing, it's the ultimate in speed, right, you just don't do it. Okay, so the second bit here is that a Qwik is progressive.
+
+[00:05:30]
+And what we mean by this is that normal frameworks, they basically download all the code and execute all the code. And so the amount of JavaScript that's required to run your site is essentially constant. Now this might go up if you've done some lazy loading, but it's kinda tricky because lazy loading in existing systems is only useful for components that are not currently in the render tree.
+
+[00:05:55]
+The moment the component is in the render tree, if it's behind a laser loaded boundary, it doesn't matter. The framework has to cross over that lazy loaded boundary, it has to eagerly download, it has to eagerly execute it. Just to figure out is, are there any listeners over there, right?
+
+[00:06:11]
+And so lazy loading in the current frameworks is only useful for basically the other route, only for things that are currently not in the render tree. The beauty of Qwik is that quick can lazy load or more importantly, as I said, execute only the code as you need it.
+
+[00:06:31]
+And so the whole code download in Qwik is very progressive. We start essentially at zero and as you do interactions more and more code gets executed, right? Maybe this just says downloaded JavaScript, but better way of thinking about it is the amount of code executed rather than downloaded, right?.
+
+[00:06:50]
+So the thing that you really wanna look at is what percent of the application has been executed? So if you look at the code coverage, right, that's the thing you really care about. And so in the case of existing systems, there's a huge code coverage initial jump. Because you executed pretty much the whole application in order to figure out where are the listeners, and then it stays pretty stable.
+
+[00:07:15]
+Whereas in a progressive system, you basically start with nothing. And as you interact with the page more things happen, right? So again, going back to the shopping cart example, when I navigate to the page, no Javascript, right? It's only when I click on a button that says Add to shopping cart, does that listener for that button execute, right?
+
+[00:07:37]
+And it is at the point of execution of that listener, does the listener go and modify some kind of state of the system. And then modification of the state of the system tells the framework that there is the reactivity graph. And the framework now knows, you modifying this state of the system requires me to go re-render the shopping cart component.
+
+[00:07:56]
+And so the shopping cart component gets executed and re-rendered, right? And the fact that there were many many components around you, that did other things like a complicated menu system to check on the status of your thing or log out or go to preferences or whatever. None of that matters, because the reactivity graph understands this.
+
+[00:08:15]
+And that actually brings up a very good point, which is that resumable systems require reactivity. Because if you don't have reactivity, then the moment I click on a button, the framework's like, something changed, I have no idea what, let's just go to the root component and re-render everything.
+
+[00:08:35]
+Which is kinda what many frameworks do, right? And if you do that, then you just lost the battle. Right, because on first interaction you have to download and execute everything. And so, reactivity is a strong prerequisite for resumability. Because unless you are reactive unless you understand the reactivity graph, you will end up just re-executing everything.
+
+[00:08:57]
+And that brings us to another next point which is lead and there are Are already reactive systems out there, like, for example, Solid Js and svelte. So can't they add reactivity? Not so simple, the problem is that all reactive systems require that you execute the application once in order to build the reactivity graph.
+
+[00:09:18]
+And again, that kind of ruins your day from the point of view of resumability, right? So the hard part is, or the tricky part here is, one, you have to be reactive. And the second bit is that reactivity graph must be serializable on the server so that when the system wakes up on the client, it can reason about the application without the application code being present.
+
+[00:09:42]
+And that's the key point here, you wanna reason about the system. You wanna know that changing this requires me to render that. And you wanna have that information without the application code being present. And that's the hard part, that's really what the key to reasonability is. If you can do that, if you can reason about the system without the application code being present, then that's resumability.
+
+[00:10:06]
+That allows you to be very surgical about the kind of code that you download and execute. So that you can just, know that I have to execute the button that clicks on the shopping cart and I know I have to re-render the shopping cart. And all the other code on the page is irrelevant I can ignore that code, I don't need to download it, I don't need to execute it, I don't have to have a present.
+
+[00:10:26]
+Okay, so kind of the lay of the land here is that, in my opinion, there are two kinds of frameworks out there. There are what I would call replayable frameworks, right? And what I mean by replayable is that in order for this frameworks to run, they have to replay the same thing the server just did.
+
+[00:10:46]
+And then there are resumable frameworks, which is a set of frameworks that can continue where the server left off. And this continuing where the server left off is really the magical bit that allows you to be performant, right? Because it is the thing that turns the problem of, let me download the whole application, which is kind of unbound in size as the application gets more and more complicated, like the amount of code you download is bigger and bigger and bigger, right?
+
+[00:11:13]
+Which is the reason why a Hello World could be 100 on 100 on any platform, but once it hits the real world requirements, nobody can get 100 out of 100. And a resumable system is that basically you can think of it as turning everything into an island, but they do it in a way where it doesn't change your developer experience.
+
+[00:11:34]
+You don't have to now think about it, it's just how the system works. But there's another important thing about turning everything to an island, which is, if you look at existing systems like Astro, the moment an island gets hydrated, they have to hydrate the whole thing. Whereas Qwik, or these resumable systems have this property that just because a component somewhere in the hierarchy got re-rendered, it doesn't mean that the parent component or the child component have to be rendered.
+
+[00:12:03]
+And if they don't have to be rendered, it also means they don't have to be downloaded, right? So the hard part here is to be able to re-render a component in the middle of the hierarchy tree. And that's something that most systems cannot do. Most systems have a very strict, start at the top, go to the leaves, kind of a mental model.
+
+[00:12:24]
+And yes, they can prune the tree a little bit so they don't have to do the whole tree, but for the most part, they have to do the whole tree.
+
