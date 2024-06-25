@@ -1,0 +1,160 @@
+[00:00:00]
+>> Scott Moss: So, for create issues, as you might know, we're gonna need a mutation. We're gonna need an object type for the issue that kinda closely aligns to our database table with the same name. We're gonna need the enums here, the inputs, and like I said, the mutations, and then all the resolvers that go with it.
+
+[00:00:19]
+So, we will do that and see how it works, so let's hop into our GraphQL Schema. Let's make our issue types and all the other things, so I'm going to go into our Schema here. I'm going to make the issue type, Type issue, if we go and look at our database Schema, you can see that we have the issues type here, it has ID, a name, a projectId, a userId.
+
+[00:00:47]
+It has content at a string, status as an enum, it has a createdAt, and then below it, there's this relations table. You can see that an issue has one user and one project, so we need to make those as well. Projects, we probably really won't get to but definitely for sure on users, projects are mostly for extra credit.
+
+[00:01:10]
+We'll just mostly focus on the user thing, but you can add it if you want, I'll talk about it when we get there. So, let's do that, so issues, we know we need ID, so let's do that. Got ID here, it has a name, or what did I call it?
+
+[00:01:26]
+So, the name, yes, it has a name, that's a string that's not null, it has content, that's a string, that's not null. It has a userId, a projectId, a status, and a createdAt. So, userId, which is the same type of the ID of userId, so I'll say that's also an ID.
+
+[00:01:51]
+It has a projectId, which is ID, it has a status, that's gonna be an enum type, so let's make that, we'll say enum, and I'm gonna call this issue, what did I call it here, issue status, like that. It's gonna map to four different enums. I believe I have DONE, TODO, INPROGRESS, and BACKLOG.
+
+[00:02:35]
+Just gonna map to those. So, status is gonna be of type IssueStatus. And lastly, it's gonna have a user, which is gonna be type user, that's not null. Arguably, you could just not have the userId and just put user, but it's up to you. Maybe sometimes you just wanna see the userId and not have to populate entire user.
+
+[00:03:02]
+So okay, so we got that. Next thing we wanna do is create the input, which, if you wanna create an issue, you have to give it a name and a content. A status is optional cuz it defaults to one in the database Schema as backlog. So, let's do that.
+
+[00:03:22]
+Say input CreateIssueInput. And yeah, name, content, status. So, name is a not null string, content is a not null string, and status is of type issueStatus. But that can be null cuz maybe you just want it to default to whatever the database defaults to. So we have that.
+
+[00:03:53]
+Now we go down to our mutation, and we can do a createIssue, which takes in an input type of createIssueInput, not null, and returns an issue. So, more of the same, but slightly different. Okay, we got that, if we go back and we actually try to run this, let's see if we get error.
+
+[00:04:26]
+
+>> Scott Moss: No, it's fine. You only get error if you make a resolver, and not on the Schema site. But you can put something on the Schema, not happen on a resolver is fine, you just won't be able to run it.
+>> Scott Moss: So, let's go make the resolvers now.
+
+[00:04:38]
+So, we head over the resolvers. We know we're gonna make a mutation here for a createIssue, so I'm just gonna go ahead and do that, createIssue, like this. It's async.
+>> Scott Moss: It's gonna be that.
+>> Scott Moss: And basically, for this, look at our notes because now we're doing authentication, we have everything authenticated, we need to check to make sure there is a user.
+
+[00:05:09]
+There's not a user, we wanna error out, so you should not be able to CreateIssue unless you are signed in. And I know you're signed in if there's a user on the context object because I validate and verify a JSON web token before all of this runs and attach the user to the context object if it is there.
+
+[00:05:25]
+And now it is up to the resolver's job to enforce that restriction on the user. So, we can do it on a resolver per resolver basis and not globally, so that leads to a lot of redundancy around checking. But you could arguably just take this logic out and create a higher order function that wraps this that says, is off, and it just does this for you plus running your resolver.
+
+[00:05:51]
+So, that is a higher order function that you can make if you don't wanna have to have to do this if-check every single time. So, whatever pattern you want, it's just JavaScript at that point.
+>> Scott Moss: But we'll go ahead and do that. So, we'll say, let's get our pan that we're never gonna use cuz it's on a mutation, there is no parent.
+
+[00:06:07]
+There's gonna be an input arc here, and then we'll get the context. I'll just go ahead and scope that to GraphQL or GQL Context like that. And then I'll say, if not, ctx.user, then throw new GraphQLError. I'm gonna say the same thing I have before, I'm actually just gonna copy this one, there we go
+>> Scott Moss: So, go ahead and throw that if there is no user, if there is a user, let's go ahead and make an issue.
+
+[00:06:46]
+So, this is where we're gonna start interacting with the database a little bit. So, just a little bit, it kinda make sense if you look at it, but it's really not that difficult. So, we'll say, issue = await db.insert, and we want to insert into the issues table, which is already imported at the top of your file if you took the imports that I had.
+
+[00:07:11]
+And we wanna insert with these values, these values are just going to be input.
+>> Scott Moss: And then we wanna do this special thing called returning, if you don't do returning, the database is just going to return back the stats on how many rows were inserted, and whether or not they were successful.
+
+[00:07:31]
+We actually want to get the issues that were created so we do .returning, that's gonna return, technically, an array. So, I'm just gonna call that ish, I guess I can't call it issues because that's already called issues, I'll just call this data. So, this will be an array of issues that always returns an array, but because we only pass in one, we should only expect to get back one.
+
+[00:07:54]
+So, I'm just gonna say return datazero, obviously you gonna do more checks in here, you just don't wanna trust that your table is always gonna return something, but this is fine for now.
+>> Scott Moss: Cool, so we got that.
+>> Scott Moss: Wait, I think we need to put the userId on here, yeah?
+
+[00:08:20]
+Yeah, yeah, there we go, we gotta put the userId on, I forgot about that. I thought that was on the input, so you don't just wanna put input on here, you actually wanna make an object. Put userId, set that to ctx.user.id, and then spread over the input, that's what you want.
+
+[00:08:38]
+Otherwise, this would break because you need userId for issue, the database would say, nope. Now we need to resolve our issue with GraphQL. There are some things on there that we have to tell it about. Specifically, we need to teach GraphQL how to get a user for an issue.
+
+[00:08:53]
+Because we said the issue type on GraphQL has a user, which is a nested type. So, we have to tell GraphQL how to resolve a user, which is an object type on an issue, which is an object type, cuz by default it won't. Because, I mean, I guess technically we could just write some more query here.
+
+[00:09:10]
+We could say, we can do a join here and try to get the user, or I guess technically what we could do, you could just do this. You could say, okay, spread over that. And then here's the user, which is going to be ctx.user, you could just do that.
+
+[00:09:33]
+
+>> Scott Moss: And then it will just automatically resolve the user property on the issue that's returned here. But who says that the ctx.user is gonna have the full fields that a user type would? There's no guarantee, in this case, I mean I did, our user only has three properties.
+
+[00:09:53]
+But you probably wanna get the user from the database and not from this context, cuz who knows? What you put on the context as far as a user might not be exactly what you expose as a user for GraphQL type. So, they might always align, and also, you wanna make sure you leave it up to the resolvers, let the resolvers do the heavy lifting, don't try to over-optimize with the databases.
+
+[00:10:15]
+That is a solution for optimizing, but I've been down that path and it's basically like looking at this thing right here. And then instead of letting the resolvers figure out what order they should run, you actually just run the whole graph in the top-level resolver based off this query.
+
+[00:10:36]
+So, you parse this query yourself and figure out, and turn that into a database query basically. Take this GraphQL query, turn it into one big database query, and return everything here. Versus, I'm only gonna just query for the thing that I need and make resolvers for it, which could lead to more database queries.
+
+[00:10:52]
+There's pros and cons, but we're just gonna leave it up to the resolvers for now. What I just described is super advanced.
+>> Scott Moss: So, in that case, we need to say, hey, you need to resolve the user issue. So, I'm gonna go out here at the mutation, I'm gonna say issue, this is how you resolve a user, like this.
+
+[00:11:13]
+As a first argument to user, that's gonna be its parent, I'm just gonna call that issue, cuz that's for sure always gonna be there. And all I really need to do, first, this doesn't have any arguments, so I'm just gonna skip that but we do have context here.
+
+[00:11:29]
+And I'm just gonna do the same thing that we did in issues, if there is no user, then how are you gonna get the user for this issue? So, go ahead and do that, and then from here, it's just a database query. So, I can say, return db.query.users.findFirst, where,
+>> Scott Moss: And then you use this eq function, which stands for equals, where users.id is the same as issue.userId.
+
+[00:12:16]
+How do I know there's a userId on the issue? Well, I know that because the database Schema has userId on the issue, you can't create an issue without a userId. And I'm returning an entire issue here, which should have a userId, if I hover over this, it'll say userId string, it's right there.
+
+[00:12:34]
+So, assuming there is an issue, there should be a userId on it. And this is the issue because this user is a child resolver of the issue, which is being returned here.
+>> Scott Moss: So, that's how we get our user, so should be able to save that, should be able to create a user now.
+
+[00:12:56]
+I think the last thing we need to do actually is resolve the enums. So, my reason you have to resolve them is cuz in the database, they're all lowercase, but in GraphQL, they're capitalized. I could have just made them both lowercase or both capitalized, but why not show you how to resolve enums, right?
+
+[00:13:11]
+So, I'm actually just gonna copy cuz that's so redundant to write, I don't feel like writing it. I was gonna put at the top of my resolvers, and just to get you understand what I'm saying, if I go to my database Schema, my enums are lowercase. If I go to my GraphQL Schema, my enums are capitalized, that is why I have to resolve them that way.
+
+[00:13:41]
+
+>> Scott Moss: That's it, so I'm teaching it like, hey, if you see this, it's this. You see this, it's this.
+>> Scott Moss: We're gonna get them back capitalized in our GraphQL query, but the database will see them. That's that, so let's go to our app, Localhost 3000, should be signed in.
+
+[00:14:03]
+I guess we could just check, let's check Apollo Studio first, yeah, let's do that first before we get embarrassed on the app. So, let's go here, I'm still signing up with my headers with my Darrell user. I'm gonna go to root, I'm gonna go to mutation, I'm gonna go create an issue.
+
+[00:14:20]
+I'm gonna say, give me the ID, give me the name, give me the user, I want the user's email and ID. I also want the content as well, so I'm gonna do that. Let me just delete these arcs right quick, and then I'm gonna say,
+>> Scott Moss: There we go, get these arcs, no, can we add the arguments please?
+
+[00:14:44]
+There we go, okay, so now I want to add the content string. I will pick a status, I'll have a default, so for content I'll say, this is the issue. And I'll say,
+>> Scott Moss: Fix the back door. That's the thing I need to do, so I'll run this mutation.
+
+[00:15:04]
+And there we go, we created an issue. We have the ID of it, the name, the user that created it and the ID of the user, and then the content itself. So, we have an issue there.
+>> Scott Moss: So, now that that works, we should feel pretty confident that we can go to the app and create the issue.
+
+[00:15:24]
+Because we're not getting issues, we still won't see anything on the page, we'll just have to go trust for now that that issue is there. And when we write the query later, you'll see it pop up on the page, but let's give it a try. So, I can say issue is do the thing and keep doing the thing.
+
+[00:15:45]
+
+>> Scott Moss: So, we can do that, we can create an issue.
+>> Scott Moss: Did that work? Let me see, why is that not working?
+>> Scott Moss: 400, let's see.
+>> Scott Moss: That request, I might have set something up wrong, let's look at the network. This would be an error on the client side, so it probably had anything to do with the server side since we just validated that it works on the server side.
+
+[00:16:13]
+So, it might be a bug I left on the client side. CreatedAt, cannot query field createdAt on type issue. Interesting, cuz I must have not had added it on my Schema version of issue, let's go check. Yeah, I forgot to add createdAt, so this is where those error messages are so good.
+
+[00:16:33]
+So, I can just do that, and let's try that again, there we go, it created the issue, cool. And I guess, just to note, I guess that's me reneging on what I said, I said it's always gonna be 200, unless it's a 400. And the only time it's a 400 is if it's a Schema validation error, I guess what I meant was, it's always gonna be a 200 if the resolvers run.
+
+[00:17:00]
+If and when you actually execute on the server, it's always gonna be 200. But if doesn't get to the execution part because the validation failed, then yeah, it's gonna be a 400. But as far as executing, it's always at 200, whether or not your resolvers threw an error or not, it's always gonna be at 200.
+
+[00:17:17]
+But the validation happens before the execution, it's not in GraphQL land yet, it's still in regular HTP land, so it respects the status codes. But after that, it's in GraphQL land and it's just gonna sent back 200.
+

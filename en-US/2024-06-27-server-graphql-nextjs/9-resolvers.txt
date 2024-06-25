@@ -1,0 +1,150 @@
+[00:00:00]
+>> Scott Moss: We left off right before we're gonna talk about resolvers, which are the meat and potatoes of GraphQL, is just schemas are one side that defines the type safe contract. But resolvers are the code that satisfies the contract and actually tries to get the data. So what happened to our notes here and we'll talk about some resolvers.
+
+[00:00:25]
+So, resolvers are functions that basically generate a response for graphical queries. You can think of these as, if you're making a traditional rest server, you have your routes, and then you have your controllers, right? These controllers talk to your database and then they return data. That's kind of what resolvers are, but they're not, because you only have one route, you only have slash GraphQL.
+
+[00:00:46]
+And it's always a post request, you don't have, a controller for each route. There's only one route. So a resolver is typically, gonna be for every single at least for every single object type you have. And every single query mutation you have, but it could also be for every single field you have.
+
+[00:01:04]
+We'll talk about that in a little bit. You didn't get down to the field level with the resolvers. But basically, you cannot create a GraphQL schema without resolvers. The reason ours has worked so far, is because we used that mock schema function that created the resolvers for us, that's actually what it's doing.
+
+[00:01:21]
+It's looking at the schema and dynamically generating resolvers on the fly. I know that because I literally had to do that for the last startup that I created, it was quite difficult. But let's talk about the structure of a resolver. Again, it's just a function, and the function names map directly to the things that they want to resolve, one for one.
+
+[00:01:40]
+So in this case I have a resolver object. You can see here, I'm saying, hey, I want to create a resolver for the user query on the query type. So I used query the same way you put it in your schema with a Q, and I can say that query has a field on it called user.
+
+[00:02:01]
+And this is the function that runs when someone asks for the user query, this is the function, okay? You get four arguments. The first argument is the optional parent of this current resolver. That might not make sense right now, but we'll talk about why that's important when we get to nested data and things like that.
+
+[00:02:24]
+So that's optional, it most likely will be no. If you are running a top level query in this case, like user on a query, this is always going to be no. There's no parent there cuz this is running on the root, args. These are the arguments that this, if on your schema, let's go to our schema.
+
+[00:02:42]
+If your schema is taking arguments, that's what the args object would be. So in the case of search, the args argument in that resolver will be an object that has an input property whose type is this type, right? So this would be an object that has an input property whose type was the type that I showed you.
+
+[00:03:03]
+That's what args is, it's any arguments that in this case query might have. If there aren't any, this thing is known. Context is exactly what it sounds like. It's basically an object that you can create at the initialization of your GraphQL server and it gets passed as a third argument to every single resolver that you have.
+
+[00:03:22]
+So the common pattern for context is to pass things like the current signed in user, maybe your ORM versus importing your ORM in the resolver file and using it directly, maybe you pass it as context. So when you go and mock this or test this, you can mock out that ORM for something else that you want, versus just pulling it into a closure and using it.
+
+[00:03:42]
+So, it's just a place in which you can pass state that gets reused for every single resolver and that gets initialized at the beginning of the server. Info is something you'll probably almost never use unless you're doing like metadata based things analytics type stuff. Info is basically information on the actual query that was sent up.
+
+[00:04:01]
+So if you want to see the raw query that actually was sent up, the abstract syntax tree, like low-level GraphQL stuff, that's what info is for. You'll almost never use this unless you're doing like tooling or some dynamic metaprogramming. But for just like resolving data, you'll almost never use this.
+
+[00:04:19]
+For the most part, you're just gonna be looking at args, if you have arguments, context, if you're taking advantage of because you don't have to, you literally never have to use it if you don't want to. And then you'll look at parents, if this is a nested resolver, and we'll talk about nested resolvers in a minute.
+
+[00:04:34]
+Other than that, you can do whatever the hell you want in this argument. I'm sorry, in this function it's, there's no limit what you can do. You can return a promise, you can return an array of promises. Those things will get resolved, it's pretty much whatever you want.
+
+[00:04:49]
+So this is where you can imagine if you were using like some third party provider for authentication. Let's say, using like clerk or something and you wanted to get the user, you would make a call to clerk, go get the user by this arg ID and come back.
+
+[00:05:03]
+It doesn't matter if it comes from your database or not, it can come from anywhere. In this example, I'm using something called data sources. So, when I created the server, I made an object on the context called data sources. And it's all the sources that my resolvers have access to and I can do that.
+
+[00:05:20]
+So this is a common pattern that people use in GraphQL is like, cuz you can have many data sources that you probably just wanna add them to your context object. And so you can bring them in and use them here. We probably won't be doing that in this course, I'll just be importing it from the top, cuz we only have one data source.
+
+[00:05:37]
+It's our database. So I'm just gonna import it because if I do it with the context, unless I do the type script correctly, I'll lose the TypeScript findings. So I won't get the auto complete on the database, or unless I create another type which doesn't take that long, I'm just lazy.
+
+[00:05:52]
+So we'll just be importing the database from the top of the file and using it versus passing it through context. But you can put whatever you want, we will use context for other things. So, let's make some resolvers, let's go back to our app. Just to, I'm just telling you right now, just go ahead and delete everything you have in this schema that we created.
+
+[00:06:11]
+Cuz if you don't, you're gonna have to make a resolver for everything in here. So just delete everything in there, make a quick query, I was gonna make a Query for me, and I'm gonna say it returns a type string, not null. That's a minimum query, I'm just gonna say type query me, okay?
+
+[00:06:32]
+Very, very, very, very simple
+>> Scott Moss: And now, what we wanna do is if we go to the route.ts where we have the schema here and we have addMockstoSchema, and we makeExecutableSchema, we can get rid of that whole field. Just get rid of this whole field, everything that I have highlighted here, we're just gonna get rid of.
+
+[00:06:56]
+So we'll get rid of schema, and instead, we're gonna put something called typeDefs. These are stored for type definitions, which is basically our schema. And then we're gonna put resolvers, which is already imported at the top of your file. So we got typeDefs, we got resolvers, and then we have these plugins.
+
+[00:07:18]
+
+>> Scott Moss: So, if you go look at the imports, type definitions is literally our schema string. Resolvers is, if you go look at that, it's an empty object, it has nothing on it. So I'm gonna save this, or I'm sorry, I'm gonna go back and save this, and you should not be able to start your server.
+
+[00:07:34]
+You're most likely gonna get a error. All right, let me see, okay, I see why it's not an object type. Yeah, so the reason I thought it was gonna throw an error is because if you don't specifically have the resolver for the thing that's in your schema, it'll say, hey, I don't see a resolver for this thing.
+
+[00:07:51]
+So therefore, I cannot start, so it typically would break, but I think it's because it's a scalar type. It doesn't matter, but either way, running it, you yield no result because we didn't actually make a resolver. So let's make a resolver for the query of me and resolve the data.
+
+[00:08:11]
+So if we go back to our resolvers, what I'm gonna do is inside this object, I'm gonna say, Query, it's only query, type here, right? So I'm gonna say query, I'm gonna say me because on the schema, it's called me, that's the field. And then I'm gonna create a resolver.
+
+[00:08:35]
+For now I'm just gonna return me, I need to return the same type that the schema says this type should be. In this case, it's a non-null string. So I can't return a number, I can't return an object. I have to return a string, so that's what I'm gonna do.
+
+[00:08:54]
+
+>> Scott Moss: So I go here, I run this again, I now get me.
+>> Scott Moss: And that is a resolver at its most basic, is literally creating, looking at your schema. And creating functions that map exactly to how they're creating your schema, right? By default, GraphQL will create automatic resolvers for you for every single field, if you return an object, we'll talk about that in a little bit.
+
+[00:09:30]
+So you don't have to make a resolver for every single field on an object type, if you return an entire object. Let's say, let me give you an example, let's make an object type here. So if I say, type person, right, and I say the person has a name, it's a string, person has ID, it's an ID, right?
+
+[00:09:52]
+And then I'm gonna make something called people, it returns an array of person, non-null, non-null, right? Let's say I do this, let's refresh this. That still works, so then now, I'm gonna make a resolver for this. So if I go into resolvers, I'm just gonna make one for people, still inside of query here.
+
+[00:10:17]
+And then It's got to be a resolver. It's gonna return an array, and it's gonna return an object with a name and an ID. So let's just do that, name of Sam, and ID of whatever, all right? So I'm gonna return that for people. Now if I go back and I say cool, give me people, give me ID, give me name, and I run this, I get that back.
+
+[00:10:48]
+But I didn't write a resolver for ID and I did not write a resolver for name. I only wrote a resolver for people or a person in this case.
+>> Scott Moss: GraphQL was smart enough to resolve each field because I returned an object that had the same field names on it.
+
+[00:11:10]
+The object that I returned in my resolver were name and ID, those happen to be the exact same name as the fields on person. So it just went ahead and automatically resolve those for me, it's like, that's the same name, therefore that must be the name field that must be the ID field.
+
+[00:11:26]
+If I change the names, right? If I say, if I'm typo that
+>> Scott Moss: Name is null because it didn't resolve that field ,it didn't know what to do right? So the other side of that is, let's say, I don't put a name here. I only return an ID, right?
+
+[00:11:48]
+Cuz I want to do something different with the name. So, what I'll do is, I can go up here and I can say, hey, for a person for a person type, this is how you resolve the name field like this. So this is how I can say, for the name field of a person run this function.
+
+[00:12:12]
+And then now I can use that first argument. This will be the parent, right? The parent in this case, is going to be the person that was returned here. So I'm just gonna call this person. So a better example would be, let's actually put a name here. Let's just say, Henry.
+
+[00:12:34]
+But I really want that to be capitalized, so I'll just say return person.name.toupperCase, or yeah, let's do uppercase.
+>> Scott Moss: Is it c, I don't know we're gonna find out. So I can do that, and that will hijack the original name being returned, then run this one and then return the string uppercase, assuming that's the right method.
+
+[00:13:06]
+So let's run that, there you go. It's uppercase now.
+>> Mark: How do you get type inferences with resolvers?
+>> Scott Moss: How you get type inference with resolvers. So, the way GraphQL works is because it's not built with TypeScript TRPC where it's like TypeScript talking to TypeScript, you have to do some type of code generation.
+
+[00:13:24]
+So, basically, if you just go look up GraphQL codGen, they have a tool for that. It basically will look at your schema like this and output Typescript for you to import into all of your files. And then that way you get the the nice syntax highlighting. I'm not doing it here in this course because I feel like it's it's very TypeScript specific, and I don't want people to have to know what TypeScript is to get the best out of GraphQL.
+
+[00:13:54]
+But, yes, in production, if you're using TypeScript and GraphQL, you would use a CodeGen. It's a command that you would run every time you change your schema, or you can have it watch and it will output TypeScript files that you can import anywhere in your app. Whether it's in the resolvers, whether it's on your client side, wherever you wanna put them.
+
+[00:14:12]
+That's how you would do it. So, yeah, it's a build step.
+>> Scott Moss: Okay, so yeah, you can see here I'm hijacking the name, I'm resolving that. And because you gotta follow the order, I'm running the people query first, so the resolver for people runs, it returns an array of these objects.
+
+[00:14:39]
+But because I also have a resolver for a person's name and this is a person, now person runs, its parent is the person that was returned and I can override what the name was by putting something here. So I can make this be whatever I want. So now you can resolve field levels as well as object levels and query levels.
+
+[00:15:00]
+So it gets pretty powerful very quickly. And, again, these functions can do whatever the hell they want. All right, so if I return the number here, what do you think is gonna happen?
+>> Scott Moss: All right, if I try to do this, it just converts It to a string.
+
+[00:15:17]
+So in this case, it's gonna coerce it to a string, because it's like, this is supposed to be a string. You return something that I can coerce, I'll do that. So it's never not gonna be what the schema says.
+>> Scott Moss: This can get pretty buggy for things like timestamps, where sometimes you thought you were gonna get a date object, but then you got a string, and it gets really weird.
+
+[00:15:35]
+But this is why sometimes you do specifically write field-level resolvers for the most part.
+

@@ -1,0 +1,146 @@
+[00:00:00]
+>> Speaker 1: All right, let's keep it moving. Let's work on getting the issues so we can see them on the page. This one, queries are usually simpler than mutations. So for the issues a couple things, we need to make an IssuesFilter type input. This is gonna allow us to filter issues by status codes and then we need to make a query for issues.
+
+[00:00:22]
+And then, obviously we need to make the resolvers, but we need to make a couple here. We need to make one that gets all the issues, and it's gonna be quite complicated, because it can take in an array of issue statuses on which it can filter on. So the database query gets kind of nuts.
+
+[00:00:38]
+And then we need to make a issues query on the user type. So that way we can get the issues for a user the same way we can get the user for an issue. So it's a one to many relationship. A user can have many issues, but one issue can have one user.
+
+[00:00:53]
+So we have to be able to resolve issues. We don't have to, but we are. We're gonna allow you to resolve the issues on a user because if you look at our database, it supports that, right? If we go to our database here, but I'm in the wrong, okay, sorry, that was the wrong file.
+
+[00:01:11]
+There we go. If we look at our database here, you can see A user has many issues. So we want to be able to support that with GraphQL. So we're going to fix our schema for that. So let's go to our schema. And the first thing I'm gonna do is go to our user and I'm gonna add a issues field here of type, issue non no.
+
+[00:01:45]
+And then we make a new type here, call it issue. It's gonna have an ID created or I'm sorry, we're gonna have to issue, I'm tripping. We need to add the query for issue.
+>> Speaker 1: And here is where it's going to take in an input. That input is gonna be the IssueFilterInput.
+
+[00:02:13]
+So let's do that, IssuesFilterInput. Input is IssuesFilterInput like this. And it's gonna take statuses, which is an array of IssueStatus, like that. And it can be null. But if you give the array, then you must put something in it. You can't just send up an empty array. So technically it should be that.
+
+[00:02:44]
+You cannot give us an array, but if you do give us an array, you better have something in it. Don't send us an empty array, which makes sense. Why would you do that? Or maybe you wrote your code in a way that it just, I don't know, it maps over, but it's up to you.
+
+[00:02:56]
+I'm gonna do that. I'll probably do something different in the docs we'll see. And then we can do for that input type, it'll just be IssueFilterInput. I won't make it required, because maybe you don't want to filter on statuses. You just want to get all the issues. So it's not gonna be required and then it's gonna return issue or it's gonna return issues.
+
+[00:03:22]
+And I guess I'll call this issues, plural, and I'll make the list required. So this is giving us a query that if you hit it will get all the issues for a given user. Will always return an array, even if there's nothing in it, has an optional input object of filtering on statuses if given.
+
+[00:03:47]
+And we just need to go write those resolvers for that. And we already added the issue array here for the user. So, okay, I wanna look at that. Let's go do that. So for the resolvers, let's go to our query. We'll make a new one for issues like this, we're going to get the parent that does not exist.
+
+[00:04:10]
+We do have an optional input here, so we'll take that and we will use the context. We don't need the info. We'll do the same thing we did with all of them. Because the resolvers are responsible for enforcing authentication, so we'll enforce it here. Now on this line, we are sure user is here And the first thing we wanna do is we need to build up a filter that we can pass our ORM if you passed in statuses, so that's what we're going to do.
+
+[00:04:39]
+I might have to just walk through this one because it's very specific to the database or the ORM that I'm using. But basically, there's one filter I have to do. And there's an optional second filter, right? The one filter I have to do is, only show me the issues for the current user.
+
+[00:04:57]
+So I have to do that filter. Otherwise, you'll just get everybody's issues in the database. So this is a multi-tenant database, so scope it by the user's ID. So that's the first filter, so I make an array of that filter. You can see I'm saying, I want to make sure that the issues user ID equals the current user's ID, so I'm scoping that.
+
+[00:05:19]
+And then if you pass in the statuses and the statuses have length, I guess I don't have to do this check right here if I did the exclamation on the inside of the array. So that would get rid of this check. If that's the case, go ahead and push in a new equal filter for each one of those statuses into the array.
+
+[00:05:37]
+So if you pass in three statuses, so we gonna pass in three equals inside that array of issues.status equaling that status. And that's basically what we're doing here. And then we can pass that into the end helper for our ORM, which if given an array of equality checks, all of them have to pass in order for you to get the result that you want.
+
+[00:05:58]
+And that's what and means. So that's just saying every one of these filters if given, have to be true in order for an issue to be returned. And then this order thing by is just, you don't even really need this. But it was driving me crazy that the things were not sorted, so I added it.
+
+[00:06:15]
+So let's do that. So we'll go in here. We'll say, andFilters are gonna be an array with the equal of issues.userId equals the context.user.id. Then I can say, if input and input.statuses. I don't have to check for length on this one, because on this version that I wrote, again, I said, if you pass that input, it better have a status in it, so this code won't even run unless that is true.
+
+[00:06:53]
+So I don't have to check for the length here like I did in the docs. And then I can say, okay, cool, if that's true, basically what I wanna do is I want to map over them and return a equal statement that I can then push in an array.
+
+[00:07:10]
+Could have just used reduce here, but it's all good. StatusFilters = Input.statuses.map, grab the status return an equal statement of issues.status equals that status like this. This thing is freaking out because I already declared something called status somewhere, probably. I just didn't spell it right. There we go, cool.
+
+[00:07:49]
+Okay, got our status filters, And then we just push them into our array. But we have to do an or here because it's like if I put another and here, what would happen is it's only one issues that have all these statuses, that wouldn't make sense. You can only have one status.
+
+[00:08:11]
+So it's like I want all the issues that belong to this user and has one of these statuses. That's what the or is, right? So I'm pushing the or in here. So I'm gonna say andFilters.push using the or keyword that's imported at the top...statusFilters.
+>> Speaker 1: So we got that.
+
+[00:08:43]
+Now we can actually make the query, which is a little funky. Also because the orderBy is a little weird. I'm probably just gonna copy that. Actually I'm just gonna copy that right now because I'm not writing that again. That's just so gross. But it's pretty simple once you get past the orderBy thing, which is just going to be get the data, that's going to equals db.query.issues.findMany, where we're gonna use the and query, spread over the and filters like that.
+
+[00:09:24]
+And then we can say orderBy, which I'm just going to paste in like that. What the orderBy thing is doing here, all this is doing is, it's sorting by the enums. This guarantees that we always get back issues with backlogs at the top in progress and then done.
+
+[00:09:42]
+There's also another one to do. You can add that here too. I just didn't feel like doing it. So you'll always get those three back in this order. Without this, you'll just get them back in any random order and then an additional sort of createdAt. So first sort by status, and then within those statuses sort by descending the createdAt.
+
+[00:10:05]
+The SQL helper allows me to write raw SQL. I couldn't figure out a way to do this with the ORM, so I just wrote it in raw SQL. Okay, so we got that. And lastly, let's just return data. That should be a list of things. If I hover over it, there we go.
+
+[00:10:23]
+It's a list of issues. Okay, so we got that. I guess I need to add async on this so await actually works. There we go. And what we need to do now is teach GraphQL how to get issues from a user. So I can go down here at top level of my resolver.
+
+[00:10:42]
+Say for the user type it has issues, and I want to resolve this. Because it's a field on a object type, I know that this parent is going to be a user. That's the quickest way you can figure out if If I'm making a resolver on an object type, this first argument is gonna be that object type, always.
+
+[00:11:02]
+This is always gonna be a user because it's a field on user. So its parent is a user. So I have the user here. I don't care for that argument. I do care about the context, so I can check for authentication, which I'm gonna do right here. And I guess technically you don't have to do this, right?
+
+[00:11:22]
+What query do we have? I don't think there's a query that you can run that will give you a user in which you're not logged in already. So you technically don't have to check for authentication in the sub resolvers because their parents are already doing it. Right, so if you follow the graph, what query can I get a user from?
+
+[00:11:47]
+I can get it from a signin. I can get it from a createUser. Well, at that point, you're signed in, and you're created so you are logged in and you should be able to get the issues. Now I don't have to check this. So technically you don't have to check in these nested ones.
+
+[00:12:02]
+It's kind of redundant, but it's not gonna hurt. This one is just return database.query.issues.findMany. Where: equals (issues.userId equals user.id) And this should give us our issues. Okay, any questions on that, yes. How do you organize your resolvers when you have hundreds of tables? Yeah, that's a good question.
+
+[00:12:55]
+I mean, you can break your resolvers up into many different files. You don't have to put them all, I mean, it's just an object. So there's nothing wrong with taking each one of these types and giving them their own file, or taking each one of these types and giving them their own folder.
+
+[00:13:11]
+And then make a file for each single resolver and then you just merge them all in, it's an object, so you can merge however you want. There really is no wrong way. I'd say most people just start off by putting everything in one file, and then what they end up doing is, they start going into their schema and separating this, taking this outta one file and putting it into many files.
+
+[00:13:31]
+And at that point you can start to co-locate things together by either functionality or entity. So you might put all your queries together, all your mutations together, or you might group things by all my user stuff, all my issue stuff. So there really is no wrong answer, but I would say just keep everything in one file until it becomes annoying.
+
+[00:13:52]
+And then from there, do what makes sense as long as you merge them in at the end of the day, GraphQL doesn't know or doesn't care. So there are also tools that will take something like this and spit out a GraphQL schema, so it can kind of get you there half the way.
+
+[00:14:08]
+So you could do that as well. That way you're really not even writing GraphQL schemas minus the things you wanna keep, like get right rid of the password field on that schema, things like that. So it works pretty well. If you use Prisma, I know for sure Prisma has the ability to generate to GraphQL because it's based off GraphQL.
+
+[00:14:28]
+So actually, we're just gonna go straight to the app. I should just be able to refresh if I didn't kill it. For this sign in user, I should see two issues I think, let's see. Just one, maybe not two. Okay, yeah, so here's my one issue that I created for the signed in user.
+
+[00:14:48]
+That's right, who I'm signing with on this app is not who I'm signing with on the Apollo thing, two different people. Okay, so that works, let's try it. Let's make another one. So I can say another issue. Hello there, create the issue. Boom, shows up another issue, right?
+
+[00:15:08]
+You can go test this in Apollo if you want. So let's go here. Already created, let me create another one here for this user, yellow. Do more fun things. So I can create that and then now I can go back, get rid of all of this, get rid of this, get rid of that.
+
+[00:15:35]
+Do a query for the issues, get the content, the name, the ID, status, and query that. And there we go. We got all of those. And then I should be able to get the user from this. So let's see if I get the user from this. That seems to work.
+
+[00:15:54]
+And then I want to make sure I can get the issues from the user, so I'll do that, and I'll say, give me the content. And that seems to work as well. So pretty effective. So this is what I mean by letting the resolvers do the work. There's no way we would have been able to anticipate like, first I gotta get this, and then I gotta write some code to get this.
+
+[00:16:16]
+You just don't know, you just let the resolvers do the work. The resolvers get called based on the query. These are the directions in which your resolvers run. So they don't know that they're already being called and things like that. So you might be asking yourself, if I'm just getting the same data here, as I'm getting here, is there a way to cache this?
+
+[00:16:34]
+Yes, there's a way to do that. Per request, there's something called a data loader. And this is actually the recommended thing that you're supposed to use is you use something called a data loader. The best way I can describe a data loader is it is a per-request cache.
+
+[00:16:51]
+So that way, when you do things like I just did, where I got the issues, I got the user that I got the issues for the user, which technically are the same issues, two levels above. I could have just cashed that per request and it would have ran my code again, it almost got the issues that previously got.
+
+[00:17:06]
+So that's what a data loader is. You can make them from scratch. There's plugins that kind of do them for you depending on ORM you have, there's Mongo, data loaders, things like that. But it's kind of beyond the scope of this. But yeah, you would use something like this, a per request cache.
+
+[00:17:21]
+I mean, technically you would use something like this for a lot of server side things like in Next.js App Directory for server components. If you wanted a cache there, you have to make sure it's per request. Otherwise all your users share the same server cache and you would leak data to someone else.
+
+[00:17:36]
+So you wanna instantiate a new cache every time you do a request. That's what data loader is. So it's a key value, cache for things. So you would use that. That way you don't have this problem, or at least you won't reusing all the resources. This database resource, you'd still be CPU Intensive if someone made a really big one.
+
