@@ -1,0 +1,121 @@
+[00:00:00]
+>> Scott Moss: Let's go make the resolvers for this. So just follow me on here, we do need to import some database stuff, some other things. So I'm just gonna copy my imports. I highly recommend you do the same. I'm just gonna put them up here, I'll talk about them.
+
+[00:00:15]
+So you have the context at least. Let me Added underneath it, I'm sorry, there we go. So what is this?
+>> Scott Moss: I'm sorry, I'm in the wrong file. I'm like, what is this? Doesn't make any sense, I need to go to my resolver file, sorry, bring it here, there we go.
+
+[00:00:42]
+Okay, so in my resolvers file, these imports are a few things. This is our ORM, this is how we interact with our database. So we're using drizzle, if you ever use drizzle, you'll know exactly what this is. If you never use drizzle, it doesn't matter, it's an ORM, they all do the same thing, slightly different.
+
+[00:01:00]
+If you don't know what ORM is, it's the SDK for your database, that's the best way I can describe it. This is the code in which you interact with your database with, these are database related type script types, and also the database tables that we will be using.
+
+[00:01:18]
+This is a custom type that I created that represents the current sign in user. We can use this to type check our GraphQL context, which eventually will have the user on it. These are utility functions for helping us sign in and sign up, and getting a user from adjacent web, so we're not gonna make that as nothing to a GraphQL.
+
+[00:01:42]
+But if you want to just understand that process, it's quite simple, a sign-in function takes an email and a password. It looks in the database to see if a user has that email, if it does, it compares that person's hash password with the plain text password that they sent up.
+
+[00:02:00]
+And if that's correct, then that person is who they say they are and they're signing in. So generate them adjacent web token and send it back. Signup is very similar, except for there is no comparison, it just tries to insert a user with a given email and password.
+
+[00:02:14]
+If that doesn't fail a unique constraint, it will then create a token for that user and send it back. Hash password, compare password, does exactly what they say. Hash password takes a plain text password and hashes it. Compare takes a hash password and a plain text password and compares it.
+
+[00:02:31]
+And then the other one up here was, what is this? Get user from token, it takes the headers, it grabs the token from the headers, it tries to validate the JSON web token. If you don't know what JSON web token is, it's a string that represents a claim to some data, in this case, a user object.
+
+[00:02:50]
+So it tries to invert that string and turn it back to an object with the same secret it used to create the token. If that works, we can create a database for that user ID to see if the user is valid, if so, return the user. This is how we know who signed in.
+
+[00:03:05]
+And then create token for user, is the thing that's actually creating the token given a user ID. And we can use this to send back to the client so they can save it at local storage. On the client side, of course, we use this JSON web token. It had to send it up every single time in order for our request to work, you will most likely have to do the same thing, but inside the Apollo app, I'll show you where to do it.
+
+[00:03:26]
+So you have a place to header there, so your queries can continue to work after we add authentication. So, nothing to do with GraphQL, plain old authentication, nothing crazy, but this can be useful if you've never built authentication before, so check it out. Anyway, done with that tangent, let's work on these resolvers.
+
+[00:03:43]
+So we need to make a resolver for me, I have one it's not correct, so let's fix it. We know me returns a user, so we need to do that. I'm just working me on this one, we're doing something that we haven't done yet. So, the first argument is a parent, this thing's never gonna have a parent, so I'm gonna put underscore there as a placeholder.
+
+[00:04:03]
+The second argument is the actual arguments passed to this query. Well, this query doesn't have any arguments, so I'm also not going to use those. So I'm just gonna put underscore underscore. The third argument is the context. I'm actually gonna use this, I need this right here, so I'm going to put ctx for context.
+
+[00:04:24]
+The way I'm gonna architecture the authentication is, I'm going to check if there is a user before the GraphQL server starts. And then if there is, I'm going to attach that user to the context object, so every resolver has it. So if we want to get the current user, we should just be able to return context.user, in this case, assuming there's a user that's signed in.
+
+[00:04:47]
+So that's all we have to do, is return ctx.user, and that type that I imported, GQL context, that's what it's for. GQL context is telling us that, hey, context, I might have user on it, it's optional, it depends if they're signed in or not. We'll get to that part where we attach the user to the context right after this, but that's where I'm gonna put it.
+
+[00:05:10]
+This is useful because you don't have to write the same logic in every single resolver to determine whether or not the person is signed in, just do it before the app starts. And then there's, we'll get to it and I'll talk more about it, but there's different scenarios and where you wanna enforce a user being there or not.
+
+[00:05:30]
+Like checking to see if a user is one thing, but enforcing it is different. We probably don't wanna enforce it on the whole server level because no one would ever be able to sign in or sign up without already being signed in, that wouldn't make it get a sense.
+
+[00:05:41]
+So you have to figure out where you wanna do it, I talked about doing on a field level. You can do it on a object level, you do it on a resolver level, there's so many levels, we're gonna choose resolver level. So the resolvers are in control on whether or not it's enforced because they have access to the user there or not, so that's what we're gonna do, sign in.
+
+[00:06:01]
+Let's go ahead and get that going. So we need to make a mutation, like so. We need to say, sign in, like so. Sign in, is gonna take arguments, but there's no parent, so nothing there. It is going to take arguments here, which is an object that has a field on it called input.
+
+[00:06:20]
+How do I know that? Well, if I go back and look at this schema, I can see that sign in takes an argument called input. And its type is all the input, which is an object that has email password. So there it is, it's called input. I can even do structure that and get email password if I want, but I'll just keep it as input.
+
+[00:06:42]
+Every resolver gets context, I'm just gonna say context. And then, the fourth argument is info, but we're not using it, so I'm not even gonna give it a name. The only reason I have to name these is because if you want to access the arguments, after earlier arguments, the earlier arguments need placeholders if you don't use them, that's just a JavaScript thing.
+
+[00:07:03]
+You just, I don't think you can do that, right, but you have to put something here. So, I put an underscore, because I'm never gonna use it. So, I wish they would have come up with a better way for that, honestly. But unfortunately, so we got to do it.
+
+[00:07:19]
+So, we have that, now, sign in, how is that going to work? Well, I mean the code is here, I can kind of walk through, is pretty simple. First, we call the sign in function with the arcs.input, all right, so let's do that. We can say, data equals await, which means, we can make this resolver asynchronous, all resolvers can, and most likely, will be asynchronous, so you can put a sync in front of them.
+
+[00:07:43]
+You can return promises, you can return an array of promises, wherever you wanna do. So we will await the sign-in function that you import at the top. You can see it takes in an email and password. Luckily for us, the input variable is an object that has email and password on it because again, right here, input is auth input, which is an object with email and password, guaranteed to be there, cuz it's required.
+
+[00:08:09]
+So this code won't even run unless there is for sure 100% an object on input that has an email and password on it. This resolver won't even execute, cuz that has to pass the schema validation. So we can guarantee that that's there, and I can just say input, there we go.
+
+[00:08:26]
+Good to go. So if we have that, then basically I just wanna check to make sure like, did that actually work? Or if it did not work, I wanna throw some errors. So let's do that. So I can say if not data or not data.token, or for some reason, not data.user, then what I can do is I can throw a new GraphQL error.
+
+[00:08:58]
+I recommend throwing GraphQL errors and not traditional errors. Without traditional error, nothing's wrong with that because the GraphQL server, you can think of the whole server being wrapped in a try catch. So it's not gonna break your server, the GraphQL server is gonna catch it. It's just the message that it sends down.
+
+[00:09:15]
+It's just gonna be like, I don't know something happened, right? So, these are GraphQL error, you have just have more control over what error message you send down, so I'm gonna say GraphQL your error. I'm gonna put in something called unauthorized, you can put whatever you want, but this is where creating an error system is a big deal.
+
+[00:09:33]
+You really should sit down and think about, what are the error codes that I wanna send? What are the error messages that I wanna send? Is my client gonna take the error message from the server and put it right on the screen, or is my client gonna look at the code and come up with his own error message?
+
+[00:09:46]
+What level of experience do you want? There is no wrong answer. It also depends if you're doing client or developer facing APIs versus just internal, so there's no wrong answers. I'm just gonna do this, then I could put extensions on here. And then for extensions, I'll talk about that in a minute.
+
+[00:10:04]
+I could put code, and I'll just say, there really isn't a wrong answer here. I think what I was doing is, yeah, you can do whatever you want. I'll just keep this simple, and I'll actually put a 401 since I guess that's what you would get if you were using REST, if you tried to sign in and it didn't work, you get a 401.
+
+[00:10:20]
+So I'll just say code 401. This is useful, so on the front end, if I get an error, I could be like, cool, here's an array of errors on my query and I'll show you an Apollo thing. I can look at the code and like, code 401, cool, I know what to show my user on the screen.
+
+[00:10:33]
+I have a map on my front end that maps error codes to messages and that's what it shows on the screen when it sees 401, or whatever code you wanna put. There's no wrong answer here when it comes to creating an error framework, or whatever, right? So, there we go, we got that.
+
+[00:10:50]
+And in this case, I need to satisfy the required constraints or the scheme of constraints of a user, which is it needs all of this plus an optional of this, right? So, I'm going to do just that, I'm gonna say cool. Returning object, with all the data on it, and if we look at the data, we can know that it's a user with a token, like this, so I can just put all the data on it.
+
+[00:11:16]
+Well, I guess technically I could just say, just return the data then at this point since it's basically that, anyway, it's a user. I'm sorry, no, we can't do that with, the user is flat, it's not a user property. If you go back and look, there's no user property on here, it's all the flat fields.
+
+[00:11:35]
+And then there's a token property, so we need to do,
+>> Scott Moss: Say, spread over the user, but then for the token, give me data.token. But I think if we just spread over this data right here, it'll also, data.user, I'm sorry, there we go. That's what we want. So spread over the data.user and then for the top, so I'm gonna give you data dot token, cool.
+
+[00:12:02]
+So we got sign in, lets you sign up, so sign up., pretty similar. We're gonna say, const data equals await, sign up. It's also gonna take the input, so let's get our arguments going.
+>> Scott Moss: Passing our input here on sign up, we got that, literally the same thing.
+
+[00:12:32]
+I'm just going to copy that. No point of writing it twice.
+>> Scott Moss: There we go, so now we have the exact same thing. We try to sign up. If you don't sign up, we throw an error. If so, we return it.
+

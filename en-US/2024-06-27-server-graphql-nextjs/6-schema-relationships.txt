@@ -1,0 +1,104 @@
+[00:00:00]
+>> Scott Moss: Hopefully some of the stuff we've talked about so far in the GraphQL schema definition language has been nothing short of impressive. Because I remember when I was first learning GraphQL, I was like, I don't know why I would ever use anything else than this. But it's not a perfect solution, it's definitely a tool for a specific problem.
+
+[00:00:20]
+I guess it's like one of those times where you start using TypeScript for the first time or any type language and you're like, wow, I don't have to write tests to see if something is this certain type. Assuming you wrote tests in the first place, it kind of felt like that.
+
+[00:00:35]
+But let's keep it moving on some of the other things in the skeeba definition language. Talked about unions. We already talked about these type modifiers like exclamation and list fields, nothing crazy there. We didn't talk about relationships, so let's talk about relationships. And this is really like the whole crux of like GraphQL, like everything's a graph, there's relational data.
+
+[00:00:59]
+And the rest, this is so hard to figure out and resolve but here, with GraphQL, it's quite simple, at least on the schema side. On the resolver side, I think this is where it gets confusing to a lot of people, and we'll cover that today, obviously. But let's hop into the relationships, so for the relationships, let's go back to our code, and like I said before, please follow along.
+
+[00:01:26]
+Let's see, what's a good example we can do for a relationship? So we can say, how about we say, we can say a profile has a person, cuz I don't fully like making another one. So let's say a profile can have a person, so I can give it a field called person, right, and then I can say its type is person, not null.
+
+[00:01:47]
+And then do we have a query for profile? Yes, we do on the union search. So I'll do the search result query, I'll get a profile, then I'll get the person on the profile, so let's check that out. So I'm gonna go back to our example here, refresh this, make sure nothing broke, cool?
+
+[00:02:05]
+And you'll know, when you refresh this, if your schema was jacked up, this would not load. So if this loads, your schema's good, [LAUGH] you didn't do anything wrong as far as syntax. You might not have the right behavior that you're expecting, but as far as syntax, you didn't do anything wrong.
+
+[00:02:20]
+So it's really executing code at runtime, you're gonna get syntax errors if you try to execute it. So if the server tries to execute your schema, it will throw an error if something is not valid. So something to keep an eye out on, so we got that. I don't care about the tweet stuff right now.
+
+[00:02:40]
+I'm just gonna say profile, and then for profile, I wanna get the person. And you can see right here I get all the fields for a person. So I can say I want the backstory, I want the name, yeah, let's just run those. So all you have to do is just expand it, on an object type.
+
+[00:03:00]
+So anything that's a relationship, you just have to put your brackets here, and you can make it, you pick what fields you want there, and you hit that, there we go. We got our person, we got our fields there. It comes back exactly the way that you think it would've come back as a nested object.
+
+[00:03:16]
+It's pretty simple, right? Let's run into a scenario that where it gets quite complicated. So let's say I have a person type, but on the person type, I also want to be able to look at the profile of a person. So I can say a person also has a profile,
+>> Scott Moss: Right?
+
+[00:03:41]
+We're saying a profile has a person and a person has a profile, it's a one-to-one relationship, that's very common, so this is how you would do that. I have a person that has a profile, a person has a profile, and a profile that has a person. So if I go back here, and I'm refreshing, but I don't think you have to refresh, this tool is pinging your schema like every one second to get the latest, I just refresh for sanity reasons.
+
+[00:04:04]
+So now if I'm on a person and I say, okay, cool, I wanna get the profile of the person. Okay, cool, I get the profile. And I wanna get the profiles username, so I run that. There we go. So I do a search result, I get a profile, I get the person of that profile, and then I get the profile of that person.
+
+[00:04:24]
+So as you might be aware of, this can be bad, right, cuz I can keep going, I can say, well, cool, give me the user or give me the person of that, and then give me the profile of that. And then give me the person of that and then give profile of that, and you can just keep going and going and going and going, and this is the cyclic nature of a GraphQL schema.
+
+[00:04:48]
+Depending on the resources of your machine where this is running, it will definitely attempt to execute that. This will probably return instantly if I did it cause I think it's all just running In memory. Let's see. Or maybe they built in some protections, let's find out. No, this returns instantly because it's they're just using recursion and going all the way down and doing this in memory.
+
+[00:05:13]
+But if each one of these was a database query or an API call, I don't know. This depending on your machine and where this code is running, this might not ever resolve, you might get a timeout, you might get errors, you might get issues. So very quickly, if you had a developer facing GraphQL API.
+
+[00:05:32]
+And someone noticed this cyclic relationship between two nodes and they wanted to DDoS you, there's nothing stopping her from doing that. I can just write a script that creates, I don't know, 300 nested profile person, nested objects and just run that in a loop and see what happens to your API.
+
+[00:05:51]
+So that would suck, and that's one of the downsides of graphic about the box is that because it's graph, you have these cyclic relationships and. And there isn't anything built into the GraphQL spec that will stop this from happening. However, there are tools and plugins outside of the GraphQL spec that kind of prevent this and they all have their own different trade-offs, there is no perfect solution.
+
+[00:06:15]
+But it's mostly a concern with developer facing GraphQL APIs. If you're building a GraphQL API for your own product, then don't write a query that does that and you'll be fine. But you can't help what developers might do, so there are ways to get around it and circumvent it.
+
+[00:06:33]
+And caching is something that can help with that, and there's different ways to cache. I've seen people, what they'll do is, they'll give, it's so complicated but like, though we haven't talked about directives yet, but you can add directives here that like do things. And something you might do is
+>> Scott Moss: You might say, this thing has like, a score of, I don't know, five or something like that.
+
+[00:07:00]
+And you might put in your code that no query can be of score more than 200. So once it starts going through all these fields, it'll start counting the score like, you went over 200 so the query stopped, right, so it can do things like that. There's like so many ways I've seen people attempt this.
+
+[00:07:18]
+It really depends on the experience you wanna offer to your developers, so you can, you can call it a score, you can call it a weight, there's many, many different ways. I've seen people say, they jack into the abstract syntax tree, the AST of GraphQL schema, and count how many times you go down a level.
+
+[00:07:35]
+And then they can say, we're only gonna let you go down in amount of levels, once you go past that, we stop it, we throw an error you can't go further, there's no one way, and they all have trade offs. It's all about the developer experience at that point.
+
+[00:07:47]
+But again, if you're building an API for your own consumption and your own app, this is not a problem. Just don't write a query that does that and protect your API so it's not used by anyone, not on your app, you're fine.
+>> Scott Moss: Cool, any questions on that?
+
+[00:08:07]
+
+>> Scott Moss: Yes.
+>> Learner: I don't see any data in Terso related to person, alien, tweet, etc, where is the data coming from?
+>> Scott Moss: It's a great question, so we kind of breezed over it earlier, we haven't gotten to the part of making a schema where you actually make the data.
+
+[00:08:23]
+We're gonna do that as soon as we go through the schema definition language. So where's the data coming from? If you go into the route TS file of /API, /app/api/graphql route right here where we're making a new Apollo Server. We're using this function called addMocksToSchema, what this function does, is it does exactly what it says it does, it will add mock data to your schema.
+
+[00:08:47]
+So here's our schema, we give it our schema, and what it will do is, whenever we query that schema, it will generate mock data for us, based off the primitive or scholar types of those fields. So the C string, it will probably return hello world. If it sees number, it'll return a random number, if it sees booing, it'll return random true or false.
+
+[00:09:06]
+So if you think about it, the schema, and this is not just what GraphQL, this is like even a database schema. Everything always resolves down to a primitive or scholar type, right? A character has a name that's a string, right, even if a person has a profile, a profile resolves down to just these scholar types, and this resolves to scholar types.
+
+[00:09:30]
+So everything is a scholar eventually, unless it's cyclic like this, and then it's like infinitely it's cyclic and that's the issue. So because everything is predictable and is a scholar type, they can just use recursion to figure out. I'll just loop through this query and satisfy all these scholar fields with a string, a number of Boolean, an ID and that type of thing.
+
+[00:09:52]
+So it's actually quite simple, but that's what's doing it right now. Yes?
+>> Learner: So there are different caches, like client side, create cache and server GraphQL cache.
+>> Scott Moss: Are the different caches? So okay, so let's talk about cashing fo a little bit, I'll just briefly talk about it.
+
+[00:10:12]
+And this is nothing to do with GraphQL. Caching on the front end in a React app has nothing to do with what caching strategies you do on the back end, has nothing to do with GraphQL, so yeah, that also applies to GraphQL. There are two separate things, you don't wanna be caching some users data in a place where all the other users can access it.
+
+[00:10:31]
+So you separate the things but yeah, there are specific mechanisms to cache with GraphQL, but for the most part, on a high level, it's the same as anything else, so no difference there.
+
