@@ -1,0 +1,94 @@
+[00:00:01]
+>> Scott Moss: We're just gonna build on top of that and to add more or our first attempt at server-side data fetching. So with React 18 and now 19 and Next.js 13, now 14, we have the ability to do asynchronous server components, which allows us to access database resources, back-end resources, directly inside of a component.
+
+[00:00:23]
+So we can do initial renders for components completely server-side without having to wait for the client to bootstrap, load up. Download JavaScript, do all that stuff, and then make a query probably inside a use effect or something, which is what you would normally do. So that's not news and it's not really advanced.
+
+[00:00:39]
+I talked about that in the intro course, but we're gonna talk about more advanced patterns specifically around caching and things like that, and how all that works. So server-side, data fetching, the best way I can describe it, I've been talking about it for a little bit now but it's really like Next.js.
+
+[00:00:57]
+It's creating a route for you for every function that you make, and then you just call the function, and you don't have to worry about managing the route. So that's the best way I can describe it, and in that function, you can do anything that you could do in a Route Handler.
+
+[00:01:13]
+So the runtime is gonna be whatever runtime that your environment supports. If you deployed Vercel or something, you could pick a runtime whether it's edge or just node. So it's really just gonna be a Route Handler, but a component.
+>> Scott Moss: Basically, some of the things here that you have to think about though, when you're doing these server-side calls are gonna be optimizations around redundant things.
+
+[00:01:43]
+Or for instance, if you are loading up slots like we are and each one of those slots needs to make sure that the user is signed in. So you need to make a call to the database to check to see if the user is signed in, in our case, three times.
+
+[00:01:59]
+That'd be very wasteful to have to do that, so you probably wanna minimalize that or cache that in some way. So these are some of the type of things that you wanna think about when you make these calls, so it's really like you have to plan it out [LAUGH] cuz it's not obvious.
+
+[00:02:18]
+So mostly, here, I'm just talking about a lot of that stuff, memoizing, things like that, but it's so much easier if I just walk you through and show you. But some of the things here, in addition to doing memoization of some of the fetch requests, are gonna be persistent caching.
+
+[00:02:36]
+So persistent caching is, the way I can describe that is, it's even though we go in between routes, whereas a memoization is a per request, a persistent cache would be it's always gonna be there until you do a hard refresh basically, right? So we're gonna talk about how do we activate that?
+
+[00:02:55]
+How do we turn that off? How do we opt into it? Different things like that. The other cool thing is gonna be streaming and suspense. Again, this is not new to React or Next.js, but we're gonna talk about how to actually use that in a way where it's practical, it's nice.
+
+[00:03:11]
+It's not something that's hypothetical, but it's something that's actually useful. I'll talk to you about how I do it. So for this one, we are going to make a couple server-side functions here. So one, we wanna lock down our application cuz now since we created auth, we don't want people to be able to access pages unless they're authenticated.
+
+[00:03:35]
+So we're gonna make a helper function that gets the current user based off the token, so we'll do that. And then we're gonna go make our functions that get the data for those route slots. We have those three route slots, right? We have one that shows the attendees count, so we can make a function that gets the attendees' count.
+
+[00:03:52]
+We have one that's the homepage this one, which one? Yeah, this one actually gets the attendees counts. We have the one that gets the events. So all the events, so we gotta make that, and then we have one that gets all the RSVP, so we have to make that one as well.
+
+[00:04:05]
+So we're gonna make all of those and then we're going to put them in their appropriate slots. We'll explore all the different caching scenarios and gotchas and then we'll figure out how we might cache those, so let's do that. So first things first is let's go make our function that we're gonna use to get the current user and pretty much every single one of these routes that needs to be protected.
+
+[00:04:29]
+And the way that I did this, I typically make a utils folder on the root of my app, and I kind of just scope it based of the type of work is gonna be done there. So in this case, I'm gonna make a users.ts file at the top.
+
+[00:04:40]
+I talked about this earlier, but I'm gonna import this server only module here. All this does is, it will throw an error if the file is ran in the browser. So if it detects window or any DOM related stuff, it'll throw an error. This is actually very important because you're gonna find out and I've done this by accident so many times, it's like you're gonna make a file like this that has a lot of utility functions in it.
+
+[00:05:06]
+Some of those functions operate on the server, and then some of them operate on the ground. You might have two functions in here, one is using cookies and another one's using local storage. Those two functions cannot exist in the same file, because one of them uses something that only works in the browser, the other one uses something that only works on the server on a request.
+
+[00:05:29]
+So by putting server only, not only am I saying, hey, this can only work on the server, I'm also saying I have access to everything in the server and I shouldn't be putting browser stuff in here, right? So let's do that, so I'm gonna go to utils.
+>> Scott Moss: And actually, if you open this up, there's a few files in here.
+
+[00:05:53]
+You won't touch these, but I can kinda talk about them. I talked a little bit about the auth tools. This is just some helper functions to sign us in, sign us up, hash passwords, things like that. Constants, I always make a follow on my app called constants where I just put constant strings.
+
+[00:06:08]
+This delay function, since now we're getting into data fetching and things like that, we're gonna simulate a delay, cuz otherwise, it'll just come back too fast. Even tussle being hosted actually comes back so fast, so you won't actually get to see anything. So we're gonna delay a lot of our requests, so we can actually see what's gonna happen.
+
+[00:06:27]
+You can get the benefit of that, so there's a delay function here. So I'm gonna get new file, call it users.
+>> Scott Moss: And then I'm gonna get my imports, so we got our COOKIE_NAME, we got our cookies redirect and our dysfunction called getUserFromToken from our auth tools, which sounds exactly like what it says.
+
+[00:06:48]
+It does exactly what it sounds like.
+>> Scott Moss: And from here, we're gonna say export const getUser or what do I call it, getCurrentUser.
+>> Scott Moss: So getCurrentUser, it doesn't have any arguments because it can access the cookies because it's running. We're gonna be using it on React Server Components, which when you use the cookie's function inside of a React Server Component or even in a server mutation, you have access to the current request and cookies needs that.
+
+[00:07:28]
+So this will work as long as we use it inside of a request. Now if I were to go to use this, where would this not work? If I were to just run a script and just run this, this would not work. There'd be no concept of cookies.
+
+[00:07:41]
+It's the same thing I said earlier about tests. If I were to try to test this, yeah, it's node and it'll operate but you probably wouldn't get what you thought you were gonna get here. Unless this is mocked out, but you still wouldn't get the value because there's no concept of cookies if there's no request, so something to keep note of.
+
+[00:08:01]
+So we're gonna get our token, which is gonna be cookies.get COOKIE_NAME. So once we get that, the next thing we wanna do is get our user from token. Well, first what we wanna do is if we see that you don't have a token, we'll just redirect you to sign in, so let's actually do that.
+
+[00:08:27]
+
+>> Scott Moss: So if no token, then redirect to sign in, and you don't have to put a return here. This is interesting because,
+>> Scott Moss: What's the word I'm looking for? It returns a type never which is the same thing as return as in nothing can happen after this if this is called, so it will terminate here if this actually happens.
+
+[00:08:53]
+So you don't actually have to put a return there. You can if you want but you don't have to. So we have that, and then we wanna get the user, which is await getUserFromToken. It needs to take in a cookie. A cookie is actually an object that has a name and a value on it, so that's what this is expecting.
+
+[00:09:16]
+And then same thing, if not user, then go back to sign in, otherwise, return the user. So now we can use this on any page that needs authentication protection. Later on, we're gonna do a global way that just locks it down for us for free, then we'll be just using this on server mutations.
+
+[00:09:41]
+Whenever someone wants to do something on the server or access some data on the server, we would use this. But as far as locking down the page, we'll do that somewhere else globally.
+
