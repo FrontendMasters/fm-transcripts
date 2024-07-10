@@ -1,0 +1,141 @@
+[00:00:00]
+>> Scott Moss: Caching on other server-side data that doesn't use request-based access like cookies. By default, what React tries to do is it tries to pretty much cache everything according to the page that the data is rendered on. So in the case of a home, like this home right here, it's gonna try to cache it if I try to navigate with client-side routing.
+
+[00:00:30]
+So what I'm gonna have to do here is I'm gonna go to our dashboard, I'm gonna make a new folder. I'm gonna call it events, without the @ sign. Since we have a route called events, I'm gonna put a page in here, right quick, page.tsx. And I'm just gonna just put something in here so we can route to it.
+
+[00:00:54]
+
+>> Scott Moss: We'll actually be building this out later, so it's fine if you get a head start on it. Just gonna return null.
+>> Scott Moss: There we go.
+>> Scott Moss: So we have that, so if I go here, there we go, that routes, okay. So, yeah, caching with non-request-based access, things like cookies and headers, everything's gonna get cached there.
+
+[00:01:28]
+But the other thing to note is that Next.js behaves differently when you do a dev build versus a production build. When you build it in production versus doing it locally, the caching is more extreme. So on development, you're gonna have a way different behavior. So what you end up having to do a lot of the times, is you end up having to do a npm run build, which is a Next build, and then do an npm run start.
+
+[00:02:01]
+So you can build it and then start it, which is what would happen on production. This will give you a better simulation of what caching will look like when you build it. It's just not a good developer experience. So I'm not gonna develop like this. But just note that once you start implementing cache strategies, do that.
+
+[00:02:20]
+Build it first, then start it, check it there. Make sure the behavior is the way that you want. Because on development, the caching strategies are way different. Because the cache function that we use from React doesn't allow you to invalidate it. It's only a per-request memoization. We need a cache to persist across many different routes, and we need the ability to invalidate it when we do a mutation.
+
+[00:02:45]
+As in when I wanna update an event or update RSVP, I wanna say, cool, this thing is, I updated one, so therefore it is invalid, so I need you to run again, right? So we need things like that to happen, and the cache from React does not allow that.
+
+[00:03:02]
+It's a per-request memoization, it does not persist across routes. So Next.js knows this, and they came up with something called unstable cache. Now, I don't know about you, [LAUGH] but I don't wanna use something in my app called unstable. I feel like they kinda knew that it didn't work well, so their PR team got ahead of it.
+
+[00:03:29]
+And was just like, put the word unstable in front of it, and then nobody could complain. I get what it's supposed to do, but it doesn't really work. So if you go read the docs, they'll say, use it, and things like that, but it doesn't work the way that it's supposed to.
+
+[00:03:43]
+So instead, I actually made one, and then I realized someone made one better, someone smarter. And they made this package right here called nextjs-better-unstable-cache [LAUGH], as a troll. So that's what I use. And to even confuse you even more, they call their caching function memoize, like the cache function that actually does memoization.
+
+[00:04:04]
+Because actually what this memoize function does, it does use the React cache memoization function. But it also uses the unstable cache from Next.js, but in a better way. So it kinda combines them both. Because one of the gotchas I found out with the unstable cache is that it will run multiple times per request.
+
+[00:04:24]
+So you did wanna memoize it. So it's a combination of all that. So that's what we're gonna use to cache all of our non-request-based server functions that don't use cookies or headers and things like that. So I'm gonna go here, I'm gonna say, memoize from this thing. And just gonna wrap this whole function, and I memoize.
+
+[00:04:51]
+Takes a second argument here, the second argument is just an options that you can do. So I'm gonna say persist: true, like this.
+>> Scott Moss: This means persist it across route changes. So even if I change routes, it's never gonna run this function again, it's persistent. Until I do a hard refresh, it's never gonna change.
+
+[00:05:15]
+
+>> Scott Moss: revalidateTags is important, whatever you return here, these are the tags you have to call when you want to invalidate this cache. So on a mutation, when you change something in the back, and you wanna say, this cache is no longer valid because I just changed something, these are the tags you would have to pass to the other cache busting function that we'll talk about later on.
+
+[00:05:38]
+So it's usually an array, you can put whatever you want. You can put mini keys, things like that. If your function takes in an argument like ours does, it takes a user ID, you'll have access to that here through the user ID, that'll be the first argument. But I don't actually need it here, cuz none of our queries are bound by that.
+
+[00:05:57]
+So I'm just gonna put something like dashboards, what is this? Attendees, something like that. There's really no wrong answer, you just have to remember what this is. So you probably wanna put these like in a constants file or something like that so you can reuse them, so you're not hard coding them everywhere.
+
+[00:06:13]
+So we have a revalidateTags, I usually put suppressedWarnings, cuz it gets noisy as hell if you don't do that. suppressWarnings, these are warnings for when you try to use this function on a client or something like that. But we kinda already handled that, so it's not a big deal.
+
+[00:06:38]
+
+>> Scott Moss: This log is just telling it what to log, so this is useful for debugging. So when I say, hey, build it first and then start it, so you can see how the caching works, make sure you turn these logs on, this will tell you when something happens.
+
+[00:06:50]
+So this is saying, show me a log when the cache is hit. Verbose is like any other logging thing, that's to show me everything. There's another one here called dedupe, this is, show me a log when you deduped it with the cache function from React, when you dedupe this function.
+
+[00:07:09]
+So this is, you hit the cache, you did not call the function again, and this is, you deduped the cache lookup. [LAUGH] It's complicated, I know, it gets deep, but that's why it's unstable. And this is the only package I found that actually solves it. So for the most part, you should probably log these while you're in development.
+
+[00:07:32]
+You can even put up process.env development, show this, if not, don't show it, but I would do that. And then logid is just a trace for your log. So we look at it, you know it came from here. You're gonna have a lot of these. So this is gonna help you with your logs.
+
+[00:07:52]
+Okay, so we did that for the getAttendeesCountForDashboard, let's go back. It's already doing it. So let me just do a refresh on the actual app so we can see where the vibe is. So let me clear the console. Refresh, let me do a hard refresh, hold on, hard refresh.
+
+[00:08:14]
+So we did a hard refresh. You can see it said cache MISS on-demand revalidation, that's because of the hard refresh. A hard refresh is like me saying, revalidate everything, do not hit the cache, that's the whole point. And then you can see, during that one request, it already tried to run it again on the one request.
+
+[00:08:37]
+And you can see the memoization caught that. And the memoization was like, no, since this one request, this function was already called, so therefore I'm not gonna call it again. I'm just gonna return what the memoized version of that was, which is exactly what the cache function from React does.
+
+[00:08:56]
+
+>> Scott Moss: Okay, so, we did that, and then, if I kind of like navigate, go back here. You can see now it says cache HIT. So it didn't run that function again. Here it missed the cache, and it had to go get it, and it took 1.116 seconds. Here the cache hit, it took way less than one second, it got it back immediately.
+
+[00:09:23]
+And that was after me changing routes, and still the memoization thing still is a problem. This is a gotcha from Next.js. Okay, let's add some caches to our other things. And once we add in a loading state for suspense, it's gonna become a lot more dramatic around how these things, you'll be able to visually see the caching and stuff, it'll make a lot more sense.
+
+[00:09:46]
+But right now we're not streaming anything, so you can't really tell. But once we do that, it'll make a big difference. So let's add in the rest of our caches. So we'll go to events. We'll add in our memoize here,
+>> Scott Moss: From that thing,
+>> Speaker 2: Where did those tags get defined?
+
+[00:10:19]
+
+>> Scott Moss: The tags, so are you specifically talking about these tags?
+>> Speaker 2: Your revalidation tags, yeah.
+>> Scott Moss: They get defined here. This is where you define them, they could be whatever you want them to be. You can think of them as cache case.
+>> Speaker 2: So the dashboard, those are components?
+
+[00:10:40]
+
+>> Scott Moss: I see what you're saying, yes, I see.
+>> Speaker 2: How does it know that that's associated with-
+>> Scott Moss: Great point.
+>> Speaker 2: Something.
+>> Scott Moss: It doesn't, this has no correlation with anything in the app. You can put whatever you want here. We haven't done the other side to do a validation ourselves.
+
+[00:10:57]
+There's a whole another side of this. So basically, what's the word for it? It's on-demand, so this is for on-demand revalidation, as in, you wrote some code to say, invalidate this. Here's the tag that I want you to revalidate.
+>> Speaker 2: I see.
+>> Scott Moss: But there is also automatic invalidation through Next.js, which is the part that's quite hard.
+
+[00:11:19]
+So basically, the strategy that I'm showing you is like opting out of all the automatic revalidation and only using on-demand revalidation, so that way you have more control over everything. So it's like, yeah, you gotta write more code, but you have more control and it's consistent and you know what's going on.
+
+[00:11:35]
+Whereas if you don't do this stuff, honestly, I couldn't tell you how it would work. I have not been able to consistently have a good experience out of the box. And scenarios in which I thought things would happen, they didn't. As you saw, I was like, okay, this is not how I thought, cuz I forgot it works different on production than it does on dev.
+
+[00:11:55]
+But wait, this thing has cookies and this thing doesn't, it's really hard.
+>> Speaker 2: And all of a sudden, you have a revalidation storm. [LAUGH]
+>> Scott Moss: Yeah, exactly. It gets very tough. So this is just like, all right, turn that off, use this. Cool, so I need to write my revalidate tags.
+
+[00:12:12]
+Does this one take in something specific? It does not. So, I'm just gonna say this one is dashboard:events. And then I want to, I don't really care about the logs for this one. So I show you guys those logs. And then, the one that I really care about is persist.
+
+[00:12:30]
+So, I want this to persist across. Basically, persist means cache infinity, that's what persist means. It's never stale, it's always good, because I want to manually revalidate this. I don't want it to ever be some interval or some random thing, no, keep this thing cached until I tell you it's not cached.
+
+[00:12:55]
+That's it, I want full control over it. I'd rather just do that than come up with some number that causes race conditions or something like that, I don't wanna do that. So, okay, same thing here.
+>> Scott Moss: Memoize,
+>> Scott Moss: Do that.
+>> Scott Moss: persist:true,
+>> Scott Moss: And revalidateTags, this will just be dashboard:rsvps.
+
+[00:13:34]
+And again, you can put whatever you want there, that really doesn't matter. This is what you have to use when you go and say, cool, this tag, invalidate everything with this tag. So it's whatever you want. Okay, so we got all of those cached, hence, I mean, you're not really gonna notice the difference in the app, because we don't have any fallbacks or anything like that.
+
+[00:13:56]
+But trust me, the app is faster now, it's better.
+>> Scott Moss: All right, you do notice that, when you switch client-side, it's immediately there, whereas before, it did not do that. So, there's an immediate loading there because it's persisted across the render, so.
+
