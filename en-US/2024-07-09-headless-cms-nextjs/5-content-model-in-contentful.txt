@@ -1,0 +1,133 @@
+[00:00:00]
+>> Scott: The next thing we want to do is now that we have this fetcher, we need to go to contentful. We need to create a content model. I think that's what it's called, a content model for the header that we just talked about, and then create an actual document, use this fetcher, pull it down, call it in the hero, and then render it in place of the static content.
+
+[00:00:21]
+So a couple steps involved, but we don't have to do that once for that setup and then after that it's just more queries and we're good to go. So I'm going to show you my flow on how I like to do things I'm doing like caching here. We'll talk about it later.
+
+[00:00:35]
+I'm going to show you my flow and how I like to do things when it comes to figuring out what query I need, bringing it in, making the types. It's pretty simple, so nothing complicated. And then here I'm just going to go ahead and just resolve everything. So I'll just say awaits res.json.
+
+[00:00:55]
+I'll await that and then GraphQL always typically if there isn't an error, there'll be a data property or an errors property like this. So I'll just say if errors, for now do something here. But we'll just say throw new error, not get content, I'll also just log them.
+
+[00:01:25]
+Otherwise just return the data. Because with GraphQL it's always going to be a 200 even if it's an error. So that's why I'm not checking status codes here. Even it errored out, it's going to send back a 200. It'll just send you back an array of errors here instead.
+
+[00:01:41]
+Okay, let's go make some shapes. Let's get to it. Okay, so content model. So click on content model at the top and you should see something like this. Unless we're being A B tested and you see something different, you can say design your first content model. So you can think of this as like a table for a database.
+
+[00:02:01]
+It's basically what this is. We're designing a schema right now. The open sources allow you to do this in code. So you'll use JSON or whatever their thing is and you can design your schema and code. And then because you're hosting it, it doesn't matter. So we're going to call this one hero.
+
+[00:02:21]
+So there's many approaches before we get into this. When it comes to data modeling for there's the approach where you design, you create a schema for a whole page. So we go through that whole page and we'll make fields and sub fields for everything on that page. And there's nothing wrong with that.
+
+[00:02:38]
+I've done that before in the past. But for this approach, I'm not going to do it that way. And the reason is because I want to take advantage of server components. What server components with next.js 13+ is that each component can make its own call to get whatever content that it needs specifically.
+
+[00:02:58]
+That way you can put those components anywhere and they'll still work exactly the same. Whereas if we render out an entire page, let's say the sections or the subsections on that page will be dependent on its parent passing in the content that it needs. So therefore it's not as flexible anymore, it's not as reusable.
+
+[00:03:18]
+So if you have like a carousel component that you want to use somewhere else, but it needs to take in a prop for its content, then now you got to make that call again to pass it its content. Whereas if it knew its own content, then it could just call it itself no matter where it is, it's self containable, it's a completely isolated instance, not even just in the component aspect, but in the content aspect as well.
+
+[00:03:42]
+So we're going to take that approach. And some might be thinking like, wow, that might be a lot of API calls when you go to a page, it's a static page. It's all going to get rendered at build time and then deploy it, export it statically. So no, it's actually not that detrimental at all.
+
+[00:03:58]
+And that's not even including things like caching, revalidation, and we'll talk about a lot of that stuff. So yeah, that's the approach that we're going to take. So things are just super simple. This is going to allow us to move things around and not have to worry about like, it's broken now because you got to pass this in.
+
+[00:04:13]
+Not going to have that problem. Any questions on that? Okay, so got our Hero out of field. First thing is we'll do the, we'll make a text field. That'll be for the pre title. So I'll call this.
+>> Speaker 2: Hey Scott, I've got one question.
+>> Scott: Yes, question, yes.
+
+[00:04:39]
+
+>> Speaker 2: Component level data fetching. Almost all APIs have rate limits, pretty low in most cases. So, you know, next.js build times, you're going to run into the rate limit on the API pretty quickly. Contentful I just looked at is 55 requests per second.
+>> Scott: How many requests per second?
+
+[00:04:55]
+
+>> Speaker 2: 55 requests per second. You're going to beat that up at build time.
+>> Scott: Yeah. So yes, a lot of them have rate limits. What I've realized, it also just depends on, a lot of them have different APIs for public content versus draft content. So for the public content ones-
+
+[00:05:15]
+
+>> Speaker 2: That's their delivery.
+>> Scott: That's their delivery API? That's pretty low. So yeah, I mean, you would have to, like in your fetcher, you would have to account for that. You'd have to throttle, you'd have to just account. Look at the header. They'll tell you how long you got until you can come back.
+
+[00:05:28]
+But for me, I would probably, I'd probably still build it with a content first approach because I want to be able to move things around. But also, for me, what I also realized is like, when you make like one big page content model, that's where it starts to get hard for the content.
+
+[00:05:43]
+The folks making the content, it's so relational and so dependent on each other that it's very fragile. You might have it to where if someone renames this one field, it'll break my code. Or if you move this here, it'll break. So if everything's isolated, it's a little simpler to think about.
+
+[00:06:03]
+But yeah, rate limits, definitely. That's so funny that that's, that the rate limit is that low for something like that. That's crazy. But yeah, there's ways around that. Thanks for bringing that up.
+>> Speaker 3: They really want you to get into that $300 a month paid tier.
+
+[00:06:18]
+
+>> Scott: There you go. That's what it is. They want you to get in there. So you make it, you can make a name here, you can call whatever you want. I typically capitalize mine and then that generates a field ID. You can always change the name no matter what, but the field ID typically never changes.
+
+[00:06:32]
+This is the ID that appears in the API. So because you're creating a dynamic schema, this is the field, the field name for this thing. So here, you can pick different options here, I'm just gonna pick short text because it's definitely less than 256 characters. So I'm just gonna say that.
+
+[00:06:53]
+I'm gonna say, I'm gonna check this box. This field represents the entry title. This basically just means that there's a view where it shows you all the, let's say you make more than one hero. This is how you identify it's this hero. I'm not gonna say it's the ID because it doesn't have to be unique, but it's the field in which you can identify this entry at a glance.
+
+[00:07:18]
+So what field do you want to show so you know that you're looking at a specific hero. Some CMS's have a setting that would be useful here where you can say, I only want someone to be able to make one hero and no other heroes. I don't think Contentful has that or I don't know where it is.
+
+[00:07:35]
+Some CMS's do have that. That's useful because you might have some person on your team go make like three heroes. But your code is expected there to only be one hero. So which one are you getting back? So it can get pretty complicated. I don't think they have that option here, but that needs to be required.
+
+[00:07:51]
+We will say you can limit if you want. You can do a regex here if you want. You can do enums if you want. And then this is like the UI you want your content folks to see when they fill this field out. So for this, I just want a single line, just a straight up text input.
+
+[00:08:07]
+It wouldn't make sense to put a URL or dropdown or a radio select or a slug that gets generated. So I'll do that. And then if they're struggling, which they probably will be, you can give them a hint here. So this will show up. So this right here is a preview of what they're going to see.
+
+[00:08:25]
+So you can see that's where the hint would go. So I would say the main title on the homepage, you know, big words, you know, like literally break this down. I've seen some CMS's that allow you to upload a screenshot here so they can hover over and it's that thing.
+
+[00:08:47]
+Okay. Because it could get, it's disconnected. That's the whole point of being headless. It's like you're disconnected. Okay, so we have our pre title. We now need to make another field. We're going to call this the title. Same thing. Same thing. This one is, I'm actually, you know, I want the title to be the, represents the entry title.
+
+[00:09:11]
+That makes more sense. This needs to be required and same thing. So here, this will be the subtitle. All the same stuff required. All that's good. And then what do we have? We have the CTA's, right? CTA's are links with labels. So that's a compound type. Well, I guess you could put adjacent objects in here.
+
+[00:09:41]
+But we're not going to do that because we're not going to take the easy way out. I also want to list. So what we're going to do is we're going to make a reference to another type, which means we need to make another type. So we're going to do that.
+
+[00:09:58]
+But first let's save this here. So now we have our hero type and then I'm going to make a new type. I'm going back to the content model and I'm going to say create a new content type here. They have a generate content type with AI. Wow. Let's see if this works.
+
+[00:10:15]
+So let's see. Enter a short description on the content type you want. I need a, I don't even know how to describe this, button with text and href. Let's see. Yeah, actually that works, good for them. So I'm gonna go ahead and take that. And now we have our link.
+
+[00:10:45]
+Our link is basically it has a text and then it has an href. But most non technical people don't know what an href is. So I'm gonna say link and I'm gonna change that to link as well. So we'll do that. And this is required. I'll make this not, that doesn't have to be unique.
+
+[00:11:06]
+And I'm going to pick the URL UI so it looks like a URL which makes more sense. And I'll say relative or absolute URL for this call to action. I'll confirm that. And then for the text, I'll call it label. And I want this to represent the entry title.
+
+[00:11:40]
+This is also required. This will just be single line text. And this is just like the text for the call to action. We'll do that. Boom. Now we got that, easy. So let's finish adding these. Let's add the button content model to the hero. And then what we're going to do is go back to our hero.
+
+[00:12:19]
+Click add field, make a new field. We're going to say reference. And the reference here, I'm just going to say call to actions, plural. And you see the bottom says one reference or many references. I want many because I want to be able to have multiple call to actions.
+
+[00:12:38]
+Right? So I'm going to say configure. And I'm going to say only a specified number of entries. The hero has two, so minimum of two, maximum of two. You got to give me two. And then accept only specified types. Yeah, I only want button types. And then what UI do you want to show?
+
+[00:13:09]
+You want to show a card or you want to show a list. Show me a list. Cool. Bulk editing, as in this is like a modal that pops up where you can edit all the, in this case, buttons in one UI. Sure, why not? Create new entries if you don't have one when you're making a hero.
+
+[00:13:27]
+Can they make one in line right there? Or they need to leave and go to the button and make it and come back and then link existing? If you already have some, can you just select one from a list? Yes, obviously we want that. Why would we not?
+
+[00:13:38]
+That should be default. Why would you not want that? Okay, so we got that. Going to hit save and now we have our first model ready to go.
+
