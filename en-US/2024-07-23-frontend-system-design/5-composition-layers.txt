@@ -1,0 +1,93 @@
+[00:00:00]
+>> Evgenii Ray: Now let's understand how the browsers utilize the GPU. So the old browsers used only the CPU to render the page, but the new browsers use CPU and GPU together in parallel to optimize the rendering. And let's now understand how the GPU is used via the browser. So would render four boxes here.
+
+[00:00:23]
+Each box is absolutely positioned and slightly moved on top of each other. And here's our html tree. So apparently, for the browser to optimize the html for the GPU rendering, it needs to have some kind of rendering tree representation which is GPU aware so the browser constructs their render object tree.
+
+[00:00:48]
+So where for each DOM element, we create a new render object. And as you can see, it's just one-to-one copy, but they have completely different properties that the DOM element contains all the information about html, or all its properties. While the Render Objects knows how to draw this element on the bitmap using the graphical context, which is passed from the top.
+
+[00:01:14]
+And as you can see, so the GPU is good at rendering many things, but if we imagine that every render object is responsible for drawing itself on the page, it doesn't look like a very optimized way to use the GPU. So that's why there is additional concept called Render Layer.
+
+[00:01:33]
+So the Render Layer is constructed when we actually use the position relative or absolute. So when we move elements to the stacking context, so basically create a new layer. Also, it's constructed for the root element, so we always need to have a root layer where we render the things.
+
+[00:01:51]
+And when we utilize some accelerated context like Canvas or CSS filters. And let's try to construct the Render Layer. So if we take the first html Render Object, we'll see that because it's the root element, the first root Render Layer will be constructed. But then we have the body and the main tag.
+
+[00:02:14]
+Because the body and the main doesn't have any special properties, this Rendering Objects will be assigned to the root Render Layer. And now let's move on to these four divs element. So, because each of these div element is positioned absolutely, this means that we need to promote these objects to separate Render Layers.
+
+[00:02:35]
+So that's why we created a new four Rendering Layers. And also this rendering layers will be applied to the root Render Layer. So each Render Layer kind of has a children property, and it stores the Render Layer as a linked list, in a stack order. So the last layer will be the the first rendered.
+
+[00:02:59]
+We may have hundreds of Render Layers, it's still not efficient to use the GPU for hundreds of objects. And remember, the GPU is good at rendering many things. So how does the browser go about that? Apparently, there is an additional layer called Graphic Layer, which is constructed when we use some 3D acceleration.
+
+[00:03:22]
+So it can be perspective change, or we use some video element where we need decoding from the GPU. And if we try to construct a Graphic Layer for that, so first, we'll start with a root Render Layer. Because it's created by html element, we initiate the first Graphic Layer, we need to have at least one when we load the page.
+
+[00:03:47]
+So for the rest of the rendering layers, because they do not utilize any 3D acceleration, we don't actually need additional rendering layer. That's why all this rendering layer will be applied to the one Graphic Layer. So now we have a Graphic Layer that has the graphic context and knows how to draw the rendering layer.
+
+[00:04:08]
+And now we have the full cycle of how browser renders things. But let's run a quick demo to see how this actually works. So if we open the following CodePen, and open the debug mode. Now we need to transition to the layer step.
+>> Evgenii Ray: So we'll see that a single Graphic Layer right now is created, and it utilizes 8.7 megabytes of the GPU memory.
+
+[00:04:42]
+So the key thing about Graphic Layers, we can utilize the Graphic Layer to optimize certain parts of the apps. So for instance, you could have the widget that relies on very advanced animations. Then you can say, hey, browser, I want this on a separate Graphic Layer so you can optimize this widget and I can see my snappy animation 120 FPS.
+
+[00:05:06]
+But the thing about the Graphic Layer is it utilizes the CPU and the GPU RAM. So every time we create a new Graphic Layer, we actually take a hit on the browser resources. And it's very easy to prove by applying the styles to the box. And let's promote each box through separate Graphic Layer.
+
+[00:05:30]
+So let's say,
+>> Evgenii Ray: We can apply 3D transformation. And if we go back to the layer step, we'll see now that we have five graphic layers in total. And the first one still utilizes 8.7 megabytes, but each newly created one utilizes more than half megabyte of the virtual memory.
+
+[00:05:58]
+And the problem of that is, imagining you have at least with hundreds of elements inside, and you decided to promote these elements to the Graphic Layer. This means that you immediately consume around maybe 100 megabytes of the GPU memory. And GPU memory is not just used for the browser and rendering the page, it's used for the system.
+
+[00:06:21]
+And your application may become unresponsive because the system will have to utilize the additional swap cache. And when we use the swap, then we get the unresponsiveness of the app. So the summary for the Graphic Layers it's a very powerful thing to utilize when you build your complex apps, but you need to make sure that you utilize it right because it uses the VRAM and also the CPU.
+
+[00:06:54]
+So instead of optimizing the app you may end up de-optimizing your application.
+>> Speaker 2: Is there any good rule of thumb for avoiding CPU bound operations in CSS?
+>> Evgenii Ray: There is a website called what triggers CSS or something, so you can actually see what is the pipeline will be triggered by changing the certain CSS properties, you just need to make sure.
+
+[00:07:21]
+So its always the rule of thumb, try and minimize any reflow. Always try to change the properties that do not trigger the full pipeline. So this is the rule of thumb. There is no good reason to just always use the full pipeline, because it always affects the application performance.
+
+[00:07:41]
+
+>> Speaker 2: Yeah, I found it, it's csstriggers.com.
+>> Evgenii Ray: Yeah.
+>> Speaker 2: And then Lucas says 8.7 megabits sounds like a lot to me, am I wrong? And what could be a good healthy number?
+>> Evgenii Ray: No, actually it's a relatively small number. Usually websites utilized around hundreds megabytes of the virtual memory.
+
+[00:08:03]
+And it doesn't grow linear, because we need to initialize the initial context, we always pay the price of this initial utilization. So it will be kind of the constant. But if you try to promote too many layers, then you may have an issue later.
+>> Speaker 2: Yeah, I think there's a tweet on about Frontend Masters that they were watching a course, and taking notes, and doing all these things on our website.
+
+[00:08:38]
+And it was taking like one tenth the resources as another just marketing page that was just trying to show a couple animations or whatever. And how absurd it is, how people can abuse the CSS engine or just JavaScript in general, having so much on the page and things shifting around, like how much that it boats up the browser.
+
+[00:09:03]
+
+>> Evgenii Ray: So it may impact the performance significantly. So for instance, if you have lists of items and each item will be promoted to the Graphic Layer, then I think it will take around 200 megabytes of memory easily. And we need to remember that the webinar is consumed mostly by mobile devices, and when we have the mobile device, we don't have such benefit.
+
+[00:09:26]
+We don't have RTX 4090 everywhere. [LAUGH] And that's why we need to be aware of the layers that we're utilizing in our app. Just make sure that you use them wisely. So for instance, if you have high activity widget that have using some nice animation, you can promote this to the separate layer.
+
+[00:09:46]
+But if you have a static page and you just promote every element to the Graphic Layer, then it's where we can get an issue.
+>> Speaker 2: I have heard that CSS transforms are good optimizations over reflows. So, how do we correlate this now given transforms take a hit on the GPU memory?
+
+[00:10:05]
+
+>> Evgenii Ray: So it's always better to utilize GPU than CPU, because when you utilize CPU you block the rendering thread and you will see that your responsiveness drops. So if you if you need to choose what to utilize always utilize GPU. You need to put a lot of effort to make sure that your app is unresponsive because of GPU.
+
+[00:10:31]
+But it's very easy to make a few mistakes and then get a frame drop when you utilize the CPU.
+

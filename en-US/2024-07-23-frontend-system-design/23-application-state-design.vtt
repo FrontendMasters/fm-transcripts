@@ -1,0 +1,1100 @@
+WEBVTT
+
+1
+00:00:00.200 --> 00:00:05.300
+&gt;&gt; Evgenii Ray: Let's discuss how we
+built the UI state in our applications.
+
+2
+00:00:05.300 --> 00:00:08.760
+So the data that we store on
+the UI has two properties.
+
+3
+00:00:08.760 --> 00:00:12.305
+It actually has two things,
+the data class,
+
+4
+00:00:12.305 --> 00:00:16.980
+so the type of data that we store,
+and the data properties.
+
+5
+00:00:16.980 --> 00:00:21.025
+The data type, the data classes
+can be the app configuration,
+
+6
+00:00:21.025 --> 00:00:25.470
+like user theme, locale, font size,
+or accessibility settings.
+
+7
+00:00:25.470 --> 00:00:30.666
+It can also be the UI elements state,
+for instance, in Google Docs,
+
+8
+00:00:30.666 --> 00:00:36.509
+you can select some special formatting and
+your element will keep the state.
+
+9
+00:00:37.549 --> 00:00:42.677
+Or it can be the server data that
+we store from the server and
+
+10
+00:00:42.677 --> 00:00:46.037
+use to render a new elements in the UI.
+
+11
+00:00:47.327 --> 00:00:51.427
+Then we have the data properties.
+
+12
+00:00:51.427 --> 00:00:56.415
+Each data class can have different
+data properties, for instance,
+
+13
+00:00:56.415 --> 00:01:02.453
+the access level, should the data be
+global or local, read and write frequency.
+
+14
+00:01:02.453 --> 00:01:05.835
+So if we expect that
+the data is read often, so
+
+15
+00:01:05.835 --> 00:01:08.861
+there is a high frequency write or read,
+
+16
+00:01:08.861 --> 00:01:14.557
+then we can't us synchronous storages
+because we'll block the UI thread.
+
+17
+00:01:14.557 --> 00:01:19.848
+So we need to make sure that this data
+either in the synchronous storage or
+
+18
+00:01:19.848 --> 00:01:22.296
+in our runtime memory.
+
+19
+00:01:22.296 --> 00:01:26.903
+So it's also the size,
+the larger the data,
+
+20
+00:01:26.903 --> 00:01:32.238
+there is a high chance that
+we'll block our UI thread
+
+21
+00:01:32.238 --> 00:01:38.806
+because we'll need to utilize
+a lot of CPU to process such data.
+
+22
+00:01:38.806 --> 00:01:43.699
+If you're trying to parse 500 megabytes
+file, then it will take a lot of
+
+23
+00:01:43.699 --> 00:01:48.607
+time to actually read this data and
+also process this data into the object.
+
+24
+00:01:50.467 --> 00:01:55.064
+And there are some general principles
+that we can apply when we design
+
+25
+00:01:55.064 --> 00:01:56.947
+the application state.
+
+26
+00:01:56.947 --> 00:01:59.741
+The first one, the more generic one,
+
+27
+00:01:59.741 --> 00:02:04.466
+we need to make sure that the access
+cost to this data is minimal.
+
+28
+00:02:04.466 --> 00:02:08.806
+So our data should be accessible
+at least in the constant time.
+
+29
+00:02:08.806 --> 00:02:12.996
+Once we optimize that, we can think
+about the search optimization.
+
+30
+00:02:12.996 --> 00:02:19.067
+We need to make sure that the search
+operation in our app is fast.
+
+31
+00:02:19.067 --> 00:02:22.737
+And the last part, we need to
+somehow optimize the memory usage.
+
+32
+00:02:22.737 --> 00:02:28.076
+The more things we store in
+the application, the more likely we're
+
+33
+00:02:28.076 --> 00:02:33.427
+going to utilize too many objects,
+and we can easily bloat our RAM.
+
+34
+00:02:35.707 --> 00:02:38.543
+So let's get the practical
+kind of example.
+
+35
+00:02:38.543 --> 00:02:43.897
+So we have the Messenger app where
+we render the contact list, and each
+
+36
+00:02:43.897 --> 00:02:50.180
+contact has a conversation where we can
+have thousands of messages potentially.
+
+37
+00:02:53.710 --> 00:02:57.018
+&gt;&gt; Evgenii Ray: And
+how would you optimize that?
+
+38
+00:02:57.018 --> 00:03:01.757
+So the most obvious approach will be just
+to put everything into the context state
+
+39
+00:03:01.757 --> 00:03:03.448
+and the global state.
+
+40
+00:03:03.448 --> 00:03:06.528
+But there is a problem with that.
+
+41
+00:03:06.528 --> 00:03:10.643
+So if you want to access
+a contact with id Jane Smith, and
+
+42
+00:03:10.643 --> 00:03:16.498
+we want to find any message with id 5,
+then we're going to do two hoops.
+
+43
+00:03:16.498 --> 00:03:19.596
+First, we're gonna
+filter out the contacts,
+
+44
+00:03:19.596 --> 00:03:22.621
+then we're going to
+filter out the messages.
+
+45
+00:03:22.621 --> 00:03:27.456
+This is although acceptable,
+it's still not the best way
+
+46
+00:03:27.456 --> 00:03:32.094
+because if we have potentially
+thousands of messages,
+
+47
+00:03:32.094 --> 00:03:38.026
+then we need to traverse the whole
+array just to access single element.
+
+48
+00:03:38.026 --> 00:03:41.522
+This is not the way we
+want to design our app.
+
+49
+00:03:42.932 --> 00:03:47.918
+So the first technique that
+we can use to optimize
+
+50
+00:03:47.918 --> 00:03:51.692
+our data is to change how we store it.
+
+51
+00:03:51.692 --> 00:03:55.212
+And there is a concept
+called data normalization.
+
+52
+00:03:55.212 --> 00:04:01.298
+So the data normalization has been around
+for, I think, 20 or 30 years already.
+
+53
+00:04:01.298 --> 00:04:04.621
+So it's a concept used and
+the database is heavily.
+
+54
+00:04:04.621 --> 00:04:10.413
+The goals of data normalization is to
+provide optimized access performance and
+
+55
+00:04:10.413 --> 00:04:15.004
+also provide the optimized structure,
+how we store the data.
+
+56
+00:04:15.004 --> 00:04:20.102
+And if we have a unified structure,
+how we store things in a state,
+
+57
+00:04:20.102 --> 00:04:24.941
+it increases the readability of
+our code and for maintenance.
+
+58
+00:04:24.941 --> 00:04:29.967
+And data normalization operates
+with the normal forms,
+
+59
+00:04:29.967 --> 00:04:33.428
+they're in total seven normal forms.
+
+60
+00:04:33.428 --> 00:04:37.843
+And the farther you go,
+the more you normalized.
+
+61
+00:04:37.843 --> 00:04:42.903
+In the UI apps we usually utilize
+only two or three normal forms,
+
+62
+00:04:42.903 --> 00:04:47.509
+and let's go through the process
+of data normalization.
+
+63
+00:04:47.509 --> 00:04:52.771
+So if we take the first example where
+we have a simple object with the id and
+
+64
+00:04:52.771 --> 00:04:56.644
+name and then it has the job and location.
+
+65
+00:04:56.644 --> 00:04:59.889
+So right now it's a non-normalized object.
+
+66
+00:04:59.889 --> 00:05:06.126
+So we can optimize this by applying
+the first normal form, and what the first
+
+67
+00:05:06.126 --> 00:05:12.474
+normal form does is tells us that every
+field on your object should be atomic.
+
+68
+00:05:12.474 --> 00:05:16.458
+So we need to reduce any
+nesting in our objects.
+
+69
+00:05:16.458 --> 00:05:22.923
+So we just flatten
+the nested objects here.
+
+70
+00:05:26.122 --> 00:05:30.366
+&gt;&gt; Evgenii Ray: The job object
+becomes the job_id and job_title, and
+
+71
+00:05:30.366 --> 00:05:35.068
+the location becomes country_code and
+the country_name.
+
+72
+00:05:35.068 --> 00:05:39.961
+Also the first normal form tells us that
+there should be the primary key, and
+
+73
+00:05:39.961 --> 00:05:45.178
+we know that we already have the primary
+key, which is the id that we can utilize.
+
+74
+00:05:45.178 --> 00:05:51.845
+So next, we can convert our first
+normal form to the second normal form.
+
+75
+00:05:51.845 --> 00:05:55.092
+And what the second normal form does,
+
+76
+00:05:55.092 --> 00:06:01.595
+it tells us that all our fields now
+ideally should depend on the entity.
+
+77
+00:06:01.595 --> 00:06:05.791
+So if we look at the following fields,
+the job_id and
+
+78
+00:06:05.791 --> 00:06:10.827
+job_title, the job_title
+actually depends on the job_id,
+
+79
+00:06:10.827 --> 00:06:15.215
+although it also depends
+on our user object.
+
+80
+00:06:15.215 --> 00:06:20.183
+So the data summarization tells us that we
+need to decouple this into the separate
+
+81
+00:06:20.183 --> 00:06:25.830
+table in the database concept, but in our
+case, it will be the separate object.
+
+82
+00:06:25.830 --> 00:06:30.920
+So we move our job to the jobs table.
+
+83
+00:06:30.920 --> 00:06:34.768
+Now we have the key,
+which is UIE as a job id, and
+
+84
+00:06:34.768 --> 00:06:39.380
+now we have the information
+relevant to this job.
+
+85
+00:06:39.380 --> 00:06:43.086
+And we also normalized the user jobs, so
+
+86
+00:06:43.086 --> 00:06:49.610
+we can access what type of job
+the user has by providing the id.
+
+87
+00:06:49.610 --> 00:06:56.391
+So now all our entities
+depend on the primary key.
+
+88
+00:06:56.391 --> 00:06:58.241
+There is a third normal form.
+
+89
+00:07:00.996 --> 00:07:07.078
+&gt;&gt; Evgenii Ray: Actually, yeah, also we
+move the countries to separate table.
+
+90
+00:07:07.078 --> 00:07:11.961
+There is a third normal form that tells us
+the main difference from the second one.
+
+91
+00:07:11.961 --> 00:07:17.901
+We say that non-primary keys should
+depend on the entity primary key.
+
+92
+00:07:17.901 --> 00:07:22.682
+But the third normal form enforces this
+rule, saying that it should depend only on
+
+93
+00:07:22.682 --> 00:07:25.821
+the primary key, and
+the difference is very subtle.
+
+94
+00:07:25.821 --> 00:07:31.491
+So if we look at the UIE job,
+it has a title and department.
+
+95
+00:07:31.491 --> 00:07:38.711
+So department really might not be directly
+related to the UI or to the title.
+
+96
+00:07:38.711 --> 00:07:42.263
+So we want to decouple that to say, okay,
+
+97
+00:07:42.263 --> 00:07:47.705
+the department should directly
+depend on the UIE id.
+
+98
+00:07:47.705 --> 00:07:52.729
+So we move the department
+to additional table and
+
+99
+00:07:52.729 --> 00:07:59.111
+now we can access the department
+type by providing the job id.
+
+100
+00:07:59.111 --> 00:08:03.496
+The third normal form
+sometimes is excessive.
+
+101
+00:08:03.496 --> 00:08:06.999
+Usually on the UI,
+we use the second normal form.
+
+102
+00:08:06.999 --> 00:08:10.776
+So it's up to your case if
+you want to apply an app.
+
+103
+00:08:10.776 --> 00:08:14.493
+So if we go back to our Messenger example,
+
+104
+00:08:14.493 --> 00:08:18.957
+let's try to convert our
+non-normalized data,
+
+105
+00:08:18.957 --> 00:08:24.258
+the state of the Messenger,
+to second normal form.
+
+106
+00:08:24.258 --> 00:08:27.428
+So first we want to reduce the nesting.
+
+107
+00:08:27.428 --> 00:08:32.665
+So we want to remove the conversation and
+the messages.
+
+108
+00:08:32.665 --> 00:08:36.680
+So once we remove the conversation and
+
+109
+00:08:36.680 --> 00:08:40.953
+the messages objects from from a table.
+
+110
+00:08:40.953 --> 00:08:43.401
+Now we apply the Atomic Fields rules.
+
+111
+00:08:43.401 --> 00:08:48.063
+Now we store the conversation_
+id instead of the object, and
+
+112
+00:08:48.063 --> 00:08:52.015
+on the message we also
+store the conversation_id.
+
+113
+00:08:52.015 --> 00:08:57.448
+And we also create a new type called
+conversation, which has the id and
+
+114
+00:08:57.448 --> 00:09:02.713
+the title, and we also remove
+the messages from the conversation.
+
+115
+00:09:04.641 --> 00:09:07.301
+&gt;&gt; Evgenii Ray: Now we
+identify the primary keys.
+
+116
+00:09:07.301 --> 00:09:10.478
+So for the contact,
+it will be id, for the message,
+
+117
+00:09:10.478 --> 00:09:14.253
+it's a message_id, for
+the conversation, it's also id.
+
+118
+00:09:14.253 --> 00:09:16.702
+And then we store these
+fields on the global state.
+
+119
+00:09:16.702 --> 00:09:21.195
+So now to access the message with
+a certain id, we just provide an id.
+
+120
+00:09:21.195 --> 00:09:25.669
+And it will return us the message,
+the same for
+
+121
+00:09:25.669 --> 00:09:29.129
+conversation and for the contact.
+
+122
+00:09:29.129 --> 00:09:34.277
+So although, you still may notice that
+to find specific message in the array,
+
+123
+00:09:34.277 --> 00:09:37.168
+we still need to traverse
+all the messages.
+
+124
+00:09:37.168 --> 00:09:40.811
+How can we optimize even that?
+
+125
+00:09:40.811 --> 00:09:45.041
+So let's move on to the second principle,
+minimize the search cost.
+
+126
+00:09:47.597 --> 00:09:51.683
+&gt;&gt; Evgenii Ray: So
+we could potentially build an index table,
+
+127
+00:09:51.683 --> 00:09:55.361
+which we'll call inverted index table.
+
+128
+00:09:55.361 --> 00:09:59.735
+It's called inverted because
+the content of the entity
+
+129
+00:09:59.735 --> 00:10:02.573
+becomes the key in this sense.
+
+130
+00:10:02.573 --> 00:10:04.358
+So what we're gonna do,
+
+131
+00:10:04.358 --> 00:10:08.787
+we're gonna extract all the words
+from the message content.
+
+132
+00:10:08.787 --> 00:10:13.645
+And then we're gonna build
+the index table where the key
+
+133
+00:10:13.645 --> 00:10:17.777
+is the word from the content
+of the message, and
+
+134
+00:10:17.777 --> 00:10:23.788
+we're gonna store the id of the message
+where this content appears.
+
+135
+00:10:23.788 --> 00:10:28.834
+And a timestamp that
+will help us to sort out
+
+136
+00:10:28.834 --> 00:10:33.608
+search results in the timestamp order.
+
+137
+00:10:33.608 --> 00:10:41.765
+So later, we can utilize some asynchronous
+job to build this inverted index table.
+
+138
+00:10:41.765 --> 00:10:46.988
+This can be a web worker,
+that will access the IndexedDB and
+
+139
+00:10:46.988 --> 00:10:52.209
+store it in the storage, or
+you can use the idle cycle of your
+
+140
+00:10:52.209 --> 00:10:57.346
+event loop to build this index
+table in your application.
+
+141
+00:10:59.406 --> 00:11:03.457
+But you may notice that, okay,
+I can search by the word.
+
+142
+00:11:03.457 --> 00:11:05.857
+But what if I want to
+search by the prefix?
+
+143
+00:11:05.857 --> 00:11:08.887
+Can we improve it even further?
+
+144
+00:11:08.887 --> 00:11:13.211
+And apparently we can,
+we can use the composite key for
+
+145
+00:11:13.211 --> 00:11:15.755
+the invertening of this table.
+
+146
+00:11:15.755 --> 00:11:21.373
+So now we're gonna store all
+personal prefixes of the word and
+
+147
+00:11:21.373 --> 00:11:24.947
+keep the message id and the timestamp.
+
+148
+00:11:24.947 --> 00:11:30.074
+So if we type in the search bar,
+for instance,
+
+149
+00:11:30.074 --> 00:11:34.938
+ja, this will give us
+all the messages where
+
+150
+00:11:34.938 --> 00:11:39.552
+we saw the ja in the conversation thread.
+
+151
+00:11:39.552 --> 00:11:42.968
+So we can store in
+JavaScript the string as
+
+152
+00:11:42.968 --> 00:11:46.976
+array because the key
+should be always a string.
+
+153
+00:11:46.976 --> 00:11:50.820
+That's where the storage comes in.
+
+154
+00:11:50.820 --> 00:11:54.503
+So before we discuss the storage,
+
+155
+00:11:54.503 --> 00:12:00.476
+let's understand how we're
+gonna manage the memory.
+
+156
+00:12:00.476 --> 00:12:02.794
+So, yep?
+
+157
+00:12:02.794 --> 00:12:06.707
+&gt;&gt; Speaker 2: So in this example, there's
+just two messages, but in theory, if you
+
+158
+00:12:06.707 --> 00:12:11.013
+had multiple messages that started with
+hey, those would all end up under that
+
+159
+00:12:11.013 --> 00:12:13.820
+single either [CROSSTALK] composite key-
+&gt;&gt; Evgenii Ray: Yeah, so
+
+160
+00:12:13.820 --> 00:12:15.769
+you will have multiple tuples here.
+
+161
+00:12:15.769 --> 00:12:16.454
+&gt;&gt; Speaker 2: Okay.
+
+162
+00:12:20.306 --> 00:12:23.552
+&gt;&gt; Evgenii Ray: So
+the inverted index table may become large.
+
+163
+00:12:23.552 --> 00:12:27.904
+So for instance, we may have already
+a 1,000 of messages in each conversation
+
+164
+00:12:27.904 --> 00:12:31.026
+thread, so we don't want to
+blow the memory of the device.
+
+165
+00:12:31.026 --> 00:12:35.166
+So how can we optimize that?
+
+166
+00:12:35.166 --> 00:12:38.467
+Right now,
+we have the conversation with John, but
+
+167
+00:12:38.467 --> 00:12:42.602
+we know that there are two more
+conversation that are not active.
+
+168
+00:12:42.602 --> 00:12:47.702
+So we can just select them from the state,
+
+169
+00:12:47.702 --> 00:12:52.074
+since we know the conversation ID,
+
+170
+00:12:52.074 --> 00:12:56.313
+and we can filter out the entries.
+
+171
+00:12:56.313 --> 00:13:01.509
+Now what we can do, we can outsource
+that to the separate storage.
+
+172
+00:13:01.509 --> 00:13:04.734
+So we move this element to
+the separate storage, and
+
+173
+00:13:04.734 --> 00:13:06.724
+we basically sharded our data.
+
+174
+00:13:06.724 --> 00:13:11.869
+So it's basically,
+the database concept in the browser where,
+
+175
+00:13:11.869 --> 00:13:17.202
+in the database, you don't have
+the single large DB instance.
+
+176
+00:13:17.202 --> 00:13:22.072
+So you have a shard and you store your
+data partially in multiple shards.
+
+177
+00:13:22.072 --> 00:13:25.761
+And when you do the query, you're actually
+querying from the different shards.
+
+178
+00:13:25.761 --> 00:13:29.538
+The same way happens here, but
+we are limited to two shards.
+
+179
+00:13:29.538 --> 00:13:33.160
+One is our global state,
+which is runtime memory.
+
+180
+00:13:33.160 --> 00:13:35.580
+And the second one is our hard drive.
+
+181
+00:13:35.580 --> 00:13:38.989
+So when we move elements
+to the hard drive,
+
+182
+00:13:38.989 --> 00:13:44.860
+we let the JavaScript engine to utilize
+all the objects from the memory and
+
+183
+00:13:44.860 --> 00:13:48.474
+let the garbage collector
+free up the space.
+
+184
+00:13:48.474 --> 00:13:54.076
+And for instance,
+if we selected the new conversation and
+
+185
+00:13:54.076 --> 00:13:58.074
+we want to load the data
+back to the store,
+
+186
+00:13:58.074 --> 00:14:05.413
+we can utilize the storage to just
+populate this back to our runtime memory.
+
+187
+00:14:05.413 --> 00:14:10.876
+And we basically are going to
+swap back and forth the data.
+
+188
+00:14:10.876 --> 00:14:12.814
+And now the question is,
+
+189
+00:14:12.814 --> 00:14:17.442
+what type of storage should I
+use to achieve such behavior?
+
+190
+00:14:17.442 --> 00:14:19.933
+And let's do the quick overview.
+
+191
+00:14:19.933 --> 00:14:24.632
+So the storage API provides
+three types of storages for us.
+
+192
+00:14:24.632 --> 00:14:29.032
+It's the Indexed DB, local storage,
+and the session storage.
+
+193
+00:14:29.032 --> 00:14:34.558
+So the session storage is good for
+storing some small non-persistent data,
+
+194
+00:14:34.558 --> 00:14:38.052
+so it stores things only for
+one single session.
+
+195
+00:14:38.052 --> 00:14:41.146
+When the user closes the website,
+
+196
+00:14:41.146 --> 00:14:46.208
+the session is destroyed and
+the data is wiped.
+
+197
+00:14:46.208 --> 00:14:48.988
+The local storage on
+the other hand is good for
+
+198
+00:14:48.988 --> 00:14:52.208
+storing small things,
+it can be user preferences,
+
+199
+00:14:52.208 --> 00:14:56.908
+you can also store non-persistent data and
+discard it if you want.
+
+200
+00:14:56.908 --> 00:15:00.278
+But the local storage
+provides persistence.
+
+201
+00:15:00.278 --> 00:15:03.686
+But the problem with the local storage and
+the session storage,
+
+202
+00:15:03.686 --> 00:15:07.226
+they only support the string type and
+they are asynchronous.
+
+203
+00:15:07.226 --> 00:15:12.248
+So if you have a data that you expect
+to read a lot and write, then you
+
+204
+00:15:12.248 --> 00:15:18.926
+will block the UI thread, and it will
+impact your application responsiveness.
+
+205
+00:15:18.926 --> 00:15:23.734
+So what do we need to do to re-implement
+the behavior we discussed previously on
+
+206
+00:15:23.734 --> 00:15:24.985
+the slides?
+
+207
+00:15:24.985 --> 00:15:30.639
+So the IndexedDB, on the other hand,
+has the almost unlimited storage capacity,
+
+208
+00:15:30.639 --> 00:15:34.614
+on average 3 gigabytes, and
+it also supports indexing.
+
+209
+00:15:34.614 --> 00:15:39.824
+So we can create a composite
+index we discussed and
+
+210
+00:15:39.824 --> 00:15:43.429
+store the key as a set of prefixes.
+
+211
+00:15:43.429 --> 00:15:47.231
+And we can actually enable this
+search using the IndexedDB, so
+
+212
+00:15:47.231 --> 00:15:49.550
+we can utilize this index.
+
+213
+00:15:49.550 --> 00:15:52.876
+And also the IndexedDB supports
+multiple type of data,
+
+214
+00:15:52.876 --> 00:15:56.900
+which is very useful when
+we store complex objects.
+
+215
+00:15:56.900 --> 00:15:58.445
+And it's also non-blocking.
+
+216
+00:15:58.445 --> 00:16:06.798
+So it's a synchronous, it means that we
+will not block the UI thread in this case.
+
+217
+00:16:09.074 --> 00:16:13.134
+&gt;&gt; Evgenii Ray: So the summary for
+application state design is first,
+
+218
+00:16:13.134 --> 00:16:15.261
+you need to know your scale.
+
+219
+00:16:15.261 --> 00:16:19.280
+Always start with the way how
+you structure your data, and
+
+220
+00:16:19.280 --> 00:16:23.072
+use normal forms to provide
+optimized access cost.
+
+221
+00:16:23.072 --> 00:16:28.762
+And use indexes if you're planning to
+do the search operations in your app.
+
+222
+00:16:28.762 --> 00:16:33.809
+If you think that you will need
+to store a good amount of data
+
+223
+00:16:33.809 --> 00:16:38.552
+in your state,
+then offload the data to a hard drive.
+
+224
+00:16:38.552 --> 00:16:42.860
+For us as developers, it's basically,
+the free space that we can use.
+
+225
+00:16:42.860 --> 00:16:46.220
+It will improve your
+responsiveness of the app.
+
+226
+00:16:46.220 --> 00:16:50.570
+And also you need to be mindful
+about the type of storage you use.
+
+227
+00:16:50.570 --> 00:16:55.992
+Utilize the data properties,
+if you expect it to read the data a lot,
+
+228
+00:16:55.992 --> 00:16:58.910
+use the asynchronous storage.
+
+229
+00:16:58.910 --> 00:17:03.640
+For small things, utilize the local
+storage or the session storage.
+
+230
+00:17:03.640 --> 00:17:08.282
+And that's it for
+the application state design.
+
