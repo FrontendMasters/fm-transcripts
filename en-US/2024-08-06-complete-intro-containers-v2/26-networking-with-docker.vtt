@@ -1,0 +1,737 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:03.591
+&gt;&gt; Brian Holt: Networking is like one of
+those features that like, when works,
+
+2
+00:00:03.591 --> 00:00:08.048
+you don't think about it and when it
+doesn't work, you just wanna die, right?
+
+3
+00:00:08.048 --> 00:00:12.602
+So I am not gonna spend a bunch of time on
+networking because I am not a networking
+
+4
+00:00:12.602 --> 00:00:13.161
+expert.
+
+5
+00:00:13.161 --> 00:00:17.533
+I'm gonna show you how to set up networks
+in Docker manually and then I'm gonna show
+
+6
+00:00:17.533 --> 00:00:21.170
+you how to do use Docker compose to
+have it done all for you automatic.
+
+7
+00:00:21.170 --> 00:00:25.610
+But one of the things that like when you
+understand what Docker compose is doing
+
+8
+00:00:25.610 --> 00:00:27.837
+for you, you'll like it a bit better.
+
+9
+00:00:27.837 --> 00:00:29.588
+Why do we care about networking?
+
+10
+00:00:29.588 --> 00:00:32.011
+Let's say we have an app and
+we have a database,
+
+11
+00:00:32.011 --> 00:00:35.040
+somehow those two containers
+have to talk to each other, or
+
+12
+00:00:35.040 --> 00:00:38.391
+you have to put them in the same
+container, which is a worse idea.
+
+13
+00:00:38.391 --> 00:00:42.106
+You wanna have your containers that
+are running your databases and
+
+14
+00:00:42.106 --> 00:00:45.488
+you want to have your containers
+that are running your app and
+
+15
+00:00:45.488 --> 00:00:48.156
+you want them to scale independently,
+right?
+
+16
+00:00:48.156 --> 00:00:51.032
+So if you have a bunch of
+traffic gonna your app but
+
+17
+00:00:51.032 --> 00:00:55.874
+none of it's gonna your database you wanna
+scale up to 10 replicas of your app and
+
+18
+00:00:55.874 --> 00:00:59.685
+keep one of your database or
+maybe three or something like that.
+
+19
+00:00:59.685 --> 00:01:03.311
+But if you're doing a bunch of
+MapReduce jobs on your MongoDB cluster,
+
+20
+00:01:03.311 --> 00:01:06.031
+you probably wanna scale that
+up on your Mongo side and
+
+21
+00:01:06.031 --> 00:01:09.434
+not have to worry about everything
+happening in your app, right?
+
+22
+00:01:09.434 --> 00:01:13.127
+You can understand that those pieces
+should move independently of each other,
+
+23
+00:01:13.127 --> 00:01:16.060
+which is why you would not wanna
+put them in the same container.
+
+24
+00:01:16.060 --> 00:01:19.703
+We're gonna be using Mongo just because
+it's a pretty easy container to use.
+
+25
+00:01:19.703 --> 00:01:25.032
+But you could do this with Postgres or
+MySQL or anything like that.
+
+26
+00:01:25.032 --> 00:01:31.756
+So let's look at docker ls,
+sorry, docker network ls,
+
+27
+00:01:31.756 --> 00:01:38.754
+and you can see here I have a bunch
+of stuff for playing around.
+
+28
+00:01:38.754 --> 00:01:43.399
+We're gonna be creating this one, so I'm
+just gonna Its gonna docker network our
+
+29
+00:01:43.399 --> 00:01:47.257
+app net because we're gonna just
+recreate it here in just a second.
+
+30
+00:01:47.257 --> 00:01:50.080
+Yours probably looks like this or
+similar, right?
+
+31
+00:01:50.080 --> 00:01:51.077
+Pretty close.
+
+32
+00:01:57.138 --> 00:02:02.088
+&gt;&gt; Brian Holt: Okay, so I did Just
+remove this, but we're gonna now
+
+33
+00:02:02.088 --> 00:02:07.272
+recreate our specific Docker
+network that we wanna do.
+
+34
+00:02:07.272 --> 00:02:10.884
+Now you could just do everything
+over bridge if you wanted to,
+
+35
+00:02:10.884 --> 00:02:13.953
+bridge is one that's created
+by default by Docker.
+
+36
+00:02:13.953 --> 00:02:18.277
+The issue is now that any time that any
+app is created inside of your cluster
+
+37
+00:02:18.277 --> 00:02:21.298
+that talks to bridge,
+they can all see each other.
+
+38
+00:02:21.298 --> 00:02:25.262
+So it's better to just
+have bespoke networks for
+
+39
+00:02:25.262 --> 00:02:29.429
+all of your individual concerns,
+let's go with.
+
+40
+00:02:29.429 --> 00:02:33.433
+In other words, Docker doesn't recommend
+it, so I'm gonna tell you that Docker
+
+41
+00:02:33.433 --> 00:02:36.407
+doesn't recommend just using
+the default bridge network.
+
+42
+00:02:36.407 --> 00:02:42.881
+So we're gonna say,
+docker network create drive=bridge,
+
+43
+00:02:42.881 --> 00:02:46.623
+and then we're gonna do app-net.
+
+44
+00:02:46.623 --> 00:02:50.649
+You can call it whatever you want,
+we're gonna call ours app-net.
+
+45
+00:02:53.618 --> 00:02:56.392
+&gt;&gt; Brian Holt: Driver.
+
+46
+00:02:56.392 --> 00:03:02.313
+Okay, and
+then now I can say docker network ls, and
+
+47
+00:03:02.313 --> 00:03:07.561
+you can see there,
+now I have this app-net.
+
+48
+00:03:07.561 --> 00:03:13.182
+So how do we connect our
+container to that network?
+
+49
+00:03:13.182 --> 00:03:17.133
+And it's really quite simple,
+
+50
+00:03:17.133 --> 00:03:25.916
+I'm gonna say docker run -d
+--network=app-net-p 27017,
+
+51
+00:03:25.916 --> 00:03:30.466
+which is the default port for Mongo.
+
+52
+00:03:30.466 --> 00:03:35.048
+27017 name we're just gonna call it db or
+
+53
+00:03:35.048 --> 00:03:41.278
+whatever you want to call it and
+then i'm gonna run Mongo:7.
+
+54
+00:03:44.790 --> 00:03:50.474
+&gt;&gt; Brian Holt: Okay, now if I say docker
+ps you can see that I have my db container
+
+55
+00:03:50.474 --> 00:03:55.654
+running in the background
+which is running on mongo:7.
+
+56
+00:03:55.654 --> 00:04:00.478
+But now because I gave it this network
+it's gonna be connected to app.net, so
+
+57
+00:04:00.478 --> 00:04:05.612
+anything else that connects to App.net can
+now has the ability to connect to this.
+
+58
+00:04:05.612 --> 00:04:10.331
+So let's create another little node
+app real quick that connects to it.
+
+59
+00:04:10.331 --> 00:04:15.119
+We're gonna make another directory
+called I'll just call it Mongo-app or
+
+60
+00:04:15.119 --> 00:04:17.453
+something like that, Mongo-app.
+
+61
+00:04:17.453 --> 00:04:19.235
+Open this in code.
+
+62
+00:04:19.235 --> 00:04:24.647
+Here, and this bit bigger,
+create a new file here.
+
+63
+00:04:24.647 --> 00:04:30.981
+Call it index.js,
+&gt;&gt; Brian Holt: And
+
+64
+00:04:30.981 --> 00:04:38.143
+I'm just gonna grab this
+directly from here.
+
+65
+00:04:38.143 --> 00:04:43.720
+Just this, it's another Fastify client.
+
+66
+00:04:43.720 --> 00:04:48.454
+You could also just do this directly
+from the project files as well.
+
+67
+00:04:48.454 --> 00:04:53.728
+Probably should have done that,
+but we're close anyway.
+
+68
+00:04:53.728 --> 00:04:59.837
+So I'm in this Mongo-app, I'm gonna have
+to say mpam init -y to get a package lock.
+
+69
+00:04:59.837 --> 00:05:04.962
+Or package file and then I need to install
+
+70
+00:05:04.962 --> 00:05:10.404
+npm install fastify, and I need Mongodb.
+
+71
+00:05:10.404 --> 00:05:12.196
+And I think that's all I need.
+
+72
+00:05:15.079 --> 00:05:18.715
+&gt;&gt; Brian Holt: So those are just the two
+dependencies that I'm using here directly
+
+73
+00:05:18.715 --> 00:05:19.363
+in the app.
+
+74
+00:05:19.363 --> 00:05:26.163
+So now you can see, yeah, fastify
+right there and mongodb right there.
+
+75
+00:05:26.163 --> 00:05:30.203
+If you look at my package file,
+you can see that I have dependencies for
+
+76
+00:05:30.203 --> 00:05:31.381
+fastify and mongo.
+
+77
+00:05:31.381 --> 00:05:33.026
+So that's just what I did there.
+
+78
+00:05:33.026 --> 00:05:36.476
+Now I think because I
+exposed this locally,
+
+79
+00:05:36.476 --> 00:05:40.124
+it should just work if I say,
+node index.js.
+
+80
+00:05:40.124 --> 00:05:42.659
+Is that true?
+
+81
+00:05:42.659 --> 00:05:45.708
+Open this in the, yeah, that's fine.
+
+82
+00:05:48.250 --> 00:05:49.223
+&gt;&gt; Brian Holt: So, yeah, it is working.
+
+83
+00:05:49.223 --> 00:05:55.007
+Then I say /add, and I do that.
+
+84
+00:05:55.007 --> 00:05:59.964
+So because I published that port,
+it's that Mongo client is available, or
+
+85
+00:05:59.964 --> 00:06:02.064
+the Mongo server is available.
+
+86
+00:06:02.064 --> 00:06:07.701
+So, despite the fact that I'm just
+running this locally, that's all.
+
+87
+00:06:07.701 --> 00:06:10.544
+There, you can see it's logging
+all that stuff out, I don't care.
+
+88
+00:06:10.544 --> 00:06:11.377
+Cool.
+
+89
+00:06:11.377 --> 00:06:13.649
+Not the point here, though.
+
+90
+00:06:13.649 --> 00:06:20.247
+What we really wanna do is we wanna, this
+to be all running directly within Docker.
+
+91
+00:06:20.247 --> 00:06:23.701
+So what I'm gonna do is I'm gonna
+come back to my client here.
+
+92
+00:06:23.701 --> 00:06:29.796
+I'm in my Mongo app, and I'm gonna, I
+guess I need to grab that Docker file too?
+
+93
+00:06:29.796 --> 00:06:32.236
+So let's go grab the Docker file.
+
+94
+00:06:36.089 --> 00:06:37.816
+&gt;&gt; Brian Holt: Project files here.
+
+95
+00:06:37.816 --> 00:06:41.438
+I have a Dockerfile, as you can imagine,
+
+96
+00:06:41.438 --> 00:06:47.236
+this is not terribly complicated,
+so I'm just gonna copy that and
+
+97
+00:06:47.236 --> 00:06:52.119
+I'm gonna create a new file here,
+call it Dockerfile.
+
+98
+00:06:55.952 --> 00:06:59.928
+&gt;&gt; Brian Holt: And this is the literally
+the exact same one that we had from
+
+99
+00:06:59.928 --> 00:07:02.131
+earlier in the course, right?
+
+100
+00:07:02.131 --> 00:07:04.808
+Okay.
+
+101
+00:07:04.808 --> 00:07:07.602
+Yeah, I think what I was actually
+intending to do here was just to go modify
+
+102
+00:07:07.602 --> 00:07:10.415
+the index.js, cuz that would've been
+way simpler than what I did here.
+
+103
+00:07:10.415 --> 00:07:13.484
+But I`m having adventures it's fun.
+
+104
+00:07:13.484 --> 00:07:17.077
+Handcrafted artisanal code
+right before your very eyes.
+
+105
+00:07:17.077 --> 00:07:21.859
+You can see here that we
+have Docker file index.js,
+
+106
+00:07:21.859 --> 00:07:25.995
+our package files and
+then our node modules.
+
+107
+00:07:25.995 --> 00:07:27.706
+That's probably what you expect to see.
+
+108
+00:07:27.706 --> 00:07:34.017
+And then now we can go ahead and build
+our projects, we can say Docker build,
+
+109
+00:07:34.017 --> 00:07:40.540
+--tag, like I called it my-app-with-Mongo,
+and just period for that.
+
+110
+00:07:40.540 --> 00:07:44.538
+You can see we will build there, great.
+
+111
+00:07:44.538 --> 00:07:50.296
+And then we're gonna say docker run-p
+
+112
+00:07:50.296 --> 00:07:55.016
+8080:8080 network.
+
+113
+00:07:57.944 --> 00:08:02.269
+&gt;&gt; Brian Holt: Equals app-net,
+as you might expect.
+
+114
+00:08:02.269 --> 00:08:05.844
+So one thing that we have to do if
+we're looking at our index.js is we
+
+115
+00:08:05.844 --> 00:08:10.174
+have to give it the Mongo connection
+string, otherwise, it's just gonna try and
+
+116
+00:08:10.174 --> 00:08:11.829
+connect to the local MongoDB.
+
+117
+00:08:11.829 --> 00:08:13.059
+That won't work, right?
+
+118
+00:08:13.059 --> 00:08:14.626
+Because it's not local to that container.
+
+119
+00:08:14.626 --> 00:08:17.193
+We have to tell it where
+it is on the network.
+
+120
+00:08:17.193 --> 00:08:21.458
+So one of the cool things that we can do
+with Docker that I haven't shown you yet,
+
+121
+00:08:21.458 --> 00:08:25.295
+but probably won't surprise you
+after I do a niche there, is --env.
+
+122
+00:08:25.295 --> 00:08:29.900
+You can pass environmental variables
+into your container as well.
+
+123
+00:08:29.900 --> 00:08:36.177
+So I'm gonna say MONGO_CONNECTION_STRING,
+
+124
+00:08:36.177 --> 00:08:42.001
+and then it's the mongodb protocol://.
+
+125
+00:08:42.001 --> 00:08:44.875
+Now what's cool about this is like,
+I can just call it db,
+
+126
+00:08:44.875 --> 00:08:47.171
+cuz that's the name of my container,
+right?
+
+127
+00:08:47.171 --> 00:08:52.933
+So it knows to look for the db
+container that's on the AppNet network.
+
+128
+00:08:52.933 --> 00:08:59.958
+So I just say db:27017.
+
+129
+00:08:59.958 --> 00:09:06.653
+And then my-app-with-mongo
+cuz if you remember up here,
+
+130
+00:09:06.653 --> 00:09:12.690
+wherever I did it,
+wherever I started the container,
+
+131
+00:09:12.690 --> 00:09:18.349
+I did it and
+I called it the date the name db, right?
+
+132
+00:09:18.349 --> 00:09:19.798
+Okay, which is what we're putting there.
+
+133
+00:09:19.798 --> 00:09:24.390
+So whatever you call that name is what
+it's gonna be called on the network.
+
+134
+00:09:24.390 --> 00:09:27.973
+Okay, so I should be able to run that.
+
+135
+00:09:27.973 --> 00:09:33.145
+Looks like it's running on the network
+exposed port 8080 up here.
+
+136
+00:09:33.145 --> 00:09:37.386
+So now I should be able to localhost
+
+137
+00:09:37.386 --> 00:09:42.398
+8080,
+&gt;&gt; Brian Holt: And
+
+138
+00:09:42.398 --> 00:09:45.000
+look, it is running on the network.
+
+139
+00:09:50.467 --> 00:09:51.316
+&gt;&gt; Brian Holt: And everything is working.
+
+140
+00:09:53.280 --> 00:09:56.581
+&gt;&gt; Brian Holt: So that is
+Mongo Networking, I mean technically, but
+
+141
+00:09:56.581 --> 00:09:59.399
+more interesting that
+is Docker networking.
+
+142
+00:10:04.129 --> 00:10:05.590
+&gt;&gt; Brian Holt: Now,
+your next question might be,
+
+143
+00:10:05.590 --> 00:10:07.647
+how do I do something more
+complicated than this?
+
+144
+00:10:07.647 --> 00:10:11.458
+And my answer to that
+question is use composer or
+
+145
+00:10:11.458 --> 00:10:14.327
+Kubernetes at that point, right?
+
+146
+00:10:14.327 --> 00:10:18.529
+If you now have three, four,
+five different types of containers,
+
+147
+00:10:18.529 --> 00:10:20.974
+all coexisting on a network together.
+
+148
+00:10:20.974 --> 00:10:25.927
+You probably need a container
+orchestration framework of some variety.
+
+149
+00:10:25.927 --> 00:10:27.372
+I'm not gonna be prescriptive.
+
+150
+00:10:27.372 --> 00:10:29.431
+Most people these days choose Kubernetes.
+
+151
+00:10:29.431 --> 00:10:32.501
+There's several other ones
+that you could choose from.
+
+152
+00:10:32.501 --> 00:10:36.810
+And there's no reason that you couldn't
+just I'll manage this with your own
+
+153
+00:10:36.810 --> 00:10:39.736
+networking but
+my question to you is, why, right?
+
+154
+00:10:39.736 --> 00:10:43.475
+There's tools that are very good at this,
+so why wouldn't you use those?
+
+155
+00:10:45.596 --> 00:10:47.897
+&gt;&gt; Brian Holt: But for
+messing around locally,
+
+156
+00:10:47.897 --> 00:10:51.027
+this isn't too bad to set up by hand,
+right?
+
+157
+00:10:51.027 --> 00:10:55.344
+And it's probably good for you to know
+this is just not that hard to do.
+

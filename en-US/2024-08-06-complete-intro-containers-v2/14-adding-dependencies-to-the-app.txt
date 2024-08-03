@@ -1,0 +1,84 @@
+[00:00:00]
+>> Brian Holt: So far, we have just been one file, no npm dependencies, which is a pipe dream when it comes to Node.js. You have to bring all of npm with you all the time or it's not a real Node app, or so I hear. So let's go ahead and add some dependencies.
+
+[00:00:20]
+Let's add a Fastify server, and I'm just gonna grab it directly out of my project here. So we are in more complicated Node app. And go ahead and grab the code here and replace this.
+>> Brian Holt: So fastify.js, it's another Node.js Rest server. You could put express here, I think the previous version of this course used happy.
+
+[00:00:52]
+Any one of them work just fine.
+>> Brian Holt: Okay, just on my host machine here, I'm gonna say npm init -y. That, if you're not familiar, just creates a package.json. Right, that's all that did. Then I'm gonna say npm install fastify. Okay, so now I have a package-lock. I have node_modules, I have a package.json that has fastify as one of its dependencies.
+
+[00:01:31]
+
+>> Brian Holt: Okay, I mean, I could run this locally, node index.js. You can see there, all that stuff would work locally.
+>> Brian Holt: Okay,
+>> Brian Holt: So now I have a bit of a problem that my Dockerfile, one, it's only copying index.js, it's not copying anything else. And it's also not running npm install for me, which is also a problem.
+
+[00:01:59]
+So let's do all of that. This is fine, this is fine. Okay, but now, we wanna get more than just index.js, we wanna get all of it, right? We wanna get package file. If we have more than one file in there, we don't wanna just grab index, we wanna grab the entire project.
+
+[00:02:18]
+So I'm just gonna say dot dot, right? That's gonna grab everything. And then I'm gonna say run. You can do npm install, that's apparently what Copilot wants me to do. I'm gonna say do ci. That's a specific tool from npm for running npm installs in environments like this.
+
+[00:02:41]
+In CI/CD, or in Docker Buildx, and stuff that, it's basically say, just run a pure, clean package-lock install. Okay, so let's go and run that. We're gonna say docker build -t more-complicated-app ..
+>> Brian Holt: And you can see there, it took a little bit longer, this took 0.8 seconds to run.
+
+[00:03:10]
+That's the longest yet, right? Because it actually did go out to npm and fully install everything. So we ran docker build, took a little bit longer. We're gonna say docker run -it -p. Do I have this running on 8080? What do I have this running on? I have this running on 8080, so I changed the port on you.
+
+[00:03:32]
+So good to know, 8080:8080.
+>> Brian Holt: name my-app, whatever you wanna call it, --rm --init. You can see we're getting more and more flags as we're going along here. And we're gonna run more-complicated-app. So you can see here, it's dumping a bunch of logging out here. You can see in our app here, we turned on logging.
+
+[00:03:59]
+Yeah, logger: true, so that's where all that logging is coming from. And if I open localhost 8080 on my computer. So if you are running into this issue, where you're saying the connection was reset, here is the issue, you have to go back into your project. It's trying to bind to localhost, which localhost is, it's a loop back just directly for your computer and will not expose itself outside of it.
+
+[00:04:27]
+So you have to say host and then just say 0.0.0.0, which allows it to be exposed outside of itself. And then we have to stop the server, we have to rebuild it, and then we have to run it again. One of the annoying parts about Docker is that anytime that you save anything, you have to rebuild it.
+
+[00:04:53]
+And now, it works. Okay, so we built a bigger project, it has npm dependencies. We ran ci, everything's all good here. Let's talk about some issues of why this isn't great yet. One, a really big issue with our Dockerfile at the moment is, this is macOS. If I run npm install on my macOS, and then I copy those files into Linux, if I have any native dependencies, SAS is a good example, right, of a native dependenc.
+
+[00:05:32]
+Or anything that comes with C or Ruby or Rust code with it, Turbo Repo or something like that, those are gonna be mismatched, right? Cuz right now, I'm installing Mac-based binaries, and those need Linux-based binaries. So I do not wanna copy my node modules, right, even if I'm running ci.
+
+[00:05:53]
+So the nice thing about ci is it throws everything out and reinstalls it. So we kinda stepped around that, but even still, we still don't wanna do that. So let's fix that first. Let's make a new file here.
+>> Brian Holt: And we're gonna call it .dockerignore.
+>> Brian Holt: This has the exact same format as gitignore, so it's probably all familiar to you.
+
+[00:06:20]
+We just wanna put node modules in here.
+>> Brian Holt: Okay, cool, that's great. Now, that's been ignored. Another one that's gonna always almost immediately go in here is you don't ever wanna copy your git directory. Again, if someone can get into your project, they can get into your git files, and that's bad.
+
+[00:06:40]
+So never copy your git files as well. Most of the things that you're going to gitignore, you probably won't also want to dockerignore as well. That's kind of a rule of thumb. Not always true, but sometimes. Yeah, and npm ci, the most important part about it is that it will always follow the package-lock.json.
+
+[00:07:02]
+And if it has any issues like verifying checksums or anything like that, it just gives up. It's like, nope, this is broken, I don't know how to fix it. And it causes an error, which is good because that means something in your supply chain changed. And you wanna go fix it, or at least investigate it before you ship it out to production.
+
+[00:07:19]
+If you do npm install and the package-lock is wrong, npm install just ignores it, which is what you want locally, cuz who cares? But we're going out to production, you very much care, right? So this is better, now we're doing npm ci. That's all working. That's great, and we'll go ahead and just kind of prove our point there.
+
+[00:07:44]
+Stop this, we're gonna build it again. And we're gonna show you that this still works. Okay, so we touched on this briefly for a second, which is the notes on expose, which is a good question. You know what? Let's just run it. Why not? We're gonna go in here, we're gonna put, we know this runs on 8080, EXPOSE 8080, right?
+
+[00:08:12]
+This could go anywhere. Let's run it there. I'm gonna rebuild this, and I'm not gonna put this -p 8080 in here. And I think you do it with just -P.
+>> Brian Holt: And then so that now will respect that expose in terms of the port that's exposed here. Which port do you think it's on?
+
+[00:08:44]
+
+>> Brian Holt: It doesn't tell you, right? So let's go look, docker ps, this is now on port 55000. So now if I come in here and say 55000, hello, world.
+>> Brian Holt: So it's up to you if you like that. Most people that I know don't do it this way, which is why I'm teaching you the way of just doing the publish directly in the CLI.
+
+[00:09:11]
+But this does exist if you wanna try it.
+>> Speaker 2: Also, in most cases, won't something else be in charge of what port is getting sent down to it?
+>> Brian Holt: Yeah, for example, if you're on AWS or something like that, they'll usually pass you the port that you have to list, or else, it won't work, right?
+
+[00:09:28]
+So in that case, you definitely don't want Docker to handle it. That's actually a great point.
+

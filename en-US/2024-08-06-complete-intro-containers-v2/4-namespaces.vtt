@@ -1,0 +1,1005 @@
+WEBVTT
+
+1
+00:00:00.180 --> 00:00:05.048
+&gt;&gt; Brian Holt: Hopefully you found
+change root pretty straightforward.
+
+2
+00:00:05.048 --> 00:00:06.661
+Namespaces and cgroups,
+
+3
+00:00:06.661 --> 00:00:10.481
+we're gonna step up a little bit
+in level of difficulty here.
+
+4
+00:00:10.481 --> 00:00:13.901
+And I'm also gonna be
+a bit more surface level,
+
+5
+00:00:13.901 --> 00:00:16.646
+because there's a lot of depth here.
+
+6
+00:00:16.646 --> 00:00:18.468
+But we'll start with namespaces.
+
+7
+00:00:18.468 --> 00:00:19.985
+Namespaces have been around forever.
+
+8
+00:00:19.985 --> 00:00:24.114
+It's kind of a core concept of how Linux,
+in the kernel, is just built,
+
+9
+00:00:24.114 --> 00:00:25.276
+kind of in general.
+
+10
+00:00:28.259 --> 00:00:29.494
+&gt;&gt; Brian Holt: But
+let's start with an example,
+
+11
+00:00:29.494 --> 00:00:32.187
+because I think that's gonna be
+the easiest way for me to illustrate this.
+
+12
+00:00:32.187 --> 00:00:36.043
+But the gist here is it's for
+security and resource management.
+
+13
+00:00:36.043 --> 00:00:37.275
+That's what namespaces are all about.
+
+14
+00:00:39.804 --> 00:00:42.451
+&gt;&gt; Brian Holt: So let's say that you buy a
+server and you put it in your basement and
+
+15
+00:00:42.451 --> 00:00:44.635
+you're gonna start selling
+it to customers, right?
+
+16
+00:00:44.635 --> 00:00:47.810
+You're gonna start running containers or
+VMs or
+
+17
+00:00:47.810 --> 00:00:52.078
+something in your basement as a way
+to make some money on the side.
+
+18
+00:00:52.078 --> 00:00:56.466
+What sort of concerns would you have
+about running untrusted code, right?
+
+19
+00:00:56.466 --> 00:00:59.568
+Because you're gonna have random people
+connecting to your servers that you don't
+
+20
+00:00:59.568 --> 00:01:00.274
+know personally.
+
+21
+00:01:00.274 --> 00:01:04.245
+They're going to be uploading stuff
+that you don't know what it does,
+
+22
+00:01:04.245 --> 00:01:06.173
+and they're gonna be running it.
+
+23
+00:01:06.173 --> 00:01:09.500
+What are your concerns
+about untrusted code?
+
+24
+00:01:09.500 --> 00:01:11.539
+So let's make an example.
+
+25
+00:01:11.539 --> 00:01:15.816
+You have Alice and Bob,
+who are both running
+
+26
+00:01:15.816 --> 00:01:20.447
+e-commerce.services that deal with money.
+
+27
+00:01:20.447 --> 00:01:24.935
+And let's say just they're generally
+good people minding their own business,
+
+28
+00:01:24.935 --> 00:01:28.115
+they're just interested in
+running their businesses.
+
+29
+00:01:28.115 --> 00:01:31.057
+But then you have Eve, who joins your
+server that has other intentions.
+
+30
+00:01:31.057 --> 00:01:34.216
+She wants to steal the money,
+source code, or
+
+31
+00:01:34.216 --> 00:01:39.003
+just whatever nefarious money-making
+scheme that Eve can get up to.
+
+32
+00:01:39.003 --> 00:01:42.003
+If you give all three of
+them unfettered root access,
+
+33
+00:01:42.003 --> 00:01:46.416
+you're gonna have some problems because
+Eve is gonna be able to run over them.
+
+34
+00:01:46.416 --> 00:01:50.285
+So the first thing you do, obviously, is
+you're gonna say, all right, here's your
+
+35
+00:01:50.285 --> 00:01:54.005
+jailed process, here's your jailed
+process, and here's your jailed process.
+
+36
+00:01:54.005 --> 00:02:01.619
+That solves your stealing files
+kind of security vulnerability.
+
+37
+00:02:01.619 --> 00:02:06.279
+Cool, but is your problem solved yet?
+
+38
+00:02:06.279 --> 00:02:06.779
+No.
+
+39
+00:02:08.566 --> 00:02:11.849
+&gt;&gt; Brian Holt: Despite the fact that
+Eve can't actually get to the file,
+
+40
+00:02:11.849 --> 00:02:14.734
+she can actually still see the processes,
+right?
+
+41
+00:02:14.734 --> 00:02:19.683
+So if you go and you run,
+I'll just show you right here.
+
+42
+00:02:19.683 --> 00:02:20.882
+If I run ps aux.
+
+43
+00:02:23.186 --> 00:02:25.729
+&gt;&gt; Brian Holt: I can see
+this bash is running, and
+
+44
+00:02:25.729 --> 00:02:31.009
+then I can also see the process
+observing itself, ps-aux right here.
+
+45
+00:02:31.009 --> 00:02:33.011
+But if I had a change-rooted environment,
+
+46
+00:02:33.011 --> 00:02:36.646
+I would be able to see everything running
+in that change-rooted environment.
+
+47
+00:02:36.646 --> 00:02:40.831
+And if I had three of them and
+they're all running their own processes,
+
+48
+00:02:40.831 --> 00:02:43.363
+they can all see each other's processes.
+
+49
+00:02:43.363 --> 00:02:46.210
+It seems kinda like a problem, right?
+
+50
+00:02:46.210 --> 00:02:49.620
+Cuz now you can just go in there and
+say, well, at the very least,
+
+51
+00:02:49.620 --> 00:02:52.986
+I can cause some chaos and
+she can just start killing processes.
+
+52
+00:02:52.986 --> 00:02:54.609
+It seems kind of problematic, right?
+
+53
+00:02:56.887 --> 00:02:58.511
+&gt;&gt; Brian Holt: She can
+unmount file systems, and
+
+54
+00:02:58.511 --> 00:03:02.606
+probably even the most dangerous thing is
+she can start hijacking processes, right?
+
+55
+00:03:02.606 --> 00:03:08.047
+She can start moving processes out of
+your subtree and into her subtree.
+
+56
+00:03:08.047 --> 00:03:09.735
+She can dump memory.
+
+57
+00:03:09.735 --> 00:03:11.672
+She can do a bunch of stuff like that.
+
+58
+00:03:11.672 --> 00:03:14.705
+Namespaces allow you to hide
+processes from other processes.
+
+59
+00:03:16.165 --> 00:03:18.995
+So now, I can give you
+a change-rooted environment,
+
+60
+00:03:18.995 --> 00:03:22.124
+but I can give every one of them
+their own set of namespace.
+
+61
+00:03:22.124 --> 00:03:26.039
+So they have their own set of processes,
+they get their own numbers,
+
+62
+00:03:26.039 --> 00:03:27.875
+they get their own everything.
+
+63
+00:03:27.875 --> 00:03:31.534
+So they can't even just guess
+each other's processes' numbers.
+
+64
+00:03:31.534 --> 00:03:33.803
+They actually are physically
+separated systems so
+
+65
+00:03:33.803 --> 00:03:36.834
+that she can't actually even
+just hijack them that way.
+
+66
+00:03:36.834 --> 00:03:40.344
+This is just part of
+what namespaces can do.
+
+67
+00:03:40.344 --> 00:03:43.677
+But it's probably the most salient
+detail in what we're talking about here.
+
+68
+00:03:43.677 --> 00:03:45.826
+But namespace handle a lot of things.
+
+69
+00:03:48.142 --> 00:03:52.134
+&gt;&gt; Brian Holt: Yeah, so what I described
+here is basically just the UTS system,
+
+70
+00:03:52.134 --> 00:03:55.337
+which is called the UNIX
+time-sharing namespace.
+
+71
+00:03:55.337 --> 00:03:59.263
+And we'll talk a bit more about some
+of the other namespaces later, but for
+
+72
+00:03:59.263 --> 00:04:01.018
+now, let's just focus on that.
+
+73
+00:04:01.018 --> 00:04:06.287
+So I'm gonna go back
+in here into my jailed
+
+74
+00:04:06.287 --> 00:04:10.664
+process,
+&gt;&gt; Brian Holt: By doing that.
+
+75
+00:04:10.664 --> 00:04:13.070
+Okay, so I'm in my jailed process.
+
+76
+00:04:13.070 --> 00:04:14.826
+I'm gonna open another tab here.
+
+77
+00:04:14.826 --> 00:04:18.688
+So you can see, I have two tabs open.
+
+78
+00:04:18.688 --> 00:04:24.318
+And then I'm gonna run this command here,
+docker exec -it docker-host bash.
+
+79
+00:04:24.318 --> 00:04:28.770
+This is going to allow me to
+connect to the same container.
+
+80
+00:04:30.903 --> 00:04:32.586
+&gt;&gt; Brian Holt: Right,
+cuz we called it docker-host.
+
+81
+00:04:32.586 --> 00:04:34.317
+In fact, I'll even just show you.
+
+82
+00:04:36.244 --> 00:04:38.815
+&gt;&gt; Brian Holt: You can see I have
+docker-host running right here.
+
+83
+00:04:38.815 --> 00:04:41.988
+It's been running for 23 minutes.
+
+84
+00:04:41.988 --> 00:04:47.589
+I'm going to say docker exec
+docker-host bash, right?
+
+85
+00:04:47.589 --> 00:04:54.234
+And so now I have another instance of
+bash connected to the same container.
+
+86
+00:04:54.234 --> 00:04:59.829
+So if I say docker ps here, or,
+not Docker ps, rather ps aux,
+
+87
+00:04:59.829 --> 00:05:06.089
+you can see, I can actually see
+multiple instances of bash running.
+
+88
+00:05:06.089 --> 00:05:09.552
+I can see the other
+processes running here.
+
+89
+00:05:09.552 --> 00:05:10.656
+So I'm the admin,
+
+90
+00:05:10.656 --> 00:05:14.523
+that's probably okay that I can
+see the other processes running.
+
+91
+00:05:14.523 --> 00:05:17.700
+But if you can imagine if I have another
+person that comes in here and another
+
+92
+00:05:17.700 --> 00:05:21.091
+jail process, they can also see each
+other's processes, which is a problem.
+
+93
+00:05:25.610 --> 00:05:30.096
+&gt;&gt; Brian Holt: Okay, and
+just to kind of demonstrate that for
+
+94
+00:05:30.096 --> 00:05:34.018
+you, I'm gonna run this process here.
+
+95
+00:05:34.018 --> 00:05:37.341
+So this is my jailed process here.
+
+96
+00:05:37.341 --> 00:05:40.501
+I'm gonna run this.
+
+97
+00:05:40.501 --> 00:05:44.470
+All this does is this just
+runs this command perpetually,
+
+98
+00:05:44.470 --> 00:05:47.229
+it doesn't really matter what it does.
+
+99
+00:05:47.229 --> 00:05:54.555
+And now, if I come over here,
+God, force of habit, ps aux.
+
+100
+00:05:54.555 --> 00:05:59.420
+Do that, cuz I don't have tail in here.
+
+101
+00:05:59.420 --> 00:06:01.656
+Well, I can do it the other way around.
+
+102
+00:06:01.656 --> 00:06:03.097
+So I can do that here.
+
+103
+00:06:05.582 --> 00:06:08.301
+&gt;&gt; Brian Holt: And
+is this gonna work from here?
+
+104
+00:06:08.301 --> 00:06:09.533
+No, but if I do here,
+
+105
+00:06:09.533 --> 00:06:13.857
+you can see here that I can see the tail
+running in my other process, right?
+
+106
+00:06:13.857 --> 00:06:16.733
+So every instance the bash
+can see each other.
+
+107
+00:06:16.733 --> 00:06:19.369
+It would work from within
+the jailed process as well,, but
+
+108
+00:06:19.369 --> 00:06:22.440
+we don't have ps in there, right,
+and we don't have tail in there.
+
+109
+00:06:22.440 --> 00:06:23.788
+So that's why that's not
+working at the moment.
+
+110
+00:06:25.138 --> 00:06:26.886
+But I'll show you that
+here in just a second.
+
+111
+00:06:30.483 --> 00:06:33.486
+&gt;&gt; Brian Holt: So we can actually even
+get a little bit more nefarious than
+
+112
+00:06:33.486 --> 00:06:34.291
+this, right?
+
+113
+00:06:34.291 --> 00:06:36.642
+So this is still running the process,
+right?
+
+114
+00:06:39.638 --> 00:06:44.426
+&gt;&gt; Brian Holt: And
+if I go grab this PID right here, 91,
+
+115
+00:06:44.426 --> 00:06:50.288
+which is the process ID,
+and if I say kill -9 91.
+
+116
+00:06:53.588 --> 00:06:58.446
+&gt;&gt; Brian Holt: You can see here it was
+killed from the other process, right?
+
+117
+00:06:58.446 --> 00:07:00.587
+This is the danger that
+we're kind of talking about,
+
+118
+00:07:00.587 --> 00:07:03.109
+that if you have multiple people
+connect to the same thing, and
+
+119
+00:07:03.109 --> 00:07:06.460
+they can see each other's process trees,
+they can start messing with each other.
+
+120
+00:07:06.460 --> 00:07:10.394
+Let's introduce some safety
+here then with unshare.
+
+121
+00:07:14.899 --> 00:07:19.921
+&gt;&gt; Brian Holt: Unshare is going to allow
+us to be able to separate processes and
+
+122
+00:07:19.921 --> 00:07:22.778
+their namespaces from each other.
+
+123
+00:07:26.411 --> 00:07:30.403
+&gt;&gt; Brian Holt: Okay, so
+what I'm gonna do here,
+
+124
+00:07:30.403 --> 00:07:36.192
+I have a bunch of setup
+instructions here for you.
+
+125
+00:07:36.192 --> 00:07:41.649
+This is gonna install, basically,
+a very minimal copy of Debian.
+
+126
+00:07:41.649 --> 00:07:46.570
+The one,
+&gt;&gt; Brian Holt: Warning I'm gonna give
+
+127
+00:07:46.570 --> 00:07:51.346
+you is that this will install about
+150 megabytes and it is not cached.
+
+128
+00:07:51.346 --> 00:07:55.400
+So if you do it again, it's gonna
+do it 150 megabytes again, right?
+
+129
+00:07:55.400 --> 00:08:01.817
+So every time that you run this command
+right here, the debootstrap one,
+
+130
+00:08:01.817 --> 00:08:06.696
+be aware that you're
+installing 150 megs of stuff.
+
+131
+00:08:06.696 --> 00:08:12.966
+Okay, so
+we're gonna run that apt-get update.
+
+132
+00:08:15.745 --> 00:08:17.369
+&gt;&gt; Brian Holt: Okay, that worked.
+
+133
+00:08:17.369 --> 00:08:22.276
+apt-get install deboostrap
+
+134
+00:08:22.276 --> 00:08:28.133
+-y,
+&gt;&gt; Brian Holt: I didn't spell that right,
+
+135
+00:08:28.133 --> 00:08:29.270
+debootstrap.
+
+136
+00:08:33.635 --> 00:08:37.551
+&gt;&gt; Brian Holt: Debootstrap is just a tool
+to install minimal copy of Debian,
+
+137
+00:08:37.551 --> 00:08:38.993
+that's what it does.
+
+138
+00:08:40.783 --> 00:08:49.055
+Okay, I'm gonna say
+debootstrap -- variant=minbase.
+
+139
+00:08:49.055 --> 00:08:53.687
+If you don't do this, you'll install
+a full copy, which is even bigger.
+
+140
+00:08:53.687 --> 00:08:58.240
+We're gonna do jammy,
+and we're gonna put it
+
+141
+00:08:58.240 --> 00:09:02.684
+into /better-root instead of my new root.
+
+142
+00:09:02.684 --> 00:09:04.975
+Okay, so I'm gonna get that running.
+
+143
+00:09:04.975 --> 00:09:08.949
+It'll take, I'll say, a couple minutes,
+
+144
+00:09:08.949 --> 00:09:14.075
+but it takes probably 90 seconds,
+I'm gonna guess.
+
+145
+00:09:14.075 --> 00:09:19.566
+So while that's running,
+we'll talk about what we're gonna do here.
+
+146
+00:09:19.566 --> 00:09:25.198
+unshare, right, so this is basically,
+I'm gonna create a new process.
+
+147
+00:09:25.198 --> 00:09:30.567
+And inside that process, I want you
+to create new namespaces for uts,
+
+148
+00:09:30.567 --> 00:09:36.301
+that's what we were just talking about,
+UNIX time-sharing, network,
+
+149
+00:09:36.301 --> 00:09:41.687
+process IDs, process forkings,
+user space, all that kinda stuff.
+
+150
+00:09:41.687 --> 00:09:45.640
+And then It inside of that unshared
+environment, we also want to change root
+
+151
+00:09:45.640 --> 00:09:49.802
+into my better-root, which is going to
+be basically a new copy of Linux for us.
+
+152
+00:09:49.802 --> 00:09:53.673
+And then I want you to
+run bash inside of it.
+
+153
+00:09:53.673 --> 00:09:57.135
+And then these three commands here
+are basically just saying, hey, Linux,
+
+154
+00:09:57.135 --> 00:10:00.863
+mount this for me, which is basically
+saying, there's a system created for you,
+
+155
+00:10:00.863 --> 00:10:01.843
+please use it for me.
+
+156
+00:10:04.292 --> 00:10:08.296
+&gt;&gt; Brian Holt: Okay, so now,
+if you look inside of better-root,
+
+157
+00:10:08.296 --> 00:10:13.210
+you'll see that it looks almost
+identical to what's out here,
+
+158
+00:10:13.210 --> 00:10:17.589
+because we just created a new
+copy of Linux essentially.
+
+159
+00:10:17.589 --> 00:10:19.645
+And then I'm going to run this.
+
+160
+00:10:24.100 --> 00:10:28.127
+&gt;&gt; Brian Holt: And you can see here,
+it looks really similar, right?
+
+161
+00:10:28.127 --> 00:10:32.129
+And it's because, now, we're basically in
+a full copy of Linux inside of our copy of
+
+162
+00:10:32.129 --> 00:10:34.588
+Linux, which is now inside of macOS for
+me, right?
+
+163
+00:10:34.588 --> 00:10:38.776
+We're going down,
+this tunnel's all the way down, okay?
+
+164
+00:10:38.776 --> 00:10:41.718
+And we're gonna mount
+all of these systems.
+
+165
+00:10:41.718 --> 00:10:45.388
+So just copy and paste all of these.
+
+166
+00:10:45.388 --> 00:10:53.712
+Let's see, sorry,
+&gt;&gt; Brian Holt: That one,
+
+167
+00:10:53.712 --> 00:10:57.410
+that one, and that one.
+
+168
+00:11:02.566 --> 00:11:09.920
+&gt;&gt; Brian Holt: All right, so now we
+are in a fully unshared environment.
+
+169
+00:11:09.920 --> 00:11:14.353
+So let's go ahead and run our little
+process here again, this tail.
+
+170
+00:11:17.359 --> 00:11:20.377
+&gt;&gt; Brian Holt: We're gonna run this
+from the host operating system.
+
+171
+00:11:20.377 --> 00:11:26.026
+So again, my first tab here up to the top,
+this is inside of my unshared environment.
+
+172
+00:11:26.026 --> 00:11:28.407
+And the second one, remember,
+is not in the unshared environment.
+
+173
+00:11:28.407 --> 00:11:31.656
+It's in the host computer.
+
+174
+00:11:31.656 --> 00:11:37.223
+So if I run this, okay,
+so this is now running.
+
+175
+00:11:37.223 --> 00:11:44.791
+And I say ps aux, notice that this
+can't see above itself, right?
+
+176
+00:11:44.791 --> 00:11:46.911
+It can't see what the parent is doing.
+
+177
+00:11:46.911 --> 00:11:51.112
+It's now wholly unaware
+of both its processes and
+
+178
+00:11:51.112 --> 00:11:54.220
+its file system of what's above it.
+
+179
+00:11:55.806 --> 00:11:57.394
+&gt;&gt; Brian Holt: I don't know,
+I think that's pretty impressive.
+
+180
+00:11:57.394 --> 00:11:59.808
+I think it's pretty cool, right?
+
+181
+00:11:59.808 --> 00:12:03.400
+We've now fully jailed and
+namespaced this off, so
+
+182
+00:12:03.400 --> 00:12:06.990
+that no matter who's creating
+apps on your server,
+
+183
+00:12:06.990 --> 00:12:11.317
+no matter how nefarious Eve is,
+she can't see the processes,
+
+184
+00:12:11.317 --> 00:12:16.890
+she can't see the files, she can't
+hijack processes, she can't kill stuff.
+
+185
+00:12:17.940 --> 00:12:24.468
+This all has become impossible to her
+because we've kind of sectioned off,
+
+186
+00:12:24.468 --> 00:12:29.169
+or one could say, contained,
+right, this process.
+
+187
+00:12:29.169 --> 00:12:31.688
+Pretty cool, right?
+
+188
+00:12:31.688 --> 00:12:37.169
+So, this is the PID right here, 8269.
+
+189
+00:12:37.169 --> 00:12:42.066
+If I try and come in here and say,
+kill -9, that PID is gonna be like,
+
+190
+00:12:42.066 --> 00:12:44.566
+I don't know what that is, right?
+
+191
+00:12:44.566 --> 00:12:50.788
+Because this one doesn't have the process
+ID of 8269, only this one does.
+
+192
+00:12:54.936 --> 00:12:55.525
+&gt;&gt; Brian Holt: Pretty sure.
+
+193
+00:13:02.578 --> 00:13:06.719
+&gt;&gt; Brian Holt: Oop,
+how many times am I gonna do that today?
+
+194
+00:13:06.719 --> 00:13:10.352
+Yeah, 8269 right there.
+
+195
+00:13:10.352 --> 00:13:13.169
+So I could do it from here, right, cuz
+this is not an unshared environment, but
+
+196
+00:13:13.169 --> 00:13:13.980
+this one can't do it.
+
+197
+00:13:13.980 --> 00:13:16.725
+It can't see it because
+it's now been contained.
+
+198
+00:13:16.725 --> 00:13:22.089
+This first tab that I have up here,
+it's inside of
+
+199
+00:13:22.089 --> 00:13:27.342
+basically the handcrafted container,
+right?
+
+200
+00:13:27.342 --> 00:13:32.592
+So you can see this command right here,
+this unshare one.
+
+201
+00:13:32.592 --> 00:13:33.402
+It's been change rooted, right?
+
+202
+00:13:33.402 --> 00:13:36.382
+So that's why it can't see any
+of the file system above it.
+
+203
+00:13:36.382 --> 00:13:41.044
+And this unshare part of it has
+contained all of its namespaces, right?
+
+204
+00:13:41.044 --> 00:13:45.124
+So you can see we've isolated its mount,
+UTS, IPC,
+
+205
+00:13:45.124 --> 00:13:49.023
+all of those, so
+that this one is now isolated, and
+
+206
+00:13:49.023 --> 00:13:54.103
+it wouldn't be able to see other
+contained processes on its host,
+
+207
+00:13:54.103 --> 00:13:59.641
+whereas this one can,
+cuz this is the host computer, right?
+
+208
+00:13:59.641 --> 00:14:05.289
+The host can see into what
+the children processes are, right?
+
+209
+00:14:05.289 --> 00:14:09.928
+When I did this for the first time, it was
+what I got really excited to teach this
+
+210
+00:14:09.928 --> 00:14:12.618
+course, it's like, my God, this is so.
+
+211
+00:14:12.618 --> 00:14:14.812
+It's understandable,
+cuz it's very tangible, right?
+
+212
+00:14:14.812 --> 00:14:17.071
+You can actually kinda watch
+all of this stuff happen,
+
+213
+00:14:17.071 --> 00:14:18.308
+which I think is really cool.
+

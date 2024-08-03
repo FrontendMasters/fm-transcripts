@@ -1,0 +1,111 @@
+[00:00:00]
+>> Brian Holt: What are containers? I said this before, but I think they are more simple than you think they are. If you thought that there was one super feature called container, you're incorrect. It's actually just kind of three features kind of duct taped together that someone eventually looked at and said, that's kind of a container, right?
+
+[00:00:22]
+And then the name stuck and that's what they are now, right? It is a Linux jail is what they used to call them, but now they're called, a change route or, a jailed process, right, that's the first thing. There's namespaces and then there's C groups, which stands for control groups.
+
+[00:00:41]
+Those three things used together and nothing else is a container, which kind of just like melted my mind. Someone just like, hey, if I put these three things together, all of a sudden I have this process that's contained and can't bust out, right? That's really all that this is.
+
+[00:00:59]
+So we're gonna do that piece by piece. We are going to assemble a container by jailing a process, like and sharing its resources and then adding it to a C group. And then at the end of that we will have a handcrafted artisan, made with organic processes container.
+
+[00:01:21]
+You would never do this by yourself, right? Why would you ever use anything besides like docker or container or something like that? But I think it's fun, I think it's cool. And I thought it was cool so I'm gonna make you do it, if you just heard a bunch of Linuxy terminology and that you didn't really get.
+
+[00:01:37]
+There is a course that I think I'm pretty proud of, we can take this six and a half light flighty hours of talking about Linux and the Command-Line. But I guarantee you I think everyone would pull something out of it there's a bunch of cool stuff in here, it's a cool course.
+
+[00:01:55]
+
+>> Brian Holt: Okay, so why do we need containers? Well, back in the ancient olden days, which I am old enough to vaguely remember, but not much older than that. We had servers in our offices that the crypt keepers of the sysadmins would go in there and they would manage, right?
+
+[00:02:19]
+And they were physical servers on a rack, on premises inside of your computer or inside of your office, or some sort of like Network Operation Center or something like that. Called this bare metal, right? Cuz your code is literally executing on a server that you could probably walk over in touch, I have worked in companies where that was the case.
+
+[00:02:42]
+But let's talk about like some things you have to worry about not only have to worry about the code that you wrote, you have to worry about the operating system that's running there. You have to worry about the hardware that's running on, you have to worry about those parts wearing out, or becoming outdated.
+
+[00:02:57]
+Or a bunch of stuff like that, you have to worry about who can access like you have to worry about like physical security of who can access your servers. You have to worry about the temperature in there. You have to worry about the power that's being served out of there.
+
+[00:03:10]
+As you can see, there's a lot of stuff here that me as a developer, I don't wanna do that, right? And I don't really wanna hire someone to do that, and I don't wanna have to own real estate to house my servers, right? If I'm just working at a coffee shop in San Francisco somewhere, I just wanna write my code and then put it somewhere.
+
+[00:03:31]
+So bare metal makes the sense if you are a massive corporation, you're Microsoft sized, it makes sense that that economy's at scale to have a fleet of people managing a fleet of servers and all those kinda things. For much of us, it's not practical or even plausible for us to be able to handle these kinda things.
+
+[00:03:51]
+What's the next step up here? We have what are called virtual machines. So all sudden we have these servers, and rather than having to get a new server every single time that we need to launch a new application. We can basically take our server and subdivide it into smaller machines.
+
+[00:04:09]
+We'll call this a virtual machine, right? Cuz it's not a physical machine, it's a logical virtual machine where you're just kinda saying, this server now has two virtual servers running on it, right? Or virtual machines, or VMs, as everyone tends to call them. This was amazing when these technology kinda started coming around, because all sudden you didn't have to have a physical, new server for everything that you wanted to separate from each other, right?
+
+[00:04:36]
+You either had to have trust that, if I'm running two servers on this so that one's not gonna mess with the other. Now we have VMs where they're actually physically separated from each other. What's hard about this is you still have to manage, the operating system, keeping all the drivers up to date, all the security patching, all that kinda stuff.
+
+[00:04:56]
+It's still kind of a pain in the butt, right? But it's at least one that a software developer can manage themselves as long as, the servers are still somewhere that they exist you don't have to actually physically order a new server anymore. Now this we could actually put code on there that, it was untrusted next to each other.
+
+[00:05:12]
+So, a good example of this is like let's say, Coke and Pepsi have an app running on the same server that governs all their soda making, right? If you're just on the same physical server, Coke could just connect to it and then pull Pepsi's recipe or vice versa, right?
+
+[00:05:29]
+There' no trust there, or rather there's infinite trust there, and you're just hoping that the other person doesn't just start poking around your files, right? As you can see, kind of a non-starter, that's where VMs are really nice. Is that VMs allow you to say, these are now separated, this file system cannot access this file system.
+
+[00:05:48]
+
+>> Brian Holt: More nefariously, they could say well, I know I'm on the same server as my competitor, I'm going to intentionally bring down the server so that they can't serve their traffic, right? So that's another thing that could happen here, and much more likely, is a software developer at one of these places could accidentally ship a bug that brings down the server.
+
+[00:06:09]
+And you don't wanna bring down everybody's server that's on the same server. So that's where VMs are super helpful, this, this is your machine, you can crash it, you can burn it, we don't care. You're paying for it, whatever. So, this is where VMs have become more useful.
+
+[00:06:24]
+They're individual instances of an operating system that allows you to create separation on a server.
+>> Brian Holt: So this comes at the cost of some performance, right? As you may imagine, if I have 17 copies of Debian running on one computer, I have to pay the cost of running Debian 17 times.
+
+[00:06:48]
+It's not so high, I mean, Debian's a pretty efficient operating system, but it's not nothing, right? You are just kind of burning resources for the sake of separation, it's not free, right?
+>> Brian Holt: But generally, these days we have enough computing power where that much overhead is probably okay.
+
+[00:07:07]
+Cuz most of it if you're running training LLMs, yeah, you're burning an entire country's worth of energy to create LLMs. It's okay that you have a couple of copies of Debian running, right? So you have to kinda keep in mind the order of magnitude there. So let's come to now public cloud.
+
+[00:07:26]
+We have VMs, I don't wanna run my own server farm. Now comes AWS, Microsoft Azure, Google Cloud, Oracle Cloud, Alibaba, things of the top five off the top of my head. Now I can create a VM in the cloud. I can just like reach out to Amazon say hey, give me another easy to instance.
+
+[00:07:48]
+And now I can deploy to this virtual machine somewhere. And they're gonna handle all the infrastructure, all of the management plane, all that kinda stuff. So I'm just kinda left to manage, mostly operating and driver stuff. If I spin up a new instance, they'll probably give me the latest secure version.
+
+[00:08:04]
+So some of that's not necessarily true. But it's now removed the need for me to actually have physical assets somewhere, right? I can just rent them from somewhere at a pretty strong premium, right? If you're willing to run your own cloud, it's probably, I mean, I don't know, I'm guessing like 50% cheaper.
+
+[00:08:23]
+You no longer have to have your own data center, right? You can actually just rely on Amazon to have your data center for you. And even at, a 50% markup, it's probably a pretty acceptable trade-off, right? Because that means you don't have to buy and you don't have to hire and there's a bunch of stuff you don't have to do.
+
+[00:08:38]
+It's a good thing to pay them to do that until you have a certain size. And even companies today like Stripe, where I used to work, still 100% on AWS. They have nothing of their own, which I think even though they're a $100 billion company, still makes a lot of sense for them.
+
+[00:08:56]
+There's a lot of tools that help you here. You have things like Terraform, Chef, Puppet, Salt, cloud formation, right, all those kinda things that kind of help you just spin up and spin down servers. At the end of the day, everything we're still talking about, though, is still virtual machines, right?
+
+[00:09:12]
+It's still an entire copy of the operating system running. So we're still paying the cost of running the entire operating system, because it is still a virtual machine. It's still an entire copy of the operating system.
+>> Brian Holt: And there's nothing here that helps you with orchestration, which is how do all my apps, connect to each other or scaling, right?
+
+[00:09:33]
+I guess there are things like scaling sets. They can say, if this server gets too busy, add another server. There's some of that's kind of managed plan that you can use. But we're gonna get into containers, that's the point of containers is they're able to do that. So it's actually just talking about containers, you're running a copy of something but you're not actually running the full copy of it.
+
+[00:09:58]
+And you're just running that directly on a container daemon, but you don't have the whole cost of writing the entire virtual machine. You don't have that whole cost of, virtualizing all of your things and allocating them all that way. Containers are a much more lighter weight of being able to do this with strong security boundaries but not necessarily as strong as a virtual machine.
+
+[00:10:22]
+So there's actually a way to run containers as a full virtual machine if you want to do that. We're not gonna talk about that, but having a full separation of a virtual machine will be a stronger security separation, but 99.99% of us don't care and don't need that, right?
+
+[00:10:39]
+If you're just running an app on AWS, a normal container will do just fine. And most companies just do it that way.
+>> Brian Holt: And they're great, I use them all the time in my day job. My last company used them, my previous company used them before then. My current company, we're adopting containers and Kubernetes and all this kinda thing.
+
+[00:11:01]
+I think it's fair to say it's one of the most revolutionary infrastructure, innovations in the past 10, 15 years. And they're just getting more important, so it's awesome that you're here talking with me about this kinda stuff.
+
