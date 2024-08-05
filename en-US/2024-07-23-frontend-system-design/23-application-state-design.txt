@@ -1,0 +1,130 @@
+[00:00:00]
+>> Evgenii Ray: Let's discuss how we built the UI state in our applications. So the data that we store on the UI has two properties. It actually has two things, the data class, so the type of data that we store, and the data properties. The data type, the data classes can be the app configuration, like user theme, locale, font size, or accessibility settings.
+
+[00:00:25]
+It can also be the UI elements state, for instance, in Google Docs, you can select some special formatting and your element will keep the state. Or it can be the server data that we store from the server and use to render a new elements in the UI. Then we have the data properties.
+
+[00:00:51]
+Each data class can have different data properties, for instance, the access level, should the data be global or local, read and write frequency. So if we expect that the data is read often, so there is a high frequency write or read, then we can't us synchronous storages because we'll block the UI thread.
+
+[00:01:14]
+So we need to make sure that this data either in the synchronous storage or in our runtime memory. So it's also the size, the larger the data, there is a high chance that we'll block our UI thread because we'll need to utilize a lot of CPU to process such data.
+
+[00:01:38]
+If you're trying to parse 500 megabytes file, then it will take a lot of time to actually read this data and also process this data into the object. And there are some general principles that we can apply when we design the application state. The first one, the more generic one, we need to make sure that the access cost to this data is minimal.
+
+[00:02:04]
+So our data should be accessible at least in the constant time. Once we optimize that, we can think about the search optimization. We need to make sure that the search operation in our app is fast. And the last part, we need to somehow optimize the memory usage. The more things we store in the application, the more likely we're going to utilize too many objects, and we can easily bloat our RAM.
+
+[00:02:35]
+So let's get the practical kind of example. So we have the Messenger app where we render the contact list, and each contact has a conversation where we can have thousands of messages potentially.
+>> Evgenii Ray: And how would you optimize that? So the most obvious approach will be just to put everything into the context state and the global state.
+
+[00:03:03]
+But there is a problem with that. So if you want to access a contact with id Jane Smith, and we want to find any message with id 5, then we're going to do two hoops. First, we're gonna filter out the contacts, then we're going to filter out the messages.
+
+[00:03:22]
+This is although acceptable, it's still not the best way because if we have potentially thousands of messages, then we need to traverse the whole array just to access single element. This is not the way we want to design our app. So the first technique that we can use to optimize our data is to change how we store it.
+
+[00:03:51]
+And there is a concept called data normalization. So the data normalization has been around for, I think, 20 or 30 years already. So it's a concept used and the database is heavily. The goals of data normalization is to provide optimized access performance and also provide the optimized structure, how we store the data.
+
+[00:04:15]
+And if we have a unified structure, how we store things in a state, it increases the readability of our code and for maintenance. And data normalization operates with the normal forms, they're in total seven normal forms. And the farther you go, the more you normalized. In the UI apps we usually utilize only two or three normal forms, and let's go through the process of data normalization.
+
+[00:04:47]
+So if we take the first example where we have a simple object with the id and name and then it has the job and location. So right now it's a non-normalized object. So we can optimize this by applying the first normal form, and what the first normal form does is tells us that every field on your object should be atomic.
+
+[00:05:12]
+So we need to reduce any nesting in our objects. So we just flatten the nested objects here.
+>> Evgenii Ray: The job object becomes the job_id and job_title, and the location becomes country_code and the country_name. Also the first normal form tells us that there should be the primary key, and we know that we already have the primary key, which is the id that we can utilize.
+
+[00:05:45]
+So next, we can convert our first normal form to the second normal form. And what the second normal form does, it tells us that all our fields now ideally should depend on the entity. So if we look at the following fields, the job_id and job_title, the job_title actually depends on the job_id, although it also depends on our user object.
+
+[00:06:15]
+So the data summarization tells us that we need to decouple this into the separate table in the database concept, but in our case, it will be the separate object. So we move our job to the jobs table. Now we have the key, which is UIE as a job id, and now we have the information relevant to this job.
+
+[00:06:39]
+And we also normalized the user jobs, so we can access what type of job the user has by providing the id. So now all our entities depend on the primary key. There is a third normal form.
+>> Evgenii Ray: Actually, yeah, also we move the countries to separate table. There is a third normal form that tells us the main difference from the second one.
+
+[00:07:11]
+We say that non-primary keys should depend on the entity primary key. But the third normal form enforces this rule, saying that it should depend only on the primary key, and the difference is very subtle. So if we look at the UIE job, it has a title and department.
+
+[00:07:31]
+So department really might not be directly related to the UI or to the title. So we want to decouple that to say, okay, the department should directly depend on the UIE id. So we move the department to additional table and now we can access the department type by providing the job id.
+
+[00:07:59]
+The third normal form sometimes is excessive. Usually on the UI, we use the second normal form. So it's up to your case if you want to apply an app. So if we go back to our Messenger example, let's try to convert our non-normalized data, the state of the Messenger, to second normal form.
+
+[00:08:24]
+So first we want to reduce the nesting. So we want to remove the conversation and the messages. So once we remove the conversation and the messages objects from from a table. Now we apply the Atomic Fields rules. Now we store the conversation_ id instead of the object, and on the message we also store the conversation_id.
+
+[00:08:52]
+And we also create a new type called conversation, which has the id and the title, and we also remove the messages from the conversation.
+>> Evgenii Ray: Now we identify the primary keys. So for the contact, it will be id, for the message, it's a message_id, for the conversation, it's also id.
+
+[00:09:14]
+And then we store these fields on the global state. So now to access the message with a certain id, we just provide an id. And it will return us the message, the same for conversation and for the contact. So although, you still may notice that to find specific message in the array, we still need to traverse all the messages.
+
+[00:09:37]
+How can we optimize even that? So let's move on to the second principle, minimize the search cost.
+>> Evgenii Ray: So we could potentially build an index table, which we'll call inverted index table. It's called inverted because the content of the entity becomes the key in this sense. So what we're gonna do, we're gonna extract all the words from the message content.
+
+[00:10:08]
+And then we're gonna build the index table where the key is the word from the content of the message, and we're gonna store the id of the message where this content appears. And a timestamp that will help us to sort out search results in the timestamp order. So later, we can utilize some asynchronous job to build this inverted index table.
+
+[00:10:41]
+This can be a web worker, that will access the IndexedDB and store it in the storage, or you can use the idle cycle of your event loop to build this index table in your application. But you may notice that, okay, I can search by the word. But what if I want to search by the prefix?
+
+[00:11:05]
+Can we improve it even further? And apparently we can, we can use the composite key for the invertening of this table. So now we're gonna store all personal prefixes of the word and keep the message id and the timestamp. So if we type in the search bar, for instance, ja, this will give us all the messages where we saw the ja in the conversation thread.
+
+[00:11:39]
+So we can store in JavaScript the string as array because the key should be always a string. That's where the storage comes in. So before we discuss the storage, let's understand how we're gonna manage the memory. So, yep?
+>> Speaker 2: So in this example, there's just two messages, but in theory, if you had multiple messages that started with hey, those would all end up under that single either [CROSSTALK] composite key-
+
+[00:12:13]
+
+>> Evgenii Ray: Yeah, so you will have multiple tuples here.
+>> Speaker 2: Okay.
+>> Evgenii Ray: So the inverted index table may become large. So for instance, we may have already a 1,000 of messages in each conversation thread, so we don't want to blow the memory of the device. So how can we optimize that?
+
+[00:12:35]
+Right now, we have the conversation with John, but we know that there are two more conversation that are not active. So we can just select them from the state, since we know the conversation ID, and we can filter out the entries. Now what we can do, we can outsource that to the separate storage.
+
+[00:13:01]
+So we move this element to the separate storage, and we basically sharded our data. So it's basically, the database concept in the browser where, in the database, you don't have the single large DB instance. So you have a shard and you store your data partially in multiple shards.
+
+[00:13:22]
+And when you do the query, you're actually querying from the different shards. The same way happens here, but we are limited to two shards. One is our global state, which is runtime memory. And the second one is our hard drive. So when we move elements to the hard drive, we let the JavaScript engine to utilize all the objects from the memory and let the garbage collector free up the space.
+
+[00:13:48]
+And for instance, if we selected the new conversation and we want to load the data back to the store, we can utilize the storage to just populate this back to our runtime memory. And we basically are going to swap back and forth the data. And now the question is, what type of storage should I use to achieve such behavior?
+
+[00:14:17]
+And let's do the quick overview. So the storage API provides three types of storages for us. It's the Indexed DB, local storage, and the session storage. So the session storage is good for storing some small non-persistent data, so it stores things only for one single session. When the user closes the website, the session is destroyed and the data is wiped.
+
+[00:14:46]
+The local storage on the other hand is good for storing small things, it can be user preferences, you can also store non-persistent data and discard it if you want. But the local storage provides persistence. But the problem with the local storage and the session storage, they only support the string type and they are asynchronous.
+
+[00:15:07]
+So if you have a data that you expect to read a lot and write, then you will block the UI thread, and it will impact your application responsiveness. So what do we need to do to re-implement the behavior we discussed previously on the slides? So the IndexedDB, on the other hand, has the almost unlimited storage capacity, on average 3 gigabytes, and it also supports indexing.
+
+[00:15:34]
+So we can create a composite index we discussed and store the key as a set of prefixes. And we can actually enable this search using the IndexedDB, so we can utilize this index. And also the IndexedDB supports multiple type of data, which is very useful when we store complex objects.
+
+[00:15:56]
+And it's also non-blocking. So it's a synchronous, it means that we will not block the UI thread in this case.
+>> Evgenii Ray: So the summary for application state design is first, you need to know your scale. Always start with the way how you structure your data, and use normal forms to provide optimized access cost.
+
+[00:16:23]
+And use indexes if you're planning to do the search operations in your app. If you think that you will need to store a good amount of data in your state, then offload the data to a hard drive. For us as developers, it's basically, the free space that we can use.
+
+[00:16:42]
+It will improve your responsiveness of the app. And also you need to be mindful about the type of storage you use. Utilize the data properties, if you expect it to read the data a lot, use the asynchronous storage. For small things, utilize the local storage or the session storage.
+
+[00:17:03]
+And that's it for the application state design.
+

@@ -1,0 +1,74 @@
+[00:00:00]
+>> Evgenii Ray: So let's talk about how we talk to the server. Imagine that we're trying to build the Shop Administration app with two main endpoints. The one is to track new orders, the second one is to chat with employees. What are the technologies we would use for that, and what is the stack?
+
+[00:00:21]
+So let's first overview the protocols available to us. So there are two main protocols. One is UDP, the second one is TCP. The UDP is the protocol that doesn't guarantee the package from the server received in the full size. So when you receive the data from the UDP, you just request the server and the server does not ensure that the data is received by the client.
+
+[00:00:57]
+So this means there is some data loss in process. This protocol is heavily used in video streaming where you can lose some data packages from file to transfer. So your video stream quality may lose some bytes, but it's not critical. So it basically provides the response and if the response is not provided, that's fine.
+
+[00:01:23]
+The server can continue to fire the response, but TCP is different. TCP ensures that the data requested by the client and sent by the server is received in full. So for that, it does the 3-way handshake. So basically, it calls the server with a synchronous package to tell, okay, server, I want to connect with you.
+
+[00:01:52]
+Then the server sends the sync acknowledge package, saying that, okay, client, I can also connect with you. And then the clients finally acknowledge, okay, let's have the conversation now. So this 3-way sync provides the kind of insurance that the data between the client and the server is received.
+
+[00:02:14]
+So and then the client makes a request. So and as you can see this because we need to do free network trips now, the TCP is generally slower than the UDP. So the main benefit of UDP is speed, while the TCP ensures data validity.
+>> Evgenii Ray: And there are some branches of these protocols.
+
+[00:02:35]
+So the first and how, basically, the web runs is the HTTP protocol. The HTTP 1.1 is based on TCP, and there is also HTPP 2, which is basically the new protocol, but it still inherits the properties of HTPP 1, and it's still backed by the TCP and there are also web sockets.
+
+[00:02:58]
+So web sockets slightly different because they do not utilize htpp 1. They use htpp 1 only to initiate the first request for the server, and then they upgrade to TCP. So it's basically, the web sockets are fully TCP-based. And there is a server sent events that are based on htpp 2, which is the server push technology.
+
+[00:03:19]
+And we're gonna look at all of this protocols just in a few slides. Then there is a UDP, and UDP, there is a protocol developed by Google called QUIK. And QUIK is using the UDP under the hood. And the new protocol, HTPP 3, is actually based on the QUIK, which is based on UDP.
+
+[00:03:38]
+So we are moving from TCP to UDP soon for the ICP 3 protocol. And also there is a web RTC which is used for the streaming and even this stream now is stream probably for the web RTC now.
+>> Evgenii Ray: Okay, let's get back to the examples with our application examples, so we have the first endpoint getting new orders.
+
+[00:04:07]
+So how would we design this? So the first thing that we could use is the technique called long polling or short polling. It's basically making the normal get call every specify timeframe, for instance, every 20 seconds, and it's very easy to implement. So we can just set up the interval and use the fetch request and call the server every 20 seconds.
+
+[00:04:37]
+So what are the issue of the log polling for getting new orders? So the first one is the HTTP protocol. Since we need to establish the 3-way handshake with the server, it will be pretty slow. And when we establish the HTTP connection, we open a new TCP socket.
+
+[00:05:03]
+And TCP socket apparently takes CPU and also drains energy as a result. And it also has the property of an inefficient network usage because when you establish the connection with the server, you send the metadata, which is the headers, with the request. And if you are on HTTP 1, then the header data is not compressed and you may end up sending 50 kilobytes every request of just any header data and HTTP 2 improve the situation by compressing the headers.
+
+[00:05:35]
+But we still have this 3-way handshake that we need to establish. And there is one thing is that the low polling and short polling actually drains the battery of the mobile devices because you need to maintain your TCP socket open. And when your TCP socket is open, the key thing how the mobile module is structured.
+
+[00:05:59]
+So in your phone, your mobile network module has two modes. One is model, it's basically, receive only, when this module in the receive only mode. So it's very energy efficient, but it can only receive the data. But there is also a duplex mode where you can send the data and receive the data.
+
+[00:06:22]
+And it's not energy efficient as a result. So when we use the long polling, the mobile device utilizes a duplex antenna. So it receives the data and sends the data. And if we run a quick experiment, for instance, we have the 2,000 battery, and we know the average energy drain.
+
+[00:06:42]
+So it takes only almost four hours to drain the full battery by maintaining just one socket opened. And I attached a link to the research paper that you can use if you are interested in reading the whole paper. So this is the problem number one, CPU utilization and the energy drain.
+
+[00:07:05]
+So this is not an issue for desktop apps where we don't think about the battery of the device because we are plugged into energy network. But this isn't a big deal for the mobile devices. Where we need to be very network and energy efficient because we have limited network bandwidth and the battery.
+
+[00:07:31]
+The second problem is the latency. The long polling and short polling latency can be initial mobile devices. And this happens when, for instance, you are on the fast train or in a fast car, and then you are connected to some network tower. So then you sit on your train, you may end up losing the connection and reconnecting to the new network tower.
+
+[00:07:54]
+So now you need to reestablish the connection again, send the address and do the 3-way handshake. And if you change your network towers multiple times, imagine that the latency can be significantly increased. And also, the problem with the long polling is that you need to re-implement reconnection. Every request to the server, which is done through the REST API is stateless.
+
+[00:08:23]
+So you will lose the state and you will need to re-implement some infrastructure on the server side to do this. So in a long run for the mobile applications, it's actually costs more to support the long polling money wise, of course. So what is the summary then? So the long polling is very good.
+
+[00:08:50]
+It's very easy and cheap to implement, and definitely there is no additional infrastructure required, unless you work with the mobile apps. If you work with the mobile apps, then there is an issue that it's not battery efficient because it's used CPU to maintain the TCP socket. And it's also not network and data efficient because you send in the headers with a request when you do the 3-way handshake and when you try to request the data, yet you are trying to receive.
+
+[00:09:19]
+And if you're on HTTP 1, the situation is even worse, because HTTP 1 sends too much overhead data. And so what is the use case then? The use case is actually for, the long polling can be used with desktop apps where we don't care about the network bandwidth and also about the latency because we're stationary.
+
+[00:09:44]
+We do not connect to different mobile towers and also we do not care about the energy drain. So it's also pretty cheap to implement for desktop users and it's pretty well suited, but when it comes to mobile web application, then you would need to consider a different technique.
+
