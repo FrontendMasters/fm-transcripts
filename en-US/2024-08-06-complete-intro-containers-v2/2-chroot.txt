@@ -1,0 +1,117 @@
+[00:00:00]
+>> Brian Holt: We're gonna talk more about containers, and we're actually gonna start running stuff on the command line and getting dangerous. So the first thing we're gonna do is this command called change root, or cha-root, as some people will call it, which I will not because I feel absurd when I say it out loud.
+
+[00:00:18]
+So we're gonna stick with change root. It basically allows you to say, all right, to this Linux process and all of its children, you can only see this directory and below. So according to that process, that's the entire world in terms of all the files that it can see.
+
+[00:00:35]
+It can't see anything outside of it. So again, this used to be called Linux jail or a jailed process. You'll still see the word jail kinda throw around. That's what they used to call it. But the actual command is change root.
+>> Brian Holt: So at this point, you should have Docker up and running.
+
+[00:00:58]
+So make sure that mine is running. You can see up here I have mine running. It says Docker is running. It doesn't matter, you don't have to have Kubernetes, but it should say Docker desktop is running. So if I say docker ps, you can see that it comes back and tells me I don't have any containers running.
+
+[00:01:17]
+
+>> Brian Holt: And it doesn't matter where you run any of these commands. So I'm going to start up a Ubuntu VM. But you could start anything from here. But let's just go ahead, I'm gonna copy and paste this. The reason being is that I wanna show you how to run all these commands from within Linux.
+
+[00:01:37]
+So we're going to be creating all of our containers from within Linux. So we're gonna be running containers within containers. I know that's a little confusing, but suffice to say, I'm gonna start a Linux process and then we're gonna start playing around. So I'm gonna copy that and I'm gonna go over to my command line and I'm gonna put this there, docker run, which is how you run an instance of a container.
+
+[00:02:07]
+-it basically says, make this interactive. Don't just throw it into the background process, I wanna interact with it directly. I'm giving it a name, otherwise it'll give you some random generated name. So I'm just gonna call it docker-host. You could call it anything, though. --rm just says, whenever I stop this container, throw everything away.
+
+[00:02:26]
+Don't keep all the logs and all that kinda stuff around. Privileged, I'm doing this because, normally, you don't wanna do privilege. But because we're doing a bunch of stuff with creating containers by hand, we want it to be elevated to the root privilege. And then we're gonna be running Ubuntu, which is just the name of the distribution, and then Jammy is the actual version that we're gonna be running.
+
+[00:02:47]
+So you could put any version of Ubuntu here. We're just gonna be running Jammy because as of recording, this is the most latest stable version of Ubuntu. So for some of you, you'll probably see it pull and download a bunch of stuff before it ends up happening. Because I've run this a bunch of times before, it just throws me right in it because it caches all of those images.
+
+[00:03:14]
+So that might take you, if you're on slow Internet, a couple of minutes, if you're on fast Internet, I don't know what, 15 seconds, something like that. It's usually pretty fast. Now if I say cat /etc /issue, you can see that I am on Ubuntu 22.04. That's a nice little trick right there if you're in a Linux environment and you wanna see what version of Linux you're running.
+
+[00:03:40]
+As far as I know, almost every distribution of Linux, this will work, and it'll tell you what distribution you're running and what version.
+>> Brian Holt: So, I just gave you a bunch of instructions for macOS. If you're using Windows and WSL, just open WSL, that's it. That's the whole thing.
+
+[00:04:02]
+You open WSL and you'll be inside of Linux. And if you're running Linux, just open a terminal because you're already in Linux. We ran cat, again, just to review what cat means. It just means open a file and read it for me. So this is a file, and it just dumps out everything that's in there.
+
+[00:04:22]
+And yeah, so now we are now running inside of a container, and we are the root process, rather, the root user. Let's make a new jail for our particular component. So I'm just gonna change directory to the root directory. You can see I'm in the root directory. pwd just means present working directory.
+
+[00:04:43]
+And I'm gonna make a new directory and we'll call it my-new-root or something like that. And you can see here I have my-new-root right there. So I'm gonna say echo, which it's gonna allow me to create a new file, echo "my super secret thing" into my-new-root/secret.txt, okay? And now if I say cat my-new-root/secret.txt, you can see it says my super secret thing.
+
+[00:05:23]
+Okay, so we created a directory, we put a secret file in there.
+>> Brian Holt: And now we're gonna try and do chroot into my-new-root, and then you tell it what to do after. So I'm gonna tell it, run me a new instance of bash or a new shell, right?
+
+[00:05:44]
+You're probably gonna say, I can't do that, because what's gonna happen is it is going to actually successfully change root into my-new-root here. But then it goes to run bash, and because it can't see anything outside of itself, it can't even see bash, right? Bash is not there for it to run.
+
+[00:06:03]
+So we actually have to physically put a new copy of bash inside of that root directory before it can actually run it. Now, it'd be nice if you could just say, okay, copy bash, right? But of course, it's not that easy. You have to bring all of its libraries with it as well.
+
+[00:06:19]
+So I'm gonna show you how to do that. Okay, so I'm gonna run ldd /bin/bash. This is gonna tell me all of the libraries that you need to bring with bash so that bash can actually run, right? If you're a Windows library or a Windows developer, you're nodding right now.
+
+[00:06:43]
+It's like, yeah, it's like DLLs, right? That's kinda the same idea, right? I'd never had to worry about this until I was messing around with containers. So we're gonna have to copy all these kind of, and copy them into the right place. So we're gonna make a new directory.
+
+[00:07:02]
+
+>> Brian Holt: mkdir my-new-root, and then lib, and we're also gonna make another one called my-new-root/lib64. If you wanna see a fun, little, stupid Linux trick, you wanna create two of these. One of them is called lib and one is called lib64.
+>> Brian Holt: If you do that, it'll actually do both of them.
+
+[00:07:32]
+Cuz the curly braces means do everything inside of here, so it's actually going to expand that out based on commas. The first one is just an empty string, so it's gonna be lib, and then the second one's gonna be lib64, right? Not important, but it's fun to show you stupid Linux tricks when I can.
+
+[00:07:53]
+All right, so if I go into my-new-root, you can see I have two very lovely directories here that are now empty, and I have to do a bunch of copying. We're going to copy everything that we see here into our directory that we need to.
+>> Brian Holt: So I think you can ignore all of the lines that don't have paths.
+
+[00:08:18]
+So I don't think I need this one. But I do need this one. Okay, so I have to copy that one into.
+>> Brian Holt: And I gotta make sure I'm getting the right one here, yep.
+>> Brian Holt: my-new-root, this one is gonna go into lib.
+>> Brian Holt: Okay, and this one is also gonna go into lib.
+
+[00:08:53]
+You can tell just cuz it says lib right there, right? I'm just trying to copy all of that.
+>> Brian Holt: Okay, so that worked.
+>> Brian Holt: And I got, let's see, I did this one,
+>> Brian Holt: I did that one. And then this one I think has to go into,
+>> Brian Holt: lib64.
+
+[00:09:25]
+No, this one just goes into lib as well, right?
+>> Brian Holt: Okay, so maybe nothing had to go into lib64 for that one, which is fine.
+>> Brian Holt: We can check to see if that actually worked.
+>> Brian Holt: I didn't copy bin bash yet. Yeah, you gotta do that as well.
+
+[00:09:57]
+Yeah, so you're gonna have to say, cp /bin/bash into, I actually have to make a bin directory as well. So I see I've gone to my-new-root# mkdir bin, which is the binary that we're actually gonna copy in here, and we're gonna cp /bin/bash into my-new-root/bin.
+>> Brian Holt: Okay, and then now we're gonna try that again.
+
+[00:10:30]
+We're gonna say chroot into my-new-root bash. Lo and behold, you can see this looks a little bit different than before. We are actually now change rooted into that directory. Now you might say the first thing you might be tempted to run is I'm gonna run ls to see what's in here, right?
+
+[00:10:48]
+And it's gonna be, I don't know what ls is, right, because you didn't copy ls in there. Like I said, this is highly impractical, what we're doing. You have to manually copy everything by hand. So let's go ahead and do, you can type exit to get out of that bash and it'll take you back out of there.
+
+[00:11:05]
+Let's go ahead and copy ls into there as well. So same process, cp /bin/ls into my-new-root/bin. Okay, that'll get that. ldd /bin/ls, this will tell you everything you need to copy, ignore everything that doesn't have a path. So copy that into, you can also do this as well, you can do multiple at the same time.
+
+[00:11:40]
+
+>> Brian Holt: Anything that has a path.
+>> Brian Holt: Oops.
+>> Brian Holt: So all that's gonna go into my-new-root/lib, okay? Now let's run our change root again. And now you can see I can at least run ls, right? So you can see I have a bin, I have a lib, lib64, and secret.
+
+[00:12:21]
+Pretty cool, right? Now let's read the file, cat secret.txt. No, we don't have cat, right? As you can see, you have to do this for every single one of them. I think it's literally, so some of them do come with bash, right? So change directory does, so a few of them do.
+
+[00:12:43]
+But yeah, most of them, you're gonna have to actually go do by hand.
+

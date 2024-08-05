@@ -1,0 +1,92 @@
+[00:00:00]
+>> Brian Holt: Networking is like one of those features that like, when works, you don't think about it and when it doesn't work, you just wanna die, right? So I am not gonna spend a bunch of time on networking because I am not a networking expert. I'm gonna show you how to set up networks in Docker manually and then I'm gonna show you how to do use Docker compose to have it done all for you automatic.
+
+[00:00:21]
+But one of the things that like when you understand what Docker compose is doing for you, you'll like it a bit better. Why do we care about networking? Let's say we have an app and we have a database, somehow those two containers have to talk to each other, or you have to put them in the same container, which is a worse idea.
+
+[00:00:38]
+You wanna have your containers that are running your databases and you want to have your containers that are running your app and you want them to scale independently, right? So if you have a bunch of traffic gonna your app but none of it's gonna your database you wanna scale up to 10 replicas of your app and keep one of your database or maybe three or something like that.
+
+[00:00:59]
+But if you're doing a bunch of MapReduce jobs on your MongoDB cluster, you probably wanna scale that up on your Mongo side and not have to worry about everything happening in your app, right? You can understand that those pieces should move independently of each other, which is why you would not wanna put them in the same container.
+
+[00:01:16]
+We're gonna be using Mongo just because it's a pretty easy container to use. But you could do this with Postgres or MySQL or anything like that. So let's look at docker ls, sorry, docker network ls, and you can see here I have a bunch of stuff for playing around.
+
+[00:01:38]
+We're gonna be creating this one, so I'm just gonna Its gonna docker network our app net because we're gonna just recreate it here in just a second. Yours probably looks like this or similar, right? Pretty close.
+>> Brian Holt: Okay, so I did Just remove this, but we're gonna now recreate our specific Docker network that we wanna do.
+
+[00:02:07]
+Now you could just do everything over bridge if you wanted to, bridge is one that's created by default by Docker. The issue is now that any time that any app is created inside of your cluster that talks to bridge, they can all see each other. So it's better to just have bespoke networks for all of your individual concerns, let's go with.
+
+[00:02:29]
+In other words, Docker doesn't recommend it, so I'm gonna tell you that Docker doesn't recommend just using the default bridge network. So we're gonna say, docker network create drive=bridge, and then we're gonna do app-net. You can call it whatever you want, we're gonna call ours app-net.
+>> Brian Holt: Driver.
+
+[00:02:56]
+Okay, and then now I can say docker network ls, and you can see there, now I have this app-net. So how do we connect our container to that network? And it's really quite simple, I'm gonna say docker run -d --network=app-net-p 27017, which is the default port for Mongo.
+
+[00:03:30]
+27017 name we're just gonna call it db or whatever you want to call it and then i'm gonna run Mongo:7.
+>> Brian Holt: Okay, now if I say docker ps you can see that I have my db container running in the background which is running on mongo:7. But now because I gave it this network it's gonna be connected to app.net, so anything else that connects to App.net can now has the ability to connect to this.
+
+[00:04:05]
+So let's create another little node app real quick that connects to it. We're gonna make another directory called I'll just call it Mongo-app or something like that, Mongo-app. Open this in code. Here, and this bit bigger, create a new file here. Call it index.js,
+>> Brian Holt: And I'm just gonna grab this directly from here.
+
+[00:04:38]
+Just this, it's another Fastify client. You could also just do this directly from the project files as well. Probably should have done that, but we're close anyway. So I'm in this Mongo-app, I'm gonna have to say mpam init -y to get a package lock. Or package file and then I need to install npm install fastify, and I need Mongodb.
+
+[00:05:10]
+And I think that's all I need.
+>> Brian Holt: So those are just the two dependencies that I'm using here directly in the app. So now you can see, yeah, fastify right there and mongodb right there. If you look at my package file, you can see that I have dependencies for fastify and mongo.
+
+[00:05:31]
+So that's just what I did there. Now I think because I exposed this locally, it should just work if I say, node index.js. Is that true? Open this in the, yeah, that's fine.
+>> Brian Holt: So, yeah, it is working. Then I say /add, and I do that. So because I published that port, it's that Mongo client is available, or the Mongo server is available.
+
+[00:06:02]
+So, despite the fact that I'm just running this locally, that's all. There, you can see it's logging all that stuff out, I don't care. Cool. Not the point here, though. What we really wanna do is we wanna, this to be all running directly within Docker. So what I'm gonna do is I'm gonna come back to my client here.
+
+[00:06:23]
+I'm in my Mongo app, and I'm gonna, I guess I need to grab that Docker file too? So let's go grab the Docker file.
+>> Brian Holt: Project files here. I have a Dockerfile, as you can imagine, this is not terribly complicated, so I'm just gonna copy that and I'm gonna create a new file here, call it Dockerfile.
+
+[00:06:55]
+
+>> Brian Holt: And this is the literally the exact same one that we had from earlier in the course, right? Okay. Yeah, I think what I was actually intending to do here was just to go modify the index.js, cuz that would've been way simpler than what I did here. But I`m having adventures it's fun.
+
+[00:07:13]
+Handcrafted artisanal code right before your very eyes. You can see here that we have Docker file index.js, our package files and then our node modules. That's probably what you expect to see. And then now we can go ahead and build our projects, we can say Docker build, --tag, like I called it my-app-with-Mongo, and just period for that.
+
+[00:07:40]
+You can see we will build there, great. And then we're gonna say docker run-p 8080:8080 network.
+>> Brian Holt: Equals app-net, as you might expect. So one thing that we have to do if we're looking at our index.js is we have to give it the Mongo connection string, otherwise, it's just gonna try and connect to the local MongoDB.
+
+[00:08:11]
+That won't work, right? Because it's not local to that container. We have to tell it where it is on the network. So one of the cool things that we can do with Docker that I haven't shown you yet, but probably won't surprise you after I do a niche there, is --env.
+
+[00:08:25]
+You can pass environmental variables into your container as well. So I'm gonna say MONGO_CONNECTION_STRING, and then it's the mongodb protocol://. Now what's cool about this is like, I can just call it db, cuz that's the name of my container, right? So it knows to look for the db container that's on the AppNet network.
+
+[00:08:52]
+So I just say db:27017. And then my-app-with-mongo cuz if you remember up here, wherever I did it, wherever I started the container, I did it and I called it the date the name db, right? Okay, which is what we're putting there. So whatever you call that name is what it's gonna be called on the network.
+
+[00:09:24]
+Okay, so I should be able to run that. Looks like it's running on the network exposed port 8080 up here. So now I should be able to localhost 8080,
+>> Brian Holt: And look, it is running on the network.
+>> Brian Holt: And everything is working.
+>> Brian Holt: So that is Mongo Networking, I mean technically, but more interesting that is Docker networking.
+
+[00:10:04]
+
+>> Brian Holt: Now, your next question might be, how do I do something more complicated than this? And my answer to that question is use composer or Kubernetes at that point, right? If you now have three, four, five different types of containers, all coexisting on a network together. You probably need a container orchestration framework of some variety.
+
+[00:10:25]
+I'm not gonna be prescriptive. Most people these days choose Kubernetes. There's several other ones that you could choose from. And there's no reason that you couldn't just I'll manage this with your own networking but my question to you is, why, right? There's tools that are very good at this, so why wouldn't you use those?
+
+[00:10:45]
+
+>> Brian Holt: But for messing around locally, this isn't too bad to set up by hand, right? And it's probably good for you to know this is just not that hard to do.
+

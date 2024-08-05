@@ -1,0 +1,93 @@
+[00:00:00]
+>> Brian Holt: We are going to open a third terminal, because we wanna have an observer to watch all of the chaos that's about to ensue. So we're gonna run that Docker exec- it docker-host bash again, so we have a third process in here, and then I'm gonna say, apt-get install htop.
+
+[00:00:20]
+If you're not familiar with htop I love it, it just allows you to visualize all the processes, how the RAM is being used, all that kind of stuff, it's a nice visual representation of what's happening, kind of cool, right? So you can see inside of Docker I have eight cores that are available.
+
+[00:00:45]
+
+>> Brian Holt: You can see all the processes that are running, who's running them, all that kind of stuff, cool, right? Let's say that we're Eve right now, this is number one, this is the unshared environment, and we want to pin one of the CPUs, so let's do that.
+>> Brian Holt: I'm actually gonna copy and paste this because it doesn't really matter what it does, this is gonna be the RAM one, okay, yeah, so this one does RAM.
+
+[00:01:18]
+
+>> Brian Holt: So I'm gonna run this and watch that consume a ton of RAM right here.
+>> Brian Holt: Yeah, you can see this one's just starting to grow right there.
+>> Brian Holt: You can see the memory trending up, all that kind of stuff, right? Where is the memory here?
+>> Brian Holt: There you go, you can see that this is also pegged, the 7th core as well, right?
+
+[00:01:58]
+
+>> Brian Holt: So, how do we kind of prevent this from happening? How do we prevent Eve from just running commands and just destroying stuff? Well, let's go ahead and stop this so that we can start pegging their CPU, so where's yes? It's this one.
+>> Brian Holt: 8359, 8359, okay, so here I'm gonna say kill -9, not that, 8359.
+
+[00:02:33]
+
+>> Brian Holt: Okay, then you can see our number 7 return to normal there.
+>> Brian Holt: So let's go ahead and stick some limits on this so that we can't do this anymore. So at the moment, let's go into sandbox/ and we're gonna cat /sysfs/cgroup/sandbox/memory.max. And right now you can see, it's like, I don't have a max, they can do whatever they want, they can take as much as I have, right?
+
+[00:03:02]
+So we're gonna echo, we're just gonna give it 80 megs right now, so I'm just gonna copy that cuz I don't remember. I think that's what it is in bytes, I'm gonna cap echo that into sandbox memory max and if I look now, you can see It now has a very strong upper limit.
+
+[00:03:23]
+Run that again, and you can see it is gonna peg the CPU again, because we have not limited the CPU, but it's gonna be much less affected on the memory side of things, right? Because we've now capped that entire sub-process is limited to 80 megabytes of RAM, which is pretty cool.
+
+[00:03:44]
+Cool, yeah, you can see there that's starting to trend up as well, so what is that? Yes, 8366 kill -9 8366, okay, so that's the first one, that is limiting RAM, let's limit how much CPU it can use, right? Because it's still able to pick a core, so if I come in here and I say yes into dev/null, this is just going to spam yes at dev/null.
+
+[00:04:20]
+Which is dev/null as you may know, is just a place where you can echo out anything and it just kind of goes into the void. So you can see here I've now managed to peg this one, so let's go ahead and kill that and then we'll try it again, but in an environment that I can't do that.
+
+[00:04:42]
+8371, kill-9 8371, and we're gonna say echo 5000 and that is 100,000.
+>> Brian Holt: Again, I have my notes here, so you can just get it from there, and this is gonna go into cpu.max.
+>> Brian Holt: I think this is 5,000 of 100,000, so that ends up being 5%, right?
+
+[00:05:18]
+So we're giving it 5% of a CPU. So you can see here, right there, it's fine, and we're gonna say from here now we're gonna run that again, yes dev/null, and you can see here that it's gonna be able to pull about 5%.
+>> Brian Holt: Pretty cool, right? So now Eve is now restricted to only 5% of the CPU she's not able to just run stupid commands and bring people down.
+
+[00:05:52]
+I think I should just be able to stop that here, no? Okay, what? 8372 kill-9 8372.
+>> Brian Holt: Cool, and then that killed it.
+>> Brian Holt: One more thing, we are going to run a fork bomb, which is never a good idea, and continue at your own risk here. If you're not familiar with a fork bomb, it's kind of a fun Linux trick, let's see if I can find it here.
+
+[00:06:29]
+And it looks like this, you may have seen this before, that's what's called a fork bomb. If you drop this, if you just copied and pasted this directly into your terminal right now, don't by the way, please don't. Or I'm not responsible for what happens, it's gonna crash your computer likely.
+
+[00:06:47]
+It's just a process that keeps forking itself and forking itself and forking itself. And you end up with this like fractal of processes that's eventually overwhelms your system, right? You can rewrite it as this, because this colon here is just the name of the function, it doesn't actually have anything special, it's just a name, right?
+
+[00:07:07]
+So you're saying fork, fork to the background, and then you run fork, a lot of forking.
+>> Brian Holt: Right? So how can we prevent Alice from just dropping a fork bomb? Well, we can limit how many processes she can spawn, so let's go ahead and run that, or pitstop.current, right?
+
+[00:07:34]
+So back here, we're gonna say cat pids.current, and you can see one, I think that's just lets it run as many as it's wants, if I'm not mistaken.
+>> Brian Holt: No, that's how many it has at the moment, and then if I put max, it should just say max.
+
+[00:07:56]
+Yeah, it basically says I'm not limiting how many pids they can have, pids being like how many unique processes that cannot be running at a time, it's what that means. So let's be overly restrictive, you would never do this, but let's just give it three that I currently have three processes at a time.
+
+[00:08:15]
+And I'm gonna run sys, or we can just do that from here into pids max.
+>> Brian Holt: And so now, it cannot run any more than three processes at a time, so let's just do like a really dumb example of that. I'm gonna grab this one right here, it's gonna try and run five processes.
+
+[00:08:45]
+
+>> Brian Holt: And you can see there, it's gonna say a resource temporarily unavailable, that's because it's like, hey, I have three processes, I can't do that. And it's gonna keep trying until eventually these 15 seconds are done, and then it'll do it again, eventually it completes.
+>> Brian Holt: So you can see there that the sleep fifteens are now done, so it can only run three processes at a time
+>> Brian Holt: So I'm gonna do this because I'm an idiot, so I'm actually gonna drop the fork bomb in there, you can try if you want to, but don't say I didn't warn you.
+
+[00:09:26]
+So, I'm gonna grab this inside of my change rooted environment and I'm gonna paste that, and it's gonna just really try and hammer. It, but eventually it's going to run out of pathways, and it'll stop, pretty cool, right? This is like a real thing that someone could do to your server, but, but using cgroups and that kind of stuff, you're able to kind of prevent that, you would never be able to prevent it like this, right?
+
+[00:09:55]
+Where it actually would just crash out, but you would basically say, look, you're paying for the server, you can do whatever you want, right? You wanna drop a fork bomb on your paid for server, by all means, but you're not going to bring down other people with it.
+
+[00:10:07]
+That's kind of it for our like crafting containers by hand, so this is it, right? Change root, namespaces, cgroups, that's a container, there's nothing else everything else that Docker does for you is like stuff around containers, like networking and volumes and bind mounts and all that kind of stuff.
+
+[00:10:27]
+Those relate to containers, but a container in and of itself is just change root, namespaces, cgroups. You now totally understand what goes into a container, which I think is pretty cool, right? It's really is just three Linux features that they duct tape together.
+

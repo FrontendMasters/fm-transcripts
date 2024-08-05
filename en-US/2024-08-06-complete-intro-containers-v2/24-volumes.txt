@@ -1,0 +1,72 @@
+[00:00:00]
+>> Brian Holt: Now let's talk about the LM the database use case that I was talking about where let's say I have a SQL database, right? And I want to save the data between runs. You could use a bind mount and you could like save that locally to your desktop.
+
+[00:00:15]
+That would be fine. It's not the way probably I would choose to do it, but it would work. But let's say you want to save it and you want to have the ability to do backups on it and then you want to be able to ship it off to production working as is.
+
+[00:00:28]
+That is what a volume is for. It's basically for state that's meant to survive between runs, and that can be shared across all of your Docker containers that are running.
+>> Brian Holt: So, let's just go ahead and create one here. So I'm just gonna do this directly from my command line.
+
+[00:00:49]
+I'm gonna pull up my notes here. Let's shut that down. I'm gonna make mkdir here, we're gonna call this docker-volume. We're gonna write a little note application to kinda demonstrate what you can do with this, okay? I'm gonna make two files here, index.js and Dockerfile. Surprise surprise, okay?
+
+[00:01:15]
+I'm gonna open this in code,
+>> Brian Holt: And testing to make this a bit bigger. There we go. I'm just gonna go copy and paste all of this. I don't really care if you know the node code or not. The long story short on what this node code does.
+
+[00:01:37]
+It's going to take in a path called data txt and then from there it's going to read the file, and then it's going to write back to the file of whatever the number is plus one, right? So if the number inside of data.txt is three, it'll write back to data.txt four, so on and so forth forever.
+
+[00:02:00]
+So If it doesn't find the file, then it's going to create it with zero. That's it.
+>> Speaker 2: Your number casting with the plus data.
+>> Brian Holt: Yeah, right there. Yeah, cuz I'm lazy and I didn't wanna do anything more special, that's what that unary plus operator is. That's what you would call that.
+
+[00:02:16]
+So, I mean, we can run this locally, right? If I say node index.js. And then now I say, you can see that there's a data.txt file there. And I say, cat data.txt, it's one. Do it again, again, again, again. And if I do that, you can see it is 4.
+
+[00:02:37]
+And if you wonder what that percent sign is, it means that I'm not adding a Linux file ending to my file and it's upset about that. But as you can see, I'm not particularly upset about it myself. If I run this as if I've packaged this up as a container and I run it once, what's gonna happen?
+
+[00:02:56]
+It's going to detect that there was no file there, it's gonna write it. And then when I stopped the container is gone, right? Because that would be a femoral state that exists inside of the container and then once it was done, it'd be gone forever. Let's say it's mission critical that I keep this data.txt file alive and then I wanna have it survive between runs.
+
+[00:03:16]
+This is what a volume can do for you. So let's just go ahead and delete data file, cuz we don't wanna keep that. Move to trash, okay? And for our Dockerfile, we're gonna say from, and let's do node:20-alpine, or whatever you wanna do. And then we're gonna say copy, chown and we're gonna do node:node.into the source directory.
+
+[00:03:54]
+
+>> Brian Holt: We're gonna say work, WORKDIR / src, and we're gonna say CMD.
+>> Brian Holt: I mean, at this point I'm just letting Copilot write my Docker files for me. Okay, so you can see here from node, we're gonna copy into our node directory. We have a work directory source node index.js.
+
+[00:04:16]
+I'm not trying to make this the best Dockerfile. I'm actually just trying to make this the minimal Dockerfile. All right, so let's go and observe the problem that I was just describing to you. We're gonna build this. I'm in docker-volume here. I'm gonna say docker build- t. We're gonna call it incrementor because I am not creative.
+
+[00:04:36]
+And yeah. Yeah, it's getting mad that we have ckview, cuz I think it's from the alpine file. It doesn't matter. So I'm gonna say docker run --rm incrementor.
+>> Brian Holt: So and if we just keep running this over and over and over and over again, right? It runs to the file, it creates the file and then it exits and then the container goes away.
+
+[00:05:13]
+Great. Probably what you expect so far. So how do we do this? How do we? Well, you probably say Brian you've been talking about volumes for 10 minutes now it's volumes. Don't ask me stupid rhetorical questions. [LAUGH] I get cranky when I've been teaching too long towards myself.
+
+[00:05:34]
+Anyway, docker run --rm ---env. We have to give it that data path if you remember here. It's looking for this data path. That's gonna be passed into the code DATA-PATH =, I wanna put /data/num.txt. You can call whatever you want, obviously. --mount, right? Then we're gonna say, type equals volume.
+
+[00:06:05]
+And then we're gonna say source equals, and then just have to give it a name doesn't really matter where it is. We're gonna call it as you might imagine incrementor-data. And we're gonna say where do we want you to mount this volume inside of our container? So we're gonna say target equals this, right?
+
+[00:06:24]
+As long as the data path here matches whatever the target is, you are good to go. So we're gonna say /data, and then we're gonna run incrementor.
+>> Brian Holt: So the first time, it's doing this cuz I've been running this, right? Cuz I've been teaching this class but let's just remove it.
+
+[00:06:46]
+Wow there's a lot in here. Increment data, docker volume, rm incrementor-data. Okay, now if I do that, file found, writing zero to a new file. And now the big reveal moment that I definitely didn't spoil 30 seconds ago. It's there now, and it'll keep working and running.
+>> Brian Holt: Because that volume is going to survive between runs, right?
+
+[00:07:20]
+So like I said, you could write, like, a SQlite file here, right if you're just doing something that and you want your database to survive between runs, which is pretty cool. The nice thing about Docker volume is there's a bunch of stuff you can do for it. It's really, really easy to just dump out your volumes and back them up.
+
+[00:07:41]
+You can seed them with data and then we're only doing this with one app right now, but you can imagine if we had let's say four different apps all reading from the same SQLite database, they could all read and write to the same volume, right? So that sharing of data amongst your Docker cluster becomes quite simple at that point.
+
