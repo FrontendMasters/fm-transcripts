@@ -1,0 +1,137 @@
+[00:00:00]
+>> Steve Kinney: Let's actually do a few things. We'll make a session, and we can also sign the cookie. And this idea of signing, or hashing, or encrypting is going to be a thing that we do repeatedly as well. Which one do we wanna do first? When I make a session, do we wanna sign it?
+
+[00:00:16]
+Let's sign it first cuz I think it'll be easier. To see what signing does in this case. So, to sign something is effectively a very, lightweight format to encrypt it, right? And I don't pretend to be an expert in cryptography, but I'll give you the, high-level TLDR. On how signing stuff works is you have your value, that is the thing going back and forth.
+
+[00:00:47]
+You have secret thing that only you know, right? Should you put them in the blender together, you should end up with a certain result that if they do not have that secret, they cannot put the two things in the blender and create the same thing, right? That was very technical I know, I know, right?
+
+[00:01:05]
+And so, thing that you should definitely not do is make a variable called cookleSecret and put it in your code, right? Because, let's review. If you push that code up, you know who else has your little secret? Everyone with access to your repo. If for some reason you have an exploit and someone can pull code out, right, and we'll see some ways that you can do that.
+
+[00:01:32]
+Everyone has access to your secret. If you've hard coded it in everywhere and you have a disgruntled former employee, everyone has access to your secret. So we'll put it here for now, but we'll look the next level, the easiest good way to do this afterwards is stored at least in an environment variable.
+
+[00:01:53]
+So you have different ones for staging versus production, so on and so forth, right? And then we can look at Amazon key storage and stuff along those lines, for when you have distributed systems or just many web servers, and store environment variables and rotating those is no longer an option, right?
+
+[00:02:12]
+But for now, this will work. And so we can say that this has got a cookieSecret, which we're gonna say. Is, I think it's actually gonna be secret, let's see. We can just actually pass in the first argument. Yeah, what was doing? Sometimes you just gotta believe in yourself.
+
+[00:02:34]
+Okay, so now we've given it a secret, which means out of the box, and this app will probably break in a second for reasons we'll kinda see. We've got this idea of a cookieSecret, which is just that first argument that goes in there. And now it is something that this plugin or you can do yourself is affected and we'll see how to like hash and sign stuff ourselves later.
+
+[00:02:55]
+But it'll sign those cookies. And so now you have one where it's like, we the browser will be able to read the cookie, but it will also know if it was ever changed. We're basically gonna send two things along the way. Here's the value of the cookie, and here's proof that we know the secret.
+
+[00:03:11]
+You can change the cookie, and theoretically, if you can't change, if you can't prove that this would be the output of mixing that cookie in with the secret, it ain't gonna work. We don't wanna store our cookie secret in the code unless we are not interested in setting up environment variables in front of people just to make a point.
+
+[00:03:31]
+So for our case we will do that, but I will then once again say that if you do this on your own, I cannot be held responsible. We're gonna put that at the bottom of the video, it's gonna be great. So this is basically just some secret key that the cookie-parser can use to sign the cookies.
+
+[00:03:46]
+Now it does need to hold on to the original one and also you might not want all of the cookies to be signed. The idea that some of the cookies are accessible through JavaScript might be something that you want. If, for instance, you were storing whether or not they wanna be in dark mode as a cookie, cuz you don't even wanna deal with local storage, right?
+
+[00:04:06]
+You might choose to make that not an HTTP-only cookie, right? Or whatever you might have different settings for different cookies. And in that case, that way you can access it from JavaScript. You might not want to sign all of your cookies for whatever reason, particularly if you are also setting them in JavaScript.
+
+[00:04:25]
+But for the point of a user session, as we saw before, we would like to not leak these. So we pass in our cookieSecret. Now, we do need to do two things. When you have a cookieSecret, you've got req.cookies, which is your cookies, right? And then you have this idea of req.signed cookies, right?
+
+[00:04:44]
+This is the cookie plus the signature. And we can go take a look at that in a second. So we gotta do a few things. Before, when we were setting cookie it was setting attributes on the cookies, we're setting cookies and setting attributes on the cookies that we're setting, say that three times fast.
+
+[00:05:00]
+we said that we wanted httpOnly. We said that if we were in production, send it over https and we will also say that this one ought to be a signed cookie and so now it'll be one of the signed cookies and at this point now the two places that we reference either.
+
+[00:05:19]
+On the login redirect, which if we miss this one, life will go on, but let's not take any chances. And then we will also grab it on the profile page, right? We also want the signedCookies. Awesome, and I'm pretty sure I will have two log out. Let's delete that cookie.
+
+[00:05:39]
+Just for safe measure. Bobbytables, popio whip, right? And we look at the value like it's still in plain text. But if I were to now go ahead and try to change this part here to admin. Right, you can see that like that, yeah, we'll change it to admin, right?
+
+[00:06:03]
+I don't have the necessary secret on the client to make the other half of this cookie value, which means it is going to try to then look at that and say. Hey, if I put the secret and admin in together, am I gonna get this hash and we're not, right?
+
+[00:06:20]
+And so at the very least, username is still in plain text, but the ability to just go into your browser and manipulate it is no longer an option, right? I believe we'll just, yeah, at that point, we kicked them out, right, cuz they are not in fact an admin.
+
+[00:06:37]
+Logging in will then reset the bobbytables.
+>> Steve Kinney: Right, and now we reset the cookie again on login, right? So now that initial vector, I'm gonna change my username to whatever I want. They can still see the username, they just can't change it cuz we've signed the cookie, right?
+
+[00:06:56]
+But we could do one better, right, and actually just completely, lobfuscate it with a session. And again, that gives us the ability to say, hey, that login from the Netherlands. Let's get rid of that one, but let's keep the one in Minneapolis. And so this is kinda something that we mostly just do on our own.
+
+[00:07:14]
+We do need to give it some kind of random identifier, right? And for the purposes of a session, we do need to store that random identifier somewhere. Now in Node.js you have a bunch of options, obviously you can store it in the database with the users node being a kind of stateful web service.
+
+[00:07:33]
+You could theoretically store it in memory in a JavaScript object, right? Also, and that'll work. Now that has problems, which is, if you are building a simple little demo app and it's one express server, yeah, do it, go for it, neat. If your web app is either serverless or multi-server, which we'll kinda deal with later in the course, you have a new set of problems, congratulations.
+
+[00:07:53]
+You can also store in a database. You will probably want to clear out things in the database. So theoretically, you could have a cron script that clears out old sessions if they haven't logged out, so on and so forth. But we'll do just the naive version to get the security point across, and then we'll look at some other options later as well.
+
+[00:08:12]
+So in my database, I also have this idea of sessions and all my sessions are right now is. It has a sessionId and that is tied to a username. So now, instead of passing its username back and forth, in plain sight, when they log in, we'll create a unique session for them that is abstracted away from the user.
+
+[00:08:32]
+When they log out, we will then destroy that session, or at least get rid of the cookie. And this is a pretty common pattern because it then separates that identity from the session and from the cookie itself, which again, sometimes is simply about a separation of concerns, just like if you're writing code.
+
+[00:08:49]
+All right, cool, so we do need some way to generate a sessionId. There's lots of different options. Do you need your own function for this? You probably don't, but I'm gonna do it just cuz I think it makes it a little bit more clear, so that we kinda see what we're doing, cuz sometimes just making well known, well named functions is a great form of documentation.
+
+[00:09:08]
+So we'll say, generate sessionId, and you've got a bunch of ways that you can do this, right? You just need really a known, unique value so you don't have any. You don't really have any collisions. Because if you give two people the same sessionId, you have now created a security problem of your own and you have no one to blame and good luck in that post-mortem.
+
+[00:09:32]
+Let's pull in, so you got one option is that Node has a crypto plugin. For various cryptography related purposes. And so we could do in this case is we can return 16 bytes random data in hexadecimal. That's going to look like most like sessionIds you've ever seen before in your life.
+
+[00:09:55]
+So now when a user walks in, walks, yeah, let's go, to go with that logs in, walks in, whatever. Right, we can also go ahead and, instead of, we can go ahead and create them a session, right? So on that post, we'll go get the user, and if that user exists, right?
+
+[00:10:15]
+Cuz if it doesn't, we don't need to make them a session. Before I forget, and I'll say this now, the other nice part about using sessions is, again, when we talked about the very beginning, what if they put a bunch of stuff in their cart and then log in?
+
+[00:10:29]
+You can theoretically create the session before you have a user, right? And then when they log in, it's like, here's all the stuff that you put in your cart before you logged in. Right, there are very good practical UX reasons to do this as well. So then we pull in that sessionId, right?
+
+[00:10:45]
+And we'll go ahead and into our database, we'll put in the id for the session as well as the username, and then we'll set the sessionId, right? It could have been username. You could make an argument that calling a sessionId might be too obvious, and you might choose to call it something a little bit more clever.
+
+[00:11:05]
+I'm not gonna do that, because I'm not trying to be clever at this moment. I am just trying to teach stuff. So we'll go ahead, and we'll put that sessionId in there, which basically, at this point, we don't, let's get rid of that code.1 Cool and so now instead of if I loved myself more and maybe I'll do this later.
+
+[00:11:27]
+I put this in a try catch block in case that database call fails which was their issue earlier. But this is a silly little app and I'm not doing that right now. So we go ahead we put that session in and now instead of at the profile page.
+
+[00:11:39]
+We don't want the username per se, we want that sessionId.
+>> Steve Kinney: SessionId, cool, cool, cool. And yeah, there's none of that. If they don't have a session, kick them out to the login page. Otherwise, we'll go ahead and we'll go get the.
+>> Steve Kinney: What did I make? What did I call it?
+
+[00:12:06]
+I called it, the username is the other, yeah it's username, cool. Session.username. Okay, so now we go ahead, we figure out what user they are, again, you might choose to store this in memory for performance reasons, great. You might choose to put it in Redis, I don't care.
+
+[00:12:23]
+Redis is cool, cuz you can set an XBerry on the keys and values there as well. But basically, what we're seeking to do here is go get the session ID from the cookie, right? Go find out what user that is behind the scenes, right? And now we're kinda never talking about the user publicly again, and then go ahead and send them the file.
+
+[00:12:44]
+Session, it was username.
+>> Steve Kinney: And we'll go to profile, and we should be good.
+>> Steve Kinney: Yep, so now we've got an obfuscated sessionId that's attach from the user, we could kill off different sessions as we need to. It also means that basically we can now remote kill sessions, right?
+
+[00:13:05]
+Cuz it was just a username, you'd have to kill the user or something along those lines. Now, if we knew we had an issue, we could theoretically terminate all sessions remotely, right, or something along those lines. So sometimes it's about making sure no one breaks in. The other one is to have the mechanisms in place should the worst happen to actually go ahead and protect yourself from that as well.
+
+[00:13:27]
+We can't hijack that cookie from the browser, we can't tamper with it. They could not guess another sessionId most likely that was in the system, right? But even if they did, the signature's also one more layer of security, right? So, should you accidentally have something that makes a mistake somewhere in your application?
+
+[00:13:46]
+You've also protected yourself a few other ways as well, right? And the idea sometimes is all, no one purposely leaves security holes in their application, an accident happens. Somebody was, maybe at three in the morning responding to an incident, right. And they made a silly mistake. And so the idea is that, should that happen, you have several other ones.
+
+[00:14:05]
+That's gonna be a theme of what we talk about today.
+
