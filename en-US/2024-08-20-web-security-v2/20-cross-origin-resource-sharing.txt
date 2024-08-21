@@ -1,0 +1,104 @@
+[00:00:00]
+>> Steve Kinney: That does bring us down to kind of another class of solutions and problems that we can play around with. We talked a lot about with that same site stuff and we've got that same origin policy, right? And there are a bunch of hacks for getting around that, but then there is a real way of dealing with it too, right?
+
+[00:00:20]
+This is when you do wanna say that, hey, I do want to allow things to a particular place or something along those lines, which is this Cross-Origin Resource Sharing. Which we think we hate because it's when the backend team doesn't turn on the headers, none of our API's work, but it's actually a way to actually have an allow list.
+
+[00:00:42]
+If you have multiple domains or something like that, it gives you an ability to kinda have that in place. And again, it is supposed to be an actual way to just safely get around the Same Origin Policy, not to actually make your life harder. You hate the lack of CORS, you don't hate CORS like I thought I did.
+
+[00:00:58]
+It's not CSRF way a prevention mechanism, right? For forms because POST requests aren't covered by CORS, right? And so even if you had CORS requests everywhere, or headers everywhere, those will work on all your AJAX CORS and your Fetch CORS absolutely. They will not work on POST requests from forms, and this is where we get to the other side of the don't break the web kind of stuff, right?
+
+[00:01:22]
+Because you can't really change the rules on what existed before, right? And so the tokens are still necessary if you use submitting forms and this creates an interesting conundrum. I think if you look at our industry for a while there, we got really into JavaScript all the things, and AJAX requests all the things.
+
+[00:01:43]
+And if you look at stuff like Remix or SvelteKit or a lot of modern frameworks, they're like, what if you just submit a form, right? Now, these are modern frameworks with a lot of accouterments, right? But you do fall back to a POST request with AJAX is covered by the same origin bind CORS and you do need to have all that place, you have those protections, but a form isn't.
+
+[00:02:04]
+So you still need this idea of a token if you support what we're gonna define as a simple request in a second. So simple requests aren't subject to CORS, and that's what a form falls under. A simple request is pretty simple. God, a simple request is pretty straightforward, it's mostly a very small set of things.
+
+[00:02:26]
+It's the base principles of what probably existed on the Internet before any kind of web security, right? So let's talk about what opts you out of not being a simple request, which is anything that's application JSON. It's not a simple request, so it's fully protected by Same-Origin Poly and CORS, and then anything other than GET, POST, or HEAD.
+
+[00:02:49]
+So if it's a PATCH or a PUT or it uses AJAX or a Fetch or whatever, right? I guess application JSON, right? Then you are protected by all the CORS policies, and you will not theoretically deal with the CSRF attack because your server will block those attacks. That token is really useful for your forms, right?
+
+[00:03:16]
+Like I said, there is kind of a little bit of a push towards forms, but these are the places where we make security boo boos, right? Because we take the thing we know from years and years of AJAX requests and realize that might not be true if I just use a form.
+
+[00:03:29]
+And those little gaps in the knowledge that I think is what makes stuff the trickiest sometimes. So there are some headers, and these are enforced by the server if the browser knows it's gonna do something that's not a simple request, it sends out an option. They can be like hey, server, what am I allowed to do, right?
+
+[00:03:50]
+And the server responds back which is, what origin are you, right? And if you're someone I allow, great, let me tell you about what you're allowed to do, right? And we'll see some of those. And so these are headers in the response, right? So that Access-Control-Allow-Origin will say, hey, here's an allowed domain.
+
+[00:04:13]
+It's tricky because I'm gonna say this now and I'll say it again in a second, it can respond with only one domain, right? And arguably, you get the origin in the request, right? And so if this origin is allowed, you can say that you are allowed. Telling it that some other origin is probably not that's useful, you do a wildcard star if you hate yourself, right?
+
+[00:04:35]
+And let requests from anywhere come in. But you can't give an array or comma-separate or anything, you can only respond with one. So if you're saying like this isn't allowed one, on server-side you can have an array check to see if it's in the array. And then put that one teller, hey browser, yeah, see the origin you're coming from is accepted.
+
+[00:04:54]
+Then you can say what method it's like yeah, sure, you can GET and POST what you can't PUT or DELETE, right? So you're saying from friendlywebsite.com, right? I will allow a certain number of methods, right? Maybe all of them, maybe some of them, and not from anyone but friendlycompany.com.
+
+[00:05:19]
+And you can say what headers are allowed to be passed along. This means the browser won't send headers that it shouldn't send, right? So it's saying, what are we cool with sending each other both ways? I don't use this one that much. Then you're like, should I be sending you the cookie, right?
+
+[00:05:39]
+There's a caveat to this one, it can only be true, or not present. If you have that wildcard star, you can set this all you want. The browser be like, I'm not sending cookies from everywhere to you, no, [LAUGH], right? Back and forth or in both directions or your cookies, really.
+
+[00:06:05]
+If you say wildcard, it will ignore this and so this is important, right? Rails did this for a while, I don't know if he it still does it. Form, you can only do GET and POST, you can't do PUT or DELETE. And so the same way we had that hidden field, that CSRF token, sometimes what people will do is they will say, have a hidden input field called _method.
+
+[00:06:36]
+And then in middleware, they'll change the method, which means now you can send PUTs and DELETEs over POST and they'll count as a simple request. Cuz over the wire they go to POST, right? I can show you in code I think I've got it in,
+>> Steve Kinney: Middleware is in the shared one, let's see.
+
+[00:07:02]
+
+>> Steve Kinney: No, I think it's actually in that previous example. So this method override, you will see I won't be using X it's a terrible idea, but you will see it in older frameworks, hopefully not newer ones. But I can't confirm that, not the ones that I use. But what it does is basically, if you have a thing called _method or query code _method, even if it's a GET or POST, it'll swap it out to be in a PUT or DELETE.
+
+[00:07:30]
+Which if you're not thinking this through, all your PUTs and DELETES and PATCHES needed CORS permissions. Form POSTs don't. So you could be like I don't need a CSRF token, or maybe your existing code. And then one person decided they wanted to use forms, right? Great use forms, use HTTP primitives.
+
+[00:07:52]
+But it's like these are the accidents cuz now as it counts as a simple request, it's not getting checked by the CORS policy. You didn't know that no one saw it in the code review, right? And now you have a way to send a DELETE request with no validation from the server, right?
+
+[00:08:09]
+And this is one of those things where we get clever sometimes, or we try to switch out things and we're not thinking holistically, and we don't have that knowledge base of how things work. We accidentally create these holes, no one did it on purpose, right? It's tricky, the blameless postmortem, it's hard to be blameless all the time.
+
+[00:08:27]
+But generally speaking, it was that kind of, we did this thing back then, or I had a framework that did a thing, and then I know that CORS doesn't allow this. So I don't worry about the CSRF token, you have a problem now. So yeah, don't try to send PUTs through POST requests and try to do anything clever, you will hurt yourself or it won't work.
+
+[00:08:50]
+The other one I said before, it can only be one array, you can't use a wildcard in the domain. You can't be like star.frontendmasters.com, right? You can't do comma-separated values, if you do, you enter the wonderful world of undefined, unspecified behavior, right? Which means maybe you have a really smart browser that will figure out what you meant and do something, but a lot of times you'll end up with a wildcard, right?
+
+[00:09:19]
+And now you will accidentally be open to all sorts of different attacks. So it's being very careful about the CORS stuff and not trying to do anything fancy or wild is probably the way forward in this one. And I think that if you really mess this one up, you will end up in a situation where both it is a wildcard, and you will allow credentials.
+
+[00:09:44]
+That thing that I told you where it won't send cookies from that origin to the bad one. If you say star, there's a chance that you could get yourself in trouble here. if you really on your server-side need to get very nuanced about this. There are some additional request security headers that we talked about earlier that are part of the HTTP spec.
+
+[00:10:09]
+There's a whole bunch in the requests that Chrome will jam in there too. But there are ones that you can check on the server-side. If you are really like, yo, this is a very sensitive operation, and I wanna be very strict on what's allowed to happen. You can check these headers and choose to return a 400 or what have you?
+
+[00:10:27]
+403, if they don't work. And so one of them is this security-fetch-site, which just kinda tells you really granularly, hey, the user did this, they literally typed in www.yourcompany.com. You'll get a none there, which means the user did it, which means it's probably legit. Whether it's cross-site, same-site, same-origin, so on and so forth.
+
+[00:10:49]
+So you can kinda see exactly the nature of this particular request and get a little more granular. It's like all these policies are just enforced. They're an agreement between the server and the browser and what you can do is basically use that to kind of have extra layer.
+
+[00:11:05]
+Will you need this all the time? Probably not, but you will know if you have a use case for it. And honestly, if you only remember that stuff kinda like this exists and you put that in your memory banks for two years from now when you need this stuff, I did my job.
+
+[00:11:18]
+Where is it going? So I got this request, where is the response headed to? Is it going into an iframe? Is it going into a full document cuz someone changed in the URL? Is it going to a web worker? You can see literally when the response is sent, what kind of code is receiving it?
+
+[00:11:44]
+This fetch-user is, again, was triggered by a user not by code, right? Not through setTimeout or something like that, you can see that as well. That will only be present if it's true, so you can't check to see if it was false. And then, was it on websockets?
+
+[00:12:02]
+It's very similar to the other one as well and these are additional ones that you can use.
+

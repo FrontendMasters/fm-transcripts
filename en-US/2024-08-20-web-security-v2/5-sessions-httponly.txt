@@ -1,0 +1,68 @@
+[00:00:00]
+>> Steve Kinney: We can add this idea of a session, right? And sessions are important cuz also they put a layer of abstraction between you and the actual identity, right? If you are, even if you encrypt the username and password and you're passing it back and forth encrypted, should somebody get it, right?
+
+[00:00:19]
+Well, now it's like every single user has to change their password. And let's also think about the period of time where you didn't know you were exploited. The idea of a session is, again, it's not necessarily a security thing per se. We are using it for the end goal of having a more secure web app.
+
+[00:00:38]
+It's basically just an abstraction, which is, when they log in, we're going to create a unique identifier for this session that is tied to you. But if you've ever seen in Gmail or a bunch of other apps, I think Facebook as well, you can go into the Gmail and see that you are logged in like four other places and be like, I should now be logged in from the Netherlands right now.
+
+[00:01:00]
+I have not been there in a decade, right? You can go ahead and cancel out those sessions without having to reset your password, right? That's good for if you think you've been exploited. Also good if you went to a library, logged into a computer to go find a map or something like that and forgot to log out.
+
+[00:01:15]
+This idea that we can separate user from sessions, it's a reasonably powerful idea. So let's go ahead and do that as well. But before that, the other problem that we have before we even fix the session thing because we'll just move the problem around, is should somebody either be able to launch a cross-site scripting attacked?
+
+[00:01:34]
+Or do anything like, if you have access to JavaScript, right, whether or not because you should or because you did, right? You can just go ask for the cookie. And you can go craft yourself a nice little fetch request to your own server somewhere, and go ahead and just collect that thing, right?
+
+[00:01:53]
+And now you can go be Bobby Tables whenever you want, right. And for those of us who think local storage is a safe place to store things, this applies not only to document cookie, but obviously local storage do get item and you're like, okay, cool. I wanna get their off token and store it in local storage, that is good until somebody else just has access to their local storage as well, right?
+
+[00:02:19]
+And so in the wilder days of the Internet, we didn't have HTTPS, and we didn't have a bunch of these other settings and tools that we'll see, but like we do now. So one of the first things before we do the session actually that we wanna do is we want to set some additional attributes on that cookie, right?
+
+[00:02:39]
+And the first one and we'll review this after we kind of do it is we'll say that we wanna have, actually, we do it not with the cookie parser. We will do it when we set the cookie post a login. We set the cookie, we can also set some various attributes on it.
+
+[00:03:04]
+And so one that we're gonna do first, we'll take a look at a bunch of these, is httpOnly. Does anyone wanna venture a wild guess what httpOnly does?
+>> Steve Kinney: It keeps it away from JavaScript, right? Now, this is something, it will be sent in the headers, we'll get in the response, but should I go ahead and I got to set a new cookie in this case, right?
+
+[00:03:29]
+Because the old one was set without the HTTP header. So we'll say, Bobby Tables,
+>> Steve Kinney: Pop, pip, right? Now we go try to hijack the cookie. It's actually undefined. Now, no point, even if they launched an attack and they hit whatever, they do document our cookie, they are not gonna get a value anymore.
+
+[00:03:56]
+Now, at this point, your cookie is no longer accessible to JavaScript at all. It'll be included in all those requests, but like they can't get their hands on it per se. Now it's still going over the wire in plain text cuz we're not using HTTPS in this case, and so if somebody was sitting on like a coffee shop wi-fi, they could theoretically sniff the network traffic and go get it out of there, right?
+
+[00:04:19]
+And like, we'll just kind of look at how to set that on a cookie now, and then we won't, cuz we're in local host. But we can also set secure. It's true. And you can see the setting that I use a lot is like, if we're in production, secure, because then we're over HTTPS but if I'm a local host, I don't wanna set up a cert, honestly.
+
+[00:04:38]
+So we might use that at various points. Let's set it in there, what could go wrong? And if you look, also, despite the fact that it's not accessible during JavaScript, like, the browser knows what's going on, because the browser's keeping track that it shouldn't be accessible in JavaScript.
+
+[00:04:51]
+You'll see that for the setting of HTTP only, we've got a little check here as well, which is to say you can actually see the status of your cookies. If you're wondering, I wonder if the cookies in my app are accessible from JavaScript. You can go log into your app, or any app you want, really.
+
+[00:05:08]
+But we're good people. You can go log into your app, and you can go check some of these settings to make sure it's the cookie that you think it is. And because this cookie is already set, in this case, I did put that secure, and it wouldn't be true at this point anyway, or I can switch this to false, but that cookies already set.
+
+[00:05:24]
+This is a cookie that is only set upon logging in, so changing it like midway through is not gonna do anything for you, because the browser is gonna hold on to that for the session. Or longer you can kind of see, if I pull this up, it doesn't get any bigger on the zoom level that stands for extra expiration.
+
+[00:05:41]
+In this case, it is session. And it'll show me the value, but it won't show me the heading. That's cute. It'll be for the session but theoretically, this is again one of the problems, which is you don't control the entire environment in which your application is used. If you set a bad cookie, right?
+
+[00:06:01]
+Or bad DNS or something along those lines, you have to deal with it until you can get access to changing it, either by setting a new one or something along those lines. It's like a very smaller, more microcosm version of all the things that can go terribly wrong with a service worker, but you don't control your environment.
+
+[00:06:22]
+You'd have to reset it, which you can choose to do, right? You could say, hypothetically, I want to actually set a new session ID on every single request. There are advantages to that, right? Because it means that, if a session ID is only good for like, the next request, that's pretty good.
+
+[00:06:40]
+But then, like, then you've got some sstate management issues on the database side, right? Like, what happens if they've got multiple browsers, right, or they're sharing a Netflix account? Maybe it's what you want. With that comes extra complexity. When we start to store these sessions in a database, right?
+
+[00:06:57]
+That means that's literal dollars and cents cost for you, right, because if you're doing all those rights to a database and all that storage, that's gonna be a thing as well. And so again, these are where the trade-offs all come in.
+

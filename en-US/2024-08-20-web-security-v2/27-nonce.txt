@@ -1,0 +1,77 @@
+[00:00:00]
+>> Steve Kinney: Let's say that I need an inline script. I don't know why, but I have to. It's a thing. You have two options. One is use this thing called a nonce, which is a number used once, and it's not a number. So it's a very, much similar to that CSRF token that we saw earlier, which is to say, cool, you can be an inline script, but you need to have this special value in your script tag, or I'm not loading you, right?
+
+[00:00:33]
+And you would inject it effectively, the same way you would do that CSRF token that we saw earlier. It would be in the template. We'll talk about the caveats in a second. But it would theoretically be in the template ready to rock and roll. And if that inline script does not have that nonce, which is again, an unpredictable value.
+
+[00:00:53]
+And theoretically, if you're just generating the entire page. We'll talk about why you might not choose to do it on every single request. But you could. And that way you're also get to have your cake and eat it too. And so, if you set that policy, nothing is allowed, even up from your own site.
+
+[00:01:14]
+But you could say that I have this idea of a nonce, and scripts dynamically added by these scripts. So let's say you have a client-side app. There's usually an entry point in Webpack or Vite, right? You're gonna say, load this thing. And maybe Webpack or Vite is the reason why you need to do this.
+
+[00:01:36]
+You're like, yo, it's loading inline scripts. That's how my body Bundler works, sorry. You can say, cool, Amma, the initial script is gonna have this nonce to say, I know that is good, and it's fine, and then scripts loaded by that script can get it as well. And this one, the base-uri is to say those scripts can't change the location that resources are loaded from, so they can't add new things at all, right?
+
+[00:02:04]
+And blocked mixed content is saying, No, HTTP, please, because the moment you have one HTTP thing, you don't have HTTPS anymore. But I think the previous version of this workshop was a whole thing about setting up HTTPS certs, because it was seven years ago these days between let's encrypt and just literally any service that you use.
+
+[00:02:25]
+We host our apps on Ver sal you just click a checkbox and HTTPS and if you were at a big enough company, have a legacy enough code base that you can't do that, then you did it already because you have a team that did it. Keeping everything HTTPS I think is key.
+
+[00:02:45]
+And then as long as it has whatever, you do this the same way that you did the CSRF token, as long as it has whatever is in the header as the nonce should be also what is in the actual tag, and if those two things match, the browser would load this thing.
+
+[00:03:03]
+If they don't match, it's not loading it. So if someone injects something else, they don't know that random value, and you could do this on every single request-response cycle, right? That's a reason why you might not want to, and I'll talk about it in a second, but you could at that point, someone can inject something, they're not gonna know that value, and they couldn't read the page because they couldn't get that first piece of JavaScript in.
+
+[00:03:26]
+Okay, so not so good, because it's just like one small it doesn't even need to be as long as a UU ID, honestly, it just needs to be somewhat of a unique value. The problem is, if this is in your HTML, good luck to caching, right? If it's supposed to be a random value every time.
+
+[00:03:46]
+So you could choose to do it on every build, but then you have the idea that someone could scrape that knot or something along those lines. But it's better than nothing. And again, I told you not to use inline scripts. So that first, as a backup, right, you could choose to either have some policies to trade off between cache, invalidation, and security.
+
+[00:04:12]
+Your unique use case is gonna balance that differently. But that's the problem with that one. The other option you have is to hash the contents, which is saying, it's very similar. You can see on that lower one, this is called subresource integrity in a lot of cases. It's to say, load code.jQuery.com, whatever version of jQuery that is.
+
+[00:04:39]
+If you hash that entire file, it better have this SHA if someone changes one byte of that remote loaded resource, don't load it right? Which is great, because it means if somebody does get access to code.jquery.com, and puts some malicious code into jquery, well, it won't pass that SHA anymore and yes, your jquery won't load and your site will break.
+
+[00:05:03]
+But you will not have malicious code running on your site because as soon as you link out to a third party, you hope that no one changes that code for evil, right? If they get broken into and you're running that code now, you have a problem too. With this, if one single character of that code changed, you would break but you wouldn't necessarily have a problem, now these are longer which means more bites over the wire, so it's a different performance concern.
+
+[00:05:33]
+And also if one character changes then you're also broken. That was a good thing, but it also means that they changed their minifier, you're broken. Let's say you upgrade webpack and you're using this for your own things, you broke yourself, right? But you do get caching and you do get all those things.
+
+[00:05:52]
+So it's a set of trade-offs. I would say that if you can pull out, you can either host your own resources. I understand the CDN argument of everyone has the same jQuery. I don't care.
+>> Student: Well, they don't anymore because browsers change their cache.
+>> Steve Kinney: Yeah, browsers change their cache, also, HTTP/2 is a thing.
+
+[00:06:10]
+You know what I mean? I get it. I don't get it. You know what I mean? Also, at least measure before you decide that you need to use the CDN version of jQuery, right? I also have a role on my team that I'd better be able to work on this app on an airplane, [LAUGH] so having to load third party resources is not interesting to me to begin with.
+
+[00:06:28]
+I also build an open source project that has to run in a locked down firewall thing. So I can't do this to begin with, but for those who need it, I did do this at a previous company. So your choice.
+>> Student: So do you have to define it both in the CSP header?
+
+[00:06:45]
+
+>> Steve Kinney: It's matching those two.
+>> Student: So what's the strategy for competing that ahead of time? Because it seems like-
+>> Steve Kinney: I mean, you can literally, as long as that jQuery doesn't change, you can literally have that hard coded in the HTML of your app.
+>> Student: Okay, so it wouldn't be a dynamic?
+
+[00:07:04]
+
+>> Steve Kinney: Yeah, it's not dynamic at all. It's saying, I trust exclusively a series of text that when I run it through a sha256 algorithm gives me that hash. If a single character of jQuery changes, it will no longer compute to that, right, which the browser is gonna check before it executes.
+
+[00:07:22]
+So you can literally just hard code that, which means you can do caching on your own page. But again the jQuery minified for, whatever, three point is not gonna change, right? I never had a break on me when I used to use it. I don't use it anymore because I can't for different constraints.
+
+[00:07:44]
+But it could break, and not for a security reason. At least with the nonce, it was probably a security reason, right? Cool? Use it if you don't have under, but the hashes can get big. Anyone changes the file, right? It can be problematic. Cool? All right, so we're gonna hit the major ones.
+
+[00:08:12]
+We're gonna look at a few more preventable, but kind of nefarious ways of figuring out how to get stuff we don't want to have happen.
+
