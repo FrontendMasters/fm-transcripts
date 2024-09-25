@@ -1,0 +1,1069 @@
+WEBVTT
+
+1
+00:00:00.340 --> 00:00:03.040
+&gt;&gt; Brian Holt: We are done
+writing queries now.
+
+2
+00:00:03.040 --> 00:00:07.117
+I feel like I've pretty well
+equipped you to go forth and
+
+3
+00:00:07.117 --> 00:00:09.730
+be able to be a utilitent of SQLite.
+
+4
+00:00:11.550 --> 00:00:15.708
+The next couple of sections here that
+we're gonna do are kind of like,
+
+5
+00:00:15.708 --> 00:00:17.050
+stuff around SQLite.
+
+6
+00:00:17.050 --> 00:00:18.240
+How do you do backups?
+
+7
+00:00:18.240 --> 00:00:20.730
+How do you do replications.
+
+8
+00:00:20.730 --> 00:00:22.517
+And then we're gonna get in a little bit,
+
+9
+00:00:22.517 --> 00:00:24.774
+these last two are kind of
+like the future of SQLite.
+
+10
+00:00:25.774 --> 00:00:28.634
+I think lib SQL something
+to keep an eye on.
+
+11
+00:00:28.634 --> 00:00:31.318
+I think local first is
+a really interesting idea, so
+
+12
+00:00:31.318 --> 00:00:35.168
+we're gonna briefly talk about it,
+and then you can stop listening to me.
+
+13
+00:00:35.168 --> 00:00:37.124
+Forever if you really want to.
+
+14
+00:00:37.124 --> 00:00:39.856
+Hopefully, maybe another
+course sometime down the road.
+
+15
+00:00:39.856 --> 00:00:44.476
+I don't know, well, jury's out,
+including on myself.
+
+16
+00:00:44.476 --> 00:00:45.730
+Okay, backups.
+
+17
+00:00:45.730 --> 00:00:52.404
+Normally, I wouldn't necessarily get
+into talking about backups with you.
+
+18
+00:00:52.404 --> 00:00:55.165
+I don't talk about my Postgres course,
+because there's enough ways to do it and
+
+19
+00:00:55.165 --> 00:00:58.806
+enough services that just do it for you,
+that I'm not really concerned about it.
+
+20
+00:00:58.806 --> 00:01:03.439
+However, If you are, let's say you're
+writing a personal blog, right?
+
+21
+00:01:03.439 --> 00:01:04.729
+And you need a database.
+
+22
+00:01:04.729 --> 00:01:09.590
+You use SQLite, and you just want to
+deploy your database with your app at
+
+23
+00:01:09.590 --> 00:01:15.319
+the same time, and you don't wanna
+have anything too special around it.
+
+24
+00:01:15.319 --> 00:01:19.518
+The problem with that architecture
+right now, if you do it that way.
+
+25
+00:01:19.518 --> 00:01:22.963
+If your server crashes, or your server
+gets blown up or something like that,
+
+26
+00:01:22.963 --> 00:01:25.638
+you would lose all of your data, right?
+
+27
+00:01:25.638 --> 00:01:30.645
+The question is how do you get your
+data out of your server at that point?
+
+28
+00:01:30.645 --> 00:01:33.768
+You kind of have a couple of options.
+
+29
+00:01:33.768 --> 00:01:36.928
+You could have some like
+they call it a fuse.
+
+30
+00:01:36.928 --> 00:01:41.197
+And actually we'll talk about that here
+in just a second which is with LightFS.
+
+31
+00:01:41.197 --> 00:01:45.375
+Where you can basically have your file
+be on some sort of shared file structure
+
+32
+00:01:45.375 --> 00:01:50.080
+where that can be written and
+shared across various different places.
+
+33
+00:01:50.080 --> 00:01:51.030
+So that would work.
+
+34
+00:01:51.030 --> 00:01:54.875
+You could have your database check
+itself into Git like every hour or
+
+35
+00:01:54.875 --> 00:01:56.540
+something like that.
+
+36
+00:01:56.540 --> 00:01:58.980
+Seems weird, wouldn't do it that way,
+but it's possible.
+
+37
+00:02:00.362 --> 00:02:03.732
+I never want my production
+boxes pushing into Git.
+
+38
+00:02:03.732 --> 00:02:05.132
+I only want it to pull from Git.
+
+39
+00:02:06.322 --> 00:02:11.554
+Or we're gonna talk about LightFS,
+I'm sorry, Lightstream.
+
+40
+00:02:11.554 --> 00:02:14.020
+Which is this project here,
+
+41
+00:02:14.020 --> 00:02:20.293
+where basically it streams your
+database to another location.
+
+42
+00:02:20.293 --> 00:02:23.533
+So, basically, you can start
+writing to a database file, and
+
+43
+00:02:23.533 --> 00:02:27.018
+then it'll stream it to, like,
+an S3 bucket somewhere else, and
+
+44
+00:02:27.018 --> 00:02:29.543
+then you can restore from
+that S3 bucket later.
+
+45
+00:02:30.613 --> 00:02:33.883
+It's really slick,
+it's pretty easy to set up.
+
+46
+00:02:33.883 --> 00:02:35.583
+And we're just gonna go through and
+do that together.
+
+47
+00:02:36.853 --> 00:02:39.871
+Keep in mind, these are just backups.
+
+48
+00:02:39.871 --> 00:02:41.701
+This is not replication.
+
+49
+00:02:41.701 --> 00:02:43.031
+You can't read from the other one.
+
+50
+00:02:43.031 --> 00:02:47.275
+You should not treat this like
+sharding something or replication or
+
+51
+00:02:47.275 --> 00:02:48.621
+anything like that.
+
+52
+00:02:50.611 --> 00:02:53.961
+Yeah, so it's replicated, but it's not
+readable from that location, right?
+
+53
+00:02:57.151 --> 00:03:00.999
+So, for this,
+we have to do a tiny bit of Docker.
+
+54
+00:03:00.999 --> 00:03:04.401
+If you're uncomfortable trying to do that,
+feel free to just kick back and
+
+55
+00:03:04.401 --> 00:03:06.067
+watch how it's done.
+
+56
+00:03:06.067 --> 00:03:08.047
+You don't have to do this with Docker.
+
+57
+00:03:08.047 --> 00:03:09.267
+You would never have to do this locally.
+
+58
+00:03:09.267 --> 00:03:11.967
+I'm just kind of showing you
+how all this stuff works.
+
+59
+00:03:11.967 --> 00:03:14.257
+Or if you'll feel to follow along.
+
+60
+00:03:14.257 --> 00:03:18.034
+I also do teach a course on, well,
+that's not the one I wanted, but
+
+61
+00:03:18.034 --> 00:03:19.519
+it's this one down here.
+
+62
+00:03:19.519 --> 00:03:23.068
+It's the Docker course, this one.
+
+63
+00:03:26.568 --> 00:03:29.566
+&gt;&gt; Brian Holt: Same kinda style of
+teaching as I do in this course,
+
+64
+00:03:29.566 --> 00:03:31.320
+just applied to containers.
+
+65
+00:03:31.320 --> 00:03:32.776
+I think it's pretty accessible.
+
+66
+00:03:32.776 --> 00:03:35.660
+Pretty proud of that one, I like that
+one a lot, it's really fun to teach.
+
+67
+00:03:37.000 --> 00:03:42.246
+So if you wanna get more into Docker, it's
+there, but we're gonna be doing that now.
+
+68
+00:03:42.246 --> 00:03:45.371
+Specifically, we're gonna be doing it
+to spin up a container of what's called
+
+69
+00:03:45.371 --> 00:03:48.215
+MinIO, or I just call it MinIO, and
+I don't think that's correct, but
+
+70
+00:03:48.215 --> 00:03:50.056
+I like saying it, so
+I'm gonna keep doing it.
+
+71
+00:03:51.286 --> 00:03:56.026
+MinIO is this, it's essentially
+S3 that you get to run locally.
+
+72
+00:03:56.026 --> 00:04:00.046
+I'm not gonna explain it much further than
+that because it's literally all I use it
+
+73
+00:04:00.046 --> 00:04:03.244
+for is to basically run
+a copy of S3 running locally.
+
+74
+00:04:03.244 --> 00:04:06.843
+If you're not familiar with S3, AWS S3,
+
+75
+00:04:06.843 --> 00:04:11.364
+it's kind of like
+the default object storage.
+
+76
+00:04:11.364 --> 00:04:15.462
+It's like where you store, you can store
+CSS files there, JavaScript files,
+
+77
+00:04:15.462 --> 00:04:16.944
+you can store images there.
+
+78
+00:04:16.944 --> 00:04:18.514
+It's basically just a bucket.
+
+79
+00:04:18.514 --> 00:04:23.085
+It's not basically, it's literally
+a bucket of storage that you put out on
+
+80
+00:04:23.085 --> 00:04:26.893
+the internet, and
+then you can access it later.
+
+81
+00:04:26.893 --> 00:04:29.342
+It's so ubiquitous that you can read and
+
+82
+00:04:29.342 --> 00:04:33.993
+write to Azure Blob Storage as if
+it was S3 and it understands it.
+
+83
+00:04:33.993 --> 00:04:34.934
+GCP does it, and
+
+84
+00:04:34.934 --> 00:04:39.113
+then MinIO is created basically as
+like a open source-ish version of it.
+
+85
+00:04:39.113 --> 00:04:41.066
+I think it is open source.
+
+86
+00:04:41.066 --> 00:04:43.576
+It's certainly you can use it locally,
+no problem.
+
+87
+00:04:45.346 --> 00:04:50.138
+And it's, it's kind of, I think this is
+more oriented towards Kubernetes, but
+
+88
+00:04:50.138 --> 00:04:54.666
+that yeah, Kubernetes native,
+doesn't matter for our intents purposes.
+
+89
+00:04:54.666 --> 00:04:57.996
+This is locally running S3,
+that's all you need to really care about.
+
+90
+00:05:00.558 --> 00:05:04.508
+Okay, so if you have Docker running,
+I do have Docker running already.
+
+91
+00:05:04.508 --> 00:05:07.878
+It's pretty easy to set up.
+
+92
+00:05:07.878 --> 00:05:12.738
+I think I put some instructions
+there on how to install it.
+
+93
+00:05:12.738 --> 00:05:17.538
+Yeah, this one here, it's literally
+just download it, run it, no big deal.
+
+94
+00:05:18.578 --> 00:05:22.508
+And then you have to go Download and
+install Lightstream.
+
+95
+00:05:22.508 --> 00:05:24.158
+So I did install on MacOS.
+
+96
+00:05:24.158 --> 00:05:28.725
+It's just a brew install,
+I already did this, so you can go do that.
+
+97
+00:05:28.725 --> 00:05:30.618
+Install in Debian.
+
+98
+00:05:30.618 --> 00:05:32.908
+Yeah, that's a good question.
+
+99
+00:05:32.908 --> 00:05:36.768
+I don't, this might not
+necessarily work on Windows.
+
+100
+00:05:38.398 --> 00:05:41.220
+So if you're on Windows,
+you might have to watch this,
+
+101
+00:05:41.220 --> 00:05:44.658
+because I don't think Lightstream
+works necessarily in Windows.
+
+102
+00:05:45.848 --> 00:05:50.412
+Okay, so assuming that you've got
+both of those downloaded installed,
+
+103
+00:05:50.412 --> 00:05:53.148
+let's go ahead and run our container here.
+
+104
+00:05:54.868 --> 00:05:58.318
+SQLite will not run that.
+
+105
+00:05:58.318 --> 00:06:00.018
+Surprise, surprise.
+
+106
+00:06:03.343 --> 00:06:03.843
+&gt;&gt; Brian Holt: Cool.
+
+107
+00:06:06.754 --> 00:06:09.708
+&gt;&gt; Brian Holt: Docker run,
+this is gonna run a new container.
+
+108
+00:06:09.708 --> 00:06:17.033
+You're telling it to expose port
+9000 on port 9000 and 9001 and 9001.
+
+109
+00:06:17.033 --> 00:06:19.301
+You're telling it what container to get,
+
+110
+00:06:19.301 --> 00:06:23.358
+which is the MinIO container
+from the MinIO organization.
+
+111
+00:06:23.358 --> 00:06:27.805
+And then this is everything that
+you're passing into run MinIO.
+
+112
+00:06:27.805 --> 00:06:31.508
+I never use MinIO directly, I just
+literally go and copy and paste this.
+
+113
+00:06:31.508 --> 00:06:34.767
+I should have it already running.
+
+114
+00:06:39.448 --> 00:06:42.990
+&gt;&gt; Brian Holt: Okay, you can ignore all
+this stuff, I don't think it matters.
+
+115
+00:06:42.990 --> 00:06:47.140
+And I think you can just
+go straight to this URL.
+
+116
+00:06:48.160 --> 00:06:50.950
+Yeah, you should end up
+on something like this.
+
+117
+00:06:50.950 --> 00:06:55.180
+This is just running
+locally on my computer.
+
+118
+00:06:55.180 --> 00:06:59.378
+Great, and now that we've done that,
+we're gonna log in and
+
+119
+00:06:59.378 --> 00:07:05.045
+we're gonna call the it's MinIO admin for
+both username and password by default.
+
+120
+00:07:07.391 --> 00:07:10.068
+&gt;&gt; Brian Holt: My official security
+recommendation is always use the default
+
+121
+00:07:10.068 --> 00:07:13.804
+username and password, I'm just kidding,
+that's terrible idea, but it's fine for
+
+122
+00:07:13.804 --> 00:07:15.081
+our local testing purposes.
+
+123
+00:07:15.081 --> 00:07:15.991
+We are now in here.
+
+124
+00:07:15.991 --> 00:07:17.601
+We're gonna click create a bucket.
+
+125
+00:07:18.961 --> 00:07:19.771
+What did I call mine?
+
+126
+00:07:19.771 --> 00:07:24.960
+I called mine, Chinook backup.
+
+127
+00:07:24.960 --> 00:07:26.950
+Okay, I don't think you need
+to do anything like that.
+
+128
+00:07:26.950 --> 00:07:29.130
+You just create, create bucket.
+
+129
+00:07:29.130 --> 00:07:32.790
+We're gonna click into it and
+make sure that it is on public.
+
+130
+00:07:36.290 --> 00:07:37.030
+Cool.
+
+131
+00:07:37.030 --> 00:07:40.112
+That's it, that is all the MinIO
+stuff that one must accomplish.
+
+132
+00:07:43.727 --> 00:07:45.193
+&gt;&gt; Brian Holt: We are now on that.
+
+133
+00:07:45.193 --> 00:07:50.220
+This is like running Docker, so
+I'm just gonna open a new tab here.
+
+134
+00:07:54.060 --> 00:07:58.076
+Okay.
+Now what we're gonna do is I'm gonna go
+
+135
+00:07:58.076 --> 00:08:03.990
+copy and paste these to things
+from my notes, which is these two.
+
+136
+00:08:05.080 --> 00:08:07.905
+This is just the username and
+password that it's gonna use, and
+
+137
+00:08:07.905 --> 00:08:10.490
+I'm gonna make them
+environmental variables.
+
+138
+00:08:10.490 --> 00:08:16.149
+If you're not familiar with Bash,
+this is just making it so
+
+139
+00:08:16.149 --> 00:08:20.223
+I can reference Lightstream access key and
+
+140
+00:08:20.223 --> 00:08:24.203
+access ID from the environment, right?
+
+141
+00:08:24.203 --> 00:08:25.711
+If I close this terminal and
+
+142
+00:08:25.711 --> 00:08:29.068
+it's gonna throw away all
+the temporary variables as well.
+
+143
+00:08:29.068 --> 00:08:31.407
+So this is only going to be working for
+
+144
+00:08:31.407 --> 00:08:34.516
+this session of the terminal
+that I have up here.
+
+145
+00:08:34.516 --> 00:08:39.922
+Okay, I've done that, now I just have
+to go run the Lightstream commands.
+
+146
+00:08:39.922 --> 00:08:44.182
+So I have Lightstream installed,
+I think cool, I do.
+
+147
+00:08:45.932 --> 00:08:50.803
+So what I'm gonna say is Lightstream,
+replicate, data, dot db,
+
+148
+00:08:50.803 --> 00:08:54.742
+yeah, data db,
+which is one that I have here, right?
+
+149
+00:08:54.742 --> 00:08:58.032
+So dot slash data db, the one that
+we've been using this whole time.
+
+150
+00:08:59.222 --> 00:09:01.108
+It's gonna be an S3 protocol.
+
+151
+00:09:01.108 --> 00:09:05.914
+That's like I said, you can, you can
+read and write to MinIO as if it was S3.
+
+152
+00:09:05.914 --> 00:09:08.940
+I'm gonna do Chinook, dash backup, or
+
+153
+00:09:08.940 --> 00:09:12.688
+whatever you chose to call it,
+dot, localhost.
+
+154
+00:09:14.428 --> 00:09:19.297
+Colon 9000, slash data dot db.
+
+155
+00:09:23.862 --> 00:09:27.929
+&gt;&gt; Brian Holt: And now, if I start
+reading and writing to that database,
+
+156
+00:09:27.929 --> 00:09:32.498
+it's all going to be streamed into
+that MinIO bucket that I have.
+
+157
+00:09:33.578 --> 00:09:38.546
+So I think, if I go to object browser,
+Chinook backup, you'll start seeing the I
+
+158
+00:09:38.546 --> 00:09:43.802
+don't know how this is structured at all,
+but you'll see that there's snapshots and
+
+159
+00:09:43.802 --> 00:09:49.289
+a bunch of stuff like that, that are all
+being now streamed to this MinIO bucket.
+
+160
+00:09:49.289 --> 00:09:53.033
+As you might imagine, we just did S3.
+
+161
+00:09:53.033 --> 00:09:54.929
+Where is it?
+
+162
+00:09:54.929 --> 00:09:55.719
+Yeah, this one right here.
+
+163
+00:09:57.469 --> 00:10:02.601
+We did local host here, but there's
+nothing stopping you from just doing
+
+164
+00:10:02.601 --> 00:10:07.481
+this directly to S3 on Amazon, or
+on cloud hosted MiniIO, or GCP, or
+
+165
+00:10:07.481 --> 00:10:12.553
+Azure Blob storage, or any number of
+the object storage kind of places.
+
+166
+00:10:13.663 --> 00:10:15.103
+And it's really just this easy.
+
+167
+00:10:15.103 --> 00:10:18.899
+So what you would do with your
+particular blog, if this you're doing,
+
+168
+00:10:18.899 --> 00:10:23.013
+you would deploy to your digital ocean
+container, your versal or whatever,
+
+169
+00:10:23.013 --> 00:10:24.986
+wherever you're deploying it.
+
+170
+00:10:24.986 --> 00:10:27.684
+You would start your server, and then you
+would start the Lightstream replicating
+
+171
+00:10:27.684 --> 00:10:30.316
+somewhere else, and then you're just,
+you're good, you're golden.
+
+172
+00:10:30.316 --> 00:10:32.366
+You are now streaming this somewhere else.
+
+173
+00:10:32.366 --> 00:10:35.606
+You can feel safe that this is now
+backed up and working just fine.
+
+174
+00:10:38.116 --> 00:10:40.947
+So, let's go ahead and do a restore,
+
+175
+00:10:40.947 --> 00:10:44.848
+just to show you that it's
+not any harder than that.
+
+176
+00:10:44.848 --> 00:10:48.252
+I'm gonna go ahead and copy and
+paste that same command again.
+
+177
+00:10:51.342 --> 00:10:56.382
+So I have done this before, just for
+like, a really simple kind of use case.
+
+178
+00:10:56.382 --> 00:11:01.462
+I've never actually had to It restore
+something, but it's just knowing that it's
+
+179
+00:11:01.462 --> 00:11:06.876
+there that I could
+&gt;&gt; Brian Holt: So.
+
+180
+00:11:10.959 --> 00:11:12.065
+&gt;&gt; Brian Holt: Yep, all right.
+
+181
+00:11:19.002 --> 00:11:19.502
+&gt;&gt; Brian Holt: Cool.
+
+182
+00:11:20.550 --> 00:11:22.750
+So I did a Lightstream restore.
+
+183
+00:11:22.750 --> 00:11:25.880
+I told it where to put it,
+I called it something else.
+
+184
+00:11:25.880 --> 00:11:30.172
+So I can say LS data, or
+let's just do ls.lh so
+
+185
+00:11:30.172 --> 00:11:34.904
+you can see here I have now
+a data.db I have a bunch of
+
+186
+00:11:34.904 --> 00:11:39.437
+stuff that Lightstream
+is creating on the side.
+
+187
+00:11:39.437 --> 00:11:44.882
+And then I have a data two.db which is
+
+188
+00:11:44.882 --> 00:11:51.038
+a restoration of what was there, right?
+
+189
+00:11:51.038 --> 00:11:52.767
+And there you go.
+It just pulled it down.
+
+190
+00:11:52.767 --> 00:11:57.647
+And I think this just pulls down
+the latest copy,which is what I did there.
+
+191
+00:11:57.647 --> 00:12:01.059
+Maybe they crashed the server, and I just
+wanted to bring it back to where it was.
+
+192
+00:12:01.059 --> 00:12:05.055
+That would certainly work.
+
+193
+00:12:05.055 --> 00:12:07.692
+Now the question you might ask me is
+how do I go back to like a further back
+
+194
+00:12:07.692 --> 00:12:08.289
+version of it?
+
+195
+00:12:08.289 --> 00:12:09.249
+I'm not sure you'd have,
+
+196
+00:12:09.249 --> 00:12:12.099
+you'd have to go read the documentation
+'cause I've never had to do it before.
+
+197
+00:12:13.639 --> 00:12:16.459
+But I, Livestream makes it super easy.
+
+198
+00:12:16.459 --> 00:12:18.389
+It's not that hard to follow here.
+
+199
+00:12:21.374 --> 00:12:23.018
+Something in here.
+
+200
+00:12:23.018 --> 00:12:25.879
+That actually just tells you
+the whole thing of how it works,
+
+201
+00:12:25.879 --> 00:12:26.954
+which is pretty cool.
+
+202
+00:12:29.504 --> 00:12:32.344
+Reference, there you go.
+
+203
+00:12:32.344 --> 00:12:33.114
+Restore.
+
+204
+00:12:33.114 --> 00:12:33.614
+&gt;&gt; Speaker 1: Restore.
+
+205
+00:12:34.684 --> 00:12:36.242
+&gt;&gt; Brian Holt: With the replica, and
+
+206
+00:12:36.242 --> 00:12:41.245
+I think you can start here with the time
+stamp to a specific point in time.
+
+207
+00:12:41.245 --> 00:12:43.545
+So that's probably have to go
+back to the versions, right?
+
+208
+00:12:43.545 --> 00:12:46.278
+So we could probably go in here and
+start writing to the database,
+
+209
+00:12:46.278 --> 00:12:49.506
+get a couple of versions in here, and
+then say restore back to a previous one,
+
+210
+00:12:49.506 --> 00:12:51.775
+and it would just roll
+it back to where it was.
+
+211
+00:12:51.775 --> 00:12:55.575
+&gt;&gt; Speaker 1: The S3 bucket
+preserves every single change then?
+
+212
+00:12:57.235 --> 00:12:58.365
+&gt;&gt; Brian Holt: It'll
+keep several versions.
+
+213
+00:12:58.365 --> 00:13:00.852
+I think you can configure
+how far back it'll go.
+
+214
+00:13:00.852 --> 00:13:01.362
+&gt;&gt; Speaker 1: Right?
+
+215
+00:13:01.362 --> 00:13:01.870
+&gt;&gt; Brian Holt: Yeah.
+
+216
+00:13:01.870 --> 00:13:05.632
+It's a really cool piece of software.
+
+217
+00:13:05.632 --> 00:13:08.905
+And I mean, we got it up and
+running in minutes, right?
+
+218
+00:13:08.905 --> 00:13:09.559
+&gt;&gt; Speaker 1: Right.
+
+219
+00:13:09.559 --> 00:13:12.471
+&gt;&gt; Brian Holt: And I love that
+it's pretty single purpose, like,
+
+220
+00:13:12.471 --> 00:13:14.862
+what you see here is
+basically all it does.
+
+221
+00:13:16.942 --> 00:13:19.972
+So very powerful, very simple,
+very single purpose.
+
+222
+00:13:19.972 --> 00:13:22.532
+I'm a big fan, really cool stuff.
+
+223
+00:13:22.532 --> 00:13:26.238
+Hopefully, for me this was like
+a revelation when I started to understand
+
+224
+00:13:26.238 --> 00:13:30.062
+what this is because now I feel very
+empowered to just put SQLite out there and
+
+225
+00:13:30.062 --> 00:13:33.442
+say, I'm doing something,
+it's very lightweight.
+
+226
+00:13:33.442 --> 00:13:36.417
+We're gonna put SQLite out there, we're
+gonna Lightstream it to a bucket, and
+
+227
+00:13:36.417 --> 00:13:37.522
+then I'm just done, right?
+
+228
+00:13:37.522 --> 00:13:38.892
+I don't have to do anything else.
+
+229
+00:13:38.892 --> 00:13:41.159
+I don't have to worry about
+database credentials.
+
+230
+00:13:41.159 --> 00:13:45.126
+I don't have to worry about paying
+another bill for another database, right?
+
+231
+00:13:45.126 --> 00:13:46.813
+It all just kinda works.
+

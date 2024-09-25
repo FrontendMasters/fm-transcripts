@@ -1,0 +1,125 @@
+[00:00:00]
+>> Brian Holt: So imagine for a second you are building an app. It's a music app because that's on the mind. We've been talking about that all day. Let's keep talking about it. If you go to Spotify and you type in black, what do you expect to get back from Spotify?
+
+[00:00:17]
+Black Sabbath, probably, which is a band, right? Amy Winehouse's Back to Black, that's a track. And Metallica has the black album, right? Those are three different columns in a database, right? So what are you gonna do about that? Well, you could write a big, long, ugly core that says, like this, like this, like this, and have three different like clauses, probably works okay.
+
+[00:00:48]
+But now imagine you're searching across 30 different columns, or you need additional kind of joins or concatenations or other sort of machinations that SQL provides you. It gets really complicated really quickly, and trying to do that with like is difficult. So we're gonna look at something called FTS, which stands for full text search.
+
+[00:01:15]
+We're gonna look at something called FTS5, which is full text search version 5, right? That's the way that Doctor Hip likes to version things. You'll notice that it's JSON one. It's the first version of the JSON extension. FTS5 is the fifth version of the full text search extension.
+
+[00:01:36]
+SQLite 3 is the third version. So that's where all the numbers are coming from. I actually didn't know that until I started researching this course, I just didn't ask any questions. It's called FDS5, we're gonna use FDS5.
+>> Brian Holt: So if you use a full text search, if you use the extension, you can do something called Match, like this.
+
+[00:02:01]
+Select star from track_search where track_search Match black, instead of having to say this or this or this or this or this, right? So assuming you already still have tables, easy_tracks here. We're gonna use this and we're gonna reuse it, and we're going to do a ful text search on that table.
+
+[00:02:28]
+If you don't have it, you can just run this query. Notice this is two queries, it says drop view if exists. You can probably imagine what if it exists, does, right? If it exists, drop it, if it doesn't, do nothing. So even if you have it and it exists, you can just run this.
+
+[00:02:49]
+And you can see it's still there.
+>> Brian Holt: Okay.
+>> Brian Holt: So now we're gonna do something called a virtual table, which is, as you might imagine, it's not a table backed by necessarily full rows, but it's going to be something that's going to be provided by one of the extensions.
+
+[00:03:15]
+
+>> Brian Holt: Since it won't actually contain the rows, right, the rows are actually going to stay in their original tables, it's going to be referencing other tables, which is where the virtual part of it comes from, okay? So let's go ahead and write this query here.
+>> Brian Holt: Create virtual table track_seach, is what we're gonna call it, using FTS5.
+
+[00:03:48]
+By the way, FTS5 is an extension of SQLite. It's actually not built into the core library itself. However, it's actually included with the pre-bundled binary, which is two things. Essentially, you can always use it, cuz I never recompile SQLite myself, I would tell you, you probably never wanna do that yourself either.
+
+[00:04:08]
+It is possible, for whatever reason, if you didn't want it and you wanted to pair it out, you could recompile SQLite without FTS5 bundled in, I think. Again, didn't really check that cuz it never would want to, but you could, in theory. The content, you can tell where the information is going to come from.
+
+[00:04:28]
+It's gonna come from our view, easy_tracks, but, and by the way, we are using a view, but it doesn't have to be a view, it could be a table. It could be a view, it could be a view of views. Turtles all the way down, right, it doesn't really matter, okay?
+
+[00:04:45]
+And you have to say content_rowid = id. So it expects a column in there to be called rowid. So if we had called our ID rowid, we wouldn't have to put this whole thing. We didn't, we just called it ID, so you have to tell it what the rowid is.
+
+[00:05:02]
+It's important because that's how it's going to reference back the original table and bring data out. And by the way, these have to be double quotes on easy_tracks, I think.
+>> Brian Holt: Put single quotes on the column of our ID. I don't know, that's what I have in my notes.
+
+[00:05:23]
+I'm never quite sure what they're going to accept with quotes, if we're being super honest, track, album, and artist. So with this, you're telling it, what do you wanna include in the full text search? So let's say we had 30 columns in here, and we only wanted to index three of them for this full text search.
+
+[00:05:47]
+This is where you would identify that. So that's what we're doing here, and now that should be enough. Cool, we now have a virtual table.
+>> Brian Holt: Right, the track_search. Notice, it came with a bunch of other stuff. I don't know why they're there. I never use them, but all you really care about is the track_search.
+
+[00:06:12]
+
+>> Brian Holt: And now we can do what our original query that we wanted to do, which is select star from track_search, where track_search Match black.
+>> Brian Holt: Yeah, see, this is another thing that bothers me about SQLite is I forget that they don't populate it right away. So you have to go tell it to, hey, actually, you need to go build this now.
+
+[00:06:45]
+So we created everything, we've done nothing wrong so far. This is all working so far, but you actually have to go and insert these into the table. So we're actually gonna say, insert into track_search, select album, artist, track from easy_tracks.
+>> Brian Holt: This is all coming from the eqp that I have on.
+
+[00:07:16]
+You can turn it off too. Now this query that I thought was going to work. Now if I run it again, you can see now it's working, right? All of these have blackened them somewhere, right? So good and bad here, the cool thing is that this virtual table is not repopulating every single time.
+
+[00:07:40]
+And if we update things, things should work. Because they're referencing the row IDs, it should work okay. But what starts getting kind of messy is, what happens when we start deleting from the table, inserting into the table, changing the row? Where you can get really messed up is, let's say I had one here called, I don't know, what if Amy Winehouse, or let's choose a different one.
+
+[00:08:03]
+What if the Black Crowes renamed to be the Pink Crowes? This would start getting really weird because it's actually indexed on Black Crowes, but it's referencing the Pink Crowes. If I don't run that query again, the insert into, it's going to give me back the Pink Crowes matching a black query because I didn't update the virtual table, right, kinda strange.
+
+[00:08:28]
+So there's two things you can either do here. You can either have some sort of cron job, some sort of normal job that says, goes through, basically drops a table, recreates it, and inserts everything in again. If you're doing something where it's infrequent in how much it updates, and you only need to update it once a day, an hour, a half hour, totally great, very much understandable.
+
+[00:08:51]
+We're not talking about triggers in this course, cuz it just didn't feel useful to teach triggers. However, if you go to the Stack Overflow answer, you'll see here that you can create what are called triggers, which are basically responses to something being inserted. And you can say, hey, when this something gets inserted into this table, go update my virtual view so that my full text search is always up-to date.
+
+[00:09:18]
+That's what you would do there. So this would be on, yeah, on deletes, do this, on updates, do this, a bunch of stuff like that. It's all in there if you wanna learn how to do it. So we did match here, I wanted to show you white as well.
+
+[00:09:37]
+You can see all these are matching white, and last one is gonna show you there is red.
+>> Brian Holt: And all that is working as well, looking at red across various different columns.
+>> Brian Holt: So my point here being, you can use match, you can use equals, or you can call it a function, or at least it looks like a function call, like that.
+
+[00:10:07]
+These all do, as far as I can tell, precisely the same thing. I will say that I learned match first, so that's what I've always used with full text search. I also like it because at a glance, it's very obvious that this is a full text search if you use match there.
+
+[00:10:27]
+
+>> Brian Holt: So that's kind of up to you, choose what you want, I use match.
+>> Brian Holt: There's a whole myriad of ways to use this. I linked to the docs here, and there's more stuff you can, I don't really use too much beyond match, but feel free to look at this.
+
+[00:10:47]
+There's other ways you can use full text search to say, include this, don't include this, all that kinda stuff
+>> Brian Holt: You can use it for things like type ahead. There's cool stuff you can do with that. There's near, again, I'm not gonna speculate too much on what those do because I haven't used them, and I haven't found need to use them.
+
+[00:11:11]
+Let's talk about bm25. Right now we're just showing you anything that matches it. So if I come back here, where's my black one? That one, and I'm gonna do bm25(track_search).
+>> Brian Holt: This is gonna give you back a score.
+>> Brian Holt: Of how close it is to the term, right?
+
+[00:11:43]
+So again, assuming you're searching for black on Spotify, you probably want the one that's the closest result. Now, basically everything in there that I showed you did match black perfectly, so you would assume that they're basically all the same. I don't actually understand how bm25 works, I just know this is how you're supposed to get the closest match.
+
+[00:12:04]
+Order by bm25(track_search).
+>> Brian Holt: Limit 15.
+>> Brian Holt: So, well, I guess this makes sense, Black Sabbath shows up three times, right? So that is the most black, right? And then down here, it looks like this is two blacks, blah, blah, blah. I think you can get, so it'll do near queries as well.
+
+[00:12:38]
+However, in any case, all of this to say, this is how you tell SQLite, give me your best guess of which one is the most correct. Now again, if you're Spotify, this is probably not really what you want, right? If someone searches for black, they're probably searching for whatever is the latest most popular song with the word black in it, and then you have some other way of ranking that.
+
+[00:13:03]
+As opposed to, which one says the word black literally the most times in the string? Otherwise, you'd have song titles that were just that, right? So I just wanted to call your awareness to it, that it's something that exists, if you need to do something that's nearest match, or closest match, just lexically.
+
+[00:13:23]
+And yeah, the smaller the number, or the more negative the number, the better the match is.
+>> Brian Holt: I think it's distance, right? I guess that would make sense cuz it's in there three times, and so it continues to get even more negative. I don't know, again, I'm just speculating there.
+
+[00:13:44]
+The docs here, as you can see, explain it. And I took one look at that and I said, nope, and I just closed the web page, [LAUGH] cuz I did not wanna do math.
+

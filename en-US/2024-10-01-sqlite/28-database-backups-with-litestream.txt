@@ -1,0 +1,129 @@
+[00:00:00]
+>> Brian Holt: We are done writing queries now. I feel like I've pretty well equipped you to go forth and be able to be a utilitent of SQLite. The next couple of sections here that we're gonna do are kind of like, stuff around SQLite. How do you do backups? How do you do replications.
+
+[00:00:20]
+And then we're gonna get in a little bit, these last two are kind of like the future of SQLite. I think lib SQL something to keep an eye on. I think local first is a really interesting idea, so we're gonna briefly talk about it, and then you can stop listening to me.
+
+[00:00:35]
+Forever if you really want to. Hopefully, maybe another course sometime down the road. I don't know, well, jury's out, including on myself. Okay, backups. Normally, I wouldn't necessarily get into talking about backups with you. I don't talk about my Postgres course, because there's enough ways to do it and enough services that just do it for you, that I'm not really concerned about it.
+
+[00:00:58]
+However, If you are, let's say you're writing a personal blog, right? And you need a database. You use SQLite, and you just want to deploy your database with your app at the same time, and you don't wanna have anything too special around it. The problem with that architecture right now, if you do it that way.
+
+[00:01:19]
+If your server crashes, or your server gets blown up or something like that, you would lose all of your data, right? The question is how do you get your data out of your server at that point? You kind of have a couple of options. You could have some like they call it a fuse.
+
+[00:01:36]
+And actually we'll talk about that here in just a second which is with LightFS. Where you can basically have your file be on some sort of shared file structure where that can be written and shared across various different places. So that would work. You could have your database check itself into Git like every hour or something like that.
+
+[00:01:56]
+Seems weird, wouldn't do it that way, but it's possible. I never want my production boxes pushing into Git. I only want it to pull from Git. Or we're gonna talk about LightFS, I'm sorry, Lightstream. Which is this project here, where basically it streams your database to another location.
+
+[00:02:20]
+So, basically, you can start writing to a database file, and then it'll stream it to, like, an S3 bucket somewhere else, and then you can restore from that S3 bucket later. It's really slick, it's pretty easy to set up. And we're just gonna go through and do that together.
+
+[00:02:36]
+Keep in mind, these are just backups. This is not replication. You can't read from the other one. You should not treat this like sharding something or replication or anything like that. Yeah, so it's replicated, but it's not readable from that location, right? So, for this, we have to do a tiny bit of Docker.
+
+[00:03:00]
+If you're uncomfortable trying to do that, feel free to just kick back and watch how it's done. You don't have to do this with Docker. You would never have to do this locally. I'm just kind of showing you how all this stuff works. Or if you'll feel to follow along.
+
+[00:03:14]
+I also do teach a course on, well, that's not the one I wanted, but it's this one down here. It's the Docker course, this one.
+>> Brian Holt: Same kinda style of teaching as I do in this course, just applied to containers. I think it's pretty accessible. Pretty proud of that one, I like that one a lot, it's really fun to teach.
+
+[00:03:37]
+So if you wanna get more into Docker, it's there, but we're gonna be doing that now. Specifically, we're gonna be doing it to spin up a container of what's called MinIO, or I just call it MinIO, and I don't think that's correct, but I like saying it, so I'm gonna keep doing it.
+
+[00:03:51]
+MinIO is this, it's essentially S3 that you get to run locally. I'm not gonna explain it much further than that because it's literally all I use it for is to basically run a copy of S3 running locally. If you're not familiar with S3, AWS S3, it's kind of like the default object storage.
+
+[00:04:11]
+It's like where you store, you can store CSS files there, JavaScript files, you can store images there. It's basically just a bucket. It's not basically, it's literally a bucket of storage that you put out on the internet, and then you can access it later. It's so ubiquitous that you can read and write to Azure Blob Storage as if it was S3 and it understands it.
+
+[00:04:33]
+GCP does it, and then MinIO is created basically as like a open source-ish version of it. I think it is open source. It's certainly you can use it locally, no problem. And it's, it's kind of, I think this is more oriented towards Kubernetes, but that yeah, Kubernetes native, doesn't matter for our intents purposes.
+
+[00:04:54]
+This is locally running S3, that's all you need to really care about. Okay, so if you have Docker running, I do have Docker running already. It's pretty easy to set up. I think I put some instructions there on how to install it. Yeah, this one here, it's literally just download it, run it, no big deal.
+
+[00:05:18]
+And then you have to go Download and install Lightstream. So I did install on MacOS. It's just a brew install, I already did this, so you can go do that. Install in Debian. Yeah, that's a good question. I don't, this might not necessarily work on Windows. So if you're on Windows, you might have to watch this, because I don't think Lightstream works necessarily in Windows.
+
+[00:05:45]
+Okay, so assuming that you've got both of those downloaded installed, let's go ahead and run our container here. SQLite will not run that. Surprise, surprise.
+>> Brian Holt: Cool.
+>> Brian Holt: Docker run, this is gonna run a new container. You're telling it to expose port 9000 on port 9000 and 9001 and 9001.
+
+[00:06:17]
+You're telling it what container to get, which is the MinIO container from the MinIO organization. And then this is everything that you're passing into run MinIO. I never use MinIO directly, I just literally go and copy and paste this. I should have it already running.
+>> Brian Holt: Okay, you can ignore all this stuff, I don't think it matters.
+
+[00:06:42]
+And I think you can just go straight to this URL. Yeah, you should end up on something like this. This is just running locally on my computer. Great, and now that we've done that, we're gonna log in and we're gonna call the it's MinIO admin for both username and password by default.
+
+[00:07:07]
+
+>> Brian Holt: My official security recommendation is always use the default username and password, I'm just kidding, that's terrible idea, but it's fine for our local testing purposes. We are now in here. We're gonna click create a bucket. What did I call mine? I called mine, Chinook backup. Okay, I don't think you need to do anything like that.
+
+[00:07:26]
+You just create, create bucket. We're gonna click into it and make sure that it is on public. Cool. That's it, that is all the MinIO stuff that one must accomplish.
+>> Brian Holt: We are now on that. This is like running Docker, so I'm just gonna open a new tab here.
+
+[00:07:54]
+Okay. Now what we're gonna do is I'm gonna go copy and paste these to things from my notes, which is these two. This is just the username and password that it's gonna use, and I'm gonna make them environmental variables. If you're not familiar with Bash, this is just making it so I can reference Lightstream access key and access ID from the environment, right?
+
+[00:08:24]
+If I close this terminal and it's gonna throw away all the temporary variables as well. So this is only going to be working for this session of the terminal that I have up here. Okay, I've done that, now I just have to go run the Lightstream commands. So I have Lightstream installed, I think cool, I do.
+
+[00:08:45]
+So what I'm gonna say is Lightstream, replicate, data, dot db, yeah, data db, which is one that I have here, right? So dot slash data db, the one that we've been using this whole time. It's gonna be an S3 protocol. That's like I said, you can, you can read and write to MinIO as if it was S3.
+
+[00:09:05]
+I'm gonna do Chinook, dash backup, or whatever you chose to call it, dot, localhost. Colon 9000, slash data dot db.
+>> Brian Holt: And now, if I start reading and writing to that database, it's all going to be streamed into that MinIO bucket that I have. So I think, if I go to object browser, Chinook backup, you'll start seeing the I don't know how this is structured at all, but you'll see that there's snapshots and a bunch of stuff like that, that are all being now streamed to this MinIO bucket.
+
+[00:09:49]
+As you might imagine, we just did S3. Where is it? Yeah, this one right here. We did local host here, but there's nothing stopping you from just doing this directly to S3 on Amazon, or on cloud hosted MiniIO, or GCP, or Azure Blob storage, or any number of the object storage kind of places.
+
+[00:10:13]
+And it's really just this easy. So what you would do with your particular blog, if this you're doing, you would deploy to your digital ocean container, your versal or whatever, wherever you're deploying it. You would start your server, and then you would start the Lightstream replicating somewhere else, and then you're just, you're good, you're golden.
+
+[00:10:30]
+You are now streaming this somewhere else. You can feel safe that this is now backed up and working just fine. So, let's go ahead and do a restore, just to show you that it's not any harder than that. I'm gonna go ahead and copy and paste that same command again.
+
+[00:10:51]
+So I have done this before, just for like, a really simple kind of use case. I've never actually had to It restore something, but it's just knowing that it's there that I could
+>> Brian Holt: So.
+>> Brian Holt: Yep, all right.
+>> Brian Holt: Cool. So I did a Lightstream restore. I told it where to put it, I called it something else.
+
+[00:11:25]
+So I can say LS data, or let's just do ls.lh so you can see here I have now a data.db I have a bunch of stuff that Lightstream is creating on the side. And then I have a data two.db which is a restoration of what was there, right?
+
+[00:11:51]
+And there you go. It just pulled it down. And I think this just pulls down the latest copy,which is what I did there. Maybe they crashed the server, and I just wanted to bring it back to where it was. That would certainly work. Now the question you might ask me is how do I go back to like a further back version of it?
+
+[00:12:08]
+I'm not sure you'd have, you'd have to go read the documentation 'cause I've never had to do it before. But I, Livestream makes it super easy. It's not that hard to follow here. Something in here. That actually just tells you the whole thing of how it works, which is pretty cool.
+
+[00:12:29]
+Reference, there you go. Restore.
+>> Speaker 1: Restore.
+>> Brian Holt: With the replica, and I think you can start here with the time stamp to a specific point in time. So that's probably have to go back to the versions, right? So we could probably go in here and start writing to the database, get a couple of versions in here, and then say restore back to a previous one, and it would just roll it back to where it was.
+
+[00:12:51]
+
+>> Speaker 1: The S3 bucket preserves every single change then?
+>> Brian Holt: It'll keep several versions. I think you can configure how far back it'll go.
+>> Speaker 1: Right?
+>> Brian Holt: Yeah. It's a really cool piece of software. And I mean, we got it up and running in minutes, right?
+>> Speaker 1: Right.
+>> Brian Holt: And I love that it's pretty single purpose, like, what you see here is basically all it does.
+
+[00:13:16]
+So very powerful, very simple, very single purpose. I'm a big fan, really cool stuff. Hopefully, for me this was like a revelation when I started to understand what this is because now I feel very empowered to just put SQLite out there and say, I'm doing something, it's very lightweight.
+
+[00:13:33]
+We're gonna put SQLite out there, we're gonna Lightstream it to a bucket, and then I'm just done, right? I don't have to do anything else. I don't have to worry about database credentials. I don't have to worry about paying another bill for another database, right? It all just kinda works.
+
