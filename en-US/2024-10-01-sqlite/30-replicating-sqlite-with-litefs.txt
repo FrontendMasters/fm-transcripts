@@ -1,0 +1,108 @@
+[00:00:00]
+>> Brian Holt: So, I want to show you how to do this. So let's go ahead and get back into my notes here. Let's see if I can make sure I cover everything, yeah, it's eventually consistent. As you might imagine, if you have your blog and it's on a secondary node and you try and write to it and it passes it up.
+
+[00:00:21]
+Gets written and passed back down, it's time, right? That's a lot of network travel that's gonna be going on there, so it's a little eventually consistent from that perspective. Yeah, for most people, that's not probably if you're just tracking visitors on a blog, 200 milliseconds, a delay on that kind of stuff is perfectly fine, right?
+
+[00:00:41]
+If you're doing like life-saving medicine, maybe don't use this product, maybe use something different, right, where the latency might make a difference. Yeah, if you need strong consistency, this is not it.
+>> Brian Holt: So let's do it. Let's try it, right? I had to retool the code a little bit.
+
+[00:01:03]
+So, I need you to clone another version of this repo, which I have called sqlite-apps-litefs. Quite similar, but there's a couple of key changes here and I didn't want everyone to have to sit there and write code that wasn't really that much more interesting. I want you to kind of experience more what's possible with litefs.
+
+[00:01:26]
+All right, make sure that I have everything here. Do I have my data in here? I do. So, this is almost the same code, really, really similar.
+>> Brian Holt: What is critical here, is there's a lot of docker stuff that I put in here for you. So there's a Dockerfile to build this correctly.
+
+[00:01:46]
+There's a docker-compose file that actually connects everything together. And then I have an nginx container in here, which is basically just running ingress proxy, and it does a round robin between all of the various different light FS servers that you're gonna have.
+>> Brian Holt: That's really it. You can maybe state it a little bit more simply.
+
+[00:02:12]
+We have a primary server, which is going to be the actual primary litefs, sqlite node is primary true, you see that there, right? And then you have a replica1. I'm only gonna have one replica, just to show you like a one to one. I try to make this as simple as possible.
+
+[00:02:34]
+You can certainly have up to 100 or 1000 or something like that. You'd have to retool this a little bit to be a bit more smart about what port things get listened on, right? You'd have to have something that would do a better job of that. Otherwise, nothing else here is particularly interesting, okay?
+
+[00:02:55]
+Yeah, let's go into talk about docker-compose, you don't have to write any code for this. I just want you to stand it up if you're following along. I do have a whole segment on docker-compose, if you're interested on that. That's on my other course, Reason nginx, you have the primary and secondaries.
+
+[00:03:15]
+Yeah, I wanted to show you in invoice here. Notice that we're reading from litefs. This is the actual shared file directory, file system that they're sharing. One thing to know about fuse or at least the litefs' version of it, you can't nest directories any further, it's all one top level directory.
+
+[00:03:38]
+That bit me a little bit, that's why I'm sharing it with you. And feel free to look at the Dockerfile again, pretty standard stuff. Interesting things here is fuse3 and sqlite that we're pulling in here and we're getting it from, yeah, that's that's essentially it, that's all we really needed.
+
+[00:03:58]
+Cool, that's it, and then if you're gonna do this yourself, you have to have litefs be the entry point to your app. And then I think I had to do a shell here. Yeah, I had to do some shell stuff to get everything to kind of work together, but that's neither here nor there.
+
+[00:04:18]
+Didn't I have another thing in here to get all this all running correctly? I thought I did, yeah, down here at the bottom, I just had to make sure that it execs this code, so it runs an import that script that I was showing you, and then it runs the server, but that's it.
+
+[00:04:37]
+So in theory, let's shutdown this container, we don't need to do this anymore. And we're gonna go into sqlite-app-litefs.
+>> Brian Holt: All right, in theory, crossing fingers whenever you're doing big darker projects. Things are known to go on awry. Docker compose up -- build. Docker compose is the thing where you'll run multiple containers at the same time.
+
+[00:05:12]
+Up is saying just read all of the individual Dockerfiles and the docker-compose directly. And then the build is if the containers are not built, please build them for me.
+>> Brian Holt: All right, it might be working. It seems like it could be working. So you can see the nginx container started up just fine, that's great.
+
+[00:05:37]
+Primary container looks like it started okay. The replica seems like it started okay. You can see all of these are coming from that and you can see this one is, they're all both listening. All right, so in theory, I should be able to read localhost 8080. And this is our same app, but it's running on.
+
+[00:06:11]
+
+>> Brian Holt: All right, so, I wanted to show you here, if I click Get Invoice 1, it read from the replica, right? And if I read from it again, it reads from the primary. And that's because nginx is doing the route, it's passing them back and forth to make sure that they get equal load between them, right?
+
+[00:06:24]
+It's load balancing. It's literally a term for that, load balancing. And it worked, so that's pretty cool as well, right? Now we have one database that's reading from literally the same database, right? And if we don't have anything in our particular that writes back to it, but it would also work in that capacity as well.
+
+[00:06:44]
+So, wanted to demonstrate to you, this is also super possible to do on your own. If you don't feel like having a cloud hosted database, which you wanna have replicas, you can do it with litefs as well.
+>> Brian Holt: And then you would have litestream on probably on one of your secondary nodes.
+
+[00:07:04]
+Yeah, probably one of your secondary nodes, just streaming off backups in the background. And then you would have backed-up and replicated databases. You can see that this is starting to feel like a real database now, right? You don't have to worry about any sort of network or ingress traffic, cuz it's all happened locally on your particular server.
+
+[00:07:24]
+Reason why you might not wanna do this, let's say you have a very busy database, your database, and let's say you just blowing up SQL with how many queries you're gonna run to it, it's going to slow down your app server. Because now your database and your app server competing for resources on the same box, that's can be hard.
+
+[00:07:43]
+What's cool about running something like postgres or something like that, is you can scale database and app server independently. Normally, it's like your database is fine, because those things can handle so much traffic, right? But your app servers are coded by us, and we're all, well, I won't include you in this.
+
+[00:07:59]
+I'm an idiot and I write bad code and therefore I take down my servers and then therefore slow down my database right, which sucks, right? It's cool that you can scale those things independently. We've lost that capability with what we're doing here. Does it matter? On many things it won't, but the one time it matters is going to matter a lot too.
+
+[00:08:18]
+So I have this running in the background as well. I don't need litestream going anymore. I'm gonna just grab this container or this command here.
+>> Brian Holt: And then we're gonna put this into here, docker exec. This is basically say, hey, connect to this container, and then run this command.
+
+[00:08:49]
+This -it means make it interactive, don't run it in the background. And then I'm going to connect to my primary and I'm going to connect to the database.
+>> Brian Holt: It's not running, so you might have to do docker ps to figure out the name of it. Yeah, see, it's something else.
+
+[00:09:12]
+It's this one I think that I want.
+>> Brian Holt: Is that not the same thing? Okay, for whatever reason, that was not the same thing. So I just copy and pasted this one to make sure that it was called the correct thing. And then we're just running sqlite3 and connecting to the database.
+
+[00:09:39]
+And if I say, here, .table, it's all the table. So this is actually me connecting into the docker container and looking at the database.
+>> Brian Holt: CREATE TABLE users. I gotta remember that, I can't remember the syntax off the top of my head. Luckily, I know someone that wrote a code on this.
+
+[00:10:05]
+And we're just gonna put ( id Primary key, I think this should be enough, that's all I need. I need integer as well.
+>> Brian Holt: Okay, tables, you can see now I have a users table. In theory, if I say exit, and I do this again, but I do it with the other container that I have running here, which is the replica.
+
+[00:10:47]
+
+>> Brian Holt: And I say tables, you can see that users table that I just created from the other node is in there, cool. And I should be able as well, to just do that again, right? CREATE TABLE,
+>> Brian Holt: And users2. So this is connected in read only mode, that makes sense.
+
+[00:11:13]
+So, yeah, that's true, because then you would you have to basically connect to the primary, which you can read into the documentation here, on how you connect to the primary to be able to write too as well. But that's all built into litefs. I wasn't planning on trying to do this demo, so I hadn't tried it before.
+
+[00:11:36]
+
+>> Brian Holt: Cool, one thing that you might be seeing here, you might see this weird, sorry, that's not the right one. It's down here in Replication. If you see this weird SQLITE ERROR, error number 1, it means that your node modules are not playing nicely with the Dockerfile. So, all you've got to do is just delete your node modules on your local computer and re-run Docker, so it builds the container again and you should be golden.
+
