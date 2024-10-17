@@ -1,0 +1,157 @@
+[00:00:00]
+>> Todd Gardner: So first we're gonna do some image resizing. Now, image resizing there's lots of ways to do this. Some people like to do this in their original source and just upload compressed images. Other people do it like in their CDNs. Some CDNs, including Buddy CDN, actually has the option that it'll live compressed images based on query string stuff like that.
+
+[00:00:21]
+But for the example purpose here, I built some build tools that automatically compress images and they're sitting here inside the tools directory. And so what we're gonna do is we're gonna run these things in order, and all the details inside of here don't really matter so much. Like they're here for your reference, you can go ahead and look If you wanna build an image optimizer or image resizer or whatever, go ahead and feel free to take this code and run with it as your base, but it's not very sophisticated.
+
+[00:00:50]
+What this is, is this is a PNG resizer, all of the images on the store are PNGs just for simplicity, and this uses a tool called Jimp I think that's how they pronounce it. I don't actually know how they pronounce Jimp, but J-I-M-P to basically create copies of all of the images and make a copy of them in a directory called R.
+
+[00:01:12]
+And we are gonna make a 360, 720,1024, 1400 and 2800 pixel wide version of a every single image. And we're gonna do that first. So npm run image png-resizer. This takes just a few seconds because there's a lot of images to generate because I'm generating five copies of every image at different sizes.
+
+[00:01:42]
+And honestly, the code's not super optimized cuz that makes it hard to write and read. There we go so if we now look in public assets image R, R for responsive there's a whole bunch of images. Every single image that was in our image directory, call out one, two, three, stickers, logo, hero, whatever, there are now several copies of it.
+
+[00:02:11]
+So I have, the original of callouts was 1,024 wide, which is about 1.5 makes for this, this image of this dopey looking AI guy with stickers on his laptop. But we could ship a smaller image at 720, that's only 800 K and a smaller one yet that's only 250 K at 360.
+
+[00:02:33]
+So right there, we've already have some potential savings where we're shipping much smaller images across the wire. Even though all we've done is make size copies, we've just done simple resizing operations to ship it. Now we'd need to actually make some changes in HTML to use these. We'll do that here in a second, but I think we should do a few more optimizations.
+
+[00:02:57]
+So the next thing is I have this p and g optimizer using a tool called Imagemin, which is just a widely available package online. And all this is gonna do, this is largely what tiny P and G does. We are just gonna run all of the images through this optimizer and generate a copy of them in the Min Direct.
+
+[00:03:18]
+Where we have like done a little bit of like optimization and removing extra plates down the colors a little bit, but largely you can't tell the difference visually. So we are gonna run image PNG, optimize.
+>> Todd Gardner: Great so now, for comparison's sake, let's look at callout 1-1024, which was 1.5MBs.
+
+[00:03:53]
+If we look in the min directory, callout-1-1024 is a third of the size at 470 kilobytes. Let's look at these side by side. So I'm gonna open this is callout 1-1024 in the min directory. Call out 1-1024, not let's look at these side by side.
+>> Todd Gardner: Can you tell the difference?
+
+[00:04:45]
+
+>> Todd Gardner: I can't they look identical to me, but the one on the left is a third of the size of the one on the right through optimization. And so we've now created an incredibly small copy of all of our images. And in the case where we can ship a small one, the downsized, the 360 wide version optimized is now only 74K.
+
+[00:05:10]
+That's way smaller than that 1.1 megabytes that we were shipping before. But there's one more thing that we can do. So I showed you before on how much smaller WebPs are than PNGs and JPEGs. Well, the third optimization that I have written here, which also uses imagemin, is we are gonna convert all of the the PNGs in the min directory.
+
+[00:05:33]
+We're gonna create a copy of them in the webP directory and we are gonna convert them to webPs. So this is our third kind of step here. Image PNG to webP. So now, let's go back for comparison. So we have in min callout1-1024. That was the one we've been looking at.
+
+[00:05:55]
+So now if we look at the WebP directory, callout 1-1024 dot WebP is 69 kilobytes, not 470 kilobytes. Can you tell the difference?
+>> Todd Gardner: No, they're identical visually identical. But through the course of these three changes, we've taken a 1.5 megabyte image and gotten it down to 70K.
+
+[00:06:23]
+Without stripping any quality like we can ship the same high quality image for retina displays for big displays. At a fraction of the size. That's huge and all we did was run it through these optimizers. Now I'm just putting them straight into code because that's how my system works.
+
+[00:06:44]
+I'm gonna deploy it this way. So we can do it this way you might have a build process that you could automatically generate these files as part of your build. Just automatically running it through compressors, doing replacement in HTML, stuff like that. Huge performance benefits for you to gain.
+
+[00:06:58]
+Now we need to reference these and so how are we going to do that? Well, we're going to use a little replacer, because I like copy paste replacements. They're fun we're actually, we're just gonna do this on, no, let's go ahead and do it on everything. Everything in the public directory, we're gonna look for a
+>> Todd Gardner: A regular expression matcher,
+>> Todd Gardner: This is fun if you guys aren't familiar with like how to do these sort of replacements in VS code it's a huge productivity win.
+
+[00:07:35]
+We're gonna look, we turned on this regular expression match and we're gonna look for the string/asset/image/anything.PNG. But we put parentheses so that we can group the name of the files and here's all of the things that we found. We found all of these files in public. We found some of them in HTML, I think there are some in JavaScript here somewhere maybe not.
+
+[00:08:05]
+Anyway, we found all of these things here. So we're gonna replace that, and we're gonna reference our new webP.
+>> Todd Gardner: So the replacement is we're gonna change all of those paths to use /assets/image/our new webP directory, and then use $1 to use whatever your grouping variable is. And so essentially, we've changed where it would reference assets image devstickers logo to assets.
+
+[00:08:34]
+Image webP devstickers.webP. Boom huge performance wins across the board. Let's look at one of these examples here in index. We've just changed well, those are our preloads we've changed all of our references to use this new one. Let's just do a quick spot check here NPM start. If I look at our site, everything should visually still look all the images are still there great, perfect.
+
+[00:09:10]
+Now, we need to, for a responsive, we need to change how we're referencing that image. And so specifically, we care about that LCP image. We could theoretically do this to all of the images, but the most important one right now is that LCP image so that's what I wanna fix.
+
+[00:09:27]
+Now, there's a lot of typing involved there that is air prone to typos. So I'm gonna just grab this thing out of my samples, which is right here cool.
+>> Todd Gardner: So here where we have our two images, right now, we just had, we had, we referenced printing hero desktop WebP and hero mobile WebP.
+
+[00:09:55]
+And I was using some bespoke JavaScript or some bespoke CSS on desktop and mobile class names to like toggle which one we show which we don't have to do anymore. So we can get rid of this entirely. And in fact, we'll get rid of the div illustration, and we'll just use the picture element for that purpose now it's picture class illustration.
+
+[00:10:16]
+Well, maybe I shouldn't have done that,
+>> Todd Gardner: Let's do it side by side,
+>> Todd Gardner: Yeah, that's better.
+>> Todd Gardner: Great so here's the sample so what we wanna do here is I wanna reference the hero desktop app, or the Hero desktop WebP, wherever I'm doing this. I'm gonna go ahead and leave these query strings on no, I'm not.
+
+[00:10:52]
+We'll just replace it like that.
+>> Todd Gardner: We also created responsive versions of all of our images. So if we look in /image/webP, you'll see that there's- the width at the end of all of the names, just for consistency. So I can do- 2800- 1400 is what I actually use so we should change that and- 720 dash webP cool.
+
+[00:11:29]
+The default will continue to just be, hey, the biggest one. Fetch priority high, height, width, cool, 721. Let's do the mobile version we'll take hero mobile, which at 360 would be- 360.
+>> Todd Gardner: -720
+>> Todd Gardner: And- 1400, which probably won't ever get used 'cause of the style rule, but it's in there so yeah.
+
+[00:12:10]
+
+>> Todd Gardner: Now one thing optimization that we made here is that we're instructing the browser to only download the image that it needs. And we're doing it with fetch priority high. Now, unfortunately, this undoes one of the other optimizations that we did earlier. We added these preloads to pull these two images down, which is great.
+
+[00:12:34]
+When you know you need that image, but now I don't know which image I need. I don't know which one until I know the size of the screen. And you don't know the size of the screen at this point. So these are, unfortunately, no longer going to help us, and we need to remove them, because otherwise we're gonna download two images that we don't necessarily need.
+
+[00:12:54]
+We don't know what image we need until we get there. So now, we're gonna rely on fetch priority high which is still good, but does not have Firefox support. Board of made it still as as good as we can make it. All right, so I have all this stuff here.
+
+[00:13:09]
+We have changes all over the place so we need to commit this. So let's optimized and responsive images okay, now, [LAUGH] Whew.
+>> Todd Gardner: It'll be a bigger trouble,
+>> Todd Gardner: Okay, now, if we go to our CDN version of this and we reload it. Yeah, that's a lot better let's open up dev tools and run the full check.
+
+[00:14:04]
+
+>> Todd Gardner: Look at that it came back at five seconds. We're way closer all right, check this out. So, now, all the metrics are on the initial screen, check this out. LCP is now at 454 milliseconds. So we still have all of these things happening right away. Now, one file that we're downloading the LCP image is this hero mobile fort 1400 we're downloading a 1400 wide version of this image, and we're doing it because this is reflecting a retina display.
+
+[00:14:42]
+So the width is always going to be multiplied by two. So cuz it's going to try and do a double density image to try and look good on iOS devices. And so the width that it calculates is always twice as big for retinas. So it's downloading the 1400 but look how fast, just by setting fetch priority high, cuz we removed the preload attribute, cuz it wasn't going to work anymore.
+
+[00:15:04]
+So just by setting fetch priority high, we're way here at the beginning, it's downloading really fast. And the total download time for this, is only 161 milliseconds, which is super fast. Like this is downloading and FCP and LCP are not far out at all. Like, we're really doing things as fast as the browser is capable of doing them at this point.
+
+[00:15:32]
+And everything should be in the green. There was a question about how do we talk about optimizing SVG images. Now, SVG images are a bit of a different animal that I don't have a whole lot of content on to go into, and they're a different animal because it's a vector.
+
+[00:15:48]
+It's not describing like here's what every pixel looks like. It's describing lines and shapes and that sort of thing, which is great for drawings, like a lot of logos will use this very simple drawings. And the great thing about an SVG is it lets you scale the size from very small to very big.
+
+[00:16:06]
+And there's not really a resolution of it. It's just the same thing, regardless of the size. Now, in terms of like, how do you optimize that, being that the internals is just XML, describing those lines and shapes. There's not an image compression thing, so they'll be natively compressed by the HTTP compression protocols that we use.
+
+[00:16:29]
+So broccoli and G IP will automatically compress those SVG files really, really well. Now, if you wanna do more than that, the best tool that I found for optimizing SVGs is this free tool online called SVGOMG. Which is this little thing where you can paste an SVG into and it's a bunch of options of like rounding off numbers and removing transparent panels and stuff like.
+
+[00:16:53]
+That it requires a little bit of fiddling to make sure you're resulting SVG is the same thing as your input SVG. But I have gotten results where I've crunched the size of an SVG in half. Generally SVGs are not the problem here. SVGs are rarely more than a couple of K.
+
+[00:17:14]
+They're not like this core big thing like PNG's that slow down your page. If you have an SVG that's more than a couple of K, chances are somebody embedded a PNG inside of the SVG. They thought I'm just gonna convert my PNG's to SVG's. And they did an export, not realizing that it just takes the entirety of the PNG and, wraps it in a byte stream inside of XML.
+
+[00:17:36]
+It doesn't actually do anything. So that's not really an SVG in my mind that's just obfuscating the problem. But I hope that addresses the question.
+>> Speaker 2: Wouldn't it be preferable if you do have animation Illustrations and logos and stuff like that to use SVGs because they're so much smaller than images for the most part.
+
+[00:18:01]
+
+>> Todd Gardner: Yeah if your source, if your original source is an SVG, like is a vector, if something if somebody made something in illustrator, keep it as a vector, don't convert it to a PNG, don't convert it to like bits. If it's a drawing, use it as SVG, use it as a drawing, it will almost always be smaller and just way easier to deal with.
+
+[00:18:26]
+
+>> Speaker 2: And I would assume look better too and
+>> Todd Gardner: Yeah, you'll be able to scale it up to way bigger sizes and stuff like that but if it's not if your original source isn't a vector, you're never gonna get it there it's not I have a an illustration that's a PNG I can't convert it.
+
+[00:18:46]
+There's no way that I am aware of to convert a PNG into an SVG that doesn't just embed the SVG bits inside of an XML document which doesn't really do anything. So that was our we deployed it, and we talked about it, and it was huge results. Where are we at super fast at this point, super fast at 454 milliseconds to LCP through through these optimizations that we've been able to add.
+
+[00:19:11]
+So that was our tactics for LCP. We've made LCP really, as fast as this website probably can ever get LCP without fundamentally changing what it looks like. We did a bunch more lazy loading, getting the images that we don't need in the scripts out of the way. We eager loaded, pulled up, made the priority of our LCP image a lot higher.
+
+[00:19:33]
+And we got huge benefits from optimizing the images to crunch them as small as we could. So that was LCP.
+

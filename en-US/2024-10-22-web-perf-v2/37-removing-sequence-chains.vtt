@@ -1,0 +1,758 @@
+WEBVTT
+
+1
+00:00:00.047 --> 00:00:04.219
+&gt;&gt; Todd Gardner: First thing,
+we're gonna collapse our dependencies.
+
+2
+00:00:04.219 --> 00:00:06.363
+So, when we look at this waterfall,
+
+3
+00:00:06.363 --> 00:00:09.821
+I'm gonna use this simplified
+version here in slides, but
+
+4
+00:00:09.821 --> 00:00:13.917
+we can see the exact same thing in
+the Chrome Dev tools in a few minutes.
+
+5
+00:00:13.917 --> 00:00:18.546
+We see this sort of sequence,
+where an HTML file is coming down, and
+
+6
+00:00:18.546 --> 00:00:23.436
+when the HTML file is down,
+there is a stylesheet that gets requested.
+
+7
+00:00:23.436 --> 00:00:28.597
+And when that stylesheet is done, that
+style might reference another stylesheet.
+
+8
+00:00:28.597 --> 00:00:30.288
+And so the net has to come down.
+
+9
+00:00:30.288 --> 00:00:33.597
+And then that stylesheet references
+something else, like a font, or
+
+10
+00:00:33.597 --> 00:00:37.258
+a background image, or something like
+that, and then that has to come down.
+
+11
+00:00:37.258 --> 00:00:41.863
+And all of those things have to
+be downloaded before FCP happens.
+
+12
+00:00:41.863 --> 00:00:44.827
+Specifically, the CSS and the fonts.
+
+13
+00:00:44.827 --> 00:00:45.968
+Why is that?
+
+14
+00:00:45.968 --> 00:00:50.511
+Because CSS and fonts are render blocking.
+
+15
+00:00:50.511 --> 00:00:55.317
+If we know about these things,
+if the document knows that this CSS file
+
+16
+00:00:55.317 --> 00:00:59.798
+has to come down, or knows that
+this font needs to be referenced,
+
+17
+00:00:59.798 --> 00:01:04.539
+it's going to block render from
+happening until they are complete.
+
+18
+00:01:04.539 --> 00:01:09.124
+And it's doing that on purpose so
+that it doesn't render weird content and
+
+19
+00:01:09.124 --> 00:01:14.020
+then shift it around as a CSS file gets
+done, which would be jarring to the user.
+
+20
+00:01:14.020 --> 00:01:17.696
+But we do need to know that those things
+do block rendering from happening.
+
+21
+00:01:17.696 --> 00:01:23.081
+So if we have a piece of CSS, or we have
+a font that we don't necessarily need yet,
+
+22
+00:01:23.081 --> 00:01:25.789
+maybe we shouldn't be downloading it.
+
+23
+00:01:25.789 --> 00:01:29.856
+In our case here,
+we have this weird sequence happening,
+
+24
+00:01:29.856 --> 00:01:33.259
+where we have three things
+that we need to get to,
+
+25
+00:01:33.259 --> 00:01:38.004
+FCP after the document, but
+they're loading one after the other.
+
+26
+00:01:38.004 --> 00:01:41.101
+We're not getting any,
+sort of parallel effect.
+
+27
+00:01:41.101 --> 00:01:45.528
+And the reason is because we have
+this little bit of code running,
+
+28
+00:01:45.528 --> 00:01:50.374
+we're using modern CSS, and
+modern CSS supports import statements.
+
+29
+00:01:50.374 --> 00:01:56.496
+And import lets us say, hey, this CSS file
+also uses that other CSS file, go get it.
+
+30
+00:01:56.496 --> 00:02:00.594
+And if we leave and import in the code
+that we actually ship to the user,
+
+31
+00:02:00.594 --> 00:02:02.964
+well, that's creating a dependency.
+
+32
+00:02:02.964 --> 00:02:04.289
+It's creating a sequence.
+
+33
+00:02:04.289 --> 00:02:07.912
+So we have one CSS file that
+references another CSS file,
+
+34
+00:02:07.912 --> 00:02:12.906
+that references another CSS file, and
+we've created a sequence in our code.
+
+35
+00:02:12.906 --> 00:02:15.484
+The other place that this
+happens is with fonts.
+
+36
+00:02:15.484 --> 00:02:20.722
+So here is a CSS file that
+references a font from Google Fonts.
+
+37
+00:02:20.722 --> 00:02:24.901
+In fact, this is the CSS file that you put
+into your page when you go to Google fonts
+
+38
+00:02:24.901 --> 00:02:28.668
+and you say, I want this particular thing,
+give me the snippet of code.
+
+39
+00:02:28.668 --> 00:02:32.893
+This is what's in that snippet of code,
+is it's referencing a font to go and
+
+40
+00:02:32.893 --> 00:02:33.559
+download.
+
+41
+00:02:33.559 --> 00:02:34.157
+And so,
+
+42
+00:02:34.157 --> 00:02:39.632
+it's creating this dependency chain
+that you need to follow along the way.
+
+43
+00:02:39.632 --> 00:02:42.267
+And that's the thing we need
+to figure out how to remove.
+
+44
+00:02:42.267 --> 00:02:47.601
+Now, these chains can also happen with
+JavaScript, and it can happen with
+
+45
+00:02:47.601 --> 00:02:52.695
+multiple chains executing at once
+that you don't always understand.
+
+46
+00:02:52.695 --> 00:02:58.621
+So here's an example where a page has
+both a JavaScript chain happening and
+
+47
+00:02:58.621 --> 00:03:00.513
+a CSS chain happening.
+
+48
+00:03:00.513 --> 00:03:04.778
+It doesn't necessarily tell
+us what those chains are, but
+
+49
+00:03:04.778 --> 00:03:08.630
+you can kind of see them if
+you look at these ordering.
+
+50
+00:03:08.630 --> 00:03:13.277
+If you see that one file is starting
+exactly when another one is completed,
+
+51
+00:03:13.277 --> 00:03:17.582
+you can kind of infer that there's
+some relationship between them.
+
+52
+00:03:17.582 --> 00:03:21.585
+For example, one JavaScript
+file requesting another one, or
+
+53
+00:03:21.585 --> 00:03:26.418
+the logic in one JavaScript file saying,
+hey, download that other one, or
+
+54
+00:03:26.418 --> 00:03:28.775
+this CSS file pointing at this font.
+
+55
+00:03:31.698 --> 00:03:35.488
+&gt;&gt; Todd Gardner: For example,
+if we were to ship a JavaScript module,
+
+56
+00:03:35.488 --> 00:03:39.111
+say we were to build our
+own performance agent, and
+
+57
+00:03:39.111 --> 00:03:42.416
+we were to pull in In
+the web vitals JS library.
+
+58
+00:03:42.416 --> 00:03:45.756
+Well, even if we host that file locally,
+if we ship this code,
+
+59
+00:03:45.756 --> 00:03:47.838
+as soon as the browser starts running,
+
+60
+00:03:47.838 --> 00:03:51.768
+it's gonna say, I need to stop here
+a second and go get web vitals JS.
+
+61
+00:03:51.768 --> 00:03:56.730
+And now we've made a serial
+request to go off and get it.
+
+62
+00:03:56.730 --> 00:03:58.345
+This also happens in JavaScript,
+
+63
+00:03:58.345 --> 00:04:00.745
+if you just do the old
+fashioned script injection.
+
+64
+00:04:00.745 --> 00:04:04.835
+This happened a lot, like, you have
+a script, it's like a small loader script,
+
+65
+00:04:04.835 --> 00:04:08.748
+and what it does is it creates a script
+element pointing at some of the scripts,
+
+66
+00:04:08.748 --> 00:04:10.086
+and sticks it in the page.
+
+67
+00:04:10.086 --> 00:04:14.931
+This created a sequence,
+one JavaScript pointing at another one,
+
+68
+00:04:14.931 --> 00:04:19.530
+forcing a serial, sequential
+thing to happen during the load.
+
+69
+00:04:19.530 --> 00:04:21.047
+So how do we remove this?
+
+70
+00:04:21.047 --> 00:04:22.744
+Well, you'll use a bundler of some kind.
+
+71
+00:04:22.744 --> 00:04:28.757
+Rather than letting the browser execute
+these dependency between files at runtime,
+
+72
+00:04:28.757 --> 00:04:31.596
+you prepackage them at developer time,
+
+73
+00:04:31.596 --> 00:04:35.365
+at engineering time,
+at build time using a bundler.
+
+74
+00:04:35.365 --> 00:04:37.198
+There's lots of bundlers out there,
+
+75
+00:04:37.198 --> 00:04:39.726
+I can't show you how every
+single one of them works.
+
+76
+00:04:39.726 --> 00:04:43.214
+The big ones that most people use
+are Webpack, Rollup, and Vite.
+
+77
+00:04:43.214 --> 00:04:45.721
+There's obviously lots of other ones,
+
+78
+00:04:45.721 --> 00:04:50.601
+I don't mean to diss your favorite bundler
+du jour, but that's how you do it.
+
+79
+00:04:50.601 --> 00:04:54.426
+You would need to bundle your
+JavaScript or your CSS or
+
+80
+00:04:54.426 --> 00:05:00.038
+whatever into not having these import
+statements in the final shipped files.
+
+81
+00:05:00.038 --> 00:05:05.094
+Now, I've built a very simple bundler
+in DevStickers that I'm gonna show
+
+82
+00:05:05.094 --> 00:05:10.406
+you first the problem, and then we're
+gonna run it and see how it gets solved.
+
+83
+00:05:10.406 --> 00:05:14.477
+So if we were to go over
+to our sequence here,
+
+84
+00:05:14.477 --> 00:05:20.212
+there is a sequence that happens
+in our waterfall right here.
+
+85
+00:05:20.212 --> 00:05:24.694
+So I'm gonna zoom in even farther here and
+see.
+
+86
+00:05:24.694 --> 00:05:28.279
+Okay, so
+the call to devstickers.shop finishes, and
+
+87
+00:05:28.279 --> 00:05:31.416
+it figures out a bunch of
+things it needs to load.
+
+88
+00:05:31.416 --> 00:05:36.619
+It finds CSS2, which is Google Fonts,
+it finds my style CSS,
+
+89
+00:05:36.619 --> 00:05:41.628
+it finds two JavaScript files,
+Scripts JS and Promo JS, and
+
+90
+00:05:41.628 --> 00:05:47.059
+it finds a bunch of images that it
+knows it needs to start getting.
+
+91
+00:05:47.059 --> 00:05:52.073
+Now, style CSS has an import
+statement in it for base JS,
+
+92
+00:05:52.073 --> 00:05:57.294
+and so it waits all the way until
+this is done and it parses and
+
+93
+00:05:57.294 --> 00:06:02.222
+says, crap,
+I have another CSS file I need to get.
+
+94
+00:06:02.222 --> 00:06:04.566
+And then it starts a request for that one.
+
+95
+00:06:04.566 --> 00:06:09.923
+Base has more import statements for
+colors, normalize,
+
+96
+00:06:09.923 --> 00:06:15.073
+and typography, that it then,
+let's move this down.
+
+97
+00:06:15.073 --> 00:06:19.662
+As you scroll around,
+it reorganizes it for
+
+98
+00:06:19.662 --> 00:06:24.259
+helpfulness, but often you just get lost.
+
+99
+00:06:24.259 --> 00:06:29.265
+It makes more requests for colors,
+typography and numbers, and at this point,
+
+100
+00:06:29.265 --> 00:06:34.211
+it knows, you also referenced some
+fonts a while ago, let me go get those.
+
+101
+00:06:34.211 --> 00:06:39.133
+Which is, these are requests to
+fonts.gstatic.com which is Google's place
+
+102
+00:06:39.133 --> 00:06:41.125
+where hosts Google Fonts from.
+
+103
+00:06:41.125 --> 00:06:42.989
+Oop, and
+then it reorganized everything again.
+
+104
+00:06:46.278 --> 00:06:51.740
+&gt;&gt; Todd Gardner: It's once all of
+these things are done way out here,
+
+105
+00:06:51.740 --> 00:06:56.458
+when all the CSS has
+finished downloading and
+
+106
+00:06:56.458 --> 00:07:04.054
+all these fonts have finished downloading,
+that FCP finally happens.
+
+107
+00:07:04.054 --> 00:07:08.600
+And so, by removing these chains,
+by collapsing these things together,
+
+108
+00:07:08.600 --> 00:07:09.762
+we can move up FCP.
+
+109
+00:07:09.762 --> 00:07:11.823
+So FCP happens sooner.
+
+110
+00:07:11.823 --> 00:07:14.111
+Here's how we're gonna do that.
+
+111
+00:07:14.111 --> 00:07:18.973
+If we go into our code,
+under public assets CSS,
+
+112
+00:07:18.973 --> 00:07:22.181
+that's where I have all my CSS.
+
+113
+00:07:22.181 --> 00:07:25.343
+I didn't use any bundlers,
+everything is just straight up.
+
+114
+00:07:25.343 --> 00:07:29.834
+Here's style CSS, which at the top says,
+these are all my styles that I wrote,
+
+115
+00:07:29.834 --> 00:07:32.868
+but there's some base things
+that I like to use a lot.
+
+116
+00:07:32.868 --> 00:07:37.360
+So I referenced a file called Base, which
+defines general styles on the body and
+
+117
+00:07:37.360 --> 00:07:39.786
+elements and buttons and stuff like that.
+
+118
+00:07:39.786 --> 00:07:44.612
+But it also references colors, it has
+all the colors that I use on my website,
+
+119
+00:07:44.612 --> 00:07:48.559
+and typography that says,
+here's the fonts that I wanna use.
+
+120
+00:07:48.559 --> 00:07:50.771
+And a general normalized CSS file,
+
+121
+00:07:50.771 --> 00:07:54.913
+that's a normal thing that you would
+see in a lot of CSS structure.
+
+122
+00:07:54.913 --> 00:07:57.706
+The problem is that I just
+shipped this thing as is, and
+
+123
+00:07:57.706 --> 00:08:00.759
+I made the browser follow
+the dependency chain at runtime.
+
+124
+00:08:00.759 --> 00:08:02.889
+So what instead we're gonna do is,
+
+125
+00:08:02.889 --> 00:08:06.936
+I use a very small bundler that
+you've probably never heard of, but
+
+126
+00:08:06.936 --> 00:08:12.133
+it's a bundler that's built into Vite and
+some other things, called Lightning CSS.
+
+127
+00:08:12.133 --> 00:08:14.457
+I don't have any
+dependencies in JavaScript,
+
+128
+00:08:14.457 --> 00:08:18.127
+I have very little JavaScript in this
+application, but I have a lot of CSS.
+
+129
+00:08:18.127 --> 00:08:24.216
+And so we're gonna run a bundler
+to produce a CSS bundle.
+
+130
+00:08:27.470 --> 00:08:30.667
+&gt;&gt; Todd Gardner: So
+now, I have a new file.
+
+131
+00:08:30.667 --> 00:08:31.835
+For the purpose of this demo,
+
+132
+00:08:31.835 --> 00:08:34.187
+I'm trying to keep everything
+as simple as I possibly can.
+
+133
+00:08:34.187 --> 00:08:38.182
+I'm not generating a new version of
+the site that's super complicated.
+
+134
+00:08:38.182 --> 00:08:42.974
+I just smashed a new file right in here
+when I built it, called styles.bundlejs,
+
+135
+00:08:42.974 --> 00:08:46.724
+which all this really does is it
+follows the dependency chain and
+
+136
+00:08:46.724 --> 00:08:48.472
+smashes it all into one file.
+
+137
+00:08:48.472 --> 00:08:51.375
+So that we don't have to do it at runtime.
+
+138
+00:08:51.375 --> 00:08:55.533
+So now I'm gonna go into my HTML,
+and rather than styles.css,
+
+139
+00:08:55.533 --> 00:09:00.160
+I'm gonna styles.bundle.css, and
+that's how we're gonna roll.
+
+140
+00:09:00.160 --> 00:09:03.132
+We're just gonna do this super simple.
+
+141
+00:09:03.132 --> 00:09:04.437
+So, npm start.
+
+142
+00:09:04.437 --> 00:09:09.676
+If I go back to my page,
+let's go to the local version.
+
+143
+00:09:09.676 --> 00:09:13.248
+So, running on localhost port 3000,
+
+144
+00:09:13.248 --> 00:09:18.915
+I'm not gonna bother throttling right now,
+cuz we're all local.
+
+145
+00:09:18.915 --> 00:09:21.848
+It doesn't matter.
+
+146
+00:09:21.848 --> 00:09:27.277
+If I run this thing having used that
+bundle, all right, so let's zoom way in.
+
+147
+00:09:27.277 --> 00:09:31.765
+So now, if we look and
+we zoom in on this, now we see,
+
+148
+00:09:31.765 --> 00:09:37.785
+here's the initial call to the HTML,
+the CSS file for CSS bundle JS and
+
+149
+00:09:37.785 --> 00:09:43.519
+the CSS2, or style bundle JS,
+and CSS2 happen at the same time.
+
+150
+00:09:43.519 --> 00:09:46.857
+And there's no sequence change
+that happened from that.
+
+151
+00:09:46.857 --> 00:09:49.587
+Now, there is still
+these fonts that happen,
+
+152
+00:09:49.587 --> 00:09:53.168
+because these fonts are being
+referenced by the CSS2 file.
+
+153
+00:09:53.168 --> 00:09:56.929
+And it doesn't know that it needs those
+fonts until these files come down and
+
+154
+00:09:56.929 --> 00:10:00.421
+knows that, like, you actually
+use these fonts for something.
+
+155
+00:10:00.421 --> 00:10:04.699
+And so
+that's why we're still sitting here,
+
+156
+00:10:04.699 --> 00:10:10.413
+kinda locked up behind the request for
+the fonts to come down.
+
+157
+00:10:10.413 --> 00:10:11.991
+And that's what we're gonna address next.
+
+158
+00:10:11.991 --> 00:10:16.402
+But what we did do successfully is
+remove the sequence chain from CSS,
+
+159
+00:10:16.402 --> 00:10:18.665
+that was slowing everything down.
+

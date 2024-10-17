@@ -1,0 +1,114 @@
+[00:00:00]
+>> Todd Gardner: We're gonna get back into the Core Web Vitals and our third web vital, and probably most often misunderstood one, Interaction to Next Paint or INP, and it's exactly what it says on the tin. It's how long does it take between an interaction and the next time the browser can paint.
+
+[00:00:21]
+How long is that and it's figuring out which one is the slowest, this is measuring how quickly do users feel like they can interact with your website and is it getting in the way, is it breaking flow? Again, this is going to be the kind of metric like LCP and CLS, where you don't have one score, this is very dependent on each individual user.
+
+[00:00:48]
+Sometimes the user has no interactions, you will not have an INP score. An INP score does not show up in most performance reports of your site because a performance report, generally doesn't interact, doesn't click on anything, doesn't do anything. This is measuring the actual interactions that an actual user is doing on your site and figuring out what's the slowest one.
+
+[00:01:13]
+So what's an interaction? An interaction is a click, a drag, a touch, a key press, but it's not a scroll. It's not the user scrolling around the page, it doesn't count, that's too easy, not worth measuring. There's other, other things involved in that. So what does this look like?
+
+[00:01:32]
+Here is a really simplified flame chart that shows what we are measuring so the user clicks on something, interacts in some way, type something, drag something, whatever. Now there might be a delay, the browser might be busy doing things when the user clicks on something. And that we'd measure as an input delay, it'd be the time that the browser's blocked doing something else.
+
+[00:01:58]
+And then there's, three events, they actually get fired when the user clicks. There's that pointer up, a mouse up and a click event, and all three events get fired in order. And then if you have JavaScript handlers, if you said hey button add event listener click do these things all of your JavaScript is now running.
+
+[00:02:18]
+And then once all those are done, all of those event handlers are done, it says, great. Now I need to paint anything that changed, and render the document. And then when that's all done, the browser will draw a new frame and show it to the user. And so we're measuring all of that time between when the inputs received, and that frame is presented, all of that together.
+
+[00:02:44]
+So again, the gray, main could be busy, the main thread could be busy running other JavaScripts, downloading an image, getting in the way somehow. Run all your JavaScript handlers and then execute your DOM layout. So let's take an example, so here is Developer Stickers Online, and Developer Stickers Online has this big Add to Cart button all over it, including right here in the header.
+
+[00:03:09]
+So if I convince the user successfully to add this thing to cart, they really want this sticker of a flying sloth, and they click on Add to Cart, INP is measuring the time and from that click, then I have an event handler that listens for that click and does some stuff.
+
+[00:03:25]
+It sends a fetch request to add that to the user's cart, and then once that event is done, it runs some analytics, and then it updates the cart count in the header. So everything that happens until we draw the update where that one happens, which is the next paint event, everything gets counted.
+
+[00:03:48]
+So there's a couple of different ways we can make this better. We can paint sooner, and we can do less, and that's fundamentally the tactics that we'll use to improve this in a little while, yeah. You talk a little bit about how async factors into this if you invoke a promise?
+
+[00:04:07]
+Yeah, again, we're gonna talk about that a lot in the improving section. The main way that we handle this is through async, through what's called yielding on the main thread, is if we, when we pick up on that event handler, and we do a bunch of stuff synchronously, that's all blocking the main thread and stopping the paint event from happening.
+
+[00:04:29]
+If we do stuff asynchronously, like with a promise or with a weight or callbacks or whatever, that's essentially kicking things into the future, so the next paint event can happen sooner. That's the main tactic that we're gonna use to make this better, we're gonna talk about that in the last section.
+
+[00:04:51]
+
+>> Todd Gardner: So, INP is not measuring a single time this happens, it's measuring every time this happens, it's not adding them together, but it is picking the worst one. So, every time the user interacts, it generates an INP. An INP event will be captured by the browser, and the time will be recorded.
+
+[00:05:11]
+So, here's a bunch of times that came out of an interaction that I did as part of testing this, and a lot of them were good. Some of them like two milliseconds, it's great, four milliseconds, the user didn't notice, that one was 243 milliseconds, which is enough that the user noticed.
+
+[00:05:27]
+If we think back to why web performance is important in the studies around user interactivity, if it's more than 0.1 seconds, which is 100 milliseconds, the user notices. That's what we're trying to prevent. We're trying to prevent the user from noticing this so that score of over 243, milliseconds that generates an iron a bad INP interaction event.
+
+[00:05:52]
+Now, some things we might want to know about INP that's a little weird. There might not be an interaction, not every visit to a page will have an INP score, a lot of times the user comes to a page, looks at it, decide it sucks and leaves. Abouts, there is no interaction, there is no INP, second thing is you don't know what is the worst one is during the lifetime of the page, because we're constantly capturing it, we're picking the worst one.
+
+[00:06:24]
+We don't know what the worst INP is until the user leaves. So you can't actually capture this until the end. The third thing is that this is heavily influenced by the capability of your device. If you spend time testing on your MacBooks or on your developer workstations, you're gonna be, yeah, INP is great.
+
+[00:06:46]
+There's no problems here everything is super fast. And that's largely due to how fast and beefy your machine is because a user instead visiting on a $200 Android device with a really tiny ARM processor in it is going to have a way worse time, a way harder time executing all your JavaScript than you do.
+
+[00:07:06]
+And so you have to really consider who your users are and who uses your site and what their capability is, we're gonna talk about that more too. So what is a good score to Google? Google doesn't even try and get everybody to that 100 millisecond threshold that is not noticeable yet.
+
+[00:07:28]
+I think they are going to, I think this was the first set of goals that they're trying to get websites to, and then they're going to advance this to 100 milliseconds in the next couple of years. But right now it's at 200 milliseconds to be good, which is some interactions might be, there might be a noticeable delay to the user, but most of them are good.
+
+[00:07:49]
+Now, if you get more than 500 milliseconds, so half a second, that's full on bad. So, that would be something would feel visibly laggy when you click on- Something in a page, it would look visibly laggy to that end user. Okay, before I move on understanding, we're gonna talk about how to fix these problems a lot in the last section, any questions about what INP is or how it's measured?
+
+[00:08:18]
+
+>> Speaker 2: Is the INP square based on the worst interaction or an average of all interactions?
+>> Todd Gardner: The worst interaction, so if you have a hundred interaction and picks the worst one. Now there is a very, minutia technical details, is that if you have a lot of interactions, if you have, dozens or hundreds there is like a caveat where, for every I think it's 80 interactions, they ignore the worst of that 80 and pick the second worst.
+
+[00:08:47]
+As was really just a data noise signal reduction thing to make their data better, but for our purposes, as web performance professionals, we should really think of it as the worst and try and make sure that the worst one is never so bad.
+>> Todd Gardner: You had a question.
+
+[00:09:06]
+
+>> Speaker 3: So let's say we got our index page, and we redirect to another page, an about page and say there was a very intensive database lookup on that page. Is that gonna affect the SEO of my index page?
+>> Todd Gardner: Yes, yep, yeah, that's not really an INP thing, that's just a load time thing.
+
+[00:09:29]
+But if you hit the index page and as part of that index, you return a 301 redirect to another page, and that page is slow, that whole chain is considered one thing, and you're gonna have a really, really slow INP or not INP. You're gonna have a really, really slow LCP because the load time is just gonna be huge.
+
+[00:09:50]
+Now, there's no interaction that's not necessarily gonna interact or impact your INP at all. Your INP would be based of when we've arrived at that about page and the user clicks on something, if you don't do anything to show the user a response to that click, and you block until you're done, that would cause a bad INP.
+
+[00:10:15]
+
+>> Todd Gardner: Yeah.
+>> Speaker 4: I was gonna say so it's measurement is to the next time the paint happens? So what if you click something and the paint is just replacing with a spinner?
+>> Todd Gardner: That's fine.
+>> Speaker 4: Okay.
+>> Todd Gardner: You don't have to be done with your action, things on the web can be expensive, you could click a button, and that button could generate a fetch call, and that fetch talks to a database, and the whole interaction could take ten seconds.
+
+[00:10:39]
+It could be, now that could have other user experience problems, but as long as your click handler just shows the user spinner, starts a fetch call, and gets out of the way, the next paint is just showing the spinner, and that's fine. This is really about, when you click on something and you don't show the user anything.
+
+[00:11:01]
+You don't give them any indication you do too much expensive JavaScript in response to that click event, that's when the whole browser appears just to, kind of shudder and freeze, cuz nothing else can happen after that event.
+>> Speaker 5: So this is based of the entire lifetime that the user has the page open.
+
+[00:11:22]
+
+>> Todd Gardner: The entire lifetime the page is open. So if you have a long running application and the user has time on page of like ten minutes, an hour, whatever, you don't know this, you can't know this until you'd send this data out with an unload thing or a beacon, leaving the page at the end of the page's lifecycle.
+
+[00:11:42]
+You don't know until the end, because the user can continue interacting up until that point.
+>> Speaker 5: So how does that send if you just close the page, how does it send?
+>> Todd Gardner: When you just close the page or whatever, how tools that would capture this. So the browser captures it itself for Google's purposes, and so that'll be in the internals of Chrome itself, we'll be all right, this page is getting torn down, I'm gonna send this data.
+
+[00:12:09]
+If we wanted to programmatically capture it, the way that we would do this is with the beacon, which is an API that allows us to send analytics data out as a page is being destroyed. That's the only way to reliably get the INP out. We're not necessarily gonna talk about that so much, but if you're interested in rolling your own reporting tools that capture this data, look at the Beacon API, which allows you to send that sort of data.
+

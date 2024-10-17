@@ -1,0 +1,105 @@
+[00:00:00]
+>> Todd Gardner: Now, this is a bunch of small changes to operations. So, this is all kinds of stuff that we haven't actually touched too much yet. The third thing I wanna do around TTFB is right-sizing your host for the workload. So, in my case, I'm putting this thing out in DigitalOcean.
+
+[00:00:18]
+You might be hosting on a platform like, I don't know, for Cell or AWS or Microsoft or Google or wherever. Making sure that you've given the appropriate amount of capacity to your service so that it can turn things on fast. You may not have this problem if you're doing a lot of serverless stuff, but for a lot of us we do.
+
+[00:00:40]
+Here's some real metrics from my DigitalOcean box, which is basically idling. It doesn't do a whole lot to serve this thing just for this workshop, and so, I don't really need to upsize this thing in terms of the raw metrics of how much CPU, memory, and data throughput it's doing because this is a trivial app.
+
+[00:01:01]
+However, for the purpose of this demonstration, I do wanna illustrate how big of an impact this can have. So, we're gonna do another little demo and reduce some artificial delay that I have put into the system. So if we go back into our local dev stickers app, one of the things that I have in here is server duration.
+
+[00:01:24]
+So this app doesn't have a real database, it doesn't really make any calls. It just kind of returns some files for my example. But your real system is probably talking to a database, or it's talking to some APIs, or it's doing something real that will make us request takes some amount of time.
+
+[00:01:43]
+I hard-coded that it's gonna take my server one second to do anything, which is kind of slow, but also kind of real. I've seen a lot of cases where server duration and time to first bytes can be considerably more than a second. So, what is a more practical number that this should be?
+
+[00:02:01]
+The RequestMetrics web server, when it returns data, it returns things on average in about 30 milliseconds, typically. So like, rather than 1,000, I'm gonna set this to 30, or maybe, let's set it to 50, so it's a nice round number, it's a little bit worse. So, we're gonna save this, and you know what?
+
+[00:02:21]
+It doesn't even matter how that behaves locally, we upgraded our server.
+>> Todd Gardner: Oops, let's stage that and send it up, and we're gonna deploy our upgraded server to production.
+>> Todd Gardner: So, how you'll notice that is in our profiling, before we made this change, you'll notice that the time that everything took here, everything took that was coming at our URLs was over a second.
+
+[00:02:56]
+And that was just our server taking a long time to do stuff. There's a few other requests here out to third parties, this is a request to Google Fonts, that are faster than that. But almost everything here is solidly over a second. And that was our server, just being slow, being not good.
+
+[00:03:16]
+So if this is done, which shows that it is, and we run a new request, we'll notice how much faster everything comes down. Now that our server only takes 50 milliseconds to process anything instead of a 1,000, everything still returns pretty quick. Now, we still have a lot of performance problems.
+
+[00:03:39]
+There's still things here that are taking 15 seconds to load, 13 seconds to load. But if we were to do a full run of this and take a look at our time to first byte, we see that we're down into the good range. We're down to 0.21. And we've also improved our FCP, which is also in the good range now, and our LCP is better, but not fixed yet.
+
+[00:04:06]
+Because remember, TTFB is part of FCP, which is part of LCP, so we're affecting all of those kind of things together. So those are the changes that we just made as part of performance config. Now, there's one more thing here that we can do. We compressed our assets, so we're shipping fewer bites over the wire.
+
+[00:04:31]
+We use an efficient protocol, so that we're not being so chatty talking to them, and we made sure our server was big enough for what we were doing. But the server is still in Amsterdam. And so, what is the cost of that? We should always strive to put our host as close to the user as we can.
+
+[00:04:52]
+And why is that? So, if we have the host and the user, there's a bunch of hidden things that don't show up in Chrome DevTools, but are happening under the covers, in terms of how these two things talk to each other over a network. So when the host is trying to return something, the host exists somewhere.
+
+[00:05:13]
+And there's a regional network, like the data center that it's in, the city that it's in, the ISPs that are a part of, there's a bunch of hops that have to happen there. So there's some regional network in Amsterdam, those that data is bouncing around. And then once it's to the main trunks of the Internet, it still has to cross the world, it still has to jump from one part of the world to another.
+
+[00:05:41]
+And then once it's close to the user, it pops back into another regional network and bounces around to the right city and the right ISP and then the last mile all the way to the user. And so, there's just a lot of things involved, there's a lot of hops happening here.
+
+[00:05:55]
+So in our specific case where we're going from Minneapolis to Amsterdam, the time that it takes to do all of those hops is 117 milliseconds. This is according to Wonder Network, which there's a link in the slides, which you can set up like real-time network projections between this city and this city.
+
+[00:06:13]
+What is like the time it takes to cross the network from those things? As of yesterday, it was 117 milliseconds, which means, that's our speed limit. To any user accessing our site in Amsterdam from Minneapolis, it will never go faster than 117 milliseconds per request. There's just no way to ever go faster than that.
+
+[00:06:35]
+And so, if we're making requests a lot, that can add up to real-time. So how do we get rid of that? Well, what if, instead of, we doing all of those hops, what if we moved our host to be in the same regional cloud, the same regional network as our user?
+
+[00:06:57]
+Then it wouldn't have to cross the internet. That's what a Content Delivery Network is or a CDN. A CDN is the ability for you to put hosts all over the world in much more regional networks, and those hosts basically make a copy of your content from your original host.
+
+[00:07:18]
+So the first time the user makes the request, it hits the content delivery network, and the content delivery network needs to make the request all the way back to your server. And so, it's still slow, it's still the same, we have to pay that 117 millisecond tax. But after that, everything can be served from the content delivery network directly.
+
+[00:07:39]
+And we no longer have to pay that tax of crossing around the world. Now, I've done that too, and we can see what that's like. So, I used a little service called BunnyCDN, which, I mean, I'm not employed by them or get any money from them, I just like them.
+
+[00:07:55]
+I think they're a cool, simple little tool, if we go to www.devstickers.shop and load this page.
+>> Todd Gardner: If we go to www.devstickers.shop, this is the BunnyCDN pointing at the same place that we originally got it. And so, the call to devstickers.shop took 308 milliseconds, and it took that because we still had the cache was cold.
+
+[00:08:32]
+And we should be able to see that if we look in the headers, because a CDN will generally tell you a bunch of information about that CDN in the request. We can see that right here, all of these headers here from the response are prefixed CDN and it's telling us information.
+
+[00:08:48]
+It's telling us that, hey, my cache missed, and I had to go and make the request to the original host. And here's a bunch of information about where I am. This edge of the CDN is in the United States, and there's a bunch of information about their proprietary stuff that we don't particularly care about.
+
+[00:09:08]
+But we know that this time it missed, so it was still slow, and we had to go back to Amsterdam. Now, if we make this call again, even if we have all of our caching disabled and stuff like that, the second time we make this call, it was 63 milliseconds.
+
+[00:09:25]
+We went from 300 to 63, and if we look in here, the reason it went that fast is cuz now we had a hit in the cache. The BunnyCDN did not need to go to Amsterdam to get that cache, it had a copy of this website in its edge somewhere in the United States, somewhere close to where we are right now, that it could return from.
+
+[00:09:44]
+We did not have to cross pipes across the world, this is why CDNs are important. We don't always notice it as developers building our own products, because we put our data center probably close to to us. But if you serve users in Europe, and your stuff is located in, say, AWS East Coast or wherever, there's a 100 millisecond tax that is being paid for all those people to cross the Atlantic in their communication.
+
+[00:10:11]
+And so, your site is way slower there than it is here. If you go to Australia, it's even worse. Australians complain all the time about how slow most American websites are because we don't think of putting CDNs in Australia. And their baseline latency is more like 700 milliseconds to cross all the oceans and hops that need to happen from Australia.
+
+[00:10:36]
+So let's put all of this together, and we're gonna set up all of our throttling, all of our network stuff, Forex, throttling, hardware, concurrency on coffee shop, Wi-Fi. We are on the CDN, we are doing compression. We're served over HTTP, and we can reload this page. All right, so we've loaded all of this thing up.
+
+[00:11:00]
+And I bet, we can tell already, a lot of these things have moved farther to the left. If we go and take a look at our console, look, our time to first byte is 0.02 seconds. And now, even though we haven't even optimized it yet, we're already into the green for LCP and FCP.
+
+[00:11:21]
+We haven't even touched those yet, but we made such big improvements in time to first bite that we're within striking distance of having everything fixed, cuz it's that important when we make these changes. Just wrapping up time to first bite. There's four big things we did here. We compressed the responses using gzip and Brotli.
+
+[00:11:45]
+We switched to efficient protocols that are less chatty over the wire. We increased the host capacity to be appropriate for what we were doing, and then we moved the endpoint of our host through a CDN, much closer to our end users. Now, one thing you might notice about this is, this is, I mean, we're engineers, but none of this was really engineering, we didn't change any content.
+
+[00:12:09]
+I didn't change any JavaScript, we didn't change any HTML, we didn't fix any images. We didn't do anything, we just did a bunch of op stuff with how our site is hosted, and we made some huge improvements. I think that's important because so many times we can make big improvements to our web performance by not actually changing what we're doing, but just changing how we do it by considering the infrastructure that we run on.
+

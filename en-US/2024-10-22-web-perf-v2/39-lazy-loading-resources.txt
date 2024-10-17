@@ -1,0 +1,121 @@
+[00:00:00]
+>> Todd Gardner: Okay, the third tactic is that there's some resources that we're downloading that aren't really on the critical path. We don't really need to do this, specifically, JavaScript. Now, here's what our waterfall kind of looks like right now. This is a thing that could be happening, where we're downloading a bunch of stuff at the beginning, and there's a JavaScript file that happens, and a CSS file.
+
+[00:00:30]
+And then the CSS file is done, but it sits there and waits for a long time before downloading another one and then FCP happens. There's this big gap where nothing seems to be downloading and what's going on there? Well, that's where we need to look at the flame chart, because the flame, there's a reason why that flame chart and the waterfall chart are shown together.
+
+[00:00:51]
+They are two views of the same thing. And what we would see here is that at the end of the script file, the script file has to be evaluated, compiled, and executed, synchronously, right? As soon as it's done, that's gonna execute, and it's just gonna do its thing.
+
+[00:01:08]
+So if you've done a bunch of obnoxiously large complex JavaScript, it can stop rendering from happening that might not otherwise be involved. It's important to note because JavaScript is parser blocking. When the browser encounters a script tag, it immediately starts downloading it, and as soon as it's done downloading it, it stops what it's doing, and executes it, right then and there.
+
+[00:01:39]
+It prevents parsing any further content, it prevents any further rendering, and prevents main execution from happening. And so, what's essentially happening here is that, in this time, when that script has come down, the thread is blocked, the CSS file that we already started downloading, it continues to download, that doesn't get interrupted.
+
+[00:02:00]
+But anything new, the browser is no longer able to parse the HTML or figure out anything new that needs to start because it's busy working on that JavaScript. So, how do we get around that? My site dev stickers doesn't necessarily need this JavaScript to run. It's add on functionality once the user starts using it.
+
+[00:02:23]
+But it doesn't need to be there to start running. And so, we need to defer it, we need to tell it to execute later. Go ahead and start downloading it whenever, but don't run it until we're almost done. And that's this script defer attribute. Now, there's a couple of other attributes that are interesting.
+
+[00:02:43]
+You might also see script async. You might have used async or used defer, and been like, I don't know why I'm using one or the other, how are they different? Why are these two things in existence that do almost what seems to be the same thing? And that's cuz they're not exactly the same thing, there's a subtle difference between them.
+
+[00:03:03]
+So if we have a plain old script, we just have script in the head of the page. This is the waterfall we get, which is what we looked at. Soon as that script is done, the execution stops, we evaluate that script, we compile that script, and we execute that script, and everything stops while that gets happening.
+
+[00:03:21]
+If we instead, decorate that script with an async, what that's saying is that, go ahead and start downloading it, whenever you're ready, whenever you have the capacity. But as soon as it's done, it will still block and execute, or block, evaluate, compile, and execute, is whenever it's done.
+
+[00:03:41]
+Now, that's interesting, it sounds like what we want, it says, go ahead and start it later, but we don't really have control of what later means. Later could still be right away, the browser thinks, I have plenty of capacity to download things, I'm still gonna start right away, or it can mean 10 milliseconds or 100 milliseconds later.
+
+[00:04:00]
+It's kind of variable, we don't know. The real problem here is that, by saying this is async, we've started a race. We've started a race between our CSS files and our JavaScript files, and if the CSS file wins, we feel like everything worked great. Rendering didn't get blocked, things work.
+
+[00:04:19]
+But, if the JavaScript file wins, the JavaScript file returns faster than the CSS file, we have the same problem. And the sooner the JavaScript is done, it blocks that same execution. Which is why sometimes what you'll see is that, things don't get any better when you add the async attribute, it's not 100% there.
+
+[00:04:39]
+So let's talk about defer instead. Defer says, go ahead and download this whenever you're ready, but I will not ever start to execute it until just before DOMContentLoaded. It's gonna take all the scripts that are deferred, and it's gonna wait until DOMContentLoaded is about to happen, and then it's going to execute them.
+
+[00:05:02]
+So, in this case, it'd be like, all right, if the two files are racing and the JavaScript file ends second. And that's the last thing to do, it says, great, there's nothing else for me to do, go ahead and start executing it, and then we'll fire DOMContentLoaded. But there's no race condition here either, because if the JavaScript file comes down sooner, it still waits, and waits for everything else to be done before firing or before executing things right before DOMContentLoaded.
+
+[00:05:33]
+So, in most cases, you wanna use defer. There's only a handful of cases where it async makes sense. Chances are, that's not your use case. The other thing that's kind of interesting about it, is that, there's an indirect relationship between deferred scripts, is that, if you have three scripts that are all deferred, their order of execution will be maintained.
+
+[00:05:58]
+The first script will execute, the second one will execute, and the third one will. Even if they download it in different order, they'll be executed in the order that they were discovered in the document. One little note, deferred, I don't know how many people do this, but script support type module for you to use modern scripting.
+
+[00:06:16]
+If you add type module, it is always deferred. You don't have to say deferred, you can't undo deferred, you can't control it at all, they will always be deferred.
+>> Todd Gardner: One question that I get a lot is, where should I put my script tags? Should I put them in the head?
+
+[00:06:33]
+Should I put them right before the end of body? Where do they go? Honestly, it probably doesn't matter anymore. It used to be before we had script defer, that you'd put them in body to control, or you'd put them at the end of your page in order to control when they would execute.
+
+[00:06:51]
+You wanted to make sure they didn't block anything. But script defer largely does that. Now, the only thing this really does is it forces the order of when we're gonna start fetching different resources rather than letting the browser figure it out. If we just leave them in the head and put defer on it, we let the browser say, if you have capacity to download this, go ahead and start.
+
+[00:07:13]
+But if you put it in the body, the browser doesn't even know about it until it gets to those scripts. And so, largely, it doesn't matter anymore. You can leave them wherever it makes sense for you ergonomically and just use the defer attribute. And that's what we're gonna do right now.
+
+[00:07:31]
+So, I'm gonna pop back open to our application, and right here in my index.html, if I scroll down a little bit, I have my two scripts, scripts.js and promo.js. And neither of them need to happen right here, neither of them are part of First Contentful Paint. So, I'm gonna just add the defer attribute to both of them, save that up.
+
+[00:07:54]
+And we're gonna just go ahead and deploy this, and we're gonna check the full thing out in production. All right, so, now, let's take a look at our CDN, and we will rerun our performance check. Sorry, go ahead.
+>> Speaker 2: What would be the difference if you left the async off of the script tag?
+
+[00:08:18]
+
+>> Todd Gardner: If I left defer or if I left async?
+>> Speaker 2: Async.
+>> Todd Gardner: There's nothing, like async or defer are mutually exclusive. You choose that it's either a deferred script or it's an async script. I don't know which one wins if you put them both.
+>> Speaker 2: But if you were to just leave off the word async and it was just blank, just a script and then source or-
+
+[00:08:38]
+
+>> Todd Gardner: Yeah, if you don't do anything, this is the behavior if you do nothing. So the script starts executing immediately. It starts downloading immediately, and as soon as it's done, it will block and execute. If you defer it, or if you async it, it might not start right away, like you're saying, even though I discovered you right away, start downloading it whenever the browser's ready.
+
+[00:09:03]
+But as soon as it's done, block and execute. And defer, go ahead and wait until you're ready to execute it, and then don't bother, or wait until you're ready to start downloading it, and then don't execute it until you've hit DOMContentLoaded. Then you can go ahead and execute it.
+
+[00:09:23]
+
+>> Speaker 3: Okay, it's right before DOMContentLoaded-
+>> Todd Gardner: It's technically, it happens before DOMContentLoaded, but that's the event it's tied to. When the browser's ready to do DOMContentLoaded, before it fires that event, it executes all the deferred scripts. And the reason is that those scripts can then listen to DOMContentLoaded as they're, hey, I am ready to start kind of event.
+
+[00:09:46]
+Where's if it was after it, then DOMContentLoaded may already fired, and then they're in a sequence which just never work.
+>> Speaker 2: So if you defer a script and then you have within the script DOMContentLoaded-
+>> Todd Gardner: Which is what I do.
+>> Speaker 2: So, that's not really [INAUDIBLE] or is it-
+
+[00:10:02]
+
+>> Todd Gardner: Yeah, so that's exactly what I'm talking about. So here in scripts.js, which is now deferred, my first line is, addEventListener DOMContentLoaded, cuz that's what I'm listening for, which is generally a safe thing to do, right? Is, this script is gonna do some DOM manipulation, I wanna make sure that all the DOM elements exist before I wake up and do it.
+
+[00:10:23]
+So I'm gonna wait for DOMContentLoaded before I do my thing. By deferring it, it's not gonna execute this until just before DOMContentLoaded, which means, I can still listen to it, and I can still use it. And I can still, all of the same patterns that we would use before still work equally well, but we've just pushed when the script starts up till as far out as we can wait.
+
+[00:10:47]
+Cool? Yeah. Great, all right, so we deployed, we ran this thing. Let's have a look at what this looks like now. We have our HTML coming down, and as the HTML starts finishing, we realize, hey, I need to download these fonts, cuz we're preloading them. And we download CSS2 and styles.bundle, which has no sequence chains.
+
+[00:11:09]
+You'll notice, they're still flagged because CSS is render blocking. It's just saying, hey, this is important, get these things done as fast as you can because I can't render without them. And then, it knows that we need to execute or we need to download and execute scripts.js and promo.js.
+
+[00:11:27]
+It knows that they're there, but they're still loading when FCP goes off, FCP is not related. We're no longer bound by any of those things. We are just waiting till we get all of our CSS and fonts, which we've started as soon as we possibly can, and this is now the shortest that we can make it given these assets.
+
+[00:11:50]
+Now, if you need to make it shorter, you need to find a way to do fewer assets here, or smaller ones. You could make the font smaller, you could use less of them, you could use more efficient ones, whatever. But with these assets, the way they are, we've gotten them as fast and efficient as we can get them, which honestly is pretty fast considering where we are.
+
+[00:12:09]
+We are at 624 milliseconds to first contentful paint. So those were our three tactics for FCP. We removed sequence chains. We pre-loaded the resources that are on the critical path, so we could start them soon, and we lazy loaded everything else, stuff that didn't need to be in the way.
+
+[00:12:29]
+We're trying to make our path to FCP as fast as we possibly can.
+

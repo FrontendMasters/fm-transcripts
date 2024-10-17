@@ -1,0 +1,884 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:04.442
+&gt;&gt; Todd Gardner: Now, this is a bunch
+of small changes to operations.
+
+2
+00:00:04.442 --> 00:00:09.560
+So, this is all kinds of stuff that we
+haven't actually touched too much yet.
+
+3
+00:00:09.560 --> 00:00:15.390
+The third thing I wanna do around TTFB is
+right-sizing your host for the workload.
+
+4
+00:00:15.390 --> 00:00:18.950
+So, in my case, I'm putting
+this thing out in DigitalOcean.
+
+5
+00:00:18.950 --> 00:00:24.551
+You might be hosting on a platform like,
+I don't know,
+
+6
+00:00:24.551 --> 00:00:30.256
+for Cell or AWS or Microsoft or
+Google or wherever.
+
+7
+00:00:30.256 --> 00:00:33.935
+Making sure that you've given
+the appropriate amount of capacity to your
+
+8
+00:00:33.935 --> 00:00:36.456
+service so
+that it can turn things on fast.
+
+9
+00:00:36.456 --> 00:00:39.783
+You may not have this problem if you're
+doing a lot of serverless stuff, but for
+
+10
+00:00:39.783 --> 00:00:40.997
+a lot of us we do.
+
+11
+00:00:40.997 --> 00:00:44.744
+Here's some real metrics
+from my DigitalOcean box,
+
+12
+00:00:44.744 --> 00:00:46.747
+which is basically idling.
+
+13
+00:00:47.817 --> 00:00:52.031
+It doesn't do a whole lot to serve
+this thing just for this workshop, and
+
+14
+00:00:52.031 --> 00:00:56.522
+so, I don't really need to upsize this
+thing in terms of the raw metrics of how
+
+15
+00:00:56.522 --> 00:01:01.854
+much CPU, memory, and data throughput
+it's doing because this is a trivial app.
+
+16
+00:01:01.854 --> 00:01:04.961
+However, for
+the purpose of this demonstration,
+
+17
+00:01:04.961 --> 00:01:09.014
+I do wanna illustrate how big
+of an impact this can have.
+
+18
+00:01:09.014 --> 00:01:11.928
+So, we're gonna do another little demo and
+
+19
+00:01:11.928 --> 00:01:16.544
+reduce some artificial delay
+that I have put into the system.
+
+20
+00:01:16.544 --> 00:01:20.167
+So if we go back into our
+local dev stickers app,
+
+21
+00:01:20.167 --> 00:01:24.439
+one of the things that I have
+in here is server duration.
+
+22
+00:01:24.439 --> 00:01:28.868
+So this app doesn't have a real database,
+it doesn't really make any calls.
+
+23
+00:01:28.868 --> 00:01:32.599
+It just kind of returns some files for
+my example.
+
+24
+00:01:32.599 --> 00:01:35.695
+But your real system is probably
+talking to a database, or
+
+25
+00:01:35.695 --> 00:01:37.338
+it's talking to some APIs, or
+
+26
+00:01:37.338 --> 00:01:41.589
+it's doing something real that will make
+us request takes some amount of time.
+
+27
+00:01:43.039 --> 00:01:47.356
+I hard-coded that it's gonna take my
+server one second to do anything,
+
+28
+00:01:47.356 --> 00:01:50.469
+which is kind of slow,
+but also kind of real.
+
+29
+00:01:50.469 --> 00:01:53.763
+I've seen a lot of cases
+where server duration and
+
+30
+00:01:53.763 --> 00:01:57.698
+time to first bytes can be
+considerably more than a second.
+
+31
+00:01:57.698 --> 00:02:01.202
+So, what is a more practical
+number that this should be?
+
+32
+00:02:01.202 --> 00:02:04.646
+The RequestMetrics web server,
+when it returns data,
+
+33
+00:02:04.646 --> 00:02:09.512
+it returns things on average in
+about 30 milliseconds, typically.
+
+34
+00:02:09.512 --> 00:02:13.462
+So like, rather than 1,000,
+I'm gonna set this to 30, or maybe,
+
+35
+00:02:13.462 --> 00:02:17.614
+let's set it to 50, so it's a nice
+round number, it's a little bit worse.
+
+36
+00:02:17.614 --> 00:02:21.584
+So, we're gonna save this,
+and you know what?
+
+37
+00:02:21.584 --> 00:02:28.327
+It doesn't even matter how that behaves
+locally, we upgraded our server.
+
+38
+00:02:31.142 --> 00:02:34.378
+&gt;&gt; Todd Gardner: Oops,
+let's stage that and send it up, and
+
+39
+00:02:34.378 --> 00:02:38.582
+we're gonna deploy our
+upgraded server to production.
+
+40
+00:02:42.776 --> 00:02:46.140
+&gt;&gt; Todd Gardner: So, how you'll
+notice that is in our profiling,
+
+41
+00:02:46.140 --> 00:02:51.906
+before we made this change, you'll notice
+that the time that everything took here,
+
+42
+00:02:51.906 --> 00:02:56.096
+everything took that was coming
+at our URLs was over a second.
+
+43
+00:02:56.096 --> 00:03:01.407
+And that was just our server
+taking a long time to do stuff.
+
+44
+00:03:01.407 --> 00:03:04.465
+There's a few other requests
+here out to third parties,
+
+45
+00:03:04.465 --> 00:03:07.791
+this is a request to Google Fonts,
+that are faster than that.
+
+46
+00:03:07.791 --> 00:03:11.417
+But almost everything here
+is solidly over a second.
+
+47
+00:03:11.417 --> 00:03:16.728
+And that was our server,
+just being slow, being not good.
+
+48
+00:03:16.728 --> 00:03:23.251
+So if this is done, which shows that
+it is, and we run a new request,
+
+49
+00:03:23.251 --> 00:03:28.522
+we'll notice how much faster
+everything comes down.
+
+50
+00:03:28.522 --> 00:03:32.747
+Now that our server only takes 50
+milliseconds to process anything instead
+
+51
+00:03:32.747 --> 00:03:36.001
+of a 1,000,
+everything still returns pretty quick.
+
+52
+00:03:36.001 --> 00:03:39.021
+Now, we still have a lot
+of performance problems.
+
+53
+00:03:39.021 --> 00:03:44.081
+There's still things here that are taking
+15 seconds to load, 13 seconds to load.
+
+54
+00:03:44.081 --> 00:03:50.729
+But if we were to do a full run of this
+and take a look at our time to first byte,
+
+55
+00:03:50.729 --> 00:03:54.659
+we see that we're down
+into the good range.
+
+56
+00:03:54.659 --> 00:03:57.066
+We're down to 0.21.
+
+57
+00:03:58.374 --> 00:04:03.241
+And we've also improved our FCP,
+which is also in the good range now,
+
+58
+00:04:03.241 --> 00:04:06.754
+and our LCP is better, but not fixed yet.
+
+59
+00:04:06.754 --> 00:04:10.163
+Because remember, TTFB is part of FCP,
+which is part of LCP, so
+
+60
+00:04:10.163 --> 00:04:13.144
+we're affecting all of those
+kind of things together.
+
+61
+00:04:14.334 --> 00:04:19.760
+So those are the changes that we just
+made as part of performance config.
+
+62
+00:04:22.050 --> 00:04:25.420
+Now, there's one more
+thing here that we can do.
+
+63
+00:04:26.660 --> 00:04:31.450
+We compressed our assets, so
+we're shipping fewer bites over the wire.
+
+64
+00:04:31.450 --> 00:04:36.120
+We use an efficient protocol, so that
+we're not being so chatty talking to them,
+
+65
+00:04:36.120 --> 00:04:40.441
+and we made sure our server was
+big enough for what we were doing.
+
+66
+00:04:40.441 --> 00:04:42.671
+But the server is still in Amsterdam.
+
+67
+00:04:43.741 --> 00:04:45.621
+And so, what is the cost of that?
+
+68
+00:04:47.111 --> 00:04:52.861
+We should always strive to put our
+host as close to the user as we can.
+
+69
+00:04:52.861 --> 00:04:54.561
+And why is that?
+
+70
+00:04:54.561 --> 00:04:59.315
+So, if we have the host and the user,
+there's a bunch of hidden things that
+
+71
+00:04:59.315 --> 00:05:03.918
+don't show up in Chrome DevTools,
+but are happening under the covers,
+
+72
+00:05:03.918 --> 00:05:08.945
+in terms of how these two things
+talk to each other over a network.
+
+73
+00:05:08.945 --> 00:05:13.995
+So when the host is trying to return
+something, the host exists somewhere.
+
+74
+00:05:13.995 --> 00:05:17.846
+And there's a regional network,
+like the data center that it's in,
+
+75
+00:05:17.846 --> 00:05:20.650
+the city that it's in,
+the ISPs that are a part of,
+
+76
+00:05:20.650 --> 00:05:23.945
+there's a bunch of hops
+that have to happen there.
+
+77
+00:05:23.945 --> 00:05:27.235
+So there's some regional
+network in Amsterdam,
+
+78
+00:05:27.235 --> 00:05:30.545
+those that data is bouncing around.
+
+79
+00:05:30.545 --> 00:05:35.711
+And then once it's to the main trunks
+of the Internet, it still has to cross
+
+80
+00:05:35.711 --> 00:05:41.290
+the world, it still has to jump from
+one part of the world to another.
+
+81
+00:05:41.290 --> 00:05:43.185
+And then once it's close to the user,
+
+82
+00:05:43.185 --> 00:05:47.274
+it pops back into another regional network
+and bounces around to the right city and
+
+83
+00:05:47.274 --> 00:05:50.700
+the right ISP and then the last
+mile all the way to the user.
+
+84
+00:05:50.700 --> 00:05:52.961
+And so,
+there's just a lot of things involved,
+
+85
+00:05:52.961 --> 00:05:55.600
+there's a lot of hops happening here.
+
+86
+00:05:55.600 --> 00:06:01.030
+So in our specific case where we're
+going from Minneapolis to Amsterdam,
+
+87
+00:06:01.030 --> 00:06:06.044
+the time that it takes to do all
+of those hops is 117 milliseconds.
+
+88
+00:06:06.044 --> 00:06:09.231
+This is according to Wonder Network,
+which there's a link in the slides,
+
+89
+00:06:09.231 --> 00:06:12.570
+which you can set up like real-time
+network projections between this city and
+
+90
+00:06:12.570 --> 00:06:13.089
+this city.
+
+91
+00:06:13.089 --> 00:06:18.009
+What is like the time it takes to
+cross the network from those things?
+
+92
+00:06:18.009 --> 00:06:23.739
+As of yesterday, it was 117 milliseconds,
+which means, that's our speed limit.
+
+93
+00:06:23.739 --> 00:06:27.741
+To any user accessing our site
+in Amsterdam from Minneapolis,
+
+94
+00:06:27.741 --> 00:06:32.589
+it will never go faster than
+117 milliseconds per request.
+
+95
+00:06:32.589 --> 00:06:35.379
+There's just no way to
+ever go faster than that.
+
+96
+00:06:35.379 --> 00:06:40.366
+And so, if we're making requests a lot,
+that can add up to real-time.
+
+97
+00:06:40.366 --> 00:06:42.306
+So how do we get rid of that?
+
+98
+00:06:42.306 --> 00:06:47.570
+Well, what if, instead of,
+we doing all of those hops,
+
+99
+00:06:47.570 --> 00:06:52.835
+what if we moved our host to
+be in the same regional cloud,
+
+100
+00:06:52.835 --> 00:06:57.225
+the same regional network as our user?
+
+101
+00:06:57.225 --> 00:07:00.141
+Then it wouldn't have
+to cross the internet.
+
+102
+00:07:00.141 --> 00:07:04.044
+That's what a Content Delivery Network
+is or a CDN.
+
+103
+00:07:04.044 --> 00:07:05.927
+A CDN is the ability for
+
+104
+00:07:05.927 --> 00:07:11.777
+you to put hosts all over the world
+in much more regional networks, and
+
+105
+00:07:11.777 --> 00:07:18.047
+those hosts basically make a copy of
+your content from your original host.
+
+106
+00:07:18.047 --> 00:07:20.317
+So the first time the user
+makes the request,
+
+107
+00:07:20.317 --> 00:07:24.383
+it hits the content delivery network, and
+the content delivery network needs to
+
+108
+00:07:24.383 --> 00:07:27.326
+make the request all the way
+back to your server.
+
+109
+00:07:27.326 --> 00:07:30.416
+And so, it's still slow,
+it's still the same,
+
+110
+00:07:30.416 --> 00:07:34.056
+we have to pay that 117 millisecond tax.
+
+111
+00:07:34.056 --> 00:07:35.170
+But after that,
+
+112
+00:07:35.170 --> 00:07:39.953
+everything can be served from
+the content delivery network directly.
+
+113
+00:07:39.953 --> 00:07:45.333
+And we no longer have to pay that
+tax of crossing around the world.
+
+114
+00:07:45.333 --> 00:07:48.456
+Now, I've done that too, and
+we can see what that's like.
+
+115
+00:07:48.456 --> 00:07:51.613
+So, I used a little service
+called BunnyCDN, which, I mean,
+
+116
+00:07:51.613 --> 00:07:55.146
+I'm not employed by them or
+get any money from them, I just like them.
+
+117
+00:07:55.146 --> 00:07:59.540
+I think they're a cool,
+simple little tool,
+
+118
+00:07:59.540 --> 00:08:04.848
+if we go to www.devstickers.shop and
+load this page.
+
+119
+00:08:10.234 --> 00:08:15.675
+&gt;&gt; Todd Gardner: If we go to
+www.devstickers.shop, this is the BunnyCDN
+
+120
+00:08:15.675 --> 00:08:20.677
+pointing at the same place
+that we originally got it.
+
+121
+00:08:20.677 --> 00:08:27.204
+And so, the call to devstickers.shop
+took 308 milliseconds,
+
+122
+00:08:27.204 --> 00:08:32.594
+and it took that because we
+still had the cache was cold.
+
+123
+00:08:32.594 --> 00:08:36.985
+And we should be able to see that if we
+look in the headers, because a CDN will
+
+124
+00:08:36.985 --> 00:08:41.262
+generally tell you a bunch of information
+about that CDN in the request.
+
+125
+00:08:41.262 --> 00:08:45.019
+We can see that right here, all of
+these headers here from the response
+
+126
+00:08:45.019 --> 00:08:48.759
+are prefixed CDN and
+it's telling us information.
+
+127
+00:08:48.759 --> 00:08:52.023
+It's telling us that, hey,
+my cache missed, and I had to go and
+
+128
+00:08:52.023 --> 00:08:54.519
+make the request to the original host.
+
+129
+00:08:54.519 --> 00:08:57.034
+And here's a bunch of
+information about where I am.
+
+130
+00:08:58.305 --> 00:09:03.667
+This edge of the CDN is in the United
+States, and there's a bunch of information
+
+131
+00:09:03.667 --> 00:09:08.885
+about their proprietary stuff that
+we don't particularly care about.
+
+132
+00:09:08.885 --> 00:09:12.341
+But we know that this time it missed,
+so it was still slow, and
+
+133
+00:09:12.341 --> 00:09:14.615
+we had to go back to Amsterdam.
+
+134
+00:09:14.615 --> 00:09:20.093
+Now, if we make this call again, even if
+we have all of our caching disabled and
+
+135
+00:09:20.093 --> 00:09:25.665
+stuff like that, the second time we
+make this call, it was 63 milliseconds.
+
+136
+00:09:25.665 --> 00:09:29.240
+We went from 300 to 63,
+and if we look in here,
+
+137
+00:09:29.240 --> 00:09:33.574
+the reason it went that fast is
+cuz now we had a hit in the cache.
+
+138
+00:09:33.574 --> 00:09:36.938
+The BunnyCDN did not need to go
+to Amsterdam to get that cache,
+
+139
+00:09:36.938 --> 00:09:40.820
+it had a copy of this website in its
+edge somewhere in the United States,
+
+140
+00:09:40.820 --> 00:09:44.924
+somewhere close to where we are right now,
+that it could return from.
+
+141
+00:09:44.924 --> 00:09:50.314
+We did not have to cross pipes across
+the world, this is why CDNs are important.
+
+142
+00:09:51.694 --> 00:09:54.738
+We don't always notice it as
+developers building our own products,
+
+143
+00:09:54.738 --> 00:09:57.614
+because we put our data center
+probably close to to us.
+
+144
+00:09:57.614 --> 00:10:01.947
+But if you serve users in Europe,
+and your stuff is located in, say,
+
+145
+00:10:01.947 --> 00:10:07.256
+AWS East Coast or wherever, there's a 100
+millisecond tax that is being paid for
+
+146
+00:10:07.256 --> 00:10:11.336
+all those people to cross
+the Atlantic in their communication.
+
+147
+00:10:11.336 --> 00:10:16.630
+And so, your site is way
+slower there than it is here.
+
+148
+00:10:16.630 --> 00:10:18.256
+If you go to Australia, it's even worse.
+
+149
+00:10:18.256 --> 00:10:22.709
+Australians complain all the time
+about how slow most American websites
+
+150
+00:10:22.709 --> 00:10:26.290
+are because we don't think of
+putting CDNs in Australia.
+
+151
+00:10:26.290 --> 00:10:30.809
+And their baseline latency is more
+like 700 milliseconds to cross all
+
+152
+00:10:30.809 --> 00:10:34.300
+the oceans and
+hops that need to happen from Australia.
+
+153
+00:10:36.850 --> 00:10:39.803
+So let's put all of this together, and
+
+154
+00:10:39.803 --> 00:10:44.994
+we're gonna set up all of our throttling,
+all of our network stuff,
+
+155
+00:10:44.994 --> 00:10:50.568
+Forex, throttling, hardware,
+concurrency on coffee shop, Wi-Fi.
+
+156
+00:10:50.568 --> 00:10:52.836
+We are on the CDN,
+we are doing compression.
+
+157
+00:10:52.836 --> 00:10:58.322
+We're served over HTTP, and
+we can reload this page.
+
+158
+00:10:58.322 --> 00:11:00.425
+All right, so
+we've loaded all of this thing up.
+
+159
+00:11:00.425 --> 00:11:02.645
+And I bet, we can tell already,
+
+160
+00:11:02.645 --> 00:11:07.004
+a lot of these things have
+moved farther to the left.
+
+161
+00:11:07.004 --> 00:11:10.242
+If we go and take a look at our console,
+
+162
+00:11:10.242 --> 00:11:14.615
+look, our time to first
+byte is 0.02 seconds.
+
+163
+00:11:14.615 --> 00:11:18.248
+And now, even though we
+haven't even optimized it yet,
+
+164
+00:11:18.248 --> 00:11:21.382
+we're already into the green for
+LCP and FCP.
+
+165
+00:11:21.382 --> 00:11:26.566
+We haven't even touched those yet, but
+we made such big improvements in time
+
+166
+00:11:26.566 --> 00:11:31.992
+to first bite that we're within striking
+distance of having everything fixed,
+
+167
+00:11:31.992 --> 00:11:36.202
+cuz it's that important
+when we make these changes.
+
+168
+00:11:36.202 --> 00:11:39.093
+Just wrapping up time to first bite.
+
+169
+00:11:39.093 --> 00:11:40.893
+There's four big things we did here.
+
+170
+00:11:40.893 --> 00:11:45.113
+We compressed the responses using gzip and
+Brotli.
+
+171
+00:11:45.113 --> 00:11:48.383
+We switched to efficient protocols
+that are less chatty over the wire.
+
+172
+00:11:48.383 --> 00:11:53.151
+We increased the host capacity to be
+appropriate for what we were doing, and
+
+173
+00:11:53.151 --> 00:11:56.428
+then we moved the endpoint
+of our host through a CDN,
+
+174
+00:11:56.428 --> 00:11:58.826
+much closer to our end users.
+
+175
+00:11:58.826 --> 00:12:04.530
+Now, one thing you might notice about this
+is, this is, I mean, we're engineers,
+
+176
+00:12:04.530 --> 00:12:09.457
+but none of this was really engineering,
+we didn't change any content.
+
+177
+00:12:09.457 --> 00:12:14.317
+I didn't change any JavaScript, we didn't
+change any HTML, we didn't fix any images.
+
+178
+00:12:14.317 --> 00:12:19.182
+We didn't do anything, we just did a bunch
+of op stuff with how our site is hosted,
+
+179
+00:12:19.182 --> 00:12:22.022
+and we made some huge improvements.
+
+180
+00:12:22.022 --> 00:12:26.698
+I think that's important because so many
+times we can make big improvements to our
+
+181
+00:12:26.698 --> 00:12:30.426
+web performance by not actually
+changing what we're doing, but
+
+182
+00:12:30.426 --> 00:12:34.787
+just changing how we do it by considering
+the infrastructure that we run on.
+
