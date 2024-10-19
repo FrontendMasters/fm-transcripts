@@ -1,0 +1,87 @@
+[00:00:00]
+>> Todd Gardner: First thing, we're gonna collapse our dependencies. So, when we look at this waterfall, I'm gonna use this simplified version here in slides, but we can see the exact same thing in the Chrome Dev tools in a few minutes. We see this sort of sequence, where an HTML file is coming down, and when the HTML file is down, there is a stylesheet that gets requested.
+
+[00:00:23]
+And when that stylesheet is done, that style might reference another stylesheet. And so the net has to come down. And then that stylesheet references something else, like a font, or a background image, or something like that, and then that has to come down. And all of those things have to be downloaded before FCP happens.
+
+[00:00:41]
+Specifically, the CSS and the fonts. Why is that? Because CSS and fonts are render blocking. If we know about these things, if the document knows that this CSS file has to come down, or knows that this font needs to be referenced, it's going to block render from happening until they are complete.
+
+[00:01:04]
+And it's doing that on purpose so that it doesn't render weird content and then shift it around as a CSS file gets done, which would be jarring to the user. But we do need to know that those things do block rendering from happening. So if we have a piece of CSS, or we have a font that we don't necessarily need yet, maybe we shouldn't be downloading it.
+
+[00:01:25]
+In our case here, we have this weird sequence happening, where we have three things that we need to get to, FCP after the document, but they're loading one after the other. We're not getting any, sort of parallel effect. And the reason is because we have this little bit of code running, we're using modern CSS, and modern CSS supports import statements.
+
+[00:01:50]
+And import lets us say, hey, this CSS file also uses that other CSS file, go get it. And if we leave and import in the code that we actually ship to the user, well, that's creating a dependency. It's creating a sequence. So we have one CSS file that references another CSS file, that references another CSS file, and we've created a sequence in our code.
+
+[00:02:12]
+The other place that this happens is with fonts. So here is a CSS file that references a font from Google Fonts. In fact, this is the CSS file that you put into your page when you go to Google fonts and you say, I want this particular thing, give me the snippet of code.
+
+[00:02:28]
+This is what's in that snippet of code, is it's referencing a font to go and download. And so, it's creating this dependency chain that you need to follow along the way. And that's the thing we need to figure out how to remove. Now, these chains can also happen with JavaScript, and it can happen with multiple chains executing at once that you don't always understand.
+
+[00:02:52]
+So here's an example where a page has both a JavaScript chain happening and a CSS chain happening. It doesn't necessarily tell us what those chains are, but you can kind of see them if you look at these ordering. If you see that one file is starting exactly when another one is completed, you can kind of infer that there's some relationship between them.
+
+[00:03:17]
+For example, one JavaScript file requesting another one, or the logic in one JavaScript file saying, hey, download that other one, or this CSS file pointing at this font.
+>> Todd Gardner: For example, if we were to ship a JavaScript module, say we were to build our own performance agent, and we were to pull in In the web vitals JS library.
+
+[00:03:42]
+Well, even if we host that file locally, if we ship this code, as soon as the browser starts running, it's gonna say, I need to stop here a second and go get web vitals JS. And now we've made a serial request to go off and get it. This also happens in JavaScript, if you just do the old fashioned script injection.
+
+[00:04:00]
+This happened a lot, like, you have a script, it's like a small loader script, and what it does is it creates a script element pointing at some of the scripts, and sticks it in the page. This created a sequence, one JavaScript pointing at another one, forcing a serial, sequential thing to happen during the load.
+
+[00:04:19]
+So how do we remove this? Well, you'll use a bundler of some kind. Rather than letting the browser execute these dependency between files at runtime, you prepackage them at developer time, at engineering time, at build time using a bundler. There's lots of bundlers out there, I can't show you how every single one of them works.
+
+[00:04:39]
+The big ones that most people use are Webpack, Rollup, and Vite. There's obviously lots of other ones, I don't mean to diss your favorite bundler du jour, but that's how you do it. You would need to bundle your JavaScript or your CSS or whatever into not having these import statements in the final shipped files.
+
+[00:05:00]
+Now, I've built a very simple bundler in DevStickers that I'm gonna show you first the problem, and then we're gonna run it and see how it gets solved. So if we were to go over to our sequence here, there is a sequence that happens in our waterfall right here.
+
+[00:05:20]
+So I'm gonna zoom in even farther here and see. Okay, so the call to devstickers.shop finishes, and it figures out a bunch of things it needs to load. It finds CSS2, which is Google Fonts, it finds my style CSS, it finds two JavaScript files, Scripts JS and Promo JS, and it finds a bunch of images that it knows it needs to start getting.
+
+[00:05:47]
+Now, style CSS has an import statement in it for base JS, and so it waits all the way until this is done and it parses and says, crap, I have another CSS file I need to get. And then it starts a request for that one. Base has more import statements for colors, normalize, and typography, that it then, let's move this down.
+
+[00:06:15]
+As you scroll around, it reorganizes it for helpfulness, but often you just get lost. It makes more requests for colors, typography and numbers, and at this point, it knows, you also referenced some fonts a while ago, let me go get those. Which is, these are requests to fonts.gstatic.com which is Google's place where hosts Google Fonts from.
+
+[00:06:41]
+Oop, and then it reorganized everything again.
+>> Todd Gardner: It's once all of these things are done way out here, when all the CSS has finished downloading and all these fonts have finished downloading, that FCP finally happens. And so, by removing these chains, by collapsing these things together, we can move up FCP.
+
+[00:07:09]
+So FCP happens sooner. Here's how we're gonna do that. If we go into our code, under public assets CSS, that's where I have all my CSS. I didn't use any bundlers, everything is just straight up. Here's style CSS, which at the top says, these are all my styles that I wrote, but there's some base things that I like to use a lot.
+
+[00:07:32]
+So I referenced a file called Base, which defines general styles on the body and elements and buttons and stuff like that. But it also references colors, it has all the colors that I use on my website, and typography that says, here's the fonts that I wanna use. And a general normalized CSS file, that's a normal thing that you would see in a lot of CSS structure.
+
+[00:07:54]
+The problem is that I just shipped this thing as is, and I made the browser follow the dependency chain at runtime. So what instead we're gonna do is, I use a very small bundler that you've probably never heard of, but it's a bundler that's built into Vite and some other things, called Lightning CSS.
+
+[00:08:12]
+I don't have any dependencies in JavaScript, I have very little JavaScript in this application, but I have a lot of CSS. And so we're gonna run a bundler to produce a CSS bundle.
+>> Todd Gardner: So now, I have a new file. For the purpose of this demo, I'm trying to keep everything as simple as I possibly can.
+
+[00:08:34]
+I'm not generating a new version of the site that's super complicated. I just smashed a new file right in here when I built it, called styles.bundlejs, which all this really does is it follows the dependency chain and smashes it all into one file. So that we don't have to do it at runtime.
+
+[00:08:51]
+So now I'm gonna go into my HTML, and rather than styles.css, I'm gonna styles.bundle.css, and that's how we're gonna roll. We're just gonna do this super simple. So, npm start. If I go back to my page, let's go to the local version. So, running on localhost port 3000, I'm not gonna bother throttling right now, cuz we're all local.
+
+[00:09:18]
+It doesn't matter. If I run this thing having used that bundle, all right, so let's zoom way in. So now, if we look and we zoom in on this, now we see, here's the initial call to the HTML, the CSS file for CSS bundle JS and the CSS2, or style bundle JS, and CSS2 happen at the same time.
+
+[00:09:43]
+And there's no sequence change that happened from that. Now, there is still these fonts that happen, because these fonts are being referenced by the CSS2 file. And it doesn't know that it needs those fonts until these files come down and knows that, like, you actually use these fonts for something.
+
+[00:10:00]
+And so that's why we're still sitting here, kinda locked up behind the request for the fonts to come down. And that's what we're gonna address next. But what we did do successfully is remove the sequence chain from CSS, that was slowing everything down.
+

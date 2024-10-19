@@ -1,0 +1,61 @@
+[00:00:00]
+>> Todd Gardner: All right, we're on the homestretch, folks, homestretch, last one, let's go, go. All right, improving INP, this is our last Core Web Vital and our last metric that we're gonna focus on. Improving, Interaction to Next Paint. What's Interaction to NextPaint? Remember, this is how quickly users can interact with your site, how fast they feel like they can interact.
+
+[00:00:23]
+And let's do a little quick demo, of how this interaction happens. Now, one of the things that I've mentioned a few times through this course is when we run these profilers, it's not actually generating INP data because there's not an interaction as part of just loading a page, there's nothing being clicked on.
+
+[00:00:41]
+Well, we can generate different kinds of profiles. We can run a profile where that's explicitly what we are measuring. But what we haven't measured here yet is INP. And when we measure INP, we need to force an interaction, which doesn't necessarily happen on load. Now, we can also record a sequence here, when we're actually interacting, we don't have to just do this on load.
+
+[00:01:06]
+So I'm gonna go ahead and clear this out, and I'm gonna just start recording. Now, this doesn't reload the page, it just starts recording the page right now. So now I can go over to the page and I can click the main button that we're trying to get users to do, which is Add to Cart.
+
+[00:01:24]
+So I clicked on it, it doesn't really give the user any feedback, eventually there's one shows up here in the corner. Now I can turn off the profiler and I can see what exactly is happening along the way. So here's everything that happened while we were recording, so I can go in, and we can drill into individual user interactions and see what's going on.
+
+[00:01:46]
+Now, the other thing I told you is that INP, you don't necessarily know what INP is until the end of the page. The extension will give you a notification every time there is a bad INP, just so you know you don't have to force a reload. And in this particular case, we see a 1200 millisecond INP, which is really, really bad.
+
+[00:02:09]
+It's when I clicked on this button, there was 1200 milliseconds of processing duration is part of that we need to look into and fix, and that's what we're gonna play with next. So, do you need to worry about this? Again, look at your data, don't spend a bunch of time trying to optimize for IMP if you don't have this problem.
+
+[00:02:28]
+Look at your real data, look at the CrUX data, and decide whether or not this is important. Like CLS, there is one solution to INP, INP is about one thing, 99% of the time, 1% of the time, there's some other more advanced techniques that we're likely gonna cover in the intermediary web performance, course, but 99% of the time, it's about this, it's about yielding to the main thread.
+
+[00:02:54]
+What does that mean? What, that's a big Advanced Software Engineering kind of word, what do I mean when I say that? So here is the code, here's the actual code behind that click button. That click button, we are listening for click events, and if the click matches a button with Add to Cart class, we do a few things.
+
+[00:03:21]
+
+>> Todd Gardner: We grab the attribute data-product-id, and we pull it out and transfer it as an integer. So now we have a number that represent, hey, what product is the user trying to add? We do a bunch of important analytics work because tracking analytics from an e-commerce store, super important.
+
+[00:03:37]
+I wanna know that the user clicked on these, and then we set up a fetch request to do a bunch of work, we await an add to cart to do some stuff. And that's it, that's all we do. In response to add to cart, when add to cart's done, it updates a number, but the actual click handler, this is what it does.
+
+[00:03:56]
+So what does that, what does that mean? Well, so if we were to look at that in a flame chart, this is what that looks like. So there's a click event in response to that click event, the browser dispatches the click event in response to the actual interaction.
+
+[00:04:13]
+The browser will dispatch the click event, and it'll look for all of the handlers that are listening to click, and it'll find one. And then it'll call that function, and that function is me. That's that anonymous function that I bound to click. That's this, this anonymous function right here, it found it bound to click.
+
+[00:04:34]
+That anonymous function calls update analytics, and update analytics takes forever. It takes so long, and when it's finally done, it's basically done, and then a paint task can happen to update the UI. So the Interaction to Next Paint is all the time between click and that paint, in our example, what we're currently at is 1200 milliseconds seconds between the click to that paint event.
+
+[00:05:01]
+That means for us that update analytics is taking a really, really long time. But analytics is important, I'm not saying you should get rid of analytics. I'm just saying it's taking a really, really long time. We ran our performance thing, we clicked on the button, we tracked that.
+
+[00:05:16]
+I did this a little out of order, that's okay, so there's two, there's a couple of ways we can solve this. When I say yield, that's a big fancy term that doesn't mean that complicated a thing. You're probably very familiar with what this is. A yield is a set timeout.
+
+[00:05:31]
+We're trying to get out of the way of the main thread. The main thread is blocking, there's only one of them, it handles all the JavaScript, all of the events, all the layouts. We need to get out of its way and do things later. So set timeout is the tried and true way that everybody knows, everybody who's JavaScript knows, we've done this a thousand times.
+
+[00:05:51]
+You schedule some code to run in the future, and you allows other work to run. Now, the other thing you can do is called requestAnimationFrame, which you may not be familiar with, but it's super powerful here. And it's a more specific version of set timeout. RequestAnimationFrame lets you schedule code to run just before the next time the browser would paint.
+
+[00:06:17]
+So the next time the browser should paint, it can do it, can give you a callback to say, hey, do you need to do something? The reason this exists is for animations, like high-velocity animations, you're doing something that's, very multimedia, very game-like, stuff like that, and you wanna execute an animation, this is what you would use for that.
+
+[00:06:35]
+But it's also super valuable for managing INP, because it lets us control the timing between the main thread and when paint happens. I'm gonna show you how
+

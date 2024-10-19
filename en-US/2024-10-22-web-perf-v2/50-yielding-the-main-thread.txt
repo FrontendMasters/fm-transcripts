@@ -1,0 +1,97 @@
+[00:00:00]
+>> Todd Gardner: So here is how we would take that same code and yield to the main thread in the most efficient ways possible, while also adding a little bit of ergonomics to the user. So, let's dig into this. I'm gonna highlight again. So now we have our same async click event and we're listening for, hey, if we're looking to add to cart, we're gonna do some stuff.
+
+[00:00:24]
+Here's the same code where we get the product Id. That's a really cheap operation. We don't need to wait on that. We can just get that. But then we're gonna stop. We're gonna stop and we're gonna request an animation frame. We're gonna stop all of our processing and we said, let's not do anything until the next time the browser is ready to paint a frame.
+
+[00:00:44]
+And the next time the browser is ready to paint a frame, let's do some stuff. Let's do some stuff like give the user some feedback that this thing happened. Like, let's change the content of the button to say the word added and then disable the button. So the button will actually change and give the user some feedback that something happened.
+
+[00:01:05]
+You could also use it to show a loading spinner or whatever sort of feedback you want to use. But here's a great time to show the user something interesting. And then we're right before that animation frame happened, but we don't want to do a lot of work before that frame.
+
+[00:01:23]
+When that frame happens, that's the P in INP, that's the next paint. So we don't wanna do any work there and update analytics is a lot of work. So here's where we'll use set timeout. There's a little typo here. There's supposed to be a number there obviously. There's a little set time out here where we're going to say, hey, in the future, update the analytics, but don't do it before this frame.
+
+[00:01:50]
+Go ahead and like finish rendering the paint as part of this animation frame, but then update analytics and go ahead and start adding to cart. But that's an async operation. So that's automatically there's a set timeout in there. And then at some point in the future or 1,500 milliseconds later, we'll change the text content of the button back and re-enable it so the user could add to cart again.
+
+[00:02:15]
+So what does this do? That's a lot of code. A little function kind of became a big function, but that's kind of important for event handlers is to have these sort of wrappers, because we've added a couple of different times where we've yielded to the main thread. The first one is this main wrapper to request animation frame is we're handling that click event, and now we're saying, wait, let's not do anything until the browser's ready to paint.
+
+[00:02:43]
+And then as soon as it's ready to paint, we're gonna do a little bit of work around changing the contents of some buttons, because that's stuff we want painted. And then we're going to defer or yield again to update analytics, and we're going to yield again to add to cart, and then we're gonna yield again to change the button back into some point in the future.
+
+[00:03:05]
+So what does that actually look like? That code, translated into a flame chart, is this. So now when the click event happens, there's still that task, the click event gets distributed and the function call happens. It calls our anonymous function. And all our anonymous function does is call requestAnimationFrame.
+
+[00:03:24]
+And then it's done. And then the browser waits until it's ready to paint. And then it spins up another test that says, hey, I'm about to render an animation frame. Does anybody have anything to do? And all that we really do, we change that button. But we spin up a set timeout and add to cart, and we get out of the way, and we yield back to the main thread so the paint can happen.
+
+[00:03:45]
+At that point INP has happened. We did from click to paint. That was what we measured. We did as few things in there as we could possibly get away with. Then at some point in the future, the timer goes off and it updates analytics, and that takes for fricking ever.
+
+[00:03:59]
+But it doesn't matter anymore because we are not standing in the way of INP and it can take as long as we need it to take. So let's do that, and then we'll confirm it in the profiler. So here's what we're gonna to do. We're gonna go into,
+>> Todd Gardner: Almost there, home stretch.
+
+[00:04:25]
+So here, in scripts js is where this thing lives. So we're attaching our click handlers. Let's make this even a little bit bigger. Get out of the way here. So here we have a click handler, and what this click handler is doing, right now it's attached at the document level because there's a little bit of client side rendering happening in this application.
+
+[00:04:47]
+And so the buttons can technically disappear and reappear. And so I don't have to constantly be binding and unbinding click handlers. I just have one click handler that listens all the way at the top. And then when that click handler goes off, I just look to see if the element matches a button I care about.
+
+[00:05:02]
+In fact, one that says add to cart on it. So if it has add to cart, I'm gonna do a couple of things. I want to get out of the way here as fast as I can. As soon as I've figured out what I want to actually render to the user, I want to get out of the way.
+
+[00:05:15]
+But to do that, I need to add a request animation frame. So that's what we're gonna add here, requestAnimationFrame, which takes a callback. You don't need anything in it. You don't need to specify time. It's just call me back when you're ready to animate something, and when we're ready to animate something, I want to, I'm just gonna copy these things, when we're ready to animate something, I want to show the user something.
+
+[00:05:45]
+I want to actually paint something meaningful to the user. So we're gonna change the contents of this button that got clicked to say the word added, and we're gonna disable the button so they can't click on it again until we're done. And then that's really all I wanna do on the main frame right now.
+
+[00:06:03]
+I wanna let that paint event happen. So now, we're gonna set time out again. And I setTimeout takes a function, and it takes a count. Now, the count in our case, I don't care what it is. It could be 0, you could omit it entirely, I'm just saying get this out of the way, call me back later, and do some work.
+
+[00:06:25]
+And that work is update analytics. That's that expensive job that I want to do. Now, I also need to actually add this thing to cart. Now, that's an await which is like a wrapped promise, so it's already wrapped in a setTimeout, we're good there. Oops, my requestAnimationFrame needs to be an async function, so I can use await.
+
+[00:06:50]
+So that's already yielding on the main thread. Now, the last thing I wanna do is I changed the content of the button, and I wanna change it back at some point. So we're gonna use setTimeout again, this time it's not really so much about yielding to the main thread as just, hey, I don't want this thing to run for about 1,500 milliseconds.
+
+[00:07:11]
+And when it does, I want to undo this action. Let's set this back to add to cart. And let's removeAttribute disabled.
+>> Todd Gardner: Cool, and let's save that. And let's npm start and play with that locally. So now if we go to developer stickers local,
+>> Todd Gardner: What we've been playing with is this add to cart button.
+
+[00:07:43]
+So now when we click it, we have this user feedback where it said added, which feels way smoother, right? Just that user responsiveness. All right, just that felt good. But let's actually measure it. Let's actually look at it. We saw INPs coming back good, so that's cool, but let's actually measure this.
+
+[00:08:09]
+Let's record and add to cart and stop and we can zoom in on this.
+>> Todd Gardner: There's this interactions panel here that actually shows us where clicks happened. It really helps you find when you're trying to trace something. So I see here's an interaction, here's a pointer event that happened.
+
+[00:08:36]
+And we can zoom in on what exactly is going on? So the pointer event happened, remember there's a bunch of green stuff, green is extensions, this is the web vitals extension getting in the way reporting on what's happening, but you can largely ignore it. But we have to zoom way in to see this at this point.
+
+[00:08:58]
+Here's the event, the click event going off that calls a function. Here's our anonymous function. If we click at what this anonymous function is, we'd have to actually zoom in. That's web vitals. That's not even us. There we go. This big one, that's not even our code. Our code is so small now, that it's, come on.
+
+[00:09:26]
+Our code is so small now that it is this guy right here. This is our code now running. It is so small and fast, it does nothing. We request an animation frame on scripts js line 31 column 8, and this is where we set up, changing the text of the button.
+
+[00:09:46]
+We even see a line saying, hey, this got pointed and runs over here, the animation frame, the browser is about to redraw and tells us about it. So our function picks up and it runs our anonymous function here, it spins up an add to cart, which spins up a fetch, and it gets out of the way.
+
+[00:10:09]
+And then the layout happens. And so this was INP right here, interaction to paint. And look at the time frame that we're at 2522.3 milliseconds to 2522.4 milliseconds. We're talking about very, very small fragments of time right now. Now there's still a bunch of JavaScript that runs. We didn't change the amount of JavaScript that runs.
+
+[00:10:35]
+We just said do it later cuz now later timer goes off, and we still do this obnoxiously huge amount of work called update analytics. It's just no longer blocking the main thread, and it's no longer standing in the way of paint. We yielded main to try and get something done fast and then let the expensive work happen later.
+
+[00:10:57]
+Now that work is still expensive, very expensive. So expensive that it's warning us that hey, this was a really long task. This JavaScript took a long time to run, and there's lots of things that we could do to probably tear that apart and optimize it. Full disclosure right now, that is just a giant while loop that spins for like 25,000 times to generate an abnoxiously large amount of work.
+
+[00:11:21]
+But see Javascript performance techniques course for all kinds of ways that you could make real Javascript perform faster. All we're concerned about right now is getting out of the way of the main thread so it can paint, because that is what we're measuring, that is what's important to Google, and so it's what's important to us.
+
