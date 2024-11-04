@@ -1,0 +1,133 @@
+[00:00:00]
+>> Spencer Schneidenbach: And querying with EF Core Basics, so up to this point, we've created our DbContext, we've created our DbSets, we've created our migrations, we've seeded our database. We've done everything we needed to do except the thing to do where the rubber meets the road, which is connect our database to our API.
+
+[00:00:17]
+So first things first, let's go over a few querying basics with LINQ. So you'll recall that LINQ methods on a given collection can be chained together such that you can very fluently express operations to look over that collection. So in this case, right here, we're filtering down, we're using Where.
+
+[00:00:41]
+In JavaScript, we would say filter. We'd say Where e.Salary is greater than 10,000, or sorry, 100,000. Then we're ordering by the name of those employees, and then we're simply selecting or map in JavaScript. We're just taking the name of those employees. We don't need every property on there, we just need the employee's name.
+
+[00:01:03]
+So we wrote a query here to talk to this employee set. We can do the same thing when we're talking to our employees table in SQLite, so let me show you what that looks like. So I wanna first kind of bring up this IRepository interface, which is our reflection of the repository pattern in our code, right?
+
+[00:01:25]
+It seems that it's useful, pretty complete. It seems like that we need to be able to get them objects, you need to be able to create, update, delete. But how does this actually look as applications get more complex? So consider that this repository abstraction kind of breaks when you wanna be able to do something like get an object by a different ID.
+
+[00:01:46]
+So for employee, for example, we can get them and uniquely identify them probably by their social security number. So if we wanted to do that, so we'd have to do something special, right? It already breaks our iRepository interface, so what would we have to do? Well, one way that you could model that is by creating an IEmployeeRepository which implements the IRepository interface.
+
+[00:02:09]
+And then defines its own GetBySocialSecurityNumber method that you could use to get that employee by that social security number. And then we could create an EmployeeRepository which we already have. Or we could switch our EmployeeRepository to implement IEmployeeRepository instead, but let's consider what that looks like in code.
+
+[00:02:27]
+We now have at least three separate files, two abstraction files, right, two of our interfaces for representing a single repository for employee. The rabbit hole goes way deeper. And there's a lot of problems with this interface such that querying it is rather difficult in a way, right? This is actually a very simplified IRepository.
+
+[00:02:49]
+You could instead do a GetAll where you expose IQueryable, but now you're introducing a layer of abstraction in your repository between that and your DbContext. So let me just skip to Spencer's opinion on this, and this is a spicy one. DbContext by its very nature is a combination of two different software patterns.
+
+[00:03:11]
+It is the repository pattern because we can get and put objects in there. And it's also the unit of work pattern because DbContext is smart enough to say, if you wanna add two employees and a benefit and then call save changes, it will do that all in one go as a unit of work.
+
+[00:03:28]
+Because it inherently supports database transactions, which will prevent, if there's an error from inserting or updating an object, it will prevent all of those data, those data mutations, from being committed to the database, which is a really, really, really critical thing. Database transactions are a really important part of a developer's day to day.
+
+[00:03:48]
+So it's my spicy, and I say it's spicy because I think that the community is very divided about this, about 50/50 based on a poll on Twitter I did a few years ago. That we should skip the IRepository interface altogether and use DbContext directly. What ends up happening is typically, is if they do use a repository pattern with Entity Framework Core is that they've introduced a lot of extra code and a lot of layers of abstraction on top of DbContext.
+
+[00:04:17]
+And repository ends just being a wrapper around DbContext, but not a particularly good one. Because one thing that abstractions do is that they leak, and what that means is an abstraction that can fail to meet all use cases, is what's called a leaky abstraction. So your abstraction might be good today, but a couple of days from now, a couple of weeks from now, it may not be sufficient.
+
+[00:04:39]
+So there are reasons that we should wrap DbContext up occasionally, right? And I do that on a case-by-case basis. Caching is a really good example of that. If I need to cache this object in some fast memory store like Redis, then I can do that, but at that point, I'm gonna introduce an abstraction to do that for me.
+
+[00:04:59]
+I'm not gonna do that ahead of time, whether or not I know to do that. So we're just gonna skip IRepository, and we're gonna rip it out completely, and we're gonna use DbContext directly. All right, I'm gonna get off my soapbox now. Now that we're off my soapbox, we have a ton of refactoring to do, and this is gonna take a little bit.
+
+[00:05:15]
+So I like to straight up remove old code and interfaces that I don't need anymore, and let the compiler tell me where to fix things. I could do dotnet build, and just let the errors guide my way. So that's exactly what we're gonna do. So we're gonna skip over to, we are on querying basics.
+
+[00:05:34]
+So we are gonna close this folder, and we're gonna open up that next lesson. We're on querying basics, boom, and we're gonna see that we have our DbContext. We have an on model creating if we need it, but we don't, it's actually not doing anything. It's actually calling the base, which by the way, if you dig into that code, this method doesn't actually do anything.
+
+[00:05:58]
+You don't need to call it the base method for this, but it's there. We still have our, let's see, we still have our IRepository abstraction, and of course, we've got our IRepository. So we're gonna do this, we're gonna go nuclear on this thing. First thing we're gonna do is hit the delete key, my favorite key to delete.
+
+[00:06:20]
+Are you sure to wanna move this to the trash? Yes, because I don't like the IRepository interface. I wanna remind you that I brought it up earlier on because I still do see it in the wild. I still think it's important to know, but I want you to know that if I were starting a new project and I never use the IRepository interface at its face, I always start with EF Core.
+
+[00:06:40]
+So now that we've gotten that all the way, we can open up our terminal dotnet build, and we got a lot of things to fix. We got, well, nine errors, that's not so bad. We'll start by going to Program.cs. You'll see that this USING statement no longer is needed.
+
+[00:06:57]
+Actually, these three are not needed, so we'll go ahead and delete them. And I can tell they're not needed by the way, because they're kind of in a faded font, so we'll just go ahead and delete those. This list of employees hasn't been needed for a while, so we'll go ahead and delete that.
+
+[00:07:11]
+And then we've got our EmployeeRepository. Where the heck does that live? We need to blow that up, too. All right, employee repository, it doesn't have anything to inherit from, so we're just gonna do the delete key, boom, love it. And then, of course, our compiler's gonna complain that these things no longer exist, so we're gonna put those down there.
+
+[00:07:32]
+And that's good, so we're gonna continue to build and see where the rest of our errors are, which they should almost exclusively be, inside of our tests and inside of our controller. So let's go ahead and go there, and we're gonna see that we no longer need the abstractions namespace.
+
+[00:07:47]
+It no longer exists because we deleted the folder and we don't have a repository anymore. So we're gonna delete that, and then we are going to delete this, because, of course, we don't have that, and we don't need that. So that's looking pretty good so far. First thing we need to do is we could keep deleting, but I'm gonna go ahead and set us up correctly since we're already on this line of code.
+
+[00:08:09]
+So I'm gonna say AppDbContext, just go ahead and have our dependency injection system wire it up for me. So when this controller's instantiated, the ASP.NET Core is going to see that we already have an ASP or an AppDbContext available. So it's going to construct that for us, connect it to SQLite, and give it into our controller.
+
+[00:08:32]
+And out of force of habit and also stylistically, I'm going to add the underscore in front of that, and then we're gonna see a bunch of things. So we're gonna see that our repository.GetAll doesn't exist anymore. So I'm gonna change this to be await _dbContext.Employees.ToArrayAsync. I'm gonna go ahead and just put them all into memory.
+
+[00:09:02]
+I am also going to put this down as task, boom, boom, we like it. Okay, and then we're gonna return employees, but we are going to say employees.Select and then pass it our method (EmployeeToGetEmployeeResponse). So far so good, we're gonna go down to here, to our single endpoint.
+
+[00:09:24]
+And we're gonna do a similar thing. So there's a couple of different things that you can do here. I'm going to go ahead and kill that. You heard me when we were talking yesterday about single methods, or methods that you can use in LINQ to get single objects out.
+
+[00:09:39]
+So there's a couple of different ones that we can talk about. I'm gonna use single or default async because that's the one that I use the most. The reason that I wanna use at least something that I know will return null is because I wanna check this to see if it's null, and if it is, then I want to return not found.
+
+[00:10:00]
+Otherwise, if you call single and that object doesn't exist, you're not gonna get a not found, you're gonna get a 500 because it's gonna throw an exception. So we're gonna say SingleOrDefaultAsync. We're gonna go ahead and out of habit, async all the way down if we can help it.
+
+[00:10:16]
+So we're gonna convert this to an async task method, which is ASP.NET Core will happily use. We will await this method, and then we will say our e goes into Id == id. So we're saying we're passing it a lambda that says, give me the employee, the single or non-existent employee where their ID is equal to the ID I pass in here.
+
+[00:10:44]
+I do wanna hover over and notice that we are not using the IEnumerable link method, we are using the IQueryable one. Because if both are available right now, but extension methods will always target when there's a narrower, what we call a narrower type. We know that IQuery that this thing has an IQueryable extension method, and IQueryable actually does inherit from IEnumerable.
+
+[00:11:08]
+So we are going to use this link method, which is exactly what we want. And you see here that we are passing an expression of func in, but it looks exactly the same as a regular function. It's a property of C#, it is called homoiconicity. And it basically says that the syntax that you use to define your data structure for your functions also can define your functions.
+
+[00:11:34]
+There are some languages that are purely homoiconistic, I guess is how you would say that, but C# isn't purely, but it is in its side of its functions. That's why LINQ is so powerful, one of the things that makes LINQ so powerful, it's very natural to use for developers.
+
+[00:11:48]
+There's also a FindAsync method which is common to see. I don't have a strong opinion about it other than I just prefer single or default async. But this one works just as well, and in this case, you're just passing in the key value of that entity, which is good.
+
+[00:12:08]
+
+>> Spencer Schneidenbach: Go ahead and keep it a single or default. Now we're gonna go ahead and run this, say, we can't run this yet. By the way, this error message, would you like to continue and run the last successful build? I don't know anybody who's ever hit yes for any reason.
+
+[00:12:26]
+We're gonna hit no, we're gonna say that, we didn't do these ones. We're gonna go reach for our commenting out syntax. We are going to ignore these. These do not exist right now. We are actually going to comment out all of these things and we are actually going to comment out as well our validator.
+
+[00:12:45]
+We're gonna take care of adding an updating objects in the next section of this. So we're just gonna ignore these things for now. We're gonna ignore our test for now as well. We're gonna hit play, we're going to see that we do get our API. We are 5129, so I will do a get, and yay, we got back employees, but we're missing something, we're missing the benefits.
+
+[00:13:08]
+And I know we seeded this thing with benefits. We seeded our employee database with benefits, so where the heck are those? Let me show you. So by default, Entity framework is going to pull back only what you tell it to pull back. I'm gonna go ahead and stop this.
+
+[00:13:24]
+So even though this Employee object does indeed include the benefits here, it's not gonna pull them back automatically. And the reason is in order to do that, Entity framework has to expand out the query and make it more complex, and it doesn't wanna do that for you unless it feels like you need it.
+
+[00:13:45]
+So what we're gonna do instead is we are gonna go here, and we're gonna do this method called Include. And Include pretty much says make sure that as part of this Employee object, you bring me back the benefits. I'm gonna run it again without this Include, and I'm gonna show you the SQL that's run as part of this.
+
+[00:14:07]
+So I'm gonna do this, I'm gonna hit Send, I'm gonna go back here, and you're gonna see the exact SQL that gets executed against our SQLite database. Let me show it here, you're gonna see that, what it looks like right there. So select pretty much all the columns from employees as e, pretty standard.
+
+[00:14:30]
+But as soon as you do that includes, Entity framework has more work to do, it has more lifting to do. So we're gonna rerun it, uncomment out the Include, rerun this thing, and we are going to hit it again, like so, and you're gonna see now that you're getting your benefits back.
+
+[00:14:46]
+We're getting the benefits, got our benefits. We were missing them and now they're back again.
+

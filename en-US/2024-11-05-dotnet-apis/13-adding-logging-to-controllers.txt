@@ -1,0 +1,117 @@
+[00:00:00]
+>> Spencer Schneidenbach: We converted all of our APIs to controllers. So now let's talk about the logging system. I'm gonna go and open, I'm gonna go to my next exercise, which is adding logging to our controllers. First, I wanna talk about what logging is and why it's important, and what abstractions exist in ASP.NET Core to allow you to log things.
+
+[00:00:20]
+So, logging is important because in a, when you've deployed something to production and something goes wrong, something happens, things will go wrong. Even if you have tests for things that you should have tests for, things will break. So logging is a construct that we can use to make it so that we can, in a way that's really convenient and easy for developers, to send messages to a target system.
+
+[00:00:45]
+It could be a file, or it could be something like Azure application insights, or something like Datadog, whatever the case may be, whatever system you use. We can hook our logger into those systems such that we can get data that we need in case something goes wrong. Or in case we need to have a little extra metadata when we're trying to debug a problem.
+
+[00:01:05]
+So the way that logging is handled is through what's called the ILogger of T interface. So the ILogger of T is, the T part of that is the basically, identifying where the service is that you're logging from. So in this case, if you had a class called MyService and that MyService class did stuff, okay?
+
+[00:01:26]
+You would inject in an ILogger of MyService, and that basically gives the logger enough informations to say, this is where this logger is coming from. So that way when it's actually flushing that log message to either the console or Datadog, it can say, hey, this happened in the MyService class.
+
+[00:01:42]
+It gives developers a little extra information. So this is injected via what's called constructor injection, which is what we do with our controllers. We define our services in our constructor and then inject them in. And then, those will get set by the dependency injection system. And then, our do work method very simply logs a informational message.
+
+[00:02:06]
+So, what is log information? And, can we log things other than just information? What does that mean? Well, that's a concept called log levels. So, .NET supports several log levels, more than you probably could ever need, which are the following. Trace, which you would only do if you're doing some real debugging, like you just want to log out this thing but you really don't want that log to go anywhere else.
+
+[00:02:30]
+Because logging systems, you log to them, it will cost money. So you don't wanna send every log. Trace log is one of those logs that you're probably not gonna send, right? It's for low-level, really intense debugging. Most of the time I just skip that and I just use the debug log level, which is useful, as it says, for debugging during development.
+
+[00:02:51]
+Information is generally just speaking, hey, I just want you to know that this thing happened. You can choose to log this to a logging provider or not. Using a filter, which, I think we'll touch on briefly here in a bit. And this is where really the logging really becomes important, when you're talking about failures that you may need to figure out or recover from when you're talking about a failure in a production system.
+
+[00:03:17]
+Maybe an API is failing. Maybe it's giving back 500 and you're not sure why. Well, our logger here, our warning error and critical, respectively, based on intensity as you can imagine, are there to serve that. So warning is typically, something unexpected has happened, but the application can still function correctly.
+
+[00:03:36]
+Maybe the system was in a slightly invalid state and this method was able to kinda bypass that, or ignore it, or even correct it. But it wanted to log warning because it wanted to let the developer and the the system engineers know what happened there. We have error, for when you've thrown an exception, we couldn't get a hold of the database, and we've caught that exception.
+
+[00:04:00]
+And now we've logged that error to our logging system to say, hey, we caught this exception, here's some data about what was going on around that time. Whatever would make your log more useful. And then critical is like all hands on deck, the type of log message where it's like, if you're logging a critical message, then you really need to pay attention to it.
+
+[00:04:23]
+These are the logging levels. The ones that I use are debug up, I typically just skip trace, personally. And then, as I demonstrated in the previous course, there's one logging method on the interface itself. But there are several extension methods that are provided to just say, hey, I just want to log a trace, or wanna log a debug log, so on and so forth.
+
+[00:04:44]
+So if we're looking at our employees controller class, we're gonna look here, and we're gonna go down to Employees, and we're gonna go to Employee Controller. And the first thing we're going to do, I'm gonna put this, knock that onto a second line, and then I'm gonna hit the comma, and I'm gonna go, ILogger of employee controller, and I'm going to say logger.
+
+[00:05:07]
+And I'm gonna do command dot, I'm gonna say, create an assign field, Logger. I am going to rename this with an underscore. That's a personal preference thing. And then, we now have our logger injected in. Couple of notes, if you do put in a type that doesn't belong here, it will tell you, and it will complain that, I don't think that this is the type that you want, or it will do that.
+
+[00:05:33]
+I think it actually does that inside of JetBrains writer. But you don't wanna do this, you just wanna inject in the logger for the thing, the item that you're constructing. So you wanna do it like that. So that's good. And now we've got a way to log messages as changes are being made to our system.
+
+[00:05:56]
+And we're gonna focus mostly on our PUT method here, just for the sake of example. To actually add in some general information to log when somebody calls this method. So we are going to call our logger and say, Logger.LogInformation. Boom, we're gonna say, updating employee with ID, blah, okay?
+
+[00:06:16]
+Let's go ahead and run it and see what happens.
+>> Spencer Schneidenbach: 5129, we'll go ahead and change this to a put request, and we'll just make up an employee. Let's see. Go ahead and send it. Boom, of course we get our not found, because there's no employee with 333.
+
+[00:06:37]
+But we've run our solution and we can see that it does indeed log an info message for the employee controller class. And it does say that we updated employee with ID 333, or at least we were trying to. And that's because we put our log information method at the top, this executed before anything else.
+
+[00:06:54]
+So naturally, it will then afterwards return not found because it will continue down the method. So, boom.
+>> Spencer Schneidenbach: We can add additional messages as is needed. I wouldn't say that there's a standard thing that I do, it really just depends on the needs of the system. I mean, I'll just say that.
+
+[00:07:21]
+So we'll stop there. We'll restart. We can add our warning message here to say that if we do execute a put request and we get not found, we can go down here and say that, okay, our warning. Warning, somebody tried to call this endpoint, an employee with this ID wasn't found.
+
+[00:07:39]
+Just thought you should know. And we can add additional information like, if we called our repository method, and maybe our repository is actually connected to a database, and we wanted to update that method. We wanted to update it, and maybe that database had an outage, okay? We might wanna catch that exception here and then log that error occurred while updating employee ID here.
+
+[00:08:03]
+And then we could, of course, also return a status code of 500, or even re-throw the exception, which would do the same thing. I do wanna mention a couple of things, you'll notice the use of what's called structured logging. Let's take a close look at this error message.
+
+[00:08:19]
+And if you're familiar with the string feature, that allows you to put a little dollar sign here in front and actually inject in a variable to actually print on the string. You can see that you can do that, but that's actually is not what's happening here. There's no dollar signs in front of this.
+
+[00:08:38]
+And that's because we are saying that this property name is called Employee ID, and as the second argument of this function for log information, we're passing in the ID. And what this will do is it will positionally, and what i mean by that is, this one is the first one, with the curly braces, that comes first.
+
+[00:08:55]
+So this is the first argument that would go into there. It will assign this to this variable and then capture it in your logging system as additional metadata. And you could use that metadata to then filter down, depending on what the logging system is capable of doing. I do wanna mention that you can have as many of these as you want.
+
+[00:09:13]
+So if you wanted to say, update employee with ID and in department, if you were capturing department in the request.
+>> Spencer Schneidenbach: You'll see that it actually complains at you. This is actually a thing that Microsoft provides to say, hey, you're not using this logger correctly. Number of parameters supplied in the logging message template do not match the number of named parameters.
+
+[00:09:36]
+So it's trying to help you here. That's when you would say, okay, the department is Engineering, and then it'll stop complaining. And that's because it sees these placeholders here and it says, you need to make sure that you're using them. And you can see if you add more, you get more error, which is pretty cool.
+
+[00:09:55]
+
+>> Spencer Schneidenbach: Microsoft trying to help you. Throw in your bone. Question, yes.
+>> Speaker 1: So, with the logger, is that just basically logging messages within the stack trace?
+>> Spencer Schneidenbach: Yes, well, in this case, it's logging messages within the console that is running. So this isn't the stack trace per se, a stack trace is an exception.
+
+[00:10:20]
+Like, if you have an exception that'll tell you all of the methods that were called up to and to the top of that exception, to show you where the position of your error message was at. Or your exception was being thrown. In this case, it's actually logging into the console, which is what the logger does by default.
+
+[00:10:40]
+So, that's where it's putting it. So that's why it has that logging capability by default. If you wanted to add it to, let's say, Datadog, or another log, some kind of log file or something else, you would add what was called a logging provider to do that for you.
+
+[00:10:54]
+And then you'd say, hey, this is my Datadog location and API key, I wanna log into there, or I wanna log into this application insights, instance. Just showing a brief example of this. This is not in the code. If you so wanted to, you could expand your testing out to ensure that you're logging is happening inside of your control.
+
+[00:11:13]
+You can actually test for that. This is using a library called Mock to actually create what's called a MockLogger, and then another library called ILogger.Mock, to verify that we are updating employee with ID. And this ID, employee with ID successfully updated. So this is if you wanted to test to make sure that something was actually happening to your log.
+
+[00:11:37]
+Testing the ILogger interface directly is actually rather difficult. You could write your own to actually capture that, but I think that would be a bit of a waste of time. The typical pattern that I've seen in the wild for actually handling this is creating a mock object using the Mock library.
+
+[00:11:54]
+And that basically says, hey, I'm gonna you do a bunch of magic under the hood to create this interface for you without having you to define a concrete class for it. So, I just wanted to throw that out there as something that you can do. I don't usually do this in practice, and the reason I don't do this is that, typically, I just don't go that far.
+
+[00:12:16]
+I don't test every possible permutation of code, or possible thing that could happen. Simply because the time and the effort involved in doing something like that usually isn't worthwhile. But in case you wanted to do that, you can, and as I mentioned, I would do it in a business critical process, where logging is absolutely necessary.
+
+[00:12:35]
+And if this log doesn't happen, Spencer loses his job, well, then I'm probably going to write a test for it. But in practice, I don't do this most of the time. It's there if you want it, though.
+

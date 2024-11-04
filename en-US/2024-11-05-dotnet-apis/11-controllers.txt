@@ -1,0 +1,68 @@
+[00:00:00]
+>> Spencer Schneidenbach: Minimal APIs, that is the paradigm that we started with and I think that this is the one that Microsoft really has at the beginning of projects, because it's very similar to frameworks like Express. It's no secret that Microsoft wants to attract more .NET developers, and frankly, I'm with them.
+
+[00:00:14]
+I wanna see the ecosystem grow and be prosperous for developers all over to see how awesome it is and feel how awesome it is the same way I do. So a lot of the examples that they have are using their minimal APIs, which is just like, define a weather forecast, right, show you an example of that, and then let you edit that, let you mess around with that, and then get started.
+
+[00:00:36]
+However, for most of the production code that I see out in the wild, they don't use minimal APIs. They use something called controllers. So I wanna talk about those, and then what we're gonna do is we are gonna refactor our application to convert it from minimal APIs to controllers.
+
+[00:00:51]
+We're gonna walk through every aspect of that. We're gonna see the good stuff, the bad stuff, and everything in-between. So let's talk about it. First let's talk about kinda the minimal API. So it's kind of there in the name, but they do have some limitations compared to controllers.
+
+[00:01:10]
+For 90% of use cases, I think they're fine. But they do tend to be less flexible than their controller counterparts. Controllers just have more support because they've been around a lot longer. They've been around since the .NET Framework days. As the project grows in size, minimal APIs tend to feel a lot more boilerplatey and harder to organize.
+
+[00:01:29]
+Controllers are a natural organization unit for APIs, which we'll see as we get to them. And maybe most importantly, in the wild, minimal APIs are simply less ubiquitous, they're less common than controllers, which have been around for a lot longer. And finally, in my opinion, dependency management for services that you use, that your API might use, is simply just cleaner on controllers.
+
+[00:01:55]
+And here's kind of a really exaggerated example of a minimal API that has just way too many services. And yes, I do define APIs that are fairly complex. Again, APIs can and do model real business workflows. And real business workflows aren't necessarily super straightforward, sometimes they're a little messy.
+
+[00:02:14]
+If you define a minimal API that requires that you use a lot of services, perhaps this is your incoming request, this is your body of your request, but then you need to have access to the database. We also need the HttpContext, because we need to read certain headers from that, and, IEmailService, we need to be able to send emails and text messages and then process payments on this endpoint.
+
+[00:02:37]
+Then we've got our IWhateverService, or IsThisEnoughServicesService? So minimal APIs can get a little long in the tooth when you're talking about dependency management. I think that minimal APIs are a great way to get started in ASP.NET. But I vastly prefer controllers. My rule of thumb is around ten, and if I think that the project has even a chance of being remotely complex or growing beyond ten endpoints, I'm gonna just throw away minimal APIs and start with controllers in general.
+
+[00:03:10]
+And I got to emphasize that 99% of ASP.NET Core development that I've been exposed to has all used controllers. So minimal APIs have their place for really small services, microservices, or maybe you're adding them to an existing project that doesn't have HTTP. Maybe it's some kind of service that you wanna be able to add a health endpoint to.
+
+[00:03:30]
+Minimal APIs would be a great use case for that if you're just defining a couple of APIs. But beyond that, it's all controllers for me. So a controller starts off as a class and it inherits from Controller, as you can imagine. You could also inherit from something called ControllerBase, which we can look at the source code for both.
+
+[00:03:45]
+But Controller gives you lots of extra goodies, so I always inherit from Controller. And here's what it looks like. So let's break this down just a little bit. First of all, we have our ApiController. Because we're, of course, focused on building ASP.NET Core API specifically, the ApiController attribute just gives it a few extra behaviors, which you can see here.
+
+[00:04:08]
+So first things first, all endpoints must use attribute-based routing. So it says that HttpGet, HttpPost, all of those are required, which are good. That's how you define routes, and that's how we wanna define routes. Returns a ProblemDetails object for all 400 or 500 responses, which is good. It automatically returns ValidationProblemDetails for 400 bad request responses.
+
+[00:04:32]
+It also automatically validates incoming objects, but it doesn't apply in our case because we're using fluid validation, which we will get to. We'll get to that a little later. And then it does some basic inference on parameters to your controller methods, which means that you don't have to use these attributes as much.
+
+[00:04:48]
+I choose to in most of my production projects, use them anyways. And to be honest with you, I'm not exactly sure how this inference magic works under the hood, so I just bypass all that. I get rid of the magic, and then in production APIs, I typically just use FromQuery, FromRoute, FromBody to be real explicit about the method parameters.
+
+[00:05:07]
+So you'll notice this kind of funny thing. You can think of this as kind of a route group, kind of, a little bit, in that you can define a base route for all of the methods on your controller. In this case, you see that there's a [controller], and that's basically an ASP.NET built-in placeholder to say, hey, we're just gonna take the name of the class that you've defined your controller in, so in this case, it's Customers, and that's what we're gonna put at the beginning of our route.
+
+[00:05:32]
+So this CustomersController would be /customers, pretty easy. We then have our HttpGet. So this would be akin to our MapGet method on a minimal API. So we simply say that we define a method, and like our minimal API method, it can have parameters to take in route parameters or the body of the request or even services if you like.
+
+[00:06:00]
+And you can say HttpGet. That's how you mark it as a get request. That's equivalent to the MapGet, but instead you're using an attribute. We return IActionResult, which we'll get to a little later. That's basically kind of our results class. And then we just name our method, and typically, the name of the method isn't really used by ASP.NET Core unless you explicitly tell it to.
+
+[00:06:20]
+You can tell it, hey, use the name of the method for this, but I typically choose not to.
+>> Spencer Schneidenbach: Our HttpGet endpoint to get a single customer is very similar to the MapGet single employee endpoint that we had previously defined. And you notice that HttpGet has an argument.
+
+[00:06:38]
+We can define the route in this argument. So it could be, we could say customers/single/id if we choose. Most RESTful API design would just simply say use the plural word, followed by slash, followed by the id. That's pretty typical. So that's defining this route to the GetCustomerId, and it builds upon the route that's defined up here in our controller.
+
+[00:07:03]
+So this would be /customers/ and then the id of your customer. So syntactically, and kind of in terms of what it looks like when the rubber meets the road, they're very similar to minimal APIs, but again, way more common.
+>> Spencer Schneidenbach: You could read all about breakdown in this part.
+
+[00:07:24]
+Just a couple of callouts is that all of my APIs, without exception, return IActionResult. That is always the case. As I mentioned, same with minimal APIs, I don't return the objects directly. I prefer to treat them as HTTP APIs and return it in explicit status code every time
+

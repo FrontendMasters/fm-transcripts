@@ -1,0 +1,140 @@
+[00:00:00]
+>> Spencer Schneidenbach: So, for the next section, we're gonna talk about adding validation to the API. Which again, I mentioned earlier that 400 bad request is my favorite response code. And that's because it's the response code that tells you when something is wrong, and how you can fix it, okay?
+
+[00:00:12]
+It's kind of the guardian between that and our real system. We don't want invalid requests to come in and mutate real data, and then cause other problems. So, in the previous course, we touched on attributes, and we used the required attribute to ensure that a property doesn't come across our API as null or empty.
+
+[00:00:33]
+So, there's a lot of these different kinds of attributes, there's a bunch actually. S, it's in the namespace System.ComponentModel.DataAnnotations, and you can see a bunch of examples here. So, required is probably the most common one, the one that I would if I use attributes for validation, I use that the most.
+
+[00:00:51]
+It does have a few couple of properties to modify its behavior, including one that says allow empty strings. So, you can say that allow empty strings, false to say that this first name shouldn't have any empty string whatsoever, because that's an empty string is a non-null string. You can constrain the string length to a certain degree.
+
+[00:01:15]
+So, you could say that a first name could not be any more than ten characters, and it must be at least three or something along those lines. You could also say that a value can have, must fall within a certain range, in this case, this range is from 18 to 65 years old.
+
+[00:01:29]
+So, in order to create a person in this system they can only be between 18 and 65, or at least that's the valid part of the request. You can even validate email addresses which in and of itself is a whole different rabbit hole that I won't go down, but the default ASP.NET Core implementation does have that.
+
+[00:01:49]
+And then we have a phone number and URL, you could say, is this a valid URL, and is this a valid phone. So, how does this fit really into our API? So, let's take a crack at refactoring our post endpoint to use some of these attributes. So, you notice that let's go first to close our folder, open up our next.
+
+[00:02:15]
+
+>> Spencer Schneidenbach: Adding validation to our API, and we notice, let's go ahead and run them.
+>> Spencer Schneidenbach: Around here, click this, get into a file, and get our little play button, perfect, that's what we want, we can close some of these, shouldn't we? There we go, all right, so we're gonna look at our post request, and you'll probably remember earlier that I said that, let's see, what's the port number?
+
+[00:02:42]
+5129, that yes, we like this, it's sending back 400 bad requests, but we don't like this because it's sending back this nasty stack trace. It's sending back the entire stack trace for our application for this particular exception, which may include some details that we don't wanna leak to the client.
+
+[00:03:03]
+In a non-production environment, we're gonna see this, but the caller's not gonna see anything at all. 'Cause thankfully, stack traces, ASP.NET Core does not like leaking stack traces in production systems. So, you can see that this isn't super, super useful, especially considered that if you're in a React app and you're filling out these fields.
+
+[00:03:21]
+And you've added backend validation because you should always add backend validation. And you've skipped front end validation for now for whatever reason. And you say, well, I've got this response back from the system, but I don't know what to do with it because it doesn't have a structured way to tell me what went wrong, right?
+
+[00:03:37]
+It's just a huge block of text, okay? So, we don't get anything useful back, but we can, and we should. So, wouldn't it be nice if we could return structured data? And that's where we have this thing called problem details. This is actually a standard, an RFC standard for returning problem details back to our client.
+
+[00:03:59]
+And I point this out to say that ASP.NET Core likes to implement standards where it makes sense, and in this case, it does make sense. So, first things we're gonna do is we are going to builder.Services.AddProblemDetails. So, we're going to stop this, go here, run this, close this, and go, builder.Services.AddProblemDetails.
+
+[00:04:25]
+And so, what that's going to do is add some services that ASP.NET Core can use to actually make our error messages look a little nicer. So, we're gonna go here and we're gonna hit play and we're gonna see, hey, we got something, we got structured data. We actually got something that a front end could parse, right?
+
+[00:04:42]
+Or a client can parse, a machine can read this and say, okay, I know what I can kind of know what to do with this. Well, kind of not really, because I mean, yes, it is JSON and it does give us a well, I know it's a bad HTTP request exception and I know the status code is 400, but we got some detail.
+
+[00:05:00]
+Failed to read the, okay, well, we're gonna step in the right direction, but we're not all the way home yet. Plus, I mean, frankly, it just has a bunch of extra stuff that you don't need. We don't need to know the headers of the request, that should be in the response of the request.
+
+[00:05:13]
+I don't know why it's adding it to the problem details, forget all that, let's go ahead and make it prettier. We get something better, but it's not quite, we're gonna go ahead and go and modify or create employee request. We are going to make a couple of changes to it, create employee request.
+
+[00:05:30]
+And we're gonna go down here, and we are actually going to add the required attribute here, required attribute here. And then we're gonna do something a little bit funky, bear with me. We are also gonna not allow empty strings, because we don't want that.
+>> Spencer Schneidenbach: Boom, boom, we don't want empty strings for our names either.
+
+[00:05:55]
+We're gonna make a slight change, we're gonna actually make this a nullable string. Now, why on earth do we wanna make it annullable string? Well, the reason is we want our caller to pass in an empty string and have our validator handle it, right? We don't want ASP.NET CORE to try to deserialize this object and then panic and throw a big exception, we don't want that.
+
+[00:06:20]
+So instead, because we wanna short, we wannna get past that and actually have it go through our validation logic, which would not happen if we did not make these nullable. We're going to instead make them nullable, at least for the case of the incoming request. This kind of represents better the looser nature of JSON.
+
+[00:06:39]
+And because we live in a fully integrated world, it's important that sometimes we have to make a couple of compromises along the way, this is a minor one, in my opinion. So, now we can refactor our post endpoint to handle the validation results, which we will do here.
+
+[00:06:55]
+We're just gonna add in a little bit of code at the beginning of our thing, we're also gonna com fix these errors, which we'll do here shortly. Boom, boom, it's gonna complain, give us some squiggly, it's gotta import some things, so we're gonna hit command period. And using system component model data annotations, which is exactly what we want, make that a little bit smaller here.
+
+[00:07:19]
+And so, what we're gonna do is create a list of validation results, this is where our validation problems will go. And then we're gonna call this validate, we're gonna call the static method try validate object, break this down a little bit.
+>> Spencer Schneidenbach: Now, what does all this do?
+
+[00:07:36]
+Let's take a look at these arguments, the arguments are the instance of the object that we actually want to validate, in this case, employee request. We wanna give it a validation context, for some reason we need to create that with the employee request, we'll touch on that in a second.
+
+[00:07:50]
+We'll give it the validation results so that way, try validate object can say, okay, well now since I'm only returning true or false. I'll go ahead and just dump anything that I find that's wrong into this list or enter this collection if it exists, and then do we wanna validate all properties true?
+
+[00:08:06]
+And then if not valid, we wanna return results bad request back to the caller. A note on this, you see that those fields that we made nullable are now complaining. But the Three nullable, and we can't set a nullable object to the a non-nullable object, in this case a string.
+
+[00:08:28]
+So, the way that we get around that is with the bang operator, an exclamation point. That pretty much just asserts to the compiler yes, I know for a fact that this thing is not null, and we do, right? We can know that because we validated that incoming request, so we're gonna hit that bang.
+
+[00:08:43]
+And we're gonna say, yes, we know this thing is not null because at this point in the code, me as the developer, I'm telling you I know better than the compiler. So, we're gonna override the compiler behavior and let this thing set this, so that looks all good.
+
+[00:08:58]
+So, we're gonna run our solution.
+>> Spencer Schneidenbach: And we're gonna try to do our request, and we're gonna see something that's already leaps and bounds better, right? We're gonna see the exact name of the member that threw the error in this case, because our JSON body doesn't include a last name.
+
+[00:09:20]
+We're gonna give it, it's gonna tell us that, hey, we got hung up on the last name property. And by the way, here's the error message, we're already light years ahead of where we were, right? Because we're at least giving something useful to the client, a react app could take this and interpret it.
+
+[00:09:36]
+And then show an error message on the screen to say, hey, this thing is not valid, but it's still not technically in problem details format. You'll notice that if we go here, if I look, Results.BadRequest is just taking in a validation result. And it doesn't say, hey, return a problem detail, we want that nice spec, we are making an API that we want developers to love to use.
+
+[00:10:01]
+So thus, we wanna make sure that we're returning validation problems in a way that's kind of standard, and we're gonna standardize that across our API. So, the way that we do that is by a handy little extension method. And we're going to use that to basically take in a list of validation results and return validation problem details.
+
+[00:10:22]
+So, we're gonna make an extension method to do that, I'm gonna stop my application. I'm going to go here, I'm going to hit the plus sign, that's on that, that's on the solution. I'm gonna say, I'm gonna add a class and I'm gonna call it extensions. And when I'm making projects and I'm adding cost of behavior and want to be able to just quickly convert one thing to another, I'm using extension methods constantly.
+
+[00:10:46]
+It's like my it's one of my favorite, extension methods or one of my favorite language features. And it's not super important that you know what this is because spoiler alert, it's not gonna exist forever. But I'm gonna go ahead and import this, and you're gonna see that, we're gonna import this as well, and you're gonna see that we create a validation problem details.
+
+[00:11:08]
+We spin through our validation results, and then we basically just go through and add it in the format that validation problem details expects. I do wanna touch on this because, earlier I said problem details, but why am I saying validation problem details? Validation problem details is a derived type of problem details, it's a derived type, do you see I'm just clicking?
+
+[00:11:32]
+Let me do that again, just to show you so as I mentioned, I do this a lot. I navigate source code, so I'm holding command and I'm clicking on it, you see that it gives that nice little underlying syntax. And I'm getting the source code for the thing that's built into ASP NET Core, telling you I do it all the time, I promise you.
+
+[00:11:51]
+And you're gonna see that validation problem details inherits from HTTP validation problem details, which in and of itself valid, inherits from problem details. So, why validation problem details, well, it's an object purpose built for exactly the use case that we're looking for. Sending bad request back to the client so that way they know how to fix the error that they're getting.
+
+[00:12:11]
+Now, we can refactor our post end point to use that, we're gonna just call that method to validation problem details. Boom, boom, to validation problem details, you see that we get it in our editor, you hover over, you see that it is indeed an extension. We're not calling the method, and we need to, otherwise it's just going to return back a reference to the method, which we don't want.
+
+[00:12:34]
+So, we're gonna get open, close parentheses, call that method, and then we're gonna go back here, we're gonna hit play. And we're gonna get back our validation problem detail. Notice that the error message is now exactly bound to the member that failed. So, React app could now take this and say, well, I know what field the last name came from, right?
+
+[00:12:56]
+So, I'll just put this error message under that last name field, right? So, this is giving us pretty much anything that we need to really have a strong, validation story for, an API that might be an external API. Somebody might be calling it from another external system, or we might be building this API for a front end, so you get a lot of power here, which is really awesome.
+
+[00:13:21]
+Now, we can also refactor our test to read from this validation problem detail if we so choose. So, up to this point, we've really only asserted in our tests that our code is one status code or another. And I would say that that's a good assertion, but it's a little bit anemic.
+
+[00:13:43]
+In other words, we can test other parts of the behavior of our validation endpoints by literally saying, well, I just don't want to just know that it's a bad request. I want to deserialize the object that I expect and see that you actually have the first name and last name in there as part of those validation details.
+
+[00:13:59]
+So, I'm going to do that right quick, I'm gonna go here, I'm gonna go to my Visual Studio code. I'm gonna open up my test project, I'm gonna go to my unit tests, stop our running of our application, and I'm gonna go to our create endpoint. I'm gonna paste this test in, format it nicely, nice white space there.
+
+[00:14:20]
+And you're gonna see that we need to import, it's the way it goes, command period, and then enter. Let the IDE do all the hard work, and then you're gonna see that we are taking this bad request. We're not just asserting that the status code is equal to bad request, we're now digging into the problem details object itself by reading that as a JSON object.
+
+[00:14:41]
+And we're making sure that all of the values that we expect in this case, we expect that first and last name because they're required are part of this. So, we're gonna go and that is gonna be what we do. So, let's run our test, make sure it all works, boom, you can see that that the test passed as expected.
+
