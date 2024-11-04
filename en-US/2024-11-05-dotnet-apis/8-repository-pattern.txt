@@ -1,0 +1,99 @@
+[00:00:00]
+>> Spencer Schneidenbach: In my last course, I touched a little bit on software patterns. I tend not to speak in software patterns very much, because I really want to do but there are some software patterns that actually have a fair amount of use. These are the ones that I use the most, which is the repository pattern.
+
+[00:00:16]
+Firstly, the factory pattern, which allows pretty much, say, one object is used to create other objects very useful in certain situations. And then unit of work, which basically says is the pattern for taking a bunch of related operations and executing them in one go. You can think of a database transaction in multiple SQL statements, if you're a SQL user, as one unit of work, right?
+
+[00:00:42]
+You want to make sure that all of those requests succeed and you wrap them in a transaction to say, yes, commit at the end, I want all those changes to be done. We're going to take this one, one that we commonly see in the .NET Core world and ASP.NET Core, and we're going to talk about the repository pattern.
+
+[00:01:01]
+That's gonna be the focus of this section. I don't want you to take away that I don't think design patterns are important. They are, in fact, important, and they are integrated in many of the languages and frameworks. But I like to focus on doing, as I said, and let the complexity of, I am a firm believer that the complexity of the architecture and the complexity of the program will reveal itself such that you don't have to start by implementing all these things.
+
+[00:01:23]
+You can start very simple, like we have. We created a very basic API, and we're building upon that. We're building upon that to show off different parts of ASP.NET Core and how these apps would be built in the real world. In the real world, we see the repository pattern quite a bit, so it's important to talk about.
+
+[00:01:42]
+Basically, the repository pattern is a design pattern to say, I want to separate the concerns of data storage, like database from the access of that inside of our code. So it's kind of like you can think of it as something that an object that sits in between a real database and our ASP.NET Core endpoints.
+
+[00:02:01]
+So repository is how we communicate, how we get to the database and remove and add objects from it. So up to this point, our list has been our repo. It's been our repository. And this is not how things are done in the real world. First of all, this list of, I mean, it's very obvious to say, but when you start it up and then shut it down, that list is destroyed.
+
+[00:02:25]
+That doesn't stay in memory. We're going to stay with an in memory repository for now. But when we refactor the database, which we will get to, you'll see, we'll talk about how that's done in Entity Framework Core. We'll show off the repository pattern in memory for now. But further, the methods of list don't really model well the operations that we actually want to perform.
+
+[00:02:48]
+It's really is just a dumb collection, right? We can add, remove, and it has no safety and no protection against just adding or removing objects wantonly. But we also may wanna test to use a separate data source, so we can test the behavior of our API without relying on a database or a common way to access data from different parts of the application.
+
+[00:03:10]
+Because we're not gonna just have employees. We're probably gonna have other companies. The employees are gonna belong to a specific company, or that employee is gonna have benefits, right? So we wanna create a common pattern for accessing all of those objects. So we're gonna introduce this interface, it's called the IRepository.
+
+[00:03:28]
+And I'm gonna go ahead and add it to, I'm gonna actually close this folder. I'm gonna open up the next folder, which contains our previous work done and we're gonna add to this. So we're going to go here. We're going go here. And the first thing I'm gonna do is I am going to add it to a folder called abstractions, which is just a common name for just something where you would store some of your of your interfaces, right?
+
+[00:04:01]
+And this is indeed an abstraction, so we're gonna call it the IRepository interface. We're gonna put it there, and we're just gonna overwrite that. So let's go through these methods one at a time. So they kind of model pretty well how we would actually get data out of a system.
+
+[00:04:17]
+So we have a GetAll which returns an IEnumerable of T, we have a create update and we also have a delete. And then we have something that says GetById, which will return that object as unknowable because we may not be able to get that object if it doesn't exist.
+
+[00:04:33]
+If it doesn't exist by that id, we won't be able to get it. So we gonna take away our list. We're gonna go ahead and delete, deleted, boom. And we're gonna create our employee repository. I'm gonna get all this code in here and then I'm gonna walk you through all of the different parts of it.
+
+[00:04:51]
+So we're gonna call this an employee repository.
+>> Spencer Schneidenbach: And I'm going to paste that in. Scroll up, the only squiggle is that we need to import our repository. So we're gonna hit command period, and we're gonna see using the employee API.abstractions, we're gonna see that we've got it.
+
+[00:05:10]
+Okay now, so now we've defined our employee repository. And you'll notice that we've implemented the interface IRepository. Gave it the type employee, because we're operating on employees. So all of these methods now replace this T type with the type of the object that we wanna operate on, in which case this is employee.
+
+[00:05:30]
+So that's exactly what we want. Perfect.
+>> Spencer Schneidenbach: So we need to update our endpoints to use this new repository. We can do that by, there's a couple of different ways we could. Well, the main way that we're going to do that is by adding in you see that our employees are gone.
+
+[00:05:46]
+So in this argument, we're going to go ahead and add our EmployeeRepository. Boom. We'll call it repo for now. And now we can access that repository from our GET request. This, the dependency injection system will attempt to match this up to a service, and we will go in and we will save our employees equals repo.GetAll and then you can see that, because we're getting our employee objects that our endpoint stops complaining.
+
+[00:06:22]
+So let's copy all of these.
+>> Spencer Schneidenbach: Boom. Put them in and you can see that we now have our EmployeeRepository. And just to make it super clear where these are coming from. This is from body. Put that over there, and then there we go. And this is from services.
+
+[00:06:50]
+So this is intended to be injected in from our dependency injection system. That's the services that we define up here. We're going to run our tests. We're gonna see what happens. We're gonna see that everything's working, everybody's happy, right? Wait a second, what the heck happened? Why did all our tests fail?
+
+[00:07:08]
+Well, it's part of the dependency injection system. It doesn't make assumptions. It doesn't want to just pull an object that doesn't exist. So we actually have to register with our dependency injection system first. So, the way that we do that Is builder.Services.Add. We will add it as a singleton in the real world, when we're working with real databases, we will not add this as a singleton.
+
+[00:07:31]
+And you'll see why in a bit. But because this is an in memory list, we're gonna go ahead and go with it.
+>> Spencer Schneidenbach: So, now you're gonna see that because we've added this service in EmployeeRepository, now we can rerun our tests and we should see that our tests pass and our behavior hasn't changed.
+
+[00:07:53]
+So just because we told employee that we need an employee repository doesn't mean that ASP.NET Core just wants to make an assumption and give us one. We need to register it in with the dependency injection system first. Another point to make sure that I point out is that most of the time when you're using a repository pattern like this, you're not just going to use the concrete type directly.
+
+[00:08:21]
+Oftentimes you're gonna be using the interface type. In this case, it's IRepository. So I'm gonna go ahead and show you what that looks like here. So it's very common to, we're gonna go ahead and pretty sure it's complaining about lack of import, perfect. So because we may want to test this component separately, or we may want to provide a different Implementation inside of our tests, we typically do not use the concrete type, which is the EmployeeRepository.
+
+[00:08:47]
+We typically use the interface type. So we're gonna go ahead and copy that down here, and we're gonna replace all of our employee repository to use what we call the interface type, not the concrete type. Go ahead and control here .NET test. Everything's looking good. It's what we wanted.
+
+[00:09:10]
+You can see that I'm not actually running this API and actually doing things that much, and it's because, as long as my tests are passing, I don't really have to. But you can see, wait a second, what the heck's going on? Where are all my employees? Well, we did take them out of the repo, after all.
+
+[00:09:28]
+So we need to add those back in, which we'll do here shortly. So that's why we're not getting back any data. All of our endpoints have been updated to user repository. We took away that stupid list in memory. And we've abstracted it away into something that we could actually use to talk to a real database if we wanted.
+
+[00:09:44]
+And then we added that repository to the dependency injection system so that way ASP.NET Core knows where it is and how to construct it and update it and see that all of our tests are passing. So looking pretty good. Can I answer any questions?
+>> Student: Yeah, so, earlier you were talking about creating different requests based on the shape of the data, so, I'm just curious, in an instance of a patch, when would one want to consider updating requests to use a patch?
+
+[00:10:23]
+
+>> Spencer Schneidenbach: That's a great question. So typically my endpoint's gonna look a little different. When I do implement patch requests, which isn't super often, I'll usually use something that models a dictionary that is a string followed by Something like an object, depending on the complexity of the entity that I'm trying to update.
+
+[00:10:46]
+So what I could do then is receive that dictionary and say, this person just wants to update the first name or just the last name, or in this case, or address two or something along those lines and then update those individual properties. I don't do that a lot and I don't see it a lot in practice either.
+
+[00:11:00]
+But it can be done outside the scope of this course, but requires a little bit of reflection but it's definitely possible, and I have done it before in the past for certain APIs.
+

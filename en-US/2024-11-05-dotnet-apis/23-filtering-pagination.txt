@@ -1,0 +1,100 @@
+[00:00:00]
+>> Spencer Schneidenbach: That is querying, but we can do a little better, imagine that you're in a payroll system with this endpoint brings back all inactive employees, right? And you're working in a company of 10,000 active employees, and they've had 100,000 people. You probably don't want to send back all of that data, so I do wanna show you, how I would refactor this, and how I would refactor this in the real world to be able to add some filtering and pagination.
+
+[00:00:28]
+So let's go ahead and do that, we are actually going to introduce a thing called get all employees request, and we're going to put it inside of our we're just going to put it right here for now. And then we will command dot and move type two, its own thing, that's perfect.
+
+[00:00:49]
+Get all employees request, but you might be saying, Spencer, we can't use gits and we can't put bodies, we can't put a body of data inside of a git. That kind of, breaks what a git is intended to be, well, not to worry, because we can actually add it to the employee controller, check this out.
+
+[00:01:12]
+So we're going to do, we're going to stop this, get all employees request, we're going to call it request, and then we're going to prefix it with this, FromQuery.
+>> Spencer Schneidenbach: Okay, we're going to prefix it with FromQuery, and what that's going to instruct ASP.NET Core to do is read all those values from the query string, bring them into this request, so that's pretty cool.
+
+[00:01:34]
+Because we actually created our validation filter earlier in the course, we also can create a validator for this thing because we don't want this page number to be less than zero. That doesn't make any sense, and we don't want the number of records to be zero or less than one.
+
+[00:01:52]
+We need to be able to pull back at least one record, so we're gonna go ahead and do that. We're gonna copy in this validator and, import this, and because we've already wired fluent validation up to our dependency injection pipeline, we've already defined a filter to actually execute this for us.
+
+[00:02:11]
+We don't have to do anything else, we can just put it here and then write our tests and make sure everything's good to go. Now we can change our get employees implementation to add paging and filters, and let me show you what that looks like. So first things first, we are actually going to make sure that in our request, that if we're getting a page, we're going to get int page number, and we're going to say request, because we don't know that the get all employees are request, it could possibly be null if there's no query string parameters provided.
+
+[00:02:43]
+Can't recall if ASP.NET Core automatically instantiates one for you anyways, even with no query parameters. But we're gonna program defensively and assume that it could be null. So, we're gonna say request do page, and then we're gonna say one. If this thing is null, then we're just going to say, we just want to go for the first page, and then we want to say int numberofRecords, and we're going to say request number of records, records per page, I should say.
+
+[00:03:18]
+And if that's not set, we'll just say 100, records per page, and then we're gonna change this a little bit. We are going to actually declare this as an IQueryable and I'll show you why here in a second. So, we are going to go for the broader type, normally this would go and get the DB set, but we're gonna actually declare it as an IQueryable, I'm gonna take out the call to this, and I'm gonna actually rename this to query.
+
+[00:03:45]
+I'm specifically marking it as a query because I wanna make it clear that that's what this is. I'm building a query here. So I'm going to say, this is a link method called skip, which is to say, skip these number of records. And I'm just gonna do a little bit of math to say, if we're anything beyond page one, we wanna skip that number of records and provide them on a second page.
+
+[00:04:07]
+And then we're gonna use another method called take, which is to say, give me only these number of records. So we're saying here that we only want
+>> Spencer Schneidenbach: This number of records, we only want to skip this many, so if they request page one, one minus one is zero, so it won't skip any records, and we want to include benefits.
+
+[00:04:31]
+
+>> Spencer Schneidenbach: Now we can add in this part and basically say, if our request is not null, then if we can build upon our query based on the value of the request. So we wanna add in a first name contains and a last name contains. And then we wanna say if first name contains is not null or whitespace, then we want to change our query and set it so that we also check to see that the first name contains this value.
+
+[00:04:59]
+Then down here of course, we don't have our employees declared, so we will go ahead and do that. So we will say var employees = await query, so we're done building our query, ToArrayAsync, and then we will send back our employee records. When I do pagination, or if I'm doing filtering, nine times out of ten, 99 times out of 100, it's gonna look something like this, if I'm using entity framework core.
+
+[00:05:25]
+So this is exactly how I would do it, one thing that you should note is if your search gets complicated enough, a get putting those requests, those variables in the query string may not be enough. You may have to convert it to a post, I have had to do that before that is, are you okay with me?
+
+[00:05:42]
+And I wanna point out that it's not ideal necessarily to bring your whole object graph into memory here, I'm doing that for the purposes of simplicity. In most cases, this probably isn't going to matter for your system, but the problem is that if you gave EF Core this method before.
+
+[00:06:00]
+For these things are in memory to say, hey, convert all these to Employee Get Response Entity Framework core is going to respond and say, I don't know what this is because you're expecting me as an I query able to know what to do with this function. And that's one of the subtleties of IQueryable that does not behave the same as IEnumerable, period.
+
+[00:06:20]
+So we're just gonna put them directly into memory, but in reality, you could select them back directly by just inlining the employee and then just creating the Get Response here, but we're not going to do that. We're just going to put them into memory, it's a minor point, but worth bringing up.
+
+[00:06:41]
+
+>> Spencer Schneidenbach: So of course we have some failing tests, but it doesn't mean we can't change our get to use our new query string. But we have some cleanup to do, and the cleanup is that first, we need to stop using the AI repository and actually go into memory.
+
+[00:06:56]
+Go into using the in-memory database, so yes SQLite does have an in memory implementation, which is super useful. There is an in-memory database provider that's not SQLite, that's provided by Microsoft, do not use this provider. Microsoft tells you don't use this provider, do not use it, it does not model a real database.
+
+[00:07:16]
+A SQLite database in memory is still way better, then even a target database, then even using an in-memory database, as opposed to, like using a Postgres or another quote unquote, real database. And I will demonstrate that, near the end of the course using something like Postgres, but Microsoft does not recommend you use it.
+
+[00:07:36]
+We will talk about a better option, but anyways, just wanted to make sure that you knew that SQLite in-memory database is the better option between the two. So we don't want our API server to use Employees.db, we just want to have it run in-memory. So we do have to do a little bit of convoluted code in order to get it to respect and just use our SQLite connection in memory and we can do this because it's just test code.
+
+[00:08:03]
+So, it's not that big a deal, it's just test code so, we're gonna go down to our tests, and we are going to say new file, we'll say new class, CustomWebApplicationFactory. And I'm not gonna go through all of the finer points here, other than to say that previously, we just used our web application factory directly inside of our tests, you can see that if we switch back here our web application factory, that's what we used.
+
+[00:08:33]
+But we're actually going to inherit from it and create another object, so that way we can configure the behavior a little bit and the bottom line is, is we want to remove that SQLite reference. We want to remove that connection string that says Employees.db we want to just take that out and replace it with our and essentially, what this is going and doing is replacing in the dependency injection pipeline.
+
+[00:08:53]
+It's replacing it with our own custom DB connection that just runs SQLite in memory pretty awesome. I'm gonna go ahead and command dot to import all the goodies, command dot import, command dot import, SQLite connection, need that, and good, that looks pretty good. So then we replace our web application factory with our new custom web application factory inside of our actual tests.
+
+[00:09:26]
+So that way we instruct X unit to instantiate that directly instead, so we can delete that and we can delete that and replace it with this, which looks pretty good. And then we run our tests and of course, once we replace them all, once we replace all these calls to IRepository.
+
+[00:09:45]
+So we're gonna go ahead and kill this right here.
+>> Spencer Schneidenbach: And we're gonna do this we don't have a repository anymore, we're gonna delete that looking good, we are going to comment out like we did at the other tests. We're just gonna comment these out because we're just ignoring them from now, and we've got our tests back.
+
+[00:10:06]
+And so we're gonna run our tests and,
+>> Spencer Schneidenbach: What happens?
+>> Spencer Schneidenbach: Wait, they failed, what the heck's going on? It's cuz we don't actually have data in here, you see that we don't, our in-memory SQLite table still needs to have migrations run on it. So it says no such table employees, so the way that we're gonna do that is we're simply gonna refactor our seed method.
+
+[00:10:32]
+So I'm gonna go commandT, and that's gonna take me up to this little search box. So I can go to seed data, and I'm just, its going to say, in addition to AppDb context, I'm gonna rename this function, I'm hitting F2, MigrateAndSeed, and I'll just do the migration here.
+
+[00:10:49]
+So context.Database.Migrate, and that will migrate our database for us, and allow our tests to run. So we'll see that, and we'll see now that they pass because we've run migrations on them and we've also preceded them, and in the in-memory database, once this stops running, it's dead, it's gone.
+
+[00:11:12]
+Okay, we can then add a new test to actually get only John, to see if we get back a single employee. So now we can test our behavior for our single employee get which we will do here, and we'll run that test. And we will see that it passes as well, so you can see that we are passing in, the employee first name contains John.
+
+[00:11:38]
+So if we had something in here, that of a name of a person that does not exist. We'll go in.NET test, and we'll see that it fails because we are expecting back a single employee from this. But if we restore our test to its former great glory, then it will find John, and all will be right with the world.
+

@@ -1,0 +1,154 @@
+[00:00:00]
+>> Spencer Schneidenbach: How do you make ASP.NET Core? Use your APIs, it's very simple, first things first, we're gonna go here, and we're gonna go to Program. I'm gonna go, close this, and you're gonna say, inside your builder.Services, AddControllers. So, this is the thing that actually will add controllers to the dependency injection pipeline, without it controllers won't work.
+
+[00:00:23]
+But that's good, because it means you're being explicit about it, and you may not want to include stuff that you're not using, so we add controllers, boom. And then down here, at the bottom of our thing, we would say MapControllers, there we go, boom. And that will put your controller in the middleware, such that it will actually look for a controller that has that matching Route, and then it will attempt to handle that method.
+
+[00:00:58]
+So, brief overview of controllers, in the next section, we will actually add them to our employee API. All right, so we are going to go ahead and rip out all of the minimal APIs, and we're gonna convert them all to controllers. And the cool thing is that a lot of this behavior, we've got them backed by tests.
+
+[00:01:18]
+So, in a real life scenario, if you had to do this, you could just run the tests. And assuming your tests were complete enough and were really substantial enough, then you can have a lot of confidence that your refactor worked, which is what we've gained. We've gained a fair amount of confidence because our tests are pretty comprehensive.
+
+[00:01:34]
+So, first things first, I always typically create a BaseController, so if you took my last course, you'll have heard me say that I'm not a big believer in inheritance. I usually go no more than one or two levels deep, controllers are one of those things that I almost exclusively will create a base method for right away.
+
+[00:01:55]
+Then typically, I do that because, depending on the nature of the project, I will often have additional behaviors, or even custom IActionResults that I might wanna return. And I`ll typically use a BaseController to do that, so I always define my own. Creating your own base controller class has one other advantage, which is that we can go ahead and slap on all of these things that we need.
+
+[00:02:19]
+And don't have to reapply them to subsequent controllers that we create, so I'm gonna go ahead and put this here. I'm gonna create a new file, I'm gonna call it a Class file, and it's gonna ask me the name, and I'm just gonna call it BaseController.
+>> Spencer Schneidenbach: Put that using statement at the top, so that we're nice and organized, one thing, there's a small typo, I'm gonna go ahead and delete this API, cuz we don't need it.
+
+[00:02:47]
+A lot of times when you're building an API project, sometimes, depending on the nature of the project, you might put your APIs behind a particular Route piece. You might say /API/customers, or /API/employees, in this case, we're just keeping it all in the base to just keep it simple, so take that out, boom.
+
+[00:03:08]
+The cool thing is that any controller that inherits from BaseController, so if we add ten or 100, as long as they all inherit from BaseController. We'll get all of the goodies that come with this APIController marker being on our controller. And then, of course, we've defined a Route for each of them, where we just say (controller).
+
+[00:03:28]
+So, we say that any EmployeeController that we create will be Employee, or Employees in this case. Employees will have a Route of /Employees, and then Customers would have a Route of /Customers, and so on, anybody that inherits from this base class will have that. We'll go ahead and then create our EmployeesController inside of our Employees directory, now, I deviate from Microsoft on this.
+
+[00:03:51]
+If you look at most codebases, including most codebases in the wild, you'll see that lots of times the organization unit seems to be by the thing itself, but not by the business thing that it solves. So, a controller is often created, all the controllers are created in a Controllers directory.
+
+[00:04:09]
+I prefer to have what is referred to as a screaming architecture, or basically, I like an architecture that screams what it is, right? So, I like to put my controllers in with the business thing that they're actually solving. In this case, I'm gonna add my EmployeesController to the Employees directory.
+
+[00:04:30]
+It makes no difference as long as they're inside of the project, as they'll be discoverable by ASP.NET Core. It really doesn't matter what directory you have them in, the directory and namespace itself does not matter. The only thing that matters is that you inherit from BaseController, and that it's part of your assembly, and that it's publicly accessible.
+
+[00:04:51]
+I believe private classes or controllers are not read by ASP.NET Core.
+>> Spencer Schneidenbach: I'm gonna say what I always say, which is that, just do what you feel comfortable with. It's one of those opinionated things that really doesn't make a difference. I just encourage you to have consistency with yourself and your team.
+
+[00:05:12]
+So, we're gonna go ahead, and I'm gonna copy and paste these things in one at a time, to kinda talk through each of them. First of all, of course, we've gotta import our stuff, so we're gonna import our abstractions, our IRepository abstraction. And then, of course, we've got our Validator, so we're going to import that as well.
+
+[00:05:31]
+You're gonna see, first things first, that as opposed to just having them inside of the controller methods themselves that actually handle the requests. We're gonna go ahead and drop these into the constructor of the EmployeesController. We're gonna drop them in, and then we're just gonna set them to values behind the scenes, we're just gonna set them to fields that are private and readonly.
+
+[00:05:52]
+So, these will be instantiated and sent in by our dependency injection pipeline. And then, we've got the blueprint for each of our methods, so I'm just gonna copy these in. Of course, we're gonna get compiler errors because these things, first of all, we need a few imports, so we'll do that.
+
+[00:06:11]
+These are under the MVC namespace, and then you can see that the compiler is rightfully complaining to say, not all code paths return a value. They want these functions to be filled in, which we'll do here in a moment. So, you'll see here that this is meant to, if I put this side by side with our Program, I'm gonna go ahead and split right, and then close this.
+
+[00:06:33]
+And you're gonna see, if we put these side by side, we are in the EmployeesController. And because we inherited from BaseController, we know that the Employees part of this word will be converted to our Route, that's due to the Route attribute here. You'll see as well that we have our Get request mapped here, that matches this one, which is our GetAll request, this request, our GetById, matches this right here.
+
+[00:07:06]
+And I`ll create an Update down here, mapped to our Post, because we marked it as an HttpPost, with our CreateEmployeeRequest, and then our Update right here, as we would expect. Now that we have the rough structure of our controllers, we can copy/paste the logic of our endpoints, pretty much almost one-to-one, so I'm gonna go ahead and do that one at a time.
+
+[00:07:26]
+I'll copy this or close that, and I will start with simply the regular GetAll, I'll paste that in.
+>> Spencer Schneidenbach: So, I'm gonna call this repository.GetAll, we say that our IResult, which is from our Results class here, does not match our return type of IActionResult. So, what we are going to do is take off the Results entirely, and we're just gonna say Ok, now, where does this Ok method come from?
+
+[00:07:58]
+The Ok method comes from actually the ControllerBase object, which we'll go and navigate to, close that real quick. And you can see that this is the ControllerBase, has a lot of additional functionality. Well, it is the base class that you must inherit from in order to have a controller.
+
+[00:08:17]
+And you can see that our Ok method simply returns an OkObjectResult. So it's exactly the same functionally as calling Results.Ok, it's just the controller way of doing things. Similarly, for our GetEmployee single, we have our repository right here, our call to the repository, we GetById. And similar to Result.NotFound, we just say NotFound, which is also a method on our ControllerBase.
+
+[00:08:46]
+And then GetEmployeeResponse goes back into the Ok method, and that gets returned and sent back to the client, as one would expect. And lastly, a couple of other things, our Post and our Put, we'll go ahead and clear these out. And you can see that they are functionally equivalent to our Post and our Put before, we've got a squiggly line here.
+
+[00:09:17]
+Go ahead and name this GetEmployeeById, and what we've returned here is something called CreatedAtAction. Which will send back a location header in our response headers to say, here's how you can access that resource now that you've created it. We have our call to repository.Create, we're still taking in our CreateEmployeeRequest here, and we are still using our createValidate method or createValidator.Validate method here.
+
+[00:09:44]
+And then finally, of course, our UpdateEmployee is much of the same, return NotFound here, taking the Body of the Request here, return Ok here, and, yeah, the Route parameter here. So, very similar to minimal APIs, and way more common to see, any questions so far?
+>> Student: I think the answer, this person's asking about the Employee controller, yes, you'd need to create the Employees controller.
+
+[00:10:13]
+
+>> Spencer Schneidenbach: Yes, and you do that by, in the Employees folder, or even in the Route of the API if you prefer, or in a Controllers folder, I just put mine in Employee. Right click, new file, like that, or you can click this new file icon right here inside of Visual Studio Code.
+
+[00:10:31]
+You can create an API Controller, it's just a class, it'll just define a class for you that has some default stuff. It might differ slightly from the Syntax that we're using, but that's how you create that controller, and then you can copy and paste in from the documentation.
+
+[00:10:47]
+So, now that we've created our controller, we have now two sets of Routes that handle the exact same Route, and ASP.NET Core won't like that, it will throw an error. So, we will go ahead and delete our endpoints from our Program.cs, and all of the development that we do from now on will be in controllers, so, go here.
+
+[00:11:12]
+
+>> Spencer Schneidenbach: Kill those, and then we can run our tests, but of course we need to have our app.MapControllers here, make sure that those controllers get picked up.
+>> Spencer Schneidenbach: Okay, this is looking pretty good, we need our call to builder.Services.AddControllers. And if you don't have that, this is the error that you'll get, we'll just show that real quick.
+
+[00:11:43]
+Which is that our endpoint builder here will say, unable to find, it throws on this line of code, MapControllers. It says, unable to find the required services, please add all the required services by calling AddControllers, so it tells you how to solve for that. Then you can see inside of the MapControllers method, that it does check for the presence of those ControllerServices, and that's where it throws that exception.
+
+[00:12:14]
+Little bit of behind the scenes for you, the MapControllers, so we will go ahead and uncomment this, and add it like so. We will run our tests and everything is gonna work just fine, everything's gonna be hunky dory, right? Nope, we got a failed test, what the heck is going on?
+
+[00:12:30]
+Item not found in collection, it's failing on our Create, that's because problem details, the way that we're returning our bad requests to our caller is slightly different. And because we've converted from minimal APIs, and we wanna preserve the behavior for controllers, we'll go ahead and fix that problem.
+
+[00:12:47]
+Now, what we can do is go here to our EmployeeController, and I wanna point out a little bit of the signature on BadRequest. So if you say return BadRequest, it will happily take in nothing, just blank. It will happily take in something called ModelStateDictionary, which I'll go over in a sec, or it can just take in any object.
+
+[00:13:18]
+So, in this case, because the BadRequest method differs slightly from results.BadRequest, it expects a different object of a different shape. We have to change our validationResults extension method to go ahead and handle that case, and the way that I do that is just to return ModelStateDictionary. So, I'm gonna go ahead and copy this here, I'm gonna put this into our extension methods.
+
+[00:13:44]
+I will keep this one here, even though I think the instruction stated, delete it, which is what I would do cuz I always, one of my favorite things is deleting code that's not being used anymore. And then I'm going to import our ModelStateDictionary, this ValidationResult. Yes, I believe that ValidationResults needs to be, yeah, capital, that's our type.
+
+[00:14:11]
+And so in, let's see, ValidationResult, this is not the correct ValidationResult, that is the one given by data annotations. You know what, we are gonna throw this one away, keep our imports from getting messed up. So, this validationResult that we want is going to be in FluentValidation.Results, we want that namespace, and then we get our errors.
+
+[00:14:32]
+Then we get the validationResult in the shape that we expect to convert it to this ModelStateDictionary, which we will go ahead and do. I will delete this line, and I will say validationResults.ToModelStateDictionary. And that is just basically an object that contains what's called model state. You'll see it a lot more, especially, you'll see it in a lot of APIs out in the wild, including MVC with views, which we will not cover in this course.
+
+[00:15:02]
+But model state is simply an object that kinda wraps up to say, this field is valid, this field is invalid, and so on. A couple of other refactors that I could, and I will do, first things first, I am not a fan of putting our Validator inside of our constructor, of our EmployeeController.
+
+[00:15:23]
+Imagine then, if we had a Validator for, going to stop this, IValidator<UpdateEmployeeRequest>, which we will create one in a future lesson. Imagine if we had like 20 endpoints, do we really want to inject 20 Validators? No, it's a lot of boilerplate that I don't want to have to maintain, and I certainly don't want to have to write, and I certainly don't wanna look at it.
+
+[00:15:47]
+So, on our BaseController, we can implement a method that we could commonly use across all of our other controllers, which is exactly what we're gonna do. We're gonna define a generic method called ValidateAsync, and we're gonna give it the instance of an object, and then we're gonna capture that type T right here.
+
+[00:16:07]
+And the reason that we're gonna capture that type T, is that we wanna be able to specify it down here inside of our IValidator. We wanna get that IValidator here from our dependency injection pipeline. And then if we don't find one, because we're validating an object that doesn't have one, we're gonna go ahead and throw an exception simply because we don't wanna just fail silently.
+
+[00:16:27]
+We may accidentally try to validate an object we don't need to validate. We can create a new ValidationContext, which is built into IValidator, and then we can pass it to our ValidateAsync method. I believe you can also skip the ValidationContext directly and just validate the instance, and I believe under the hood it creates a ValidationContext.
+
+[00:16:55]
+So, let's go ahead and make sure that we got our imports here, ValidationResult. Make sure that you're importing the right ValidationResult, if you import the wrong one, you will get a compiler error. So we will, because we have ValidationResult as a class in multiple namespaces, we wanna make sure that we do import the correct one.
+
+[00:17:12]
+So, we'll put that there, which is good, and now we can go and delete some code, which is, again, one of my favorite things to do. So, we're gonna delete createValidator here, we're gonna delete it from here. And we're gonna scroll down, and instead of doing that, we're just gonna call our base method ValidateAsync.
+
+[00:17:31]
+So now, we've taken a little bit of reusable logic and put it in our base controller, because we may want to use this across multiple controllers, so, what about this property copying stuff? I think a lot of people are going to look at this and say, well, gee, Spencer, this is a lot of boilerplate, all you're doing is taking the Request object.
+
+[00:17:53]
+That seems to be like, where's our Object.assign, like we have in JavaScript? There are libraries that you can use to automatically copy these properties over. I chose not to do this in this course, just to make sure that the course stays simple, but I do name one of them, which is AutoMapper.
+
+[00:18:11]
+AutoMapper is probably the most famous one and the most ubiquitous one in the .NET Core library. It's actually a project made by a guy named Jimmy Bogard, and Automapper has been around for years and years. So, you can do that in order to shorten some of these property assignments, it would give you your Object.assign essentially, but like I said, I'm not doing it for this course.
+
+[00:18:36]
+But I could, if I wanted to make a common method, or a factory method, to create a newEmployee object from an incoming Request, or something similar if I wanted to do that. So, I just wanted to let you know that that boilerplate reducing stuff definitely exists.
+
