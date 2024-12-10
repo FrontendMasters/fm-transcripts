@@ -1,0 +1,167 @@
+[00:00:00]
+>> Scott Moss: First thing we need to do is, we need to create a step in which we can ingest all of the data that we're gonna be ingesting today. So, just to show you the data, there's this website called Kaggle, which is kind of like a GitHub for data.
+
+[00:00:15]
+It's just like, some of it's open source, I think actually, is all open source. I don't know, some of it might be paid, but you can go in here and get tons of data sets, and you can see right here I viewed this IMDB movie data set and I downloaded it.
+
+[00:00:29]
+You can see the license here, how you can use it, etc, etc. So, great place to find data. They also have models and things like that, so you can check out some of these models. But, yeah, highly recommend Kaggle for data. Yeah, so we need to make our ingest step, which is gonna take our CSV of movies that you should already have in your repo, and we're going to index them and put them in our vector database.
+
+[00:00:56]
+So let's do it. And this is gonna be an offline index, so we're only gonna do this one time. You don't have to do this many times. We only have to do this once, and then we can start querying in things from there. So let's do it. I'm gonna go to my code, there's a folder here called rag.
+
+[00:01:14]
+That's where you'll find your movie data set, the CSV file, you can take a look at it if you want. There's an ingest file and a query file. So an ingest file is where we're gonna be. First thing is, because this is gonna be a script that we run outside of the context of the AI, we need to go ahead and make sure we import our environment variables.
+
+[00:01:32]
+So we'll do an import.env config. This reads your .env file and loads up everything. So we wanna make sure we have that. The next thing we wanna do is we wanna get the index function from upstash vector and the parse function from CSV parse sync. So I'm gonna say index, and then, as, I'm gonna call it UpstashIndex from upstash/vector.
+
+[00:01:58]
+And then, import {} from csv-parse/sync, I wanna get the parse function.
+>> Scott Moss: So we got that. And then I'm just gonna get these fs, file, module, the path, and ora, it's like a loader that we can show in the terminal. So, fs from fs, you can do node:fs if you wanna be specific.
+
+[00:02:25]
+Import path from node:path, up to you. And then, ora from ora.
+>> Scott Moss: Cool, so we got those. Now we wanna initialize our index. This is the same index that you just created on upstash. We're getting a reference to it here, so you could just say, const index = new UpstashIndex.
+
+[00:02:52]
+And actually, you don't even have to pass in these environment variables like this if they're already set in your environment variable with the exact same name as this. And we loaded them, we did here. It'll just find it. So you don't have to pass these in if you don't want to, I'm just doing it to be explicit.
+
+[00:03:06]
+So I will do that. And actually, that's not what I call them. Well, I don't wanna look at my file to show you what they are, so I'm not gonna add them. [LAUGH] I'm just gonna ask, couldn't. But trust me, I'm pretty sure you don't have to add them if you use the exact same names that was on the dashboard.
+
+[00:03:24]
+Which, if you just copy and paste it from the dashboard, you should be good. But put them in here if you want. They're like this. And I'm pretty sure that's it. Now, we need to index our movie data. Let's walk through this strategy. So, first thing we need to do is load up our CSV.
+
+[00:03:43]
+If this is a bigger file, this is a couple megabytes, you wouldn't just load this thing up in memory. You probably don't have that much RAM on your computer. It's not that big of a file, so we're gonna load up. It's a couple kilobytes. It's not even a megabyte.
+
+[00:03:54]
+But if this was a bigger file, you would stream this row by row and do it that way, but we're not. So I understand that people are looking this like, why are you loading this up memory? It's not a big file. We're gonna load it up in memory.
+
+[00:04:07]
+This parse function is essentially just gonna turn into JSON for us, so we have JSON. And then, I'm being super dramatic here, because there's a better way to do this, but I want you to just to see what it looks like. Is, for each one movie, we're going to upsert the index in the database.
+
+[00:04:23]
+So, if you don't know what upsert means, upsert just means, create it if it's not there, if it is there, just update it. That's what upsert means. Update it, create it if it's not there. So we're gonna do that one at a time, serially. So it's gonna take, I don't know, depending how fast your computer, your connection is, this might take 60 seconds.
+
+[00:04:43]
+Maybe a little more. Upsert takes in an array of these, so we can honestly, probably do them all at one time. But I think it's just more dramatic and cool just to see them do it one at a time, so you kinda know what's happening. When it happens so quickly, you don't really know what's going on.
+
+[00:04:57]
+So doing one at a time, I think is really cool. So we do that, and then we just call the function, cuz we're never gonna import this file anywhere. We're just gonna call it from the command line index, it's offline index. We're never gonna run this at run time or anything like that.
+
+[00:05:11]
+Cool, okay, let's do it. So I'm gonna say const indexMovieData
+>> Scott Moss: Async, and then, yeah, so the spinner, this is something that I use all the time. It shows you a really nice spinner in the terminal, otherwise you're just looking at a blank screen and you have no idea what the hell's going on.
+
+[00:05:37]
+So I'm gonna start my spinner. I'm gonna grab my data.
+>> Scott Moss: Equals, what are we doing here? Yeah, so let's get the path, let's get the read file sync,
+>> Scott Moss: Or, I should say, moviesPath, or whatever, = path.join, and then, here's the thing, I don't think you can do dirname anymore for using modules and NPM.
+
+[00:06:09]
+There's just another way to do it. So you can't use dirname like that. So we're gonna use process.cwd, which is, current working directory. If you don't know what that means, it just means the current directory that you're on. And our file is located at source rag, this path.
+
+[00:06:28]
+So it's relative to the root of this folder, right? The current working directory is the directory in which you run the command from, not the directory this file is in, not to be confused. So when we run this command, we'll be in this directory, the root here. So relative to this root, here's the file.
+
+[00:06:54]
+
+>> Scott Moss: Cool, the next thing we wanna do is read the file. So let's do that, and then get the records. So we'll do that,moviesPath, read that file.
+>> Scott Moss: And then records would be csv, I'm sorry, it'll be parse:csvData columns true. So the option that I had. Yeah, skip empty lines.
+
+[00:07:26]
+Definitely, yeah, do that. That will, I think the data is clean, but just do that.
+>> Scott Moss: Okay, so we got that, pretty simple, nice to update your text. To update the loader, you can just call .text and set it equal to something so it'll be like, cool. Now we're gonna start the movie indexing.
+
+[00:07:46]
+And then, here we wanna do a for of loop. For of loop allows you to do async things serially. So we can not go to the next one until the previous one is done. You can't do that in a for loop, or stuff like that. So for of loop allows you to do that, which is really cool.
+
+[00:08:06]
+We'll update our spinner text to be like, indexing this movie, all the column names are capitalized, so capital Title. And then from there, as far as how you format this, there's two things you got to think about. Whatever you put on data, that's the thing that's gonna be converted to a vector.
+
+[00:08:31]
+So think about a query that a user might ask, forget about the metadata, just think about a query that they might ask for, and that being turned into a vector. What vectors would you want that user's query to be compared to? So that's what you wanna put here.
+
+[00:08:49]
+So basically, what do you want them to be able to search for without the metadata, just vector to vector? That's what you wanna put in your text. And this is where the chunking comes from. Luckily for us, this is not a lot of tokens, so we don't have to do any chunking.
+
+[00:09:05]
+But if this was, I don't know, a couple thousand tokens, we have to break this up. Okay, cool, now we gotta figure out a chunking strategy. And each chunk is its own upsert, for instance, like another level to it. But this is not a lot, so we can just chunk some things.
+
+[00:09:27]
+So my strategy was, I'll put the title, I'll put the genre, I'll put the description. That's all I'm gonna do as far as vector. You can do whatever you want, however you want to be able to search, you can put whatever information. So if you think having the year in the database is good, so if someone types in a year, it'll find something with that year, yeah, you can do that.
+
+[00:09:48]
+You can also do that as a metadata search as well, which is different. So there's no right or wrong answer, you kind gotta figure out what works for you. So I'm just gonna do this in no particular order, you can do whatever you want. You can follow me or choose not to, play around with it.
+
+[00:10:02]
+So, this is the text, I'm just gonna say that. I'm actually gonna do the periods. I think I tried this with the dashes and it was bad. Not bad, it just wasn't as good. So we'll put the title, I'll put the genre, I'll put the description.
+>> Scott Moss: And then from there, we're going to call upsert, we have to give it an ID.
+
+[00:10:30]
+If we don't, it'll make one, which is fine. But in case you run this again, you want this to be idempotent. If you don't know idempotent means, it just means, if I do the same. So when it comes to mutated things, like upserting, updating, deleting, creating, anything that modifies or creates a resource on some service or database somewhere.
+
+[00:10:49]
+If I call it again, I don't want some weird side effect, I just want it to have happened once, right? This is very important for financial systems, where if I call transfer this money from this account to this account. It'll do it, and for some reason, I did it at the same time, or slightly after on my other device, I should get back the same result.
+
+[00:11:09]
+It shouldn't transfer it again. It should have already realized that it transferred it, and the system won't break. So, a lot of systems have idempotent IDs, where they'll send you back an ID that you can send up again, so it knows how to track that. So by us supplying our own ID here, if we were to run this again, we we would not be creating something else in the database, it would only update the one that was already there by this ID.
+
+[00:11:36]
+So let's do that.
+>> Scott Moss: Try, catch, I don't want this to break, so obviously I'm gonna try catch this. And then I'm going to say, await index.upsert, like this. ID is gonna be the title, the data is gonna be the text, and then we have the metadata. And again, you can do whatever you want here for the metadata.
+
+[00:12:03]
+I think I have a TypeScript type. Do I have a typescript type here? No, maybe not. You can do whatever you want. It's whatever you like. Essentially, whatever you put here, this is something that you would probably expose to either your user so they can filter on it, or you do some filtering yourself.
+
+[00:12:22]
+Maybe you have another LLM that figures out these filters for you, who knows? But this is like, you want to be able to filter it and and go down on this level for each one of these fields. I'm just gonna copy them all, just as an example.
+>> Scott Moss: And I called it record in this example.
+
+[00:12:48]
+So I'll call it record, cool.
+>> Scott Moss: And for me, right now, I have year, but the parser is reading this as a string. So maybe I would convert this to a number. Maybe I would convert rating into a number. I think it's reading as a string. Same thing, I would convert these to numbers, this to a number.
+
+[00:13:06]
+So that way, when I do the filtering, it can do number comparisons on them and stuff like that. So in fact, I might also go ahead and I'll just do it. I'll just say, number.
+>> Scott Moss: I don't think I need a new number, so we'll do that.
+>> Scott Moss: We'll do this, that's a number, votes is a number,
+>> Scott Moss: Ratings is a number.
+
+[00:13:37]
+And here's a number, cool. All these numbers, watch this break. [LAUGH] Cool, so we got that, and then, for the error, let's just update our spinner and do a log.
+>> Scott Moss: There we go.
+>> Scott Moss: And then lastly, we can just say, cool, all movies indexed. And I think succeed stops it already.
+
+[00:14:08]
+So I don't think I have to hit Stop. And right now, that's not gonna do anything unless I call the function. So I'm gonna call the function here, indexMovieData, which calls this function here that we just created.
+>> Scott Moss: And we should be safe to run it. So you can execute the file by doing npm run ingest, I already have a script in here that I'm pretty sure it works on Windows too.
+
+[00:14:35]
+Yeah, this works on Windows, it's just calling npx, tsx, the path to that file. So you can call that directly, or you can just do npm run ingest. If I didn't break anything with those numbers, we should be good, and I already have an index for this data, so it should just be upserting mine.
+
+[00:14:55]
+Npm run, and just, let's see. There we go. So you should see something like this, where it's just gonna go through and index every single movie one by one. And this is why I wanted to do it one by one, so you can see that it's doing every movie one by one here.
+
+[00:15:11]
+This would have been done already if we would have bashed it. [LAUGH] We'd be done, all right? But I wanted you to see this so you understand what it's doing. So, like I said, I think last time I did this, it took like 60 seconds. So give it a minute.
+
+[00:15:23]
+Literally, it'll let you know it's done. There's a thousand movies, so it's not too bad. And then once you do it, we can go check your dashboard, and you should see 999 in there, or whatever number. All movies indexed, go to your Upstash dashboard.
+>> Scott Moss: I'm gonna go to mine that I have here.
+
+[00:15:49]
+Hopefully, yeah, my upsert worked, I still only have 999, not 2000. So you should have this too. If you don't have this and you didn't get any errors, there was one time I created an index on Upstash where I got no errors, but I couldn't index anything. And this was in prod, I couldn't figure out what was going on.
+
+[00:16:10]
+I just created another index, same code, and it worked. That only happened one time. So if you didn't get any errors but yet you don't have anything in here, create another index, swap out your environment variables, and see if that helps. But that literally only happened to me one time, and I've created 10,000 of these indexes.
+
+[00:16:25]
+So you can click on Data Browser, you can search for things, Captain America, and Captain America sort of pops up. So give it a try. Yeah, let me see if my, yeah, they're numbers now. Yes, okay, so now you could do metadata filtering. So I only wanna see Space Journey with a rating greater than
+>> Scott Moss: 6, there we go.
+
+[00:17:01]
+So that works. So everything here has a rating greater than 6. It's a space journey, actually, I'm a snob, so give me anything greater than 8. There we go, WALL-E, wow. WALL-E that good? 8.4, I mean, it was a good movie, but damn.
+

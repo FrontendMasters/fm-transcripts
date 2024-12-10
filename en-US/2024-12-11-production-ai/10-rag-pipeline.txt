@@ -1,0 +1,127 @@
+[00:00:00]
+>> Scott Moss: All right, let's talk about the RAG pipeline. So first of all, we need to understand the different parts of RAG. RAG involves a couple things. It involves a vector database, we'll talk about a vector database, it involves embeddings in vectors, and then it involves indexing that, and then querying that.
+
+[00:00:21]
+So it involves those four things at minimum. And then depending on what your process is, you'll have more than that. I'll show you a graph right now, it'll blow your mind, just the type of stuff you have to do to get something that's 60% good, it's insane. So let's talk about the RAG pipeline, knowing that we have those different pieces.
+
+[00:00:39]
+So the first thing is, is you start with your documents. Your documents are the things that you want your AI to have access to to answer questions. So in my example of these documents might be books, they might be pages, they might be chapters. And that's the first hard part is, one, I know I have all this data, what is the best way to put it in the database, right?
+
+[00:01:01]
+Because if you think about it, first of all, you don't need to know how a vector database works right now, but let's think about the problem that we have. The problem that we have is, we can't fit all this data into the LLM. So if I just take all this data and put in the vector database as one entity, that doesn't solve my problem.
+
+[00:01:18]
+Because [LAUGH] when the AI queries this database to get it, they're gonna get back the whole thing anyway. I might as well just put it in there. So now you have to think, okay, I have to break this up so when the AI finds the appropriate one, it only gets that piece, right?
+
+[00:01:34]
+So then you have to think of what's called a chunking strategy. How do I chunk this data to a point where it's appropriate so when my AI finds these pieces of chunks, I'm confident that it has the information that it needs. And then you have to think about how that works.
+
+[00:01:53]
+Some of your data might be relational. For us, we might chunk someone's emails. Emails are highly relational about the threat that they're on, whether you sent it or received it. Did you get BCC or CC? Who was the sender? There's so many different angles in which you have to think about, and then that's not even considering the body that's in the email.
+
+[00:02:14]
+And if you think about email body, it might not just have the email that you sent, but if it's a reply, it's got all the other ones underneath it too, which is doubled, because those emails have them as well. So it's, you have to really think about, how do I separate this to the point where the AI kinda knows it?
+
+[00:02:31]
+So there really is no right answer, but what most people do is they pick a token limit of, all right, I'm gonna pick a chunk, I'm gonna have it be at max x amount of tokens, right? Let's say 100 tokens, so that's, I don't know, 400 characters or something like that, think a number.
+
+[00:02:48]
+And then what they'll do is they will do a overlap. So if I have a book, and I'm breaking up every 100 tokens, what I will do is, for every 100 tokens, when I go to the next set that I'm chunking, I'll start back. So if I've already chunked 100 tokens, the next one won't start off at the 100th token, it'll start off at token 80.
+
+[00:03:13]
+So I'll overlap 20 tokens, and then I'll go from 80, up to another 100, so that'll be, whatever that number is. And then basically, the chunk after the chunk before it, there's an overlap of 20 tokens where they're exactly the same. That way when I don't miss context, because if you break up a sentence in the middle of a word, you might lose the context of that sentence.
+
+[00:03:38]
+So having that overlap there helps the AI continue the context of certain words. So this can get really crazy. So that's naive rack, that's generic, very naive implementation V1. So that's what most people start with. They do chunking on some token level, and then they do some type of overlap.
+
+[00:04:02]
+So you'll see a lot of that. And then that's not to mention text extraction, I'm talking about things that are already texts like a book, it's already a PDF, you already have the text. Some things aren't text, right, some things might be in JSON, so you have to figure out, how do I format that to text?
+
+[00:04:16]
+Some things might be in XML, some things might be images, some things might be video, some things might be songs. How do I transform MP3 into something that I can index, right? You need a model for that. So that's usually step zero, but honestly, I think a lot of that is solved pretty well already.
+
+[00:04:35]
+There's literally a model to do all of that, but I think the chunking is hard because although it's easy to do, there is no right answer. And I see a lot of different strategies every single day about how to do this best. And if you ever wanna talk about chunking, let me know, I know way too much about that.
+
+[00:04:55]
+The next thing you do is you have to do embeddings. So what is an embedding? Okay, so here's an embedding. An embedding is a group of vectors, a vector is a number, it's an array of vectors, each number is between zero and one. It's a couple decimal points.
+
+[00:05:16]
+And they are the numerical representation of a piece of text, right? So this piece of text, when passed into some embedding model, so right now we have LLMs, we also have embedding models. Embedding models are the things that transform your text into numbers consistently every single time. It is the foundation of LLMs.
+
+[00:05:39]
+Without embedding models, LLMS would not be able to do this type of prediction in similarity types of semantics. So what you have to do is, when you have the data that you want to ingest, you then have to convert that data, those chunks, into vectors, which is a group of numbers.
+
+[00:06:01]
+And you have to put them in a vector database cuz the vector database only takes embedding, it only takes list of numbers. You can't put text in a vector database. Once you have them in the vector database, you can do math on them, right? So you could think of, maybe this represents a three-dimensional vector database, and these are pieces of text that are grouped together by similar semantics or words.
+
+[00:06:27]
+And you can kinda see how far they are from each other and their distance between them. And this is exactly how we calculate the distance between what a user is saying and what we want the AI to know inside of a vector database. We just put it on a graph, we do some math, and we figure out, which are the ones that have the closest similarities, right?
+
+[00:06:49]
+Although, it's on a 1500 dimension database, not 3-dimension or 700-dimension database, it really just depends on your embedding model. Different embedding models have different levels of dimensions. The higher the dimension, the more detail it knows, but the more it costs, and the slower it might be, just like an LLM.
+
+[00:07:08]
+Cool, so once you do that, then you have to store it, put it in your vector database, typically depends on the type of data you have. You store that information like we're gonna do today, you just run it once. We have static data, we have a movie database that's never updated, so we're just gonna update it once, and that's it.
+
+[00:07:25]
+We do that offline, we don't do that when application's running. Now if you're indexing data that is constantly changing, then it's like a regular database. When that data comes in, you create it, you chunk it, you create an embedding, you save it in your database, just like you would in a regular database.
+
+[00:07:42]
+So it just depends on your data. I would say, for most of the examples out there, usually talk about some static data or something that doesn't really change that much. Take your notion data and turn it into a vector so you can search on it or something like that, or talk to a PDF or something like that.
+
+[00:07:56]
+Those are static, they almost never change. So the update frequency is just depending on how much your data changes, right? Yeah, it can get pretty expensive [LAUGH]. Then the last part, which is the R of RAG, retrieval, is, well, not the last part, the other side of the coin.
+
+[00:08:14]
+What I just talked about was indexing and ingesting the data. Now that you have that, when someone ask a question on your LLM, now you gotta go retrieve it. So now here's the other side of it. We already indexed it, it's in the database. The retrieval part is kinda similar to the indexing part, we take what the user said, we also turn that into an embedding.
+
+[00:08:38]
+Why would we turn what the user said into an embedding, anybody know why?
+>> Speaker 2: So we can do math?
+>> Scott Moss: So we can do math, right, yeah, we wanna do number math. So [LAUGH] well, number math isn't all math numbers, that's so silly. We wanna do math, so we have to convert the user's text into vectors, numerical representation, the same way that the rest of our data is.
+
+[00:09:01]
+And then what we can do, most vector databases have different search algorithms on how you wanna search. There's so many of them most people use, like cosine similarity. There's other ones that I'm not smart enough to even remember or understand, but for the most part, that's what a lot of people do.
+
+[00:09:22]
+And it's the type of algorithm that it runs to create that list of similar pieces of data, so you find those. Some databases have advanced features like metadata filtering, and you'll see that we have that as well in the database that we're gonna use. Where you can not only search from a vector, but you can also filter on metadata.
+
+[00:09:44]
+As far as movies go, this director equals this, year, between this year and this year. So you can narrow it down even further, so you can get really good with it. And yeah, so that's the retrieval part. The augmentation part, the A in RAG, is taking those results and adding it back to the original LLM so it can see it, right?
+
+[00:10:07]
+How do I take these results and add it back? That part sounds simple, but there's so much. In a production app, you would almost never come directly from a RAG or from a vector query with a list of things and give it to the AI, you almost never do it for a lot of reasons.
+
+[00:10:23]
+One, how many tokens are in here? If there's a lot of tokens in here, and I just feed it back to AI, I'm back to where I started, I might break the LLM cuz I added too many tokens. So one, how many tokens are in here? Two, a vector database is really good at finding things that semantically make sense, but they actually aren't good at understanding relevance, right?
+
+[00:10:45]
+So if I had a question that mentioned something about a date and, find me movies that were between this time and this time, and it wouldn't found me movies. Let's say I said, find me a movie that's in between the year 1989 and 2000. And then it found me two movies, its title was called 1989, and the other one's title was called 2000.
+
+[00:11:12]
+Yeah, the vector database is gonna be like, yeah, here you go, but that's actually not relevant at all. So typically, you would have another step, which is called re-ranking, which would rank these on how relevant they are to the original message, and some other thing. You might even summarize these because they're still too big, there's a lot of optimization around that.
+
+[00:11:33]
+And then you would augment your original AI with the results of that so we can see it. So that's the augmentation step. And then the generation step is, now that AI can see it, formulate an answer. You have the information you need, you have the original user question, formulate an answer, that's the generation part.
+
+[00:11:54]
+And that has its own nuances as well, trying to have a ground, cuz a lot of apps, if you go to use Claude or, anything that, perplexity, they have sources. Here are all the sources that I use to answer your question so that generation part would have that, yes.
+
+[00:12:14]
+
+>> Speaker 3: Do we need to have some kinda description for each chunk that helps AI choose the correct chunk?
+>> Scott Moss: It's so hard to answer that question because you don't need to do any of that, it might help depending on your use case. The closest thing I can think of that reminds me of that is actually how Claude and the Anthropic team does their chunking.
+
+[00:12:42]
+It's called contextual retrieval, and it does exactly that. It'll take a chunk, and then it'll run that chunk through an LLM to give a description of that chunk in relation to the entire document. And then that contextualized chunk is what they put in the vector database. So the AI not only sees the chunk, but understands how this chunk relates to the entire document.
+
+[00:13:09]
+This is actually what I use in production, this is one of the things I use in production. So yeah, you can do it, but there's other things that you can do as well that are really helpful. But no, you don't need to do it. Because the data itself, the semantics itself, those numbers themselves, are the things that are being compared.
+
+[00:13:29]
+So you have to think to yourself, there's a process of thinking of, what would I expect my users to be searching for versus the data that I have? And how can I get ahead of that and add some of that here? But also the only way to get around this is just EVALS.
+
+[00:13:46]
+You have to do EVALS on this stuff to see how good your retrieval is, your augmentation is, your generation is, everything. There's just no way around it. One of many approaches is that, yes.
+

@@ -1,0 +1,129 @@
+[00:00:00]
+>> Scott Moss: We're not gonna do anything crazy. [LAUGH] We're not gonna do anything crazy. Cuz, one, I don't wanna look like a fool. And two, it gets so scientific, I just wanna give you the framework and the idea of how to eval things, right? So, let's follow along. The first thing we need to do is, we need to create our own custom scorer, or metric.
+
+[00:00:25]
+There's so many that we can use, I just chose one that I think is a little easier to grok. And this is not an LLM-based one, although we can do that. This one is just a tool called match, and I just made one from scratch. And essentially what it does is, it checks to see if the LLM made the correct tool call given an input.
+
+[00:00:46]
+It actually doesn't do a good job of checking the inverse, so we could fix it for that, but I left that for folks to implement if they want. So it's only gonna check if it called the right tool. If it did, it'll give you a 1. If it didn't, it'll give you a 0.
+
+[00:00:59]
+Pretty simple. It's deterministic, because it's all just code. There's no LLM involved, but you will be able to run through the whole thing. So before I do that, I need to run you through the framework that I created to do evals and kinda the landscape of all of that.
+
+[00:01:15]
+Okay, so, actually, let me check out to the other branch, I'm on the finished branch. So I'm gonna check out the step 1. If you're not there, follow me there, step/1.
+>> Scott Moss: Little tour of the app, as far as evals go. There's an evals folder here on the root.
+
+[00:01:35]
+
+>> Scott Moss: And inside of there you might see three files in this app folder here. So evalTools is gonna be the framework that I created to run our evals. I couldn't find any good one in TypeScript that you can just run. They're all in Python, they're just all in Python.
+
+[00:01:54]
+And the ones that are in TypeScript are paid products. So I just made one, so I made one for us today that we're gonna use. So I'm just gonna walk through what's going on here. Essentially, what this one's gonna do is, it's just a function that take, the way that you typically see evals is, like I said, it's science.
+
+[00:02:13]
+You have an experiment, so you give your experiment a name. So in our case we might have an experiment called Reddit, or generate-image, or whatever you wanna call it. You can call your experiment whatever you want, just a way to keep, you need an experiment cuz you need to keep track of historical reference of how you're improving the system.
+
+[00:02:31]
+So an experiment is a unique name associated with the thing that you're testing so you can track the improvement on whether or not it's going up or going down, right? So, just science there. And then typically what you have is three things for this eval to run. You have a task, this is some async function.
+
+[00:02:49]
+This is typically where you run your AI system. Let me run my thing and get a result. It could be whatever you want. It doesn't even need to be AI, it's just some async function that runs and it spits back a result. Data is typically an array of inputs and expected outputs.
+
+[00:03:08]
+So I'll say the input is this thing that this user might have typed, what I expect the system to output is this thing. And you have an array of that, so this is your data set that I was talking about. Whether you got that from users, whether you generated it yourself, whether you had AI do it for you, this would be your data.
+
+[00:03:26]
+And then scorers are an array of metrics you want to score these inputs and expected data on. So these might be scientific things like Levenshtein distance, or in our case, testing if the AI called the right tool or not. You can have as many scores as you want.
+
+[00:03:46]
+And then, this function kinda just does all that for you, calculates the scores and saves them to a file that we can then read from an app. So that's essentially what this is doing. We won't be making this framework, there's no reason to go through and make this framework.
+
+[00:04:05]
+So this is why this is here for you already, but this is what we'll be using and I just wanted you to see that as a reference. There's some other files here, like run, that gives us a command from the package JSON that allows us to run our evals very simply.
+
+[00:04:17]
+You'll use that, I'll show you how to use it, it's pretty simple. And then this scores file is where we're gonna make our own custom scores that we can use in our evals. One thing to just look at right quick is if you look at the package JSON, you should see three commands in here.
+
+[00:04:32]
+You have start, that's to actually execute the agent, eval, is to run an eval, and it takes the name of a file, we'll get into making those eval files, if you don't give it a name it'll run every eval. And then, don't worry about this one, we'll get into this one later.
+
+[00:04:45]
+So let's do it. So the first thing we wanna do is we wanna make a custom scorer. Again, we wanna check to make sure you're calling the right tool calls, so we're gonna make a function. I'm using a project called AutoEvals, it's a set of scorers written in TypeScript based off of OpenAI's evals framework written in Python.
+
+[00:05:08]
+So, thank god we have this, because without this, this would be hard, I think. There's some really cool stuff in here, so we're just gonna implement a lot of this stuff. So if you haven't already, make sure you do npm-install to get all your packages. So, let's do it.
+
+[00:05:23]
+So I'll implement evals, or this type (Scorer) from autoevals. And I'm gonna export const ToolCallMatch here. It's of type Scorer, I'm just gonna say any any like that. And then, every score always takes in an input, an output, and the expected value. Some of them take in some extra ones, a lot of them never use the input.
+
+[00:05:54]
+Really just depends on the thing you're testing. Typically, it's just these two. These are typically what you're testing. I wanna see, I'm comparing the thing that the AI said versus what you told me should be right. And that's typically, I would say, more than 50% of the evals are doing.
+
+[00:06:10]
+They're comparing that in some way. So, we have our input, our output, and our expected.
+>> Scott Moss: Expected.
+>> Scott Moss: Cool.
+>> Scott Moss: Now, what do we want to do? For the tool call one, if you remember, if you have any experience making LLMs and tool calls, when an LLM, at least in this case, one that's based off of open AI's API structure.
+
+[00:06:45]
+When it makes a tool call, it returns a message with a role of assistant. And that message has a tool called array on it. And if the tool call in there, basically, we want to grab that object that's in that array and check the name of it. And if that name matches the one that we expect it to be, then they call the right tool.
+
+[00:07:11]
+So essentially, just checking to see if the tool call that the AI sent to us to call is the same name as the one that we expect it to be. It's just a triple equals check here. So that's what we're gonna do. And that's gonna be our score.
+
+[00:07:26]
+So, I'm not gonna write all that, but let's walk through it. So the first thing is, the output is gonna be a message from the AI. It's an object that has a role and content and things on that, we wanna check to see, again, is it type-assisted? Because for some reason, maybe your data is messed up and this is type tool or type system or type user.
+
+[00:07:49]
+So first, let's make sure this AI actually sent this message. Then we just make, this is just a sanity check just to make sure that, hey, did the AI send an assisted message with tool_calls? Because the AI can send two different types of messages. It can send a tool-called message, or it can send a final response.
+
+[00:08:07]
+And a final response, if you remember from the other course, or just practice with LLMs in general, it'll have a content property on it. So if there's a content property on it, that's the final response. If there's not a content property on it, it's probably a tool call.
+
+[00:08:21]
+So we're checking to see if, hey, is there a tool call array here? If so, is there at least one thing in there, which it should be? I don't think, if it isn't, then that LLM is broken. That's nothing on your system. If that LLM didn't give you content but gave you a tool call array but no tool calls in it, that thing's busted.
+
+[00:08:38]
+But just to make sure my code doesn't break, I'm checking for that. And then I grab the first one in there, which is an object that has a function property. And that object has a name property, and I'm checking to see if that function's name. The one that AI told me to call, is the one that the expected value name is, to see if they're the same.
+
+[00:09:00]
+And if it is, you get a 1, if not, you get a 0.
+>> Scott Moss: It's so silly, but at the same time, it's actually pretty good. And then from there, yeah, I'm just gonna return this object that has the name, put the name on here. So that way, if we go look at it on a chart, I can see what scorer gave this score.
+
+[00:09:27]
+So that way I know what to improve, I know that this tool called match-fail, then it's not good at picking the right tool. So I would have to go fix that, right, and we'll demonstrate that in a minute. So I'm just gonna return the name and the score here.
+
+[00:09:45]
+
+>> Scott Moss: And then scorer. And again, like I said, you will probably not use the input a lot, unless you're doing some type of LLM-based metric, which we probably won't get into today. Cuz it's a rabbit hole, and I think that's where a lot of all the subjectivity is, and that's where a lot of white papers are coming from.
+
+[00:10:06]
+So we're just gonna keep it simple.
+>> Speaker 2: When running evals, do you store the inputs, outputs, and expected results to analyze later, or do you just store the final eval result?
+>> Scott Moss: That's such a great question, somebody's thinking over there. So, that's a great question. Yes, you typically want to store these data sets, and that is why there are products out there that help you run and visualize your evals, because of just that one part of, how do I collect this data?
+
+[00:10:41]
+Where is it stored? So I can reuse it when I run my evals. Even though I'm running my evals offline on my machine, where is this data coming from. If you have megabytes of data, hopefully you're not storing that in your repo and push that up every time, so it needs to be stored somewhere.
+
+[00:10:54]
+We're not gonna do that today, obviously, we're just gonna just hard code some some data. But yeah, typically you would have some paid platform that you use, like, I don't wanna, you guys know I hate promoting products, but we are using their open source tools, so I guess I should mention them.
+
+[00:11:12]
+So, Braintrust data is one that I personally use, I think it's pretty good. And they give you a dashboard, where you can see all your evals and scores and things that fail, they give you an analysis. They store your data, you can use it locally. You can just run the evals on their platform.
+
+[00:11:28]
+There's a lot of different things you can do here. This is just one of many, I'm not even gonna say, go use this one. This is just one of minis. This is the one that I use. But if you're not there yet, you don't have a lot of data, maybe it's just all synthetic and it's in the file, you don't really need this.
+
+[00:11:42]
+You can just do what we're doing right now. It's when you start getting a lot of data and collecting it from users, where you're like, all right, where do we put this? There's nothing stopping from just putting that in your own database too, and just put that stuff in your own database.
+
+[00:11:54]
+But if you're really serious about it, you're gonna need a place where you can go label these things, another human in the loop thing that I didn't talk about is labeling this data. You might have a human whose job is to go in and label the data that your users didn't label, and then you would have to hire a SME, a subject matter expert on that topic, to label that data.
+
+[00:12:17]
+To make sure if it's good or not. What is the expected thing here? So like, it can get really crazy. So this is why you would use a tool like this, cuz they give you a platform where you can do that and visualize it. So, we're not gonna be doing that today, because they're stupid expensive.
+
+[00:12:32]
+But yes, great question.
+
