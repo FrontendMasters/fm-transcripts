@@ -1,0 +1,71 @@
+[00:00:00]
+>> Scott Moss: We now have approvals, we talked about evals, we talked about rag, these are all things that I think you need in a production ready system that move beyond just prototype. In fact, if all you ever did was evals and nothing else, you would be doing better than 99% of the stuff that's out there.
+
+[00:00:16]
+In my opinion, I cannot tell you how many products are in production, paid products that when you use them, they do not work [LAUGH]. And these are paid products, because that's just the state of things, everything worked well on my machine until I pushed it up to AWS, and now it doesn't work well.
+
+[00:00:33]
+That's just how it is, so just knowing how to eval, you're already ahead of the game, in my opinion, I learned evals late. Okay, let's talk about memory management, so we have a problem with our messages. They're going to become too big and we won't be able to talk to our chat anymore.
+
+[00:00:56]
+Let's see if I can simulate that, I was gonna write a script to do it, but then I just fell off [LAUGH] so we'll just copy and paste until that happens, so what do I mean by that? Let me find a repeatable section here that I can copy and paste over and over.
+
+[00:01:15]
+I'll make one, so let's say I do something like npm start *hello*
+>> Scott Moss: Cool, that's a good repeatable section, so then now I can go down here, and I can say, I'll copy this part right here. Actually, let me put a comma here so that way it'll do that too, I'll copy this and then I'll just do this.
+
+[00:01:48]
+
+>> Scott Moss: I almost had a bunch, this thing takes way more tokens than I thought it was gonna take, but eventually you will run out of memory, and it will be like, sorry, can't help you. Those are too many tokens, so what do you do at that point? Well, you could just reset the chat, you could just do this, you could just go up here, I mean, I'll just do this, hold up.
+
+[00:02:20]
+You just reset the chat like this and that will for sure work, right? Well, what do you lose when you do that?
+>> Student: Everything.
+>> Scott Moss: You lose everything, you lose your entire conversation, imagine using iMessage or Slack and before you can send the next message you got to delete all your previous messages.
+
+[00:02:35]
+That will suck, that's like before they had cloud storage with your photos you want to take this photo on your camera? [LAUGH] But upload these photos first and pay us five bucks, so that would be terrible, we don't want that. The other alternative is, what people do is, chat apps like ChatGPT or Cloud will just encourage you to start a new chat window, which is essentially starting over, but in a new chat window.
+
+[00:03:00]
+Cloud is famous for it, they'll even warn you when you're getting close to like, hey, you're getting close, you might want to make a new chat, right? So that's the thing, you don't want to do that, so, you want to implement different strategies, so that's what we're gonna do today.
+
+[00:03:16]
+The first strategy is called window slicing, this is super basic, and we'll do some version of that today. It's essentially just don't return all the messages, just return a subset of the messages. It can be by like a number of messages, it can be by number of tokens, however you want to do it.
+
+[00:03:32]
+You just create a window of messages, most likely the most recent ones up until a certain point, whether it's a certain token count or a certain message count. That's all you show, so your AI has really good, short to medium term memory, but not long term memory. Basically, it don't know what the hell you said you know, 30,000 tokens ago, or something like that, or whatever your token limit was.
+
+[00:03:56]
+So that's one way, summarization based management, which is what we're also gonna do is, you do maintain a window of recent messages, so in this case, very similar to this, you only show the last X amount of tokens, last X amount of messages. And then periodically, you summarize the older messages that you would have evicted.
+
+[00:04:21]
+So in this case, if we're only gonna show the last 200 messages, we want to summarize the ones we would have got rid of, right? Once you summarize that, you put that summary into the system prompt of like, hey, here's the conversation so far that has happened. And then the AI understands that summary plus the new messages that you sent, so we'll be doing something like that.
+
+[00:04:49]
+You also have like hierarchical summarization, so this is like getting really into it. Like when you summarize it, you're like here's the immediate thing that we just talked about. Here's something that we talked about recently, and here's this like forever. You just need to know this about this, this person or this conversation.
+
+[00:05:05]
+This is like a fact about them, it's their shoe size, it's like their favorite color. Whatever it is, you just need to know this, this is like a fact, you could do topic based segmentation, so, group them by different topics. Here's different topics that mean you and this person have had a conversation about group those things, and then you have advanced techniques, so whether or not something is important.
+
+[00:05:32]
+So not only you're summarizing it, you're trying to figure out if this information is even important, because maybe most of the stuff that they said is just stuff that doesn't matter. So really only to keep the stuff that's important, so you give those things scores of importance, and you only retain the things that have like high scores, or maybe they last longer.
+
+[00:05:49]
+So when you start evicting things or getting rid of stuff out of your summaries and your messages, you only get rid of things with low scores. So that could be pretty cool, compressed contact storage.
+>> Scott Moss: Yeah, don't do this [LAUGH] why put this here? This one is a little more advanced, so it's basically just like taking entities and random important keywords and things that stand out, and only keeping those things.
+
+[00:06:22]
+It's not really that relevant, I don't think it really helps that much. You can do dynamic window sizing, like a hash table where you change the window size depending on some behavior, some threshold, or something like that. The last thing that I didn't put here is you would actually just use rack for this, we put those movies in the vector database.
+
+[00:06:44]
+You could just put those messages in a vector database too, give it a tool to say, query chat history. And then if someone asked the agent something about something they said weeks ago, they could go query that vector database and be like, yeah, I found our conversation that we had a week ago about this, here you go, right?
+
+[00:07:03]
+You can find that, so you can do that as well, and as you can see, a combination of all these things, plus things I didn't even mention because I'm not aware of. There's really no good answer for this, what I do in production is three things. I limit you with a window, I record facts about you so if you have a fact that you mentioned like I prefer this or I like this or this is something about me.
+
+[00:07:33]
+I have a tool that understands that you're giving it a fact, and it saves that fact in the database, and then I also summarize the conversation so. Summarizing the conversation, putting that in there, putting the facts in the system prompt and then only showing you a window typically is good enough.
+
+[00:07:49]
+Now, what the AI sees and what the user sees are two different things, the user can scroll up indefinitely and see every message from the dawn of time, but the AI is only going to see this window.
+
