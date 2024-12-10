@@ -1,0 +1,192 @@
+[00:00:00]
+>> Scott Moss: The other thing to know is that now that we have different roles in the chat, there's a certain order you have to follow, otherwise, the AI will break. So you can have multiple user messages if you want next to each other. You can have multiple assistant messages if you want next to each other in succession.
+
+[00:00:17]
+But you have to think about those, what would happen? If some reason you submitted three user messages before the AI submitted the response to the first one, what do you think would happen? I don't know, it's very unpredictable. So you probably wanna guard against that, although it's technically possible.
+
+[00:00:32]
+But then there's other situations where the AI actually won't accept it at all. Once we get into tool calling, you'll see. If the AI says you must call this function and you don't come back with a response to that function, the AI won't accept the answer and it will break.
+
+[00:00:44]
+So you have to have these exact responses in order for the AI to continue. And then the other side, again, is like, technically, the AI will still work, but you might have a really bad user experience if you sent up four user messages before it responded to the first one.
+
+[00:00:58]
+I have no idea what the AI is gonna do in that example. It might batch them and try to do them in order, who knows? But it's not gonna be good, so don't do it. This one's pretty simple, I'm just gonna be using a in memory, well, I say in memory, but it's really a file-based database.
+
+[00:01:14]
+It's called lowdb. It just treats a JSON file as a database, that's it. And it's just like an abstraction over writing to the file and reading from the file, that's it. And there's some helpers in here to help us prep the messages, because there's some things we need on the messages as far as our UI is concerned, createdAt and ids, to make them unique.
+
+[00:01:34]
+But the AI won't or doesn't care about things like ids and createdAt time stamps. So we wanna add and remove those things as we go. So let's do that. We're gonna go into the memory file, you have this in here, and we have this thing from lowdb called JSONFilePreset.
+
+[00:01:54]
+So we're gonna import that from lowdb, Json, or lowdb/node,
+>> Scott Moss: JSONFilePreset, like that.
+>> Scott Moss: I have this type that I made. Now that we have different types of messages and the types' file's called a AIMessage. If you wanna go look at it, it's basically this type that OpenAI says is a message you might get back.
+
+[00:02:28]
+And then I added the other two that it didn't had, which are the other two types that I talked about. So this is just a catch all type of every type of message you might send or get back from an AI. So that's what that is, nothing crazy.
+
+[00:02:43]
+And then I have this thing called uuid. If you don't know what a uuid is, it's just a spec on generating a random string. This is so we can create conflict-free IDs. We don't have a database, so we're making our own IDs right now. That's what this is, it's just a uuid, nothing crazy.
+
+[00:03:04]
+
+>> Scott Moss: And then for TypeScripts, I'm just adding another type that extends the AIMessage, because the AIMessage itself doesn't have an id and a createdAt. But when it's in the database, it will. So I just extend the AIMessage with the id and the createdAt, so I have that. You don't have to add this, you never have to add anything with types.
+
+[00:03:28]
+Types are always optional. I just like types. No, actually, I honestly, I take that back. I don't really like types, I just hate the red squigglies. Let's just be honest, I hate it. It's so annoying, it's obvious not do this. I can't help it, that's really it. So the first thing is let's make a function called addMetadata.
+
+[00:03:48]
+It takes a message, that's an AIMessage, and it just adds a new id and createdAt on the message, that's it. So lets do that, so export const addMetadata. It's gonna take a message, that's an AIMessage, and it's just gonna return a brand new object that's got the message spread over it.
+
+[00:04:10]
+And it's gonna make an id with a uuid, and then a createdAt, that's a string, that's today. That's it. Same thing a database would do, just an abstraction around it, nothing crazy. It's nothing to do with AI other than the fact that when you get the message back from the AI, there's no id on it, there's no createdAt.
+
+[00:04:32]
+It's just a role and some content, that's it. You don't have any of this stuff. So if you wanna save them in your database, there will be ids and createdAt. So, and if you're building a chat app, you are saving your messages in a database. Otherwise, how the hell do you feed them back to the AI?
+
+[00:04:49]
+
+>> Scott Moss: Okay, and then we'll just make the opposite, we'll make one that removes the metadata. So when we feed these messages back to the AI, it doesn't have the id and the createdAt on it cuz the AI doesn't care about that. And I think some of them might even break if you try to add them on there.
+
+[00:05:02]
+So just removed the id and the createdAt because, yeah, we don't need it. So let's do that.
+>> Scott Moss: removeMetadata, and this is just gonna return. Oops, okay, all this completion, okay, this is just gonna say super, super trick here. You can say, createdAt, prop off the things that you don't want.
+
+[00:05:28]
+And then the rest is just like, I'll just say rest = message, and then now you can just return the message, right? I'm sorry, you can return the rest. I'm just taking those things off, everything that's left is the actual message and then just return that. Okay, I have another type here for data.
+
+[00:05:51]
+This is just so I can type my database methods, something that lowdb allows you to do. So if you have the other type up top, you can just make this one as well. In fact, I'll just make it up here, wire side up here. There we go. We got our data, again, types are optional.
+
+[00:06:11]
+And then as far as the database goes, it's pretty simple, we just need a function that gets the database, adds a message, and then gets the messages. I'm sorry, adds messages and then gets the messages. That's it, cuz we're gonna get them all at one time, and then we want the ability to save many at a time if we want.
+
+[00:06:31]
+So let's do that. So I'm gonna make my defaultData, which is type Data. And for this, I'm just gonna make it an object with a messages array. That's how our database is gonna be. It's just gonna be an object with messages array, pretty simple. You need to make a function that says getDb, and I'm gonna export this.
+
+[00:06:53]
+All getDb is gonna do is use this preset here. You can use this generic. If you don't know what a generic is in TypeScript, it's like passing an argument to a type. So that type can use it internally for something, usually for the return value or something like that.
+
+[00:07:09]
+In this case, this generic is telling the JSON preset that this database has this type of data, essentially. So now when you use all these methods down here, when you write this code, it'll know that there's a messages array here, it'll know that. You don't have to do it, it doesn't change the behavior, it just gives you really cool auto complete.
+
+[00:07:30]
+But shit, if you're using a cursor, it will probably autocomplete it anyway. But it's a different type of autocomplete. I mean, honestly, if you run TypeScript at build time, that's probably the most benefit. But doesn't everybody just turn that off now? [LAUGH] I don't know, if I'm the only one that is like, turn off TypeScript.
+
+[00:07:46]
+I don't care if there's errors, just leave me alone. I only want it in the editor, but who knows? Okay, so getDb, this is db =, is it a promise? Yes, okay, JSONFilePreset. I guess I gotta make this async. Okay, I did not mean to be that, but whatever.
+
+[00:08:07]
+JSONFilePreset, passing our generic, I'm just gonna put it on a file. This is saying, where do you want this file to be? We already have a file called db.json. You can literally put in whatever you want here and it will put it there. I'm using db.json, and then I'm going to say the default data, which is this.
+
+[00:08:23]
+So we got that, return our db, super simple. Now, we're gonna say, addMessages.
+>> Scott Moss: Messages, it's going to be an async function that takes in messages whose type is an array of AIMessages, like that. And then pretty simple, you get the db, we push those messages into it and then we call it write.
+
+[00:08:56]
+So let's do that. So we say db = await db, db.data and this is where that TypeScript comes in. You can see it sees that there's a messages there. We'll push in these messages, but not before adding the metadata to each one. So adding the id, adding the createdAt, so I map over them.
+
+[00:09:18]
+And for each one of them, I add the metadata, and then I just say, write that to the file, please.
+>> Scott Moss: Pretty simple. I'm pretty sure the way Lodash works is when you get the db, it just reads the file, has it in memory. At that point, you've manipulated any JavaScript object and then you write it back to the file.
+
+[00:09:40]
+This is an abstraction around that.
+>> Scott Moss: Okay, and then opposite, getMessages.
+>> Scott Moss: Same thing, gotta get the database. And then we want to return db.data.messages.map, and we want to remove the metadata. Cuz if we're getting the messages, that means we're about to add them to the AI. So we want to remove the id, we wanna remove the createdAt.
+
+[00:10:10]
+We only want the role of the content, the things that the AI wants, not the things that it doesn't want, so we're gonna do that. And then the next thing we wanna do is we want to add our chat history to our LLM. So when we ask you that question this time, what is my name, it'll at least have the information.
+
+[00:10:29]
+Will it get it right? I hope so, [LAUGH] but it'll at least have the information, right? And a good model will get it right. So let's do that. Let's go back to our index file. We can say, come here. Well, there's a couple things we need to do, right?
+
+[00:10:50]
+So one thing is if we add the previous messages here, which we will get from getMessages, and then we add our next one here. It's not gonna remember this one cuz we're only just adding it. So we're gonna have to save that one, too, but I wanted to see if you guys were gonna catch up.
+
+[00:11:15]
+Then I realized that one's a little hard to catch. So let's just do it. So yeah, let's get the messages. So let's say import, we'll add messages and we'll also get messages like this. And then here, we want to be able to pass in the history. So go to run LLM.
+
+[00:11:41]
+Let's see, right now, it only takes in the message string. We want it to be able to take in messages like this and not just a message string, right? So if we go to the LLM right quick, we can instead say, you know what? No more are we are just a transactional LLM or a chat thing.
+
+[00:11:59]
+So I'm gonna say messages now. You're gonna take in messages, and messages is gonna be an array of AI messages, like that.
+>> Scott Moss: And now, down here, I can just get rid of this and just say it's just messages now.
+>> Scott Moss: So you take in some messages and we just forward them straight to OpenAI, we don't do anything else.
+
+[00:12:25]
+Just grab the messages, pass them to OpenAI, done. Follow me there? Okay, cool, back to the index. We can get rid of the userMessage, and now I can say, let me grab the history or whatever you wanna call it, that's getMessages.
+>> Scott Moss: Well, I guess I'll just call it messages for name sake.
+
+[00:12:47]
+It's not to write it twice because I'm so lazy. Then we can just pass in messages like this with the older messages at the beginning of the array. And then the new message we just got with a role of user and content is gonna be userMessage.
+>> Scott Moss: Cool, follow me so far?
+
+[00:13:20]
+Okay, so like I said, we're gonna get the previous ones and it'll work, but it won't know this new one cuz we're not saving it. So just to show you an example, I'm gonna go into my db.json, I'm just gonna add some messages in here. I'm gonna say, role user, I guess it's gotta be JSON, role user, and then I'm gonna say content.
+
+[00:13:46]
+I'm gonna say, Hello, my name,
+>> Scott Moss: Is Scott, and I'm just gonna add that as the first message, and then I'll add a second message. And here's where it gets really crazy, I can speak for the AI. I can just come here and say, assistant, remember you said this?
+
+[00:14:09]
+The AI doesn't have to generate this message. I can say what the AI said, which is something you will be doing a lot if you make a chat app because you don't always need the AI to generate something. Some things are deterministic, you kinda know what they are.
+
+[00:14:22]
+So you will be doing this a lot. So I was gonna say, well, the AI responded, but with Hi, Scott. Cool, so I'm gonna put those messages in there. So now, if this works, the very next thing that I should say is, what is my name? And it should be able to tell me even though I told it what my name is.
+
+[00:14:40]
+If I ask it on the CLI, I should say what my name is and it should say, Scott, if we did this right. So let's go see. I'm gonna say,
+>> Scott Moss: What is my name? Your name is Scott, looks like it knows my name now, right? And just to show you that I can put anything here, let's say John.
+
+[00:15:06]
+
+>> Scott Moss: If I do that, then your name is John, right? Okay, so almost done with this one. The last thing we need to do is make sure we save this. This has to be saved, we need to save this first. There's two ways we can do it, we could just save it here, and then when we get the messages, it'll already be in here, or we can get the messages.
+
+[00:15:30]
+Yeah, that's probably the best thing, just save it here like this. And then now, when you get the messages, all you have to do is just say messages.
+>> Scott Moss: Because this right here saves that new userMessage in the chat already, then we get all the messages and we just forward them here.
+
+[00:16:00]
+
+>> Scott Moss: So just adding the messages before we get them, and then just only passing in the messages array like this. So yes, question.
+>> Audience 1: What would be the difference between sending all of this as a prompt, just joining all of the messages?
+>> Scott Moss: Sending all of this as a prompt.
+
+[00:16:19]
+Okay, good question. So let's break down the moving parts of this. This userMessage is the prompt, this is what it means to send a prompt. The thing that we're typing in here is a prompt, this is a prompt. Each userMessage is a prompt, so we have to save them individually.
+
+[00:16:41]
+So we can separate the prompt that you wrote and the response that the LLM gave. So yeah, that's just how it's stored, each prompt is its own message. So the only alternative to that would be a non-conversational LLM, it'd be like a one-off transactional thing. You just want it to do one thing and then it's done.
+
+[00:17:02]
+And again, that's a way different use case.
+>> Audience 1: So we have to save the response of the AI, too?
+>> Scott Moss: Yes, you have to save the response of the AI, too, exactly, yes. [LAUGH] Yes, you have to save the response of the AI, otherwise it won't show up in the memory.
+
+[00:17:19]
+I was hoping someone's gonna run that and see if they caught that. But yes, you have to save the response of the AI, too, it literally won't be in the memory if you don't. And I was gonna try to demonstrate that. But yeah, so the best way you can do that is like here's the response, it's a string.
+
+[00:17:40]
+You could just come down here and say, wait, addMessages. In this case, it's gonna be role assistant and the content is gonna be the response. I'm going to clear out my db. You're probably gonna doing this a lot, you can just delete the whole messages thing. You don't actually have to add anything back, it'll add it back, but it's just out of habit, I just always add it back.
+
+[00:18:10]
+I don't think you have to, I think that the lowdb will take care of it. I think if you deleted the file, it'll still work. So it's just me doing that. So now it knows nothing. So I'll say, what is my name? Let's ask what is my name.
+
+[00:18:29]
+
+>> Scott Moss: Says [SOUND] I don't know, [LAUGH] you never told me, right? And if I go look at my db, here we go. Here's the message that I sent,
+>> Scott Moss: And then here's what this system responded back with. I have no idea. So we know that that's there, so let's teach it then.
+
+[00:18:47]
+Okay, my name is Scott. So let's see what it says now, nice to meet you, Scott. So if we go back and look, we can see that like, cool. I said, my name is Scott, nice to meet you. Now, it knows. So anything that I asked going forward with this memory, it'll know that it's in the context now.
+
+[00:19:07]
+So as you see, just a lot more work creating a chat interface than it is like a transactional thing. And this is without thinking about all the problems that I talked about as far as context windows and stuff like that. So you're gonna run into a lot of that still.
+
+[00:19:29]
+Cool, any questions on chat and memory? You can have a full-blown chat with us. Go ahead and have fun, ask your questions. At this point, it's essentially the same thing as ChatGPT without their system problem. I don't know what's in their system problem.
+

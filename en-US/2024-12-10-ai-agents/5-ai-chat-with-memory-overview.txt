@@ -1,0 +1,84 @@
+[00:00:00]
+>> Scott Moss: A couple things, I pushed up the changes to step two, which is what we're gonna be working on now. So if you wanna get those changes, you can go to step two, check out to that branch, and all the changes will be there. The other thing is, if you did make a new API account with OpenAI for the model that I'm using four O Mini, you might have to give yourself permission in the OpenAI to use that model if you got an error saying you don't have permission, so just make sure you go on the dashboard and give yourself permission to that model.
+
+[00:00:25]
+You can also just try a different model, like 3.5 which I think everyone has permission to by default. It's just not as good. So your results may vary. Use four O Mini. Let's actually make a chat. So like we talked about and then you saw I asked, hey, my name is Scott, and then I said, what is my name?
+
+[00:00:42]
+And it had no idea. So we, we will work up to that. But the first part of of making this work is just making sure that there is some form of chat history, some form of back and forth, that I can have with this system. So it's not just transactional, we wanna build that.
+
+[00:01:05]
+The difference between one off LLM calls again these are really great if you have everything that you need to answer the question and you can provide it to the LLM, you don't really need a chat. Like for instance, if you just want it to summarize like a PDF and you have the PDF you can just upload the PDF and ask it to summarize the PDF and you don't really need to chat history unless you want follow-up questions, and then then you do but these are really good for like standalone tasks.
+
+[00:01:32]
+So and like an assistant use case this might be book this counter meeting or send us email or something like that just one off things, really great for answering questions, simple analyses, cogeneration that I showed you, translation is a really good one. It's actually really good at that.
+
+[00:01:50]
+Then you get into chat-based, right? So chat-based is, again, maintains the conversation history, understands context from the previous messages. So as long as it is our responsibility to feed the LM all the messages in the history, it won't do that by default. So what you'll see in a lot of like chat apps is that they're passing the entire history around all the time.
+
+[00:02:16]
+At least that's like how it used to be. I think people have gotten a lot smarter. Like they would literally, you'll send the whole all the messages down to the front end. And then when someone sends a message, you send all the messages back, which is like, why would you do that?
+
+[00:02:27]
+You just save it in the database or Redis or whatever. But a lot of people did that. But the AI needs all the messages. For now, we'll talk about different techniques because eventually that doesn't work. But for now, if you want it to know something you have to give it all the information that it needs to know.
+
+[00:02:44]
+So the other thing about chat based interactions is we had that in our code here, right? We had this right here, this role of user. When you get to a chat based interface, you start to use the other roles like system and assistant, and we'll talk about those.
+
+[00:02:59]
+There's also another one called tool that you will talk about that one too [LAUGH]. And then there's higher token usage because remember you get charged on all the tokens on your input and the tokens on your output. So if you're sending every single message that you've ever said on every single request, so the AI knows all the history that you had so far, you get charged for those tokens too.
+
+[00:03:24]
+So it's not just the new message that you add, it's every message ever that you add it, plus the new message. And those are the tokens you get charged on. The more tokens you add, the more it's gonna cost, the longer it's going to take. So as you can see, that's a problem.
+
+[00:03:41]
+And a lot of startups are solving just that problem. Literally just that problem, a lot of companies are solving that. And there's many ways and we'll talk about some of them. I'll address them and practicality in the production course version of this. But yeah, there are some constraints there.
+
+[00:03:57]
+It does get expensive. And then, yeah, obviously more complex state management. Again, you need to save these messages somewhere. You got to put them in a database and different things like that. And we're gonna have like a database in this course that we use as a file. But you'll see like the different constraints and things around that.
+
+[00:04:13]
+So, it just it just complicates it a little more. If you wanna do a chat you got to think about things. One thing though, like as I said It does get more expensive, it goes up every message, it's gonna go up, and the thing you have to think about is when we get into tool calling.
+
+[00:04:30]
+Sometimes, like for instance, if you had a function that allowed the AI to search the web, and it searched the web, and it came back with like 10 full-blown HTML pages, and then that's what you return back to the chat. Guess how many tokens that's going to eat up in your costs, just so it can answer this one question that you asked it.
+
+[00:04:51]
+And it's always there. And you only ask that question once, but it's still in your history. And then you keep adding and then you do another thing that adds, right? Like eventually you run out of memory. And the token count goes up over time. So those are like things you have to think about.
+
+[00:05:05]
+And then once you hit that context window size, you're done. So this is why sometimes like in Clawed, if you use Clawed online, it'll like, eventually, once you start using it so much in one chat, it'll have like a little thing at the bottom says longer conversations. Or it'll be like a, I forgot exactly what it says, but it's like, hey, you should start a new chat.
+
+[00:05:24]
+You need to make a new chat because like this, this is getting too long. GPT solution is they randomly, depending on what you say, we'll take what you said and it'll say like updating memory or something like that. And it'll, it'll remember what you just said and save it to a database, so it doesn't have to feed all of your chat messages over, and over, and over again.
+
+[00:05:46]
+It just remembers the important things that you said, and it feeds those summaries. It just summarizes everything you said so far versus feeding word for word everything you said. So some things get lost, some things don't. It's not exactly what you said, but it's a summary, and that's one technique that you'll see happen a lot.
+
+[00:06:03]
+So lots of things. Cool, okay. So common patterns. We did the one-off pattern just now recently, right? You literally call complete, you give it a thing. It'll do a thing. This is just some example code, it's not exactly our abstraction, but I think you get the point. This is, for instance, if you wanted to.
+
+[00:06:22]
+And if you had an app that generated topics for something, you could pass in a topic and then it'll generate a description for that topic. So this is an example of doing a one off thing. This is how you can incorporate AI that literally just take something and completes and does one thing at the end and you don't have to worry about like a chat.
+
+[00:06:46]
+So this is a great example of that. But then you get into like a chat pattern and it's very similar to like what we just did where we have to pass in the messages an array of messages. But as you can see, the difference here is that like we prefix those messages with the previous messages.
+
+[00:07:01]
+So new messages go at the end of the array. So, older messages are at the beginning and then you add the new user one. And you have to do that every single time. So, like, you're passing in the entire history every single time. So, it knows what the history is.
+
+[00:07:16]
+So, that's pretty much the big difference there. The big thing that you'll have to do with chat based LLM stuff is managing history and tokens. That's the biggest thing because if you run out of tokens, your AI will never be able to answer a question going for it.
+
+[00:07:36]
+So imagine you just keep sending it messages and then eventually it's like nope, nope, and it and because you keep adding it, it just gets bigger. So you have to figure out what is the best strategy for you, or strategies for your application to handle all of this history that you need to provide if you wanna maintain a chat.
+
+[00:07:55]
+You don't have to do that with a one-off one. The one-off one doesn't even know what the last thing you said was. So it's a lot simpler. If you're not gonna build a chat interface of somebody's chatting, you don't need to chat LM. How is what they talk to it?
+
+[00:08:08]
+Unless you're doing like over an email thread or something. If you otherwise like just use a transactional one. And then, if you are building a chat base UI UX, then you do need a chat LM. You wouldn't wanna do one off LLM, calls inside of a chat that'd be really confusing.
+
+[00:08:25]
+Nobody would know why. It doesn't remember anything. It has the shortest term memory, and nothing would work. So that's how you decide, are you building a chat app, Chat LLM? Are you not building a chat app? Probably not Chat LLM, that's about it.
+
