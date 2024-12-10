@@ -1,0 +1,117 @@
+[00:00:00]
+>> Scott moss: We just finished doing rag for movie search, and that turned out really cool. It worked very well. You can think about different strategies for evaluating that, and you should be evaluating that. And note that evaluating rag is probably the most difficult part of an agent to evaluate, in my opinion.
+
+[00:00:18]
+So, good luck. [LAUGH] And then, yeah, these are some rack-as-a-service search-type things that I was talking about. So now we're gonna move on to something else that's also pretty cool and important in its own right, and that's structured outputs. We've kind of been using some version of structured outputs already for our tool calling.
+
+[00:00:42]
+If you noticed that when we call a tool or we make a tool definition, we provide a schema for, that's not a good one, here we go. We provide a schema for, when AI says, I wanna call this function, AI must adhere to this schema so we can get those arguments so we can actually run our function deterministically.
+
+[00:01:06]
+So that's kind of a structured output. But the final result that the AI returns right now is the string. It's a content string. We could actually have the AI return an object and whatever schema we want, and at least in OpenAI's example, it's guaranteed to be that shape.
+
+[00:01:24]
+And that's because they fine-tune the model to always return a JSON in the schema that you want, and that's called a structured output. So you can get back deterministic shapes of data. The values, you still got to tune that. You still got to eval that, but the shape will always be the same.
+
+[00:01:42]
+That way you can write deterministic code against that shape. So for the most part, that's actually true. There are sometimes where it's not, but even when it's not, it'll tell you when it's not, it'll refuse to do it. Okay, so benefits of structured outputs. Guaranteed valid response formats that match your schema.
+
+[00:02:01]
+No missing required field, so if you have some system that's expecting some required field from this LLM, you'll get that field every time depending on the model you use. But in OpenAI's example, you should be getting it. You don't have those parsing errors anymore. Before structured outputs, what you would do is, you would still have a schema, and you would put it in the system, prompting, can you please return your data in this shape?
+
+[00:02:26]
+And the AI might do it, it might not do it. So you would try to parse it. You would try cache that parse. If it failed, you would run it again. You would try to cache that parse. If it failed, you run it again up until it failed on however many attempts you wanted it to fail and you just gave up on it.
+
+[00:02:40]
+But that's essentially kinda what Lengcheng did before structured outputs in JSON mode, which was like, hey, just give us a Zod schema, we'll throw it in the system prompt and we'll keep trying to parse the output until it matches that schema, up until a failure amount. But now you don't have to.
+
+[00:02:55]
+It'll give you back that shape every single time if you're using one of the OpenAI's models that supports it, which is really cool. So, obviously, that allows for better error handling. You can just check whether or not this thing came back in the shape that you wanted. Edge cases are more predictable, things like that.
+
+[00:03:14]
+Obviously, development is so much easier because, imagine writing code with a schema-less database where you can just throw whatever you want in it. That would be terrible. That's essentially what an LLM is. So now [LAUGH] you don't have that. You have something that spits out, something that has a shape.
+
+[00:03:30]
+So how does that look? Very similar to what you're doing now. You make a schema. The root has to always be an object from what I've discovered. If it's not an object, it's not gonna work. And the reason that is, is because it turns into this, which essentially has to be an object.
+
+[00:03:45]
+This is how you would do it with the raw API, but we have Zod. Python uses something called pedantic models or whatever. We use Zod here in TypeScript JavaScript. So in this case, I can define a schema, I can say it has to have a title. Some categories, which are an array of strings.
+
+[00:04:02]
+Confidence is a number. Suggestions, which is an array of objects. And there are limits to this. I forgot what the depth limit is, but it's pretty high. You can look at the docs, but there's a depth limit of how nested you can go. Zod supports default values, you can't do that cuz you don't need to.
+
+[00:04:26]
+You can just do the default value in yourself after you get it back. You can't do formatting. Zod supports coercion, coercing something to another value. For instance, if I want this to be a number, like I want a number between 0 and 1, I couldn't do that here.
+
+[00:04:44]
+I could do with Zod, but OpenAI won't support it. I could say it has to be greater than 0 but less than 1. That's the number that I want. You can't support that on the schema level. I could put that in a prompt and be like, make sure this is a number between 0 and 1 and try to eval that.
+
+[00:05:00]
+But yeah, for that example, I actually just go 0 to 100 and I just do the math myself and convert it to a decimal. So some things you can't do, but for the most part, it works pretty well. Yeah, I mean, there really isn't much to cover here other than make a schema.
+
+[00:05:16]
+[LAUGH] What does your app need, make sure your schema follows that design. So start with whatever your app is trying to consume, what functions you're trying to use, and create a schema for that. There is a case where you might have a model refusal. And let me go look up exactly why the model might refuse that before, I don't know what I'm talking about.
+
+[00:05:36]
+Let me see, structured outputs,
+>> Scott moss: Refusal. Refusal, I think if it's a safety thing with moderation or something like that. Yeah, it might occasionally refuse to fulfill the request for safety reasons. So since the refusal does not necessarily follow the schema you have supplied in the format, the API response will include a new field called refusal to indicate that the model refused to fulfill the request.
+
+[00:06:06]
+So what that would look like is you would get back something like, let me get rid of this, you get back something like this. The output would be .refusal, and it refused for, whatever reason it decided to not do it, it will refuse it. Most of the time I get this for moderation stuff, like, I'm not saying that, or I'm not gonna do that, so it'll refuse it.
+
+[00:06:29]
+So you really got to look for those two things. You look for the refusal, or now you can get back the parsed argument. Before we would get back the message, but now we get back this parse thing, and that's because we're using a different completion. We're doing openai.beta, whereas before we were doing openai.chat.
+
+[00:06:45]
+It's openai.beta.chat.completion.parse, which is also different. So this right here allows us to do those structured outputs. I've heard from some people, I haven't measured this, that structured outputs lower the quality of the responses, and that the quality is better if you don't have structured outputs. I myself haven't tested it.
+
+[00:07:07]
+For my application, I'm gonna use structured outputs, and I'll tell you my use case. But there are alternatives to this, like the one that I told you about, just looping over with the schema yourself, using XML. There's other ways to do it, but I like the structured outputs.
+
+[00:07:21]
+Let's talk about some of the examples you might use structured outputs for. So for my app, we use structured outputs for generative UI. So we have a chat app. Depending on the tool that was called or the question that you asked, instead of rendering a chat bubble, we might render a component, right?
+
+[00:07:40]
+So you can think of this as, if you had a chat app and you asked what the weather was, it could just respond back in a chat bubble, like here's the weather. Or it can show you a weather component that looks nice and is interactive. Okay, structured outputs allow me to do that because when I say I can give the AI a list of enums, and each enum is a type of component that my front end knows about.
+
+[00:08:05]
+So it knows about a weather component, it knows about this component, knows about this component, and each one of those enums is a schema object that has parameters on them. So for the weather component, it must have the city, the temperature outside, whatever. And then, once my friend sees that object, there's an if statement, so we're in JSS, it's like, is this component type weather?
+
+[00:08:29]
+Cool, show the weather component, not a chat bubble, right? So you're basically allowing your AI to determine what UI to show your users, right? So you can do that on a component level, which I think is really cool. You could even go a little lower, and I think OpenAI has an example of it.
+
+[00:08:45]
+Let's see.
+>> Scott moss: You can go even lower level and,
+>> Scott moss: They're not gonna show me the sample of it, where you can just give the AI a list of atom component. So here is a title, here is a bar chart, here is a column, [LAUGH] here is a button.
+
+[00:09:11]
+And then it will compose the UI for you, and then it'll give you a list of those things. And then you would build a renderer on your front end that loops through that list and renders out and make a component on the fly based off the little components that the AI set to render.
+
+[00:09:25]
+So you're literally generating a UI on the fly, and the AI is determining what's the best layout for those things. It can get really powerful if you can train an AI to do that very well, but we moved it a level above. It was like, let's just give it a list of big components versus a list of these smaller atomic components so we can have some sort of consistency in our app, because we don't wanna train this thing to always do that.
+
+[00:09:49]
+And at that point, you might as well just say, always show this component. But you can get pretty interesting with that. The other thing is structured output can be recursive, so I'm not sure if they have an example of recursion in here. There you go. So you can have recursive properties in here, which is extremely powerful.
+
+[00:10:08]
+So I think in this example with, yeah, they're literally doing what I was describing. They have enums for divs, buttons, headers, sections, fields and forms, and they can all be nested inside of each other, right? So in this case, you have an array here, and where is that?
+
+[00:10:30]
+There it is, here it is. So items right here, this is basically saying, the children of this entity here can be itself. It's referencing itself. That's what this is saying. So it's recursive. So that way you can have divs and divs, a button and a div, it's just like HTML.
+
+[00:10:52]
+So, and then the AI will generate you a DOM tree that you can then just render on your app. Which is crazy to think about, but actually quite powerful. So they had a blog post that I wanted to show you. Yeah, here it is. So look, they have generative UI that generates this landing page.
+
+[00:11:14]
+And you can see, this is what it will look like, here's the schema or the output for it. Here's the output that the system put out that you can see it had a children's array, type was header. It had children, its type was div, its label was Green Thumb Gardening.
+
+[00:11:30]
+Here's the attributes to put on it, [LAUGH] like, what class to put on it. Kinda crazy. So it's literally generating something that someone is transforming to React in this case cuz it has class names, I'm guessing they're using React, but this could be anything. This could be whatever you want it to render to whatever system you have.
+
+[00:11:50]
+So that one was pretty cool. A sign up screen. So this thing generates a sign up screen. So if you start thinking about it this way, you can have a different UI depending on some logic. So if this AI had a system prompts that knew everything about the user, their preferences, what device they were on, all this stuff, it could generate a UI specific for that person to do something that it needs, right?
+
+[00:12:17]
+So it might make a different sign up screen for a different type of person on the fly. It's pretty powerful.
+
