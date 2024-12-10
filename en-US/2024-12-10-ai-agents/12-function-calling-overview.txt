@@ -1,0 +1,96 @@
+[00:00:00]
+>> Scott Moss: Last time we talked about agents and we got a tool calling, I merged a little bit of this current lesson into the last one because it just made more sense. We're gonna finish up the tool calling. We left off where we can pass the tool and the AI can tell us that it wants to call a tool, but we aren't actually doing anything with that.
+
+[00:00:19]
+Yes.
+>> Speaker 2: How do you handle things like security when a user is using something that might be sent to an agent? How do you prevent them from accessing other users' data, these kinds of things?
+>> Scott Moss: It's a great question. The same way you do it now. AI can't run anything you didn't give it access to.
+
+[00:00:40]
+So, and that specific case of how would you prevent an AI from if you have a multi tenant system. Actually, we're going to get into the very specifics of that literally right now, but it's really no different than what you're doing now, right? The function knows, you can pass in different parameters to that function this is the current user ID.
+
+[00:01:02]
+And then that function can do a query scope down to just that user ID or whatever you're fragmenting on whatever. However you split your users up, so the AI won't run any, yeah, I guess you could just give your AI a tool that's here you go. Here's my whole ORM go Crazy then, yeah, I guess that's a problem, but you probably typically won't do that.
+
+[00:01:24]
+You would have very scoped functions within the realm of that tool call. So shouldn't be a problem. Cool, okay, so we already talked about what the tool calling stuff looks like, but I'm gonna show you kind of like the message flow. So here's a diagram. User ask a message, all right?
+
+[00:01:44]
+Assistant says, cool, I'll call that function. We didn't talk about arguments. We'll do arguments this time so you can see what that looks like and then you immediately have to respond back. And we saw the error. You have to respond back with the role of tool and the tool call ID must be the same ID that was in the tool calls array in the message before it.
+
+[00:02:08]
+You have to do that. You will get the error that I had if you don't remember that. As far as like, I think this is confusing sometimes is what can the tool return whatever you want as long as it's a string it doesn't matter you can return whatever you want.
+
+[00:02:25]
+There is no schema on what you return the schema is mostly for what arguments are passed in. Because that's something that your system needs to be deterministic, so you can appropriately run the right function but when you're. Giving something to the AI, it doesn't care. It doesn't need a schema.
+
+[00:02:42]
+You just pass it whatever you want. So even getting creative in like what you return here can help the AI have better answers. Some things I like to do is I like to if my tool is some async function, I always try catch it so it doesn't throw an error.
+
+[00:02:58]
+But if it does throw an error in the catch, I like to send back an object to the AI as a tool response of failed true reason. And I'll put a reason so then the AI can see that reason. And then maybe it might show the user something like, sorry.
+
+[00:03:15]
+I think right now in our system, if an error happens We tell the AI an error happens, versus just throwing an error and having the system shut down. And then we've trained the AI to be like, sorry, I had a problem doing this. I let my engineers know, right?
+
+[00:03:29]
+And it'll say something like that. So that way you still have a good experience where if you just let that thing fail, user's not gonna see anything, so it's a different way of like programming. You kind of got to think about it so you can return whatever you want, as long as it's a string which includes JSON.
+
+[00:03:45]
+So that's how that works. And then you feed that back to the AI, and the AI is like, okay, cool. I'm gonna try to answer this now or not, and I'm going to tell you to do another tool call you, don't know that's. That's the whole point of an agent.
+
+[00:04:00]
+It decides on whether or not it can, should or what it should call and how it should call it. We talked about this stuff already. Here's a really good example of some clear versus like ambiguous matches. I'll put this example here. So let's say a user asks for what's the stock price of Apple?
+
+[00:04:18]
+This is pretty clear. Because I have a function that calls like get stock price and it describes the stock price. This intent that makes sense. And we even said that it takes an argument called symbol. They asked for Apple. That makes sense. I think the only thing that might be confusing here is that if the AI didn't know that Apple's ticker or symbol was a APL then Maybe it'll just make something up or maybe it'll ask.
+
+[00:04:41]
+That is the only thing I can see where it would be confused. Everything else seems pretty clear here. The second one is pretty ambiguous. How's Apple doing today? I don't know, should I be getting the stock price to figure that out? Maybe I have another tool that says search the web.
+
+[00:04:53]
+Should I call that one instead? Maybe I have another tool that says something it's very ambiguous on what the AI is supposed to do here. And this is especially in a chat interface where someone can type anything, this is where you run into problems where it's this is very ambiguous.
+
+[00:05:11]
+So it's like best case scenario, it's a clear match or it's a no match. But a lot of the times it's this because a lot of users might have compound sentences, can you do this, and then can you do this, and then can you do this as well?
+
+[00:05:24]
+And that's one message. And it's what do you want me to do here, right? So it can get pretty confusing, and here lies the confusion and stuff like that. So you also want to make sure the tools that you get give your AI are so different from each other that when it decides which ones it wants to choose, it's very clear which ones should be chosen.
+
+[00:05:48]
+If you have something that says getWeather and then you have another one that says getWeather for this for a city, and they do way too different things, like good luck, it's just, that's too close. It's better off just to have one tool called getWeather and make it take an optional argument for a city, and then that's better.
+
+[00:06:06]
+So they'll always call that one tool or something like that. So, yeah, it can get pretty crazy, pretty hairy, really quickly. Common function types. Data retrieval. So this is call this function, go get something. So hit another API, hit a database. Rag, something like that. Go get me some data, bring it back and then in this case, like show it to me, answer a question, whatever.
+
+[00:06:35]
+Actions, these are like more mutative things. Go do something for me. This is where AI gets scary, and it'll go do a thing for you. Go send this email for me. Go, I don't know, go buy this thing for me. Here's my credit card something spooky like that.
+
+[00:06:51]
+It could do that, and it will do that if you have an API. So, I think that's where it just gets absolutely terrifying. And then calculations, answer that you needed to perform some analysis that requires a brain, and then give me an answer. So in this case, calculate my monthly mortgage payment.
+
+[00:07:11]
+Assuming this AI had access to, I don't know, some bank statements that you had or whatever information and I'm sorry in this case, it takes in a principle or rate in year. So, if you gave it a principle or rate in some years, it could calculate your mortgage for you.
+
+[00:07:28]
+So this will just be a function that you make that literally takes in these three things and returns back your mortgage with some simple calculation of that. So, those are really the most three things. The number one thing for sure is going to be this. It's gonna be data retrieval.
+
+[00:07:42]
+100% that's gonna be like more than half your tools, maybe some of this. This is very powerful, and I think it requires human in the loop. I'll talk about human in the loop later. Probably almost never this, unless you're doing fintech. This is probably all you're doing, but probably never this, from my experience.
+
+[00:08:09]
+
+>> Scott Moss: We talked about this already, descriptions, descriptions, descriptions. Don't do unclear descriptions. Emails, what the hell does that mean? [LAUGH] I don't know. Emails, you really have to work with AI as if it's another human. That's the best thing that I can describe. Just talk to it the way that you would talk to a human.
+
+[00:08:36]
+And that's a great starting point. You can optimize it after that, but talk to it like you would talk to a human because it was trained on all human context so it makes sense just do that. So if you just told someone that like emails how would they know that that this function is meant to like send emails like.
+
+[00:08:59]
+I don't know, does it get emails? Does it delete emails? What do you mean? So yeah, like imagine if you had an engineer on your team and they wrote a function in your app and the name of the function was emails. What the hell does that do? I don't know.
+
+[00:09:11]
+Give it a better name, right? So it's the same thing. And yeah, you can pretty much do anything. API calls, database ops. Literally anything you wanna do, you can do it. We talked about this, you need to, for as far as like sitting the message back, you need to reply back with their role of tool a string with the answer.
+
+[00:09:30]
+And the tool call ID must be the same ID as the tool call before it.
+

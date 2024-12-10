@@ -1,0 +1,105 @@
+[00:00:00]
+>> Scott moss: Agent loops. Why do we need loops? Kind of talked about it a lot. What is the problem that we have now? So the problem that we have now, if I look at this, is, you can see right here, I asked it, and I even spelled it wrong, tell me what the weather is right now, though, and all it did was say, get the weather, okay?
+
+[00:00:22]
+Tell me what the weather is. It didn't tell me. It went and got it, but it didn't actually tell me. Cause now we have to feed that answer back to the LLM so it can answer the original question and then it can give me an answer. That's a loop.
+
+[00:00:35]
+We need to be able to do that. Cause if we go look at my database right now, the last message that's in there is just saying. I went and got the weather, but what I would expect to see is a message that looks like this, that's role assistant and has content in it, and tells me the current weather.
+
+[00:00:52]
+That's what I would expect to see. But I don't see that right now, right? So I need to feed this answer back to the LLM, the same way we feed a user message to the LLM, I wanna feed this message back to the LLM. So then it can be like, cool, I got the data now, we're gonna answer the question now.
+
+[00:01:09]
+So we need to do that.
+>> Scott moss: And that's what makes an agent an agent. And then from there, the agent decides on whether or not it should keep doing that. Because if it wants to loop again, it'll just spit out another tool call. If it doesn't want to loop again, it'll just be like, I have a final answer.
+
+[00:01:27]
+Here's some content, and that's what we check on. So, some multi-step things that you might see out there is like people searching for flights, checking hotel availability, comparing prices, making bookings, send confirmations. These are all like multi-step things. I talked a little bit about dependent actions and how in my system at our company we use like approval.
+
+[00:01:50]
+So if you want to do one thing, there has to be another action that happens before it. There are so many ways to do that. You can just try to train the model with the right descriptions of the right tools, and hope it just gets it right. We tried that, it just didn't work well.
+
+[00:02:05]
+You could do what we do is where we interject and we intercept. You try to call this tool Psych. Do this one first, and only if they say yes, then we'll let you do this one. So it's deterministic in that way. There's other ways to do it as well.
+
+[00:02:19]
+If you have an intent classifier, you don't need to let the AI decide anything tool related, you do it yourself and you run them in parallel. So there really is no wrong or right way to do it. You got to try and see what works for yourself. But yeah, you can have dependent actions, run this tool and then you have to run this tool.
+
+[00:02:37]
+You could put that in your system prompt. You can put that in your descriptions for your tools. You can put that in everywhere you can think of to get it to play nicely. So this is a really good example. Verify funds before you make a payment. So if I say, cool, can you pay my bill right quick?
+
+[00:02:53]
+Go pay this bill. And it's like, yeah. It'd be really cool if it looked at my bank account first to make sure I have money before it went to go pay the bill. That way, I don't have to get this error message so I might say, an assistant prompt.
+
+[00:03:06]
+Before you run the make payment tool, be sure to always run the verify fund tool first, you have to do this. And then in the verify fund description, I might say, use this tool as a pre-tool for this tool, and this tool, and this tool. And then in the make payment function description, I might say, never run this tool without calling verify funds first, right?
+
+[00:03:29]
+I might do stuff like that. And then even as like another interception in the tool call in that if statement there, I'm checking for tool calls. If I see make payment, I for sure know that if the AI did its job and called verify funds first, that the verify funds message would have to be two messages before this one.
+
+[00:03:52]
+The tool call for the verify funds would have to be two messages before this because the message before this would have been a response to verify funds. And the message before that would have been the call to verify funds. So what I could do inside that loop is like, if I see a tool call for make payment, look two messages up to see if there's a verify funds there.
+
+[00:04:11]
+And if there isn't, the AI just messed up and tried to make a payment without verifying the funds. So stop at the verify funds message and then continue, right? So it's like, you have to do all these things to make sure it stays on track and instructions alone just aren't good enough, in my opinion.
+
+[00:04:27]
+So it's fun [LAUGH].
+This one's kind of cool. But at the end of the day, you just need to send back the tool response. And here's an example of someone searching for flights, right? So user says, find cheap flights to NYC and book me a hotel. That right there, we're gonna run two actions.
+
+[00:04:54]
+I already know. You actually need to do two things. So the first thing it does is it searches for flights. We call the function, we get the results back. We're cool, here's all the flights. We send that back to the AI, it's looping. The AI decides, cool. I'm now gonna search for hotels.
+
+[00:05:09]
+It tells us I wanna search for hotels with these arguments, cool. We see that it wants to search for hotels. We call that function, we get back all the hotels, we send that back to the AI, great. The AI gets that, and then it's like, cool. I have everything I need, I'm gonna answer this question now.
+
+[00:05:22]
+And now you get back an answer, of everything that it did. It did all those things, so pretty cool. This is actually a really good example if somebody wants to build something. So how does that actually look? Well, at the end of the day, it's just like a wild loop.
+
+[00:05:37]
+I mean, it really depends on your architecture, but for now we're just gonna do a wild loop. You could have a stop case in here. In this case, I have an example of. This is more like a one off thing, not something you would probably do in a chat where it's like, the whole point of this agent is to do a thing, and I know it's supposed to do this thing, so I'm just gonna keep looping until that thing is done.
+
+[00:05:57]
+But in a chat, you don't know if anybody's trying to do a thing. They can say whatever the hell they want. So you don't actually know what the goal is. So you can't actually hard-code for a specific, whether or not this task was complete. This would be like, if there's a button in your app, when you press this button, it's supposed to go do this thing, then now I know what that thing is, so I could actually stop this loop on that thing is done or not.
+
+[00:06:18]
+In our case, it's a chat. We'll just keep looping forever until the AI says, I'm done, essentially. We could stop it with like a max loops and be like, pass in 10 turns here. If it goes over 10 turns, break, stop. And that's something you can do. But then you end up in a potential broken state.
+
+[00:06:34]
+If you broke on a tool call, remember the next message you send has to be a tool response. So then you have to fix that. So it's like, you could break it, but like you have to break softly to always break on a response from the AI whose role is assistant and content is filled out.
+
+[00:06:52]
+Otherwise it's gonna be broken. There's so many things to think about, but the flexibility is there. This is really advanced user canceled. Okay, let's talk about this one. There is a way that you can like, and I talk about these things, right?
+>> Scott moss: So task complete, max turns reached.
+
+[00:07:12]
+Obviously, the thing blew up, user canceled. This is a fourth one, is, if your system supports it, you could just have the user say, never mind, stop doing this. Don't even do it anymore, right? But you would need the system that can support that, you probably like WebSockets and things like that.
+
+[00:07:30]
+And you would need some way of feeding that input into a system that's actively running. So again, you would be like WebSockets. I don't think you could do this on serverless. You need like WebSockets for this and a persistent server. That's like, cool. I'm gonna start a job, we're gonna run this agent.
+
+[00:07:46]
+In the same process, there's a WebSocket listening for a user who might say, please stop doing this. And if that's the case, I need to stop this loop, but safely and softly to the point where the last message is something that's not gonna end off in a broken state.
+
+[00:08:01]
+So pretty much, the last message has to be typed role assistant and content has to be there. So typically, what we do in our system when we're interrupted, either by an error or something like that, I always check people like, cool, what is the last message that we're on right now?
+
+[00:08:14]
+If that's not safe, I then generate a safe message that says, like, oops, sorry. Looks like I got interrupted, or, oops, sorry, there was an error. So I always end off on a soft message no matter what. So the next message the user sends won't break the system, or you could catch it on when the user sends it but then the user experience is bad.
+
+[00:08:32]
+So you could do that. There really isn't anything you can't do, it's just a different way of thinking about it. Like I always just try to think about is like, if there's a human, like you asked someone on your team to go do something and they're like, just thinking about it, they're researching, they're turning on it.
+
+[00:08:52]
+And then you slack them, like stop doing that. I don't need that anymore. Thank you. And they stop. What would they do with their work at that point? Would they just leave it there and be like, cool, here's everything I've done so far. Would they not show you?
+
+[00:09:10]
+And that's where you gotta start thinking about, what is your user experience? Get rid of all that work. I don't even want to know about that, or like, actually, show me where you left off. So then now they have to format it and make sure it ends. That there's a last message like, yeah, I would have gotten done, but here's everything I have so far, and that's the final message.
+
+[00:09:28]
+It's kind of like that. You really got to think about it from a psychological standpoint of what would this be like if I were to talk to a human? Because that's really how you have to like program with these LLMs in my opinion. It's like, from a psychology standpoint, how would a human have done this, and those are typically the patterns that I implement.
+
+[00:09:48]
+I'm like, this is how we talk to a person, so I'm gonna implement that pattern here in a code and it works very well with LLMs.
+
