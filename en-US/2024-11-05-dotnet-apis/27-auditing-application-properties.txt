@@ -8,63 +8,63 @@ So Entity Framework Core has a few things that can help with this. Let me first 
 And what I can do with it is I can say, here's all the common properties. So I'll put a ID on there oftentimes, or I will have created by or last modified by, as well as a created on date and a last modified on date. And those things, believe it or not, as you get into programming and into serious programming, those things can mean quite a bit to your application.
 
 [00:00:55]
-It can mean something, especially when you're trying to track problems down. We're declaring the props is nullable to make migrating just a little bit easier. But in practice, if you didn't do this first, which I highly recommend you do, it's something that you would, one, have to set them to as you wouldn't want them to be nullable.
+It can mean something, especially when you're trying to track problems down. We're declaring the props as nullable to make migrating just a little bit easier. But in practice, if you didn't do this first, which I highly recommend you do, it's something that you would, one, have to set them to as you wouldn't want them to be nullable.
 
 [00:01:12]
 You'd want them to be hydrated with a value. So we're gonna go ahead and close this solution, open up the next one
 >> Spencer Schneidenbach: Repos are up over here, and we're gonna go to auditing properties, and we are gonna go down here. We're gonna go to our solution explorer, a little bit cleaner view, and we are going to copy in our auditable entity.
 
 [00:01:41]
-And we are going to just do just for the sake of demonstration, we're just gonna apply this to our employee object. We're gonna call it abstract class auditable entity, and then we are going to inherit from that class. We will go ahead and add a migration.net EF. Migrations add, add new and audit props to employee.
+And we are going to just do just for the sake of demonstration, we're just gonna apply this to our Employee object. We're gonna call it abstract class AuditableEntity, and then we are going to inherit from that class. We will go ahead and add a migration. Dotnet ef migrations add AddNewAuditPropsToEmployee.
 
 [00:02:08]
-CD the employee API and then try to rerun it. Perfect. We're gonna take a look at our migration. We never take migrations for granted. And we're gonna see created by, created on, last modified last on. Those are things that we wanna have in those in this field. And then we can do this cool thing where we override the save changes and the save changes async method.
+Cd TheEmployeeAPI and then try to rerun it. Perfect. We're gonna take a look at our migration. We never take migrations for granted. And we're gonna see CreatedBy, CreatedOn, last modified, last on. Those are things that we wanna have in those in this field. And then we can do this cool thing where we override the SaveChanges and the SaveChangesAsync method.
 
 [00:02:31]
-Worth mentioning, there is a regular save changes method if, for some reason you can't use sync, async. But so that's there for you. And what we can do is modify our DB context such that when we call save changes, we can actually spin through our change tracker here and then update those entities before they're actually saved to the database.
+Worth mentioning, there is a regular SaveChanges method if, for some reason you can't use sync, async. But so that's there for you. And what we can do is modify our DbContext such that when we call SaveChanges, we can actually spin through our change tracker here and then update those entities before they're actually saved to the database.
 
 [00:02:54]
-So this is referred to as interception. It gives you a huge amount of power to control how entities are set. I don't expect that, and I don't want you to abuse this power, but in this case, it's actually quite helpful. So what you can do is you can go through each of the entities in the change tracker, you can for each through them.
+So this is referred to as interception. It gives you a huge amount of power to control how entities are set. I don't expect that, and I don't want you to abuse this power, but in this case, it's actually quite helpful. So what you can do is you can go through each of the entities in the change tracker, you can foreach through them.
 
 [00:03:12]
-And then if entity state is added, you can set your created buy or created on and created on properties to UTC now. And then if it's modified instead, you could say last modified by the update user and then last modified on datetime.UTC now. And then to make sure that that is called every time when you're calling save changes async, you'll simply override save changes async here.
+And then if entity state is added, you can set your created by or created on and created on properties to UTC now. And then if it's modified instead, you could say last modified by the update user and then last modified on DateTime.UtcNow. And then to make sure that that is called every time when you're calling SaveChangesAsync, you'll simply override SaveChangesAsync here.
 
 [00:03:39]
 Because it's a virtual method, which is awesome. And then you can just update your auditable fields here. So that that'll do is every time that change is made, now these dates will be applied. Now this string will be applied to those fields. So you can kinda use them to change things on the fly.
 
 [00:03:58]
-Again, power that you should use narrowly, but very useful at times, especially for situations like this. So I wanna make sure that those values are being set. So I'm gonna look at my tests to do that. So first thing I'm gonna do is I am going to refactor to use something that's gonna look a little strange, but it is very useful.
+Again, a power that you should use narrowly, but very useful at times, especially for situations like this. So I wanna make sure that those values are being set. So I'm gonna look at my tests to do that. So first thing I'm gonna do is I am going to refactor to use something that's gonna look a little strange, but it is very useful.
 
 [00:04:19]
-And it is used by Microsoft to test things, and it's called I system clock. And what I system clock does is simply expose out the datetime.UTC now field. This abstraction is useful because then you can create a fixed moment in time, as opposed to trying to guess what the value of that field is, you can just say these tests always run in 1/1/2022.
+And it is used by Microsoft to test things, and it's called ISystemClock. And what ISystemClock does is simply expose out the DateTime.Utc now field. This abstraction is useful because then you can create a fixed moment in time, as opposed to trying to guess what the value of that field is, you can just say these tests always run in 1/1/2022.
 
 [00:04:41]
-So that way we can guarantee that's what the the database field is always gonna be. So we're gonna say builder dot services dot add singleton. And we're gonna say I system clock. We're gonna take the one from extensions dot internal. And then we are going to say system clock.
+So that way we can guarantee that's what the the database field is always gonna be. So we're gonna say builder.Services.AddSingleton. And we're gonna say ISystemClock. We're gonna take the one from Extensions.Internal. And then we are going to say SystemClock.
 
 [00:05:04]
 
->> Spencer Schneidenbach: That's good. That's stuff. And if you look at the definition for system clock, you see it literally only returns UTC now, off of a type called datetime offset, which we haven't covered. It's a datetime that also tracks the current offset of the time zone that you're in.
+>> Spencer Schneidenbach: That's good. That's stuff. And if you look at the definition for SystemClock, you see it literally only returns UTC now, off of a type called DateTimeOffset, which we haven't covered. It's a datetime that also tracks the current offset of the time zone that you're in.
 
 [00:05:21]
-That's really all you need to know. But we can get the UTC time from that as well. So we're gonna do that. We're gonna actually modify our DB context to actually use this i system clock. We're gonna do that here, make one more change. We're gonna actually inject it here into our constructor.
+That's really all you need to know. But we can get the UTC time from that as well. So we're gonna do that. We're gonna actually modify our DbContext to actually use this ISystemClock. We're gonna do that here, make one more change. We're gonna actually inject it here into our constructor.
 
 [00:05:42]
-You're gonna see now we have our i system clock, we will go ahead and import it, which is what we need to do. And now when we save changes, we're actually reaching for that system clock. And again, this is really valuable only if you're testing this field, if you feel like this is worth testing.
+You're gonna see now we have our ISystemClock, we will go ahead and import it, which is what we need to do. And now when we save changes, we're actually reaching for that system clock. And again, this is really valuable only if you're testing this field, if you feel like this is worth testing.
 
 [00:06:01]
-And we're gonna put it right here. We're gonna get back in our custom web application factory. That's our test runner that will change all the systems for our tests. We will scroll down and we will add. And you can see that we are setting it to our time to 01-01-2022, at zero o'clock.
+And we're gonna put it right here. We're gonna get back in our CustomWebApplicationFactory. That's our test runner that will change all the systems for our tests. We will scroll down and we will add. And you can see that we are setting it to our time to 01-01-2022, at zero o'clock.
 
 [00:06:21]
-We're gonna go to our custom web application factory. We're going to paste it down here. We're gonna command.dot to import things. That's looking pretty good. And then lastly, we wanna just make sure that in our update, employee returns okay result test. That we set that that system clock time is exactly what we set it to in our test system.
+We're gonna go to our CustomWebApplicationFactory. We're going to paste it down here. We're gonna command + dot to import things. That's looking pretty good. And then lastly, we wanna just make sure that in our update, employee returns okay result test. That we set that that system clock time is exactly what we set it to in our test system.
 
 [00:06:48]
 So I'm gonna go down here. I am going to copy that line in.
->> Spencer Schneidenbach: And then I am going to actually debug this test kinda just to show. We're gonna build, so .NET build.
+>> Spencer Schneidenbach: And then I am going to actually debug this test kinda just to show. We're gonna build, so dotnet build.
 >> Spencer Schneidenbach: Now our tests show up. I'm gonna hit the little bug so that it debugs.
 
 [00:07:20]
 
->> Spencer Schneidenbach: And we're gonna see that when we hit this break point, our last modified on should be 1/1/2022, which it is because we've taken that time from the I system clock interface. And then we have, of course, our test system clock where we've fixed our date and time to 1/1/2022.
+>> Spencer Schneidenbach: And we're gonna see that when we hit this break point, our last modified on should be 1/1/2022, which it is because we've taken that time from the ISystemClock interface. And then we have, of course, our test system clock where we've fixed our date and time to 1/1/2022.
 
 [00:07:41]
 So the main point I wanted you to take from that is really about the auditable entries and how you can kinda change things. But a little bit of a test technique if you're dealing with time and you need to go back to a fixed point in time, the system clock interface is very useful for that.
