@@ -1,0 +1,74 @@
+[00:00:00]
+>> Jon Kuperman: And so then the last kind of area that we want to talk about for this is the memory tab itself. I do find starting with the task manager or the performance to be easier cuz you get a quick visual indicator if you have a problem or not.
+
+[00:00:11]
+But essentially what you can do here, you can go to the memory tab and then you can click this button, and this button will record a heap snapshot. Again, this is a bit overwhelming and it kind of shows all the different things and you kind of have this very similar thing.
+
+[00:00:25]
+Remember, in CPU performance, we talk about total time and self-time, right? So total time is it and all of its children, self-time is just it. Memory has a very similar idea where we have shallow and retained size. So shallow size is how big that item itself is, and retain size is how much memory could be freed if that thing were to be cleared.
+
+[00:00:48]
+And so you could think of like a small array that references a huge array. And the small array might have a little shallow size, but if it's the only thing referencing the large array, it might have a really large retain size. So without getting into any algorithm stuff, how do people feel about this kind of general idea of mark and sweep garbage collection in JavaScript?
+
+[00:01:08]
+Should we cover this a little bit? Seeing some iffies. Okay, that's great, that's totally great, there's definitely not a prerequisite or a requirement. But the idea being that you have all of these different ways and different programming languages or different engines to manage memory that gets used. So in low level languages, you often have to allocate and deallocate yourself.
+
+[00:01:28]
+You say, hey, I need a seven length array. And when you're done, you say, hey, I don't need this seven length array anymore. And you have to put that in your source code everywhere that you use it. In a lot of these more modern scripting languages, they have what's called garbage collection.
+
+[00:01:41]
+Meaning that, there's some code running in the engine level itself that will detect when things aren't needed anymore, and it'll get rid of those for you. And so ideally, if there's no bugs in your code we are able to write applications. We can use a big array, then we can get done with it and since we're not using it, it falls out of scope.
+
+[00:01:59]
+It's this kind of very magical thing. And the way that works is with what we call a mark and sweep algorithm, where we're basically marking things that are still used. And then as soon as a pass is finished, we know we can delete anything that didn't just get marked because it's not in use anymore.
+
+[00:02:13]
+So in that sense, we don't have memory leaks in JavaScript, because if something is no longer referenced it will go away. But in the sense that we can still be accidentally pointing to things, through any number of things like I covered before with the even listeners or with the closures or anything like that, we have lots of different memory issues.
+
+[00:02:32]
+So that's a little bit about how the memory management works and why you might see different things like the retained size could be a lot bigger than the shallow size. When we're looking through the items themselves, I think a few ways to make this easier is understanding that stuff that is wrapped in the parentheses is like system level stuff.
+
+[00:02:52]
+And often not unhelpful, but is just not going to be our course of the application causing memory leak. And so what you'll often want to do is sort by shallow or retain size, but sort of come down and start looking at things like, for example, this div. These are user land created things.
+
+[00:03:11]
+So this is like a lot of memory in a div, whereas these native string objects might not be the most helpful to us. Because while they indicate memory is really being used, A, it's a bit hard to know how much the system uses anyway without application code going on.
+
+[00:03:28]
+And B, it's very hard to get from these system objects back to the JavaScript that created them. So yeah question.
+>> Speaker 2: Say, how does the main threads memory management affected by web workers or vice-versa in terms of memory leaks?
+>> Jon Kuperman: Yeah, that's a great question. So as far as CPU goes, the workers give us infinite scalability, or at least scaling to the number of cores that you have where each one represents or loosely represents a core and you can do separate work.
+
+[00:03:54]
+With memory, you're still constrained in the sense that like Chrome as an application is taking up so much memory, kicking things out into a worker. While it may represent a little bit different in the graphs, is still your tab's memory allocation and your tab will be capped to a maximum where it'll be frozen after that amount of time.
+
+[00:04:13]
+Similarly, Chrome will be capped to a maximum where it'll freeze the operating system after an amount of time. So I guess the short answer is it doesn't buy you out of any of the stuff in the same way that threads will buy you out of CPU-bound issues. So with that all being said, what I think is the most useful workflow.
+
+[00:04:31]
+And the one that we'll be using in our exercise to try to really understand just the memory your application is using, is I find it really useful to capture heap snapshot by recording. Once it's captured, go into your app and do some stuff, like let's say we just make a bunch of divs, then capture another one.
+
+[00:04:50]
+So now we've got two heap snapshots, and we can kinda see right away the first one we captured is smaller than the second one. From here, instead of seeing the summary like we've been looking at, we can just compare them to each other, and that should get rid of a lot of the noise.
+
+[00:05:03]
+So if we say, let's compare snapshot three to snapshot two, we should only see the difference between those snapshots. And I find that to be the most useful way to kind of go through and figure out what's really going on in your application. So when we do the summary, we see all this stuff that's a bit confusing, system, object shape, all these different things.
+
+[00:05:22]
+But when we do the comparison between the two, we can see that truthfully, the thing with the largest delta is that 7,000 new divs were created. And from here, we can start trying to get back into our source code a little bit, understanding where in my code am I creating all of these divs?
+
+[00:05:38]
+Where are they coming from? Again, with the caveats, these represent internal state, they don't keep this pointer track to your source code. So where I say, the tool is very powerful but it is not always going to give you an easy click-through to like, okay, there's a lot of divs, where are they coming from, and open something up.
+
+[00:05:58]
+These are really just like a memory heap snapshot, they can identify what type of thing it is, but you still are going to be a little bit on your own piecing it back to your application code. So I can confidently say here, I have a memory leak and I'm leaking a bunch of HTML elements, and those elements are divs.
+
+[00:06:14]
+I know that easily from looking at this, but it is not quite as easy for me to just get back to the line of JavaScript that actually generated that, right? I can see these things are being attached to the body somewhere, I can see that they're divs. I don't get that exact kind of thing that you would maybe hope for, which is, this came from line 30 in main and so it sorta gets you part of the way.
+
+[00:06:37]
+You can quickly identify, do I have a memory leak? You can quickly identify what type it is. Is it JavaScript? Is it documents? Is it nodes? And you can quickly compare your app to see how much it's growing and what it's growing by. And then from there you sort of have to do quite a bit more manual work, which is why I say it's maybe the most difficult one to use out of all these performance analysis tools.
+
+[00:06:58]
+Trying to get it mapped that back to your actual source code and figuring out what might be going wrong.
+

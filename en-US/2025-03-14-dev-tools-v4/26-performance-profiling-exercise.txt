@@ -1,0 +1,104 @@
+[00:00:00]
+>> Jon Kuperman: This is not about necessarily fixing or understanding what changed in the code, it's more about getting comfortable. I'd love it if you're able to open up a performance profile, run it on your site and just start gleaning information. Do I have an issue, do I not have an issue?
+
+[00:00:15]
+Am I dropping frames? What's slow? Just kind of understanding things. So as we go into to this exercise, which we'll see here under exercises, and then CPU or layout thrashing, we'll see this kind of animation, and you can just visually tell that this animation is struggling, right? As you're looking at it, it's struggling.
+
+[00:00:34]
+And then there's an optimize button, and when you click the optimize button, it's the same animation, but it's running a lot faster. Now, it's not about figuring out, reading the source code and figuring out how it was made a lot faster. If you had to guess, I would hope you would guess that it either uses request animation frames or CSS transforms.
+
+[00:00:49]
+But regardless of that, what I'd love for you to do is just spend a few minutes, go to the page unoptimized and run the profile on it. Is it obvious to you that frames are being dropped, that things are struggling, and then hit optimize and see what's different.
+
+[00:01:03]
+Compare function times did a function like a movement function, take a lot longer, a lot less long, just kind of getting your feet wet and getting familiar with this kind of thing. So take a few minutes to do that, and then we'll kinda go through all the nitty gritty details together afterwards.
+
+[00:01:19]
+All right, hope, everybody fared okay with this. So yeah, let's just kind of take a look together, we can kind of cover exactly what changed. But I think the idea is they're pretty universal, where it's, do I have a problem? If I do have a problem and I'm dropping frames, can I do either less work or kick some of it off to a CSS transform request animation frame or chunk it in some way basically.
+
+[00:01:43]
+It's not the business logic implementation will be hard, but figuring out kind of what needs to be done shouldn't be hard to say, hey, this is too expensive, we're losing frames, let's figure it out. So go ahead and open the DevTools, and I'll do a performance audit, just make sure I get some of this janky key stuff in there and then I'll let it do its thing and kind of load.
+
+[00:02:03]
+So it loads up, I'm gonna kind of move this a little bit to the bottom here for now and we're gonna just kind of focus on the main thread. So you can see that we are, well, this actually will probably look very different based on laptop, I think that's like one important thing to call out is that your CPU ability to handle.
+
+[00:02:22]
+These are all CPU bound things, right. There's a bunch of JavaScript doing calculations, and that is gonna be very much limited by your processor, so I have a multi-year-old MacBook, so it's probably in the middle. If you had something brand new, you might see no page junk at all and if you had something much older, you would probably see a tremendous amount of red.
+
+[00:02:39]
+Again, it's just using as much CPU as it can, so it's really about how much CPU your computer has to offer. Did everybody see something like this? Some red, it's not varying amounts of red on there, perhaps more, perhaps less. Great, so we can kind of zoom in and again, the controls take a little bit of getting used to, but scrolling up and down will work if the call stacks very tall.
+
+[00:02:59]
+But Command on Mac or Control on Windows and then scrolling will sort of let you get in here on these things. So again, kind of trying to simplify this information so we can see okay, this is running, it's doing a lot of JavaScript, right? We can tell by how much yellow is running across the time, it's very JavaScript heavy.
+
+[00:03:17]
+If it was doing a small amount of JavaScript but a lot repainting, then we would just see a lot of green and purple across it. But we're actually seeing that it's doing a lot of repainting, and that green and purple is caused by yellow, which is JavaScript. So that's where the work is coming from, we're CPU bound.
+
+[00:03:32]
+I think one of my hopes here is that it's almost with just this and some deductive reasoning you can actually make it quite far into diagnosing your application issue without getting into the source code and the business logic. You can say, okay, this app is doing a lot of stuff, it stays busy and steady state, it's JavaScript constrained.
+
+[00:03:51]
+So you already could be thinking like, I wonder if we could kick some things off to a web worker. I wonder if we could use request animation frame things like that. We're definitely dropping some frames, not dropping all the frames, but we've got some things that are really struggling.
+
+[00:04:05]
+And if we zoom in and kind of try to figure out what's taking a long time, we can see that the function itself with the large self-time is this moveBalls method. And if we click on that, we can kind of open it up in the source code. And again, since we ran the performance tab, we can see that the source code has highlighted for us here that this animation loop is the thing that is causing a lot of this pain.
+
+[00:04:26]
+So I don't wanna get too far into the business logic. This is a bit contrived, but the basic idea is that I have the exact same code for all these different balls, and they all in each tick get new coordinates, and they move to those new coordinates. In the unoptimized version, we're doing the thing that we talked about earlier where we're doing a bunch of reads, then we're setting the positions, then we're reading again in order to do collision detection.
+
+[00:04:49]
+So we're doing things kind of all out of order, right? And then if we go ahead, I'm gonna close this for a second, and we hit optimize, we can kind of visually see that things feel a lot smoother. Again, this will depend on your hardware, but it should be pretty evident.
+
+[00:05:03]
+And then if we go ahead and we run another performance and just kind of mess around with it a little bit, we should see a similar, but quite a different looking performance analysis, it's still the same code path. It's still doing kind of the same things, but the time that it has taken is now very visibly smaller, right?
+
+[00:05:18]
+We were seeing these wide yellow rectangles and now we're seeing narrow, yellow rectangles and actually what might be the most interesting let's see if we restart and I'll do a recording. Let it be unoptimized for a second, then let it be optimized for a second, then stop the recording.
+
+[00:05:33]
+We should really be able to see here a comparison of when the code changes over from the unoptimized version to the optimized version. This can also be really nice when you're working on performance stuff and you wanna prove that what you did actually made the app faster as opposed to just things that make the app theoretically faster, yeah?
+
+[00:05:50]
+
+>> Student 1: In a practical scenario, how would you do that? Would you build a similar button that's gonna pull down different code, or like?
+>> Jon Kuperman: I might do that, I think probably what I would do is I would do a recording beforehand and then I would download it in some way, or I would just save that profile open.
+
+[00:06:05]
+And I would grab a few things like for example, if we go to bottom up and we go to the largest self-time and find one of these functions that are ours like somewhere, like move balls. Okay, on my first recording I spent, whatever it is, 1,800 milliseconds in this function over a five-second recording, I try to match as many things as possible.
+
+[00:06:27]
+So then make the changes to the code, build that, and then do another five-second recording and see what the difference is in the time, some things like that.
+>> Student 1: Is there a convention to share these between a team, or like how would a team?
+>> Jon Kuperman: These are standardized files, you can download one, name it whatever you want, you can send it to anybody else.
+
+[00:06:42]
+Then all you have to do is open DevTools, go to performance, and then import one, and you can get the whole thing there. So we do this quite a bit, like somebody reports an issue at work and we're having trouble reproducing it, we'll ask for one of these HARs, and then they can send the HAR.
+
+[00:06:56]
+We don't have the application, but we at least have this profile to kinda run through.
+>> Student 1: So a good place to put them is this a Git type activity, an issue, or?
+>> Jon Kuperman: That's a good question, yeah.
+>> Student 1: Where would you store something?
+>> Jon Kuperman: I mean, we just kind of store them all internally on Google Drive or something like that.
+
+[00:07:10]
+But I could see this being a really cool thing if you uploaded it and then put it in a GitHub issue, I could see that being tremendously helpful, yeah. You'll get it a lot if you file tickets against the Chrome DevTools team, they'll always ask for them. If you're, I'm seeing this issue, they're let me get a hard to reproduce, so yeah, there are reasonably small binary files that can be loaded by the DevTools.
+
+[00:07:30]
+And they are stable, so I mean, I don't know what the guarantee is, but they do work for extended period of time. So here we can get this pretty nice visualization where you can just plainly see where we went from the unoptimized and the wider yellow to the optimized and the more narrow yellow.
+
+[00:07:45]
+And you can also see that while we had these kind of huge chunks before where we would lose frames for a significant period of time, in the optimized version we are still dropping frames from time to time. But it's much more like a sporadic occasional thing happening, and so yeah, I think there's, again, without getting too deep into it.
+
+[00:08:06]
+I would hope that throughout this workshop you just get a little bit more comfortable kind of like move just moving around on these things, clicking on them. And then going to the summary and connecting through to the source code. Identifying things like what the thing with the longest self-time is, or what our function with the longest self-time is like in scripting these.
+
+[00:08:27]
+This anonymous function that calls move balls is the longest one, just having ways that you can't break anything by clicking around inside here. So to kind of capture a recording start, kind of understanding how CPU bound things are. Before you even think about the business logic for fixing it, how constrained are you, how much of a problem it is, what areas in the code base are kind of causing this issue?
+
+[00:08:50]
+How long is it really taking? And from there, I guess the harder jump would be, okay, well we know we are losing frames, we are CPU bound, move balls is the problem. Yes it'll get difficult on a business logic to figure out how to optimize a function. But I think it's really powerful, rather than hey, my app is slow to come and say, hey, my app is slow because move balls is being called and taking too long, we're dropping frames.
+
+[00:09:13]
+It's a big difference when you're kind of investigating things so how's everybody feeling? I know it's a little bit heavy, but Billy's loosely about processing these.
+
