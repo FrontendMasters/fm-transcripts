@@ -1,0 +1,85 @@
+[00:00:00]
+>> Jon Kuperman: All right, welcome everybody to Mastering Chrome DevTools. This is version four of the course that I've done through Frontend Masters. And yeah, so today we've got, hopefully a lot of really cool stuff to cover. And yeah, let's get into it. Just real quick about me, my name is John Kuperman.
+
+[00:00:17]
+I, for the last few years, have sat on TC39, which is the standards body behind the JavaScript language. So that's how new features get into the language. They also maintain working groups around a lot of other cool things, like source maps, which I am a co-convener for, as well as proposals for signals.
+
+[00:00:35]
+So we will talk about source maps today as they relate very closely to Chrome DevTools, but We'll not talk about signals today, despite my passion for talking about signals. And then, for work, I work at Bloomberg. I build DevTools, so I get to work very closely with the Chrome DevTools.
+
+[00:00:51]
+We do a lot of tight integrations with them for our financial terminal, as well as we build custom DevTools, both on top of Chrome and separate. So, I love building and talking about developer tooling. For this course, I'll leave this slide up for a minute, but we basically got the code for people who wanna follow along locally.
+
+[00:01:12]
+That's on GitHub, at mastering-devtools-static. We've got the slides, which I made a tiny URL for if anyone wants to follow along with the slides as we go. And then the code itself is deployed to masteringdevtools.com. So please feel free to just use masteringdevtools.com unless you're more comfortable working in your own kind of, IDE and building things locally and refreshing.
+
+[00:01:33]
+In which case, you can get the same experience by pulling down the code and just running it with any HTTP server. So, I've got instructions on how to get the code running, it's literally just static HTML and CSS, so it should be quite easy. Otherwise, yeah, just follow along with the slides and the deployed code.
+
+[00:01:49]
+A bit about what I do before we kind of get into it. Two of my colleagues gave this great conference talk a few months ago that I have linked at the bottom of the slides called Building a C++/JS Browser for the Financial Markets. So yeah, we essentially make our own web browser, except instead of serving user-generated web content, we serve financial applications.
+
+[00:02:09]
+So there's thousands of these financial applications, we have this custom browser that does a bunch of really cool real-time and charting and fast rendering. And, it's a really, really cool project where we get to do all sorts of deep work within Chromium and within Chrome DevTools, and a bunch of high performance C++.
+
+[00:02:28]
+And a bunch of really cool things that lets us contribute to open-source. So we sit on, what wig the web committee, TC39, the C++ Standards Committee, just doing as much as we can out in the open. Which is kind of perfect for me cuz I came in just loving Chrome DevTools, and I get to work very, very closely with them all the time.
+
+[00:02:47]
+So I usually find people come from three different, maybe, categories with Chrome DevTools. I suppose there's people who have never really opened them before, maybe they know that they're there, or maybe they've used it once or twice. Then there's usually the bread and butter folks who have used elements, maybe the console a good amount, maybe sources a little bit.
+
+[00:03:05]
+Maybe they clicked on performance and memory. And then there's people who do a considerable amount of performance audit. So, where is everybody kind of at right now, in terms of their comfort with DevTools?
+>> Speaker 2: Lots of consoles.
+>> Jon Kuperman: Lots of console, yeah, that's great. That's a good one.
+
+[00:03:22]
+That's very useful.
+>> Speaker 3: Prototyping.
+>> Jon Kuperman: Okay, yeah, so you're in the Elements tab a lot, and, okay.
+>> Speaker 3: My software takes a ton of time to build, so-
+>> Jon Kuperman: That's great, yeah.
+>> Speaker 3: If you have to troubleshoot anything, it's best to do it in the DevTools.
+>> Jon Kuperman: No, I love that.
+
+[00:03:34]
+I think that's such a good way of using them to get around some hurdle, yeah.
+>> Speaker 4: Also setting breakpoints.
+>> Jon Kuperman: Yeah, breakpoints. Cool, yeah, we have a whole section on step-through debugging, but essentially trying to elevate from just console logging into step-through debugging with breakpoints. Awesome, awesome.
+>> Speaker 5: Network tab, security, privacy for me, just seeing where my data is going.
+
+[00:03:55]
+
+>> Jon Kuperman: Yeah, I know, that's great. Yeah, yeah, network tab, security, privacy can be really, really good. Yeah, I do quite a bit with the network tab at work, just making sure that bundle sizes are coming in an appropriate way and all of our TLS settings and everything all right.
+
+[00:04:08]
+That's great.
+>> Speaker 6: Yeah, also looking at image formats and optimization and-
+>> Jon Kuperman: Yeah
+>> Speaker 6: Looking at, filter by the largest.
+>> Jon Kuperman: Yep, I love that. Yeah, I love that, again, more like great performance stuff, like seeing all the stuff that's kinda coming to you and analyzing, you can use the network tab, see what the biggest thing is.
+
+[00:04:27]
+I think that's really cool. You could use Lighthouse, which will give you offerings if there's maybe better formats that you could be using. Or just telling you if you're maybe loading 1000 by 1000 image and then rendering it 100 by 100, things like that, which still bite massive production sites all the time.
+
+[00:04:43]
+It's always kind of a funny thing to me that we have all these conference talks and workshops about optimizing your build system that you're like, I saved 0.3 kilobytes off this. And, I switched to a lighter version, which is great. I love all that stuff. But then, serving like a ten meg image on top of all that stuff after you've worked so hard, yeah, I think those are excellent.
+
+[00:05:02]
+Cool, yeah, hopefully we'll cover a good amount of that today. And then, hopefully, I always hope the most new value, I hope, will come from the performance and the memory stuff. Getting a little bit more comfortable with really auditing the nitty gritty of your site and seeing what's going on.
+
+[00:05:18]
+Excellent, to cover in this course, these are the sections that we've got outlined. So, essential Chrome DevTools, which I hope will just give you a passing familiarity with each one of the tabs. Just kind of, a comfort in understanding what they're there for and what they can do.
+
+[00:05:31]
+Then we'll get into network optimization, talk about all sorts of stuff coming over the network and how to use the DevTools to get a really good understanding. We'll go into Lighthouse audits, so covering a lot of the rail and kind of, web core vital stuff that we talked about before, as well as image optimization and bundle optimization.
+
+[00:05:48]
+We'll have a section on step-through debugging, so kind of making some examples where just console logging would be quite difficult to fix a problem but step-through debugging can make it a lot easier. Then we'll get into performance profiling, so that's CPU-bound stuff. So we'll kind of analyze the performance of certain things and we'll play around with concepts like CSS transforms or animation frames, things like that.
+
+[00:06:09]
+And then finally, landing in memory management, talking about how to detect if your app has a memory leak. And if so, how to kind of use heap snapshots, kind of figure out where the memory leak might be coming from. And then at the very end, we'll play around with a few of the cool experiments.
+
+[00:06:24]
+I'm not sure how many people are familiar, but Chrome DevTools launches a ton of experiments behind flags all the time. And they're available to users. They didn't used to be, but they are. And so it can be kind of a fun place to click through and see what's there and enable some and, yeah, we'll just kind of have a play with that.
+

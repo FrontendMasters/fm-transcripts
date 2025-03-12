@@ -1,0 +1,71 @@
+[00:00:00]
+>> Jon Kuperman: Have this is an interview question when I was really young, and it has ground my gears ever since then. But somebody said, can JavaScript have memory leaks? Yeah, of course, right? Yeah, they're no, no, it's garbage collected language blah blah blah, I was 15. But anyway, yeah JavaScript gonna have a ton of memory leaks, it is garbage collected.
+
+[00:00:19]
+You don't have to do your own reference counting, you don't have to do your own freeing of memory. But you can write code that does things that were not intended, and one of those things can be retaining memory, right? It's a very probable thing. So these categories of memory leaks, which I think are simple and contrived, but they are responsible for most of what I see in production when I look at it memory leaks.
+
+[00:00:39]
+So one of them would be accidental global variables. I know this gets covered in quite a few front of masters courses, where you are not binding something, or you're not in strict mode. And you make a variable, and it magically gets created up on the window object. So then when your function falls out of scope, this thing persists there, right?
+
+[00:00:58]
+Yeah, again, this is simple, but I do, in general, I think declaring variables scoped too highly, where that doesn't get cleaned up is a very common workflow. Another one is closures have so many different issues, and this is by far not an anti closure talk whatsoever, but closures can have all sorts of issues.
+
+[00:01:18]
+So, for example, here we have this function, and the function really returns another function, and that function only needs access to an integer count. But in the closure scope, we made this huge array, and just the way that these JavaScript engines work. It says, increment has closure over create counter, we'll keep create counter scope alive, therefore, huge array gets kept alive.
+
+[00:01:39]
+So again, kind of when you're working with these closures, just being careful not to make huge things that are attached to things that you'll wanna stay alive forever. Again, worrying less about authoring and more about getting good using the dev tools to spot these kinds of things. But this is one of my most common things at work.
+
+[00:01:56]
+I feel this happens all the time where people will author code in ways where they retain huge amounts of data because they only need one property, but they pass in a whole class, or something like that. So closures can be a little bit tricky. Event listeners can also be a tricky area.
+
+[00:02:12]
+So you can see here we've got button, and then we've got a button at event listener, but then nothing ever removed that. So if we have a long-held single-page application, and you move away from the area of the screen where you had that, you can end up with a tremendous amount of event listeners.
+
+[00:02:27]
+Now, one at a time isn't gonna get you in any trouble, but imagine you're rendering an infinite virtual table of data. And as you insert items in there, you add event listeners for each one of them, so that when they're click done. They do something, people are scrolling and scrolling.
+
+[00:02:41]
+You're not removing the old ones like before long, you can end up with hundreds of thousands or millions. Now, there's ways around this, you can do event delegation. You can only have the listener on the table itself instead of each node, or you can just have cleanup methods that intelligently clean it up.
+
+[00:02:54]
+But these are an area that can really bite you, and you can kind of leak memory because the event listener itself retains the HTML element in memory because it needs it there. So you're not only keeping the JavaScript code, but you're actually keeping that JavaScript reference to the HTML element.
+
+[00:03:09]
+Intervals, another one, right, you can have these set intervals that do stuff and you don't clear them, right? The set interval and set timer return a clear ID that you can call clear interval and clear timer. Again, maybe not a problem if you have one that just runs throughout your application.
+
+[00:03:23]
+But this can bite you quite often, where you just have some task that keeps running long after it's needed. Another one now is detached DOM nodes. So when you think about the web, and you think about JavaScript interacting with HTML, and you see these patterns of create element.
+
+[00:03:38]
+You create a div, you add some attributes to it, you stick it in the dumb. One thing that's hard to remember is that you sort of have two copies of every element. You have the one in HTML that you stuck in with append HTML, but you also have in JavaScript memory, reference to it.
+
+[00:03:54]
+And that clearing the HTML doesn't necessarily remove that JavaScript graph. I don't know if I'm explaining that well, but does that make sense? So you create a div, and you name it foo, and you give it some properties. Then the body append HTML, foo. At this point, the HTML has grown, which causes memory to increase.
+
+[00:04:14]
+But so, too, has your JavaScript memory heap, because you've got this thing. So now if you call body.removeElement foo, that's fine. It'll shrink back your HTML. But if you don't unset or delete that in-memory div that you made, its memory will just stick around. So again, these things can be quite very innocent when you're doing it once or twice or ten times, but quite dangerous if you have a really high-speed loop that's running.
+
+[00:04:38]
+And could be creating a bunch of these things, sticking them in memory and not clearing them. I don't know why I added this, I thought it was cool. It's like visualization somebody made this repo. It's like all these visualizations of garbage collection, memory techniques or whatever. And so you can see this one on the left is running very periodically.
+
+[00:04:53]
+And it's Mark and sweep approach, where it's collecting things and as they fall out of retention, it clears that room or whatever. And the other one is running these regular large GC events, where let's say, I grow and grow and grow, and then it does a full application sweep afterwards.
+
+[00:05:08]
+This isn't really important, I just thought these were really cool. That being said, let's move on to our last lesson and exercise. Memory is pretty cool. Yeah, please.
+>> Male Student 1: And I think this is a good place to use unsubscribe and then undestroy when you're working with angular.
+>> Jon Kuperman: Yeah, so frameworks often provide and yeah this is great.
+
+[00:05:26]
+And it ties into a lot of things, there are quite a lot of API's that frameworks that offer you cleanup techniques, cleanup tools. So yeah, like in angular you have the ability to have these hooks that are on destroy or on cleanup, and you can do work in there.
+
+[00:05:42]
+React hooks have the same thing where they return a cleanup method. So when React disposes the component, you can dispose of extra things you want. A great place to use it if you have a component angular react that sets a global event listener, then you should hook into the cleanup and remove that event listener.
+
+[00:05:59]
+This is more true with new things, I work on signal stuff a lot, and these signals capture a bunch of scope. They also effects, and signals always have return cleanup functions. So it's probably a pattern you've seen a lot before where you'll have some framework thing, and then optionally it can return a function, and that function runs on cleanup.
+
+[00:06:18]
+And I think a big part of writing high performance code is taking advantage of that and making sure you do whatever you need to kinda clean up your application code.
+

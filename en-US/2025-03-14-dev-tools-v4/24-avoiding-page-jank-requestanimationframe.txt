@@ -1,0 +1,78 @@
+[00:00:00]
+>> Jon Kuperman: We talked about this earlier, but one thing to keep in mind when we're talking about performance and network stuff is that JavaScript bytes do not equal image bytes. So you can see some really cool stuff here where you have 170KB JavaScript bundle and 170KB photo, and they both take 3.4 seconds to download, they're the same size.
+
+[00:00:18]
+But on the JavaScript side, we spend 2 seconds parsing and compiling it, on the image side, we spend 0.06 seconds decoding the images, it's almost instant. Then when we get to execution time, we spend 1.5 seconds executing it, whereas the image we spend 0.02 seconds just rasterizing it, painting it on the screen.
+
+[00:00:38]
+So yes, image savings are hugely important that download will really take a lot of time, but I think the big thing is to just be cautious with your JavaScript. This isn't an anti js talk by any means, but JavaScript incurs costs at multiple levels, so that's important to remember that.
+
+[00:00:52]
+It has the download cost, then it has the parse cost, then it has the execute cost. Okay, so page jank, the red things showing up on the performance. So I just wanna cover this again, not for necessarily memorization, but I always think it's kind of cool. So devices like monitors, refresh their screens about 60 times per second.
+
+[00:01:12]
+That's like the hertz that you can kinda control and some fancy, like video game monitors do, like, I don't even know, 240 or something like that. But when you're building for office monitors, like the things that we're going to be using on your work laptop or your work desktop, 60 times a second.
+
+[00:01:25]
+And so the browser needs to hand off a frame 60 times per second to be, now it looks like this, now it looks like this, and this is just happening constantly on every web app. And so one new picture gets to put up. But so you basically have this budget which is 1divided by 60, so you get 16.6 milliseconds.
+
+[00:01:45]
+If your thread blocks are more than that, you'll drop a frame, that's just simply how it will work. But unfortunately, as application developers, we don't get the whole 16 milliseconds, that would be too much for us to get. Because there's just a bunch of generic stuff that all pages have to do, browsers have to paint a bunch of different stuff, so we really get about 10 milliseconds to handle our frame.
+
+[00:02:05]
+Now, the point of this is not to start thinking about your code in terms of how many milliseconds it takes to run, that is exhausting, there's no need to do that at all. It's more just understanding when you see the page jank in the performance tab, what's happening here?
+
+[00:02:18]
+What's happening here is that you probably had a blocking operation, maybe recurring, that was taking longer than 10 milliseconds. And therefore, as the monitor refreshed, your code wasn't ready to give a new frame yet, that's what's happening here. And that helps you kind of think about the types of solutions to come up with, like chunking the workout using a web worker, different than doing less work, things like that.
+
+[00:02:41]
+So how many people have heard of request animation frame? Okay, this stuff starts getting a bit heavy, so just jump in if I got anything. So basically, you can think about this experience with the browser, and we use JavaScript to interact with the website. And we could think about two main operations, we do reads and we do writes, right?
+
+[00:03:01]
+And so here's an example, we get the current width, so box width or whatever. Or get element ID, where we're like reading things. Then we can also do writes, we can do box style width and we can set the width to something else, right? And so all of our code sort of breaks down like this.
+
+[00:03:15]
+We're constantly reading in things, accessing the properties, other times we're setting properties, and as your app gets really big, you've got reads and writes just all over the place, right? And so this is where frameworks come into play. A lot of these modern day frameworks like react and angular, and all these things, they take care of this for you so you don't have to think about it.
+
+[00:03:32]
+But when you do think about it, every time you do a write, it invalidates everything that you could be reading off that thing, right? If I say box.width, and it's 100, great, then I say, box.width = a + b + c, and now it's like the browser doesn't really know what that's gonna be until it re computes it again.
+
+[00:03:52]
+And this is pretty similar to doing anything in kind of computer science where, writes often invalidate reads or invalidate caches, right? And so you can think if you do a lot of JavaScript HTML manipulation yourself, you could get into a really bad spot where it's just hard to think about you're doing writes and reads all over the place.
+
+[00:04:10]
+It'd be way better if you could batch them, but who has time for that? The frameworks do help for this, they batch them but ultimately, this is like a real consideration where you can get a lot of page jank. A lot of the performance stuff that I work on is solved via the concept of batching, where I will take a lot of these writes and kind of batch them together and put the reads together.
+
+[00:04:28]
+Now that being said, you don't need to do all this yourself, because we have these really cool APIs like request animation frame. And so request animation frame, as you can see in this code, example, is basically saying, okay. The next time you're about to recalculate anyway for your own business, whenever that is, I have some changes I would like to make before you do that.
+
+[00:04:47]
+And so it's kind of working with the browser, right, where you're saying, I wanna change the size of a bunch of this stuff, but I know that's gonna mess it up for all the things reading it. So I'm gonna hook into the browser's animation frames, the next time you're gonna invalidate and recompute everything, anyway, let me in there.
+
+[00:05:04]
+Now again, we don't have to do a lot of this stuff because if you look in the source code of a lot of your favorite frameworks, they do a lot of this stuff. They take all of your destructive operations, and they kind of batch them in there. But I think it's an important concept that we know, especially if we do raw DOM manipulation.
+
+[00:05:21]
+Or especially if we work on something that doesn't have access to this stuff that one of these core principles that these frameworks do, or that you should not necessarily be thinking about every day. But that can get you in trouble is that if you do too many of these, read write, read write, read write, you're basically never getting this really nice fast path cache.
+
+[00:05:38]
+And you're always invalidating things and causing the browser to repaint them over and over again. So using a framework will get you like, 90% of the way there. But it is really cool to see that we actually have the ability as JavaScript developers to hook into the browser system ourselves.
+
+[00:05:51]
+Going back to that like 10 milliseconds thing, be like, okay, I know you're gonna do a new frame soon, as soon as that new frame gets sent up and you're ready to start recomputing, let me know. And I have a bunch of work that I'd like you to do.
+
+[00:06:01]
+So anything in this callback will all be done in a batch together and will all be done before it recalculates anyway. So quite nice. So this is a kind of performance thing, like you can go from this seemingly innocuous function that grabs a box and sets its width and height, and that does that in a set interval.
+
+[00:06:16]
+And that can be very slow, and then you can do the exact same thing, except you take the writes, and you put them in a requestAnimationFrame and that can be extremely fast. Just as a theoretical concept. Another thing you can do is you can do CSS transforms. So in a very, very, very similar way, you could be doing these writes and these reads.
+
+[00:06:35]
+And when you do a read or you do a write, it throws away the cache, the same exact thing, right? We've got this on click method that grabs a read and then does a write to the same thing. We can get away with a lot better performance by kicking it off to a CSS transform, by doing the box style transform and doing this kind of calculation inside the transform.
+
+[00:06:58]
+Again, not needing to memorize these things, but just knowing that there are tools out there. So the tools out there are request animation frame and CSS transforms, CSS transforms are really great for positional stuff, if you've got graphs, charts, games moving around. Request animation frame is a lot better for chunking and batching, just DOM rewrites.
+
+[00:07:18]
+But they're the same concept, which is instead Instead of doing this in a way that will invalidate and cause this constant collision. Working with the browser to say, hey, when you're gonna make a change, I've got some other work for you to do.
+
