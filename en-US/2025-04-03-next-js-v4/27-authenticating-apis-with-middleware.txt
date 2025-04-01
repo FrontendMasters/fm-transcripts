@@ -1,0 +1,132 @@
+[00:00:00]
+>> Scott Moss: How do we make middleware in Next js? It's really easy. You just make a file on the root called middleware, that's it. So outside of the app folder you make a file called middleware. And now this file has the opportunity, I say opportunity because it depends on how you configure it.
+
+[00:00:21]
+It has the opportunity to run on every single request that comes to your app, but again, it does come down to how you configure it. And there are many, many ways to configure it. The easiest way, in my opinion, is just to use the matcher. So if you export a config object like this, you can say what paths you want the middleware to be triggered on, and it uses a glot pattern.
+
+[00:00:45]
+You can also use regexes, you can also use exact paths, you can use many different ways to describe what paths you want the middleware to operate on. So we can just put this in here, and let's just give it a whirl. So I'll do this and I'll say, on every path.
+
+[00:01:05]
+And then what I'll do here is, oops, console log here, I'll just do this, I'll go back to our app, start it, and this thing says, wait, invalid. Let's just do that. Cool, so now when I go to the index of our app, did the log, let's see if it actually log.
+
+[00:01:55]
+I don't, I don't see my middleware log, maybe, maybe it doesn't show up here anymore, I don't know. I thought that that was gonna show up there in the server, but I guess not. Regardless, we're still gonna make middleware for authenticating our APIs. Because having to check for, let's say we wanna have an API key for our developer API, having to check for that on the code level for every single route is annoying.
+
+[00:02:18]
+So let's just do that on the middleware. Globally, it's not the perfect protection because we still wanna check to make sure the API key actually belongs to a user, and maybe they have a paid account and this and that. Unless you have that stored on a edge storage mechanism Edge, Redis, or something like that.
+
+[00:02:37]
+You still got to go to your source, your code that talks to your database that has that information. So it's not a complete check, but at least it's checking to see if you even have it in the header. And if you do have it in the header, then we can forward you to the server and then you can go from there, if that makes sense, yes.
+
+[00:02:53]
+
+>> Speaker 2: Does middleware only work in serverless or Vercel environments or does it work standalone?
+>> Scott Moss: So, great question. Almost every one of Vercell's competitors supports this now, so it pretty much works. It's really hard to say where all these features work because there's n amount of hosting platforms, I don't know what they all support.
+
+[00:03:17]
+What I can say is that the leading hosting platforms like Vercel, Netlify, Railway, like all these other ones that would support Next JS also support middleware. So it's pretty safe to say if they have Edge Compute, they probably support middleware in some way. Vercel definitely supports it.
+>> Scott Moss: Okay, so let's lock down our API.
+
+[00:03:47]
+So what we're gonna do here is we're gonna match on anything that says API. And then what we're gonna do is we're gonna check in here, programming, hey, the request that came in starts with/API, we want to grab the authorization header. If there is no header, get out of here.
+
+[00:04:08]
+Otherwise just pass through, so let's do that. So I'll say matcher and I'll say API. How did I do that? Path like this.
+>> Scott Moss: And then we can use the request here, and get the request.NextUrl.pathname.startswith. Next URL is not Next js URL, it's the next URL that you're trying to go to.
+
+[00:04:43]
+So don't confuse that with Next js URL. It's the URL that, because remember this is intercepting something. So this is the URL that the request is trying to go to, that's why it's called Next URL. So if request nexturl.pathname startsWith/API, we want to get the headers using the standard getter method on the headers because it's a set,
+>> Scott Moss: Headers and we can import headers.
+
+[00:05:19]
+So headers dot, or I think we've got to do like headers dot. Need to make this async. Actually, I would I like this better. I just like arrow functions better.
+>> Scott Moss: There we go. Cool, okay, so headers.get await that authorization. Yeah, let me make sure I capitalize it.
+
+[00:06:05]
+Cool, so we get the authHeader. f not authHeader, then what we wanna do here is just do a 401. We could also redirect you, but if you're hitting the API, there's no point of redirecting your API request, you're not trying to go to our website, you're trying to hit our API, so we'll just send back a 401.
+
+[00:06:26]
+So I'll just copy that. Get out of here, you didn't add your API key. Otherwise we can just say NextResponse dot, what is it? Yeah, dot next, keep going. This is a common pattern in most middleware implementations that there's like a next function so you can continue to go.
+
+[00:06:48]
+Cuz a lot of middleware implementation has a stack of middleware where you might have more than one function that runs. So it's like, go to the next one in the stack and then it just keeps going next, and you can think of the handler as the last piece of middleware in the stack.
+
+[00:07:01]
+So if it keeps going next, eventually you'll hit the last one.
+>> Speaker 3 slow: So is that next response? Could we think of that as some sort of like, singleton or.
+>> Scott Moss: Yeah, yeah.
+>> Speaker 3 slow: Coming out of thin air.
+>> Scott Moss: Yeah, well, I'm importing it here.
+>> Speaker 3 slow: Right.
+>> Scott Moss: Yeah, cuz you're like, we're not instantiating it as a new instance, it's just like a global.
+
+[00:07:28]
+Yeah, you can think of that. I mean, I think they kept it that way because you have response, which is global. This is built in. So they kind of just wanna be on parity with that, I think, cuz you can make a new response.
+>> Scott Moss: And then from there there's like methods on here.
+
+[00:07:53]
+So I think they wanted to elevate theirs to also be capitalized and whatnot, so yeah.
+>> Speaker 4: So yeah, you got headers, You can grab cookies, I assume too.
+>> Scott Moss: Yep.
+>> Speaker 4: So it's all kind of operating within the context of a single request. It's kinda like we were talking about yesterday with server functions.
+
+[00:08:22]
+
+>> Scott Moss: Yep, it's literally the same thing that you just made, but think of this as we just made the methods for get post. Okay, this is all the verbs. Every single request that'll come in, no matter what the verb is, it's gonna come in here first, I mean, yeah, I could return JSON here if I want it.
+
+[00:08:44]
+You would never be able to use the API because I'm only ever gonna return JSON. So, yeah, it works the same way as that. The standards for the web is basically, they're trying to standardize how you do edge compute versus serverless, it's all the same. Now it's all the same code because they want you to be able to toggle environments without having to change your code, which is almost there, maybe not there.
+
+[00:09:11]
+People are taking different approaches because some things work in node and will never work in the edge. I'll talk more about later after this, but that's kind of where the standards come from. It's like it'd be really cool to be able to run a node but also run on the edge without changing my code.
+
+[00:09:24]
+That's not gonna happen, but that's the dream, yes.
+>> Speaker 5: Is there any reason you need to check the pathnamestartsWith, because would the matcher already make that true?
+>> Scott Moss: That's a great question. I wonder if somebody's gonna ask that. So in this example, no, but you might have a matcher that has different paths.
+
+[00:09:44]
+In that case, you only wanna run this logic on that path and then you have another if statement for logic on another path. But yeah, in this case, because we only have a matcher for this, we don't actually need this. But I'm gonna put it there anyway just in case some person comes later down the road is like, you know what, I want to add this to.
+
+[00:10:03]
+I don't wanna check for user on our pages, I wanna say anything. I moved everything that's signed in into Dashboard, so I wanna check everything in Dashboard. I wanna do this and then inside of here I wanna check for a JWT if it starts with Dashboard. So that way I can check to see if there's a user without having to do the user request in the pages.
+
+[00:10:26]
+So yeah, just future proofing, but no, there is no exact reason.
+>> Speaker 6 lATINO: So the logic has to be on that same file or is there a way to spread the logic into different files and just have it.
+>> Scott Moss: Yeah, great question. Yeah, you can spread the logic into any files you want.
+
+[00:10:45]
+You can import your stuff, bring it in as long as it's edge compatible. So again, I wouldn't be able to import file system and bring it in here, that would break, that doesn't work on the edge. There's a lot of stuff that just works in node that does not work on the edge, but yeah, as long as it works on the edge, yeah, you can bring it in here from anywhere.
+
+[00:11:03]
+Let's try to run this again. I still got the same thing cuz maybe I have authorization in here I think. I had an authorization header in there, so try that again. There we go 401 as soon as I add in authorization header, as you saw, we're not really checking the value right now, we're just checking to see if it's in there, it works.
+
+[00:11:34]
+
+>> Speaker 3 slow: Just observation, it's interesting to me that you're returning NextResponse JSON, then the convention is that the status is in that JSON object. So okay, that first parameter is the actual JSON that you wanna return.
+>> Scott Moss: Yep.
+>> Speaker 3 slow: And then the second parameter is additional stuff related to the JSON.
+
+[00:12:07]
+
+>> Scott Moss: Yep, exactly, yeah. This is the data that I want to return, this is the configuration for the response, yeah. In the older versions of Next JS with the response object used to be able to do something like status, or status text, or something like that. And these still exist, but these aren't methods anymore, these are properties that you can get, so these are getters.
+
+[00:12:28]
+So that can be confusing sometimes. But as you saw when I did that, here we go, the MDM reference. It's just pointing to the official response object that's widely available in every browser and every runtime. So again, Next JS is just using this, it's not doing anything else.
+
+[00:12:57]
+Cool, any other questions on middleware?
+>> Speaker 7: I can see potentially, requests coming from the clients have a middleware that as your authorization header to all your requests and then requests that are coming to these URLs. You check if the authorization header is present and if it's valid.
+>> Scott Moss: Yep, a hundred percent.
+
+[00:13:13]
+Yep, I mean there really isn't anything you can't do in the middleware, honestly, that's the power of it. You can literally run compute on the edge and it's like you're only limited by the resources in which this has access to. So again, as long as you use like a serverless storage, you can't use the file system stuff like that.
+
+[00:13:34]
+You can do some pretty crazy stuff. You can build a whole app, I mean, I could return JSX in here if I wanted to. Don't do it in here, but you could, in fact, you could go to any one of these pages and you can change this to a different runtime.
+
+[00:13:52]
+I forgot if it's actual called runtime, or not, or something like that. There's a flag that you can return that will put this in a different environment, which is the same with just returning JSX in here. So yeah, some frameworks are just an abstraction around this. Cloudflare workers is literally this, but as a product.
+
