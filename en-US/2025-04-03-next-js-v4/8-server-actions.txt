@@ -1,0 +1,145 @@
+[00:00:00]
+>> Scott Moss: We left off talking about static pages and how to determine what is a static page according to Next JS and a little widget you get down here. We're gonna move into dynamic land and start working on more app-like features. So the signed in experience, starting with the actual auth pages that allow you to sign in.
+
+[00:00:22]
+So, you've done this before, you've created forms, you've submitted data to the server, you probably know this pattern through and thorough. How to make a form, how to have controlled inputs using useState or some form Hook or something like that, and then submit that. If you're an OG, you just go ahead and call Fetch on submit or something, prevent your default, do your stuff.
+
+[00:00:47]
+If you're a little bit cooler, maybe you use a mutation from React Query or some TRPC, something like that. We're not gonna do any of that. [LAUGH] So it's gonna be completely different. We're not even gonna make an API route, but yet we're still gonna get things to the server.
+
+[00:01:04]
+So, how are we going to do that? Well, we'll talk about it. So, Server Actions. Anybody know what these are? I guess technically now they're called server functions, but same thing. You ever heard of these? Yeah, so new feature introduced by React. It has little to do with Next.js, although Next.js did.
+
+[00:01:32]
+When Next.js saw that React was introducing this, they went ahead and made it available in Next.js many versions ago. But now that it is stable in React, it's stable in Next.js as well. I've been using Server Actions, or now server functions, for well over a year at this point.
+
+[00:01:48]
+And I've also been quoted in a previous version, of course, of being, I don't know when you would ever use Server Actions or why you would use them, you should still use API routes. Well, that time has come and passed, it's the other way around now. I don't know when you would ever use API routes at this point.
+
+[00:02:07]
+Well, there are some use cases and we'll talk about them. But for the most use case, you're probably gonna be doing Server Actions. So, what is a Server Action? It is a asynchronous function that gets called on the server, but usually initiated from some interaction. So usually something on the client happens, and then a Server Action gets fired and this is code that gets executed on the server.
+
+[00:02:32]
+Sounds like an API route, [LAUGH] because it is. You just don't make it. It's really a clean syntax for creating API route, so you don't have to do it. From your perspective, you're just making these functions, but there is a network boundary type of. There is an HTTP request that's happening, there is some data that's being sent to the server, you're just not responsible for doing that.
+
+[00:02:57]
+That's essentially what a Server Action is. It's just a more streamlined way of creating API routes without having to make API routes. You wanna cross the network boundary, you wanna go from client to server, you wanna post some data, you wanna update something, you wanna create something, even get something.
+
+[00:03:12]
+You can do Server Actions to get things as well. So we'll talk a little more in depth about it, but I added some links to how Next.js talks about it and how React talks about it, but that's just how I think about it. Just completely replace what you think, like Server Actions, API routes, same thing.
+
+[00:03:33]
+If you think about it from that perspective, you're gonna be fine. They also have access to the same thing. They have access to the request and the headers and the cookies and things like that. Because you are actually making HTTP request, you're just not writing the code for the HTTP request.
+
+[00:03:47]
+It's kinda done for you, if that makes sense.
+>> Speaker 2: How does this work with things like Capacitor, for hybrid applications, where Capacitor is actually serving the client application through a local host embedded in the device.
+>> Scott Moss: Yeah, so, Capacitor, like the mobile framework?
+>> Speaker 2: Yeah.
+>> Scott Moss: Yeah, okay.
+
+[00:04:06]
+So the question was, how does something like Server Action, Server Functions, work with a framework like Capacitor, whereas Capacitor itself is serving the application on a local host on the device? Because from my knowledge, Capacitor is a hybrid mobile framework that runs on the device through an invisible shell of an app.
+
+[00:04:29]
+
+>> Mark: Kind of Electron?
+>> Scott Moss: No, Electron is like running Native. Yeah, Electron doesn't need a server, but Capacitor does. Capacitor has a local host that's running on an empty shell, Native mobile app, right?
+>> Mark: Correct.
+>> Scott Moss: Okay, yeah, so how would that work? Well, I guess because you're hosting it on the device, so actually that's a good point.
+
+[00:04:55]
+Expo has, Expo, what do they call it, Expo Routes? Expo Router, there it is. So, Expo is one of the first mobile frameworks I've seen that's introduced pretty much spec for spec. Kinda like what Next.js is doing with server side routing and server components and things like that.
+
+[00:05:16]
+Capacitor, I don't think this is going to affect that too much because essentially Capacitor itself hasn't implemented what Next.js has. React supports Server Actions and React Server Components, but you still need the server part. Next.js solves that by giving you the server part. Capacitor doesn't have the server part, so you would have to implement what Next.js implemented for Capacitor for it to take advantage of it.
+
+[00:05:44]
+So you wouldn't see any benefit from Capacitor for React Server Components. Although, if you did have that, something like Expo Router, then yeah, you can see those benefits. And I think you kinda already get this with Capacitor, but you can have over the air, or I guess server driven UI that updates without you having to go through the App Store or things like that.
+
+[00:06:08]
+But yeah, I think you wouldn't see a benefit unless Capacitor themselves created the mechanism that actually supports the server-side necessity of having Server Actions or Server Functions, yeah. Because if it's just running localhost, then you don't have access to your resources that you have deployed somewhere. It's the person's phone, and at that point you might as well use whatever Native modules capacitor gives you to access the person's phone, so.
+
+[00:06:37]
+Okay, cool, let's do it then. So we need to make a sign in function, we need to make a sign up function and a sign out function. Let me just describe to you how these work and the logic behind it. Because I did abstract a lot of the stuff dealing with the session stuff, which I think has little to do or nothing to do with Next.js.
+
+[00:06:57]
+So, I'm not gonna have you go through creating the sessions and things, although I will talk about it. Essentially, what we're doing for sign in and sign up, it's email password, so pretty typical. On sign in the strategy is take the email password that the user gave us.
+
+[00:07:14]
+We're gonna do some form validation here on the server with Zod. If you don't know what Zod is, it's runtime schemas. So think of TypeScript but runtime, so we can check a schema at runtime and get an error or not and whether or not some object is validated by that schema or doesn't have to be an object, but any piece of data.
+
+[00:07:33]
+So validate those inputs. It's the same thing you would do on API route, right? You would have form validation on the client, and then you should also have form validation on the route for whatever you're posting or putting. So it's the same thing, we're just doing it here.
+
+[00:07:49]
+And then, check to see if we can find a user by that email. If we can't, then, that user doesn't exist, but don't tell them that. And then, if the user is there, check to see if their passwords are valid. If it's not, user doesn't exist, but they don't need to know that.
+
+[00:08:04]
+And then, if so, create a session which literally just creates a JSON web token and puts it in the cookie. Because again, this runs on a request, cuz it's gonna be a Server Action. So it has access to the request object, so therefore it has access to set cookies.
+
+[00:08:19]
+Just like a Server Route would have access to set cookies, this function has access to set cookies, cuz it's running on an HTTP request. That's a strategy for sign in, sign up, more of the same, you're just not checking, you're just gonna see if that email doesn't exist.
+
+[00:08:34]
+And if it doesn't, go ahead and sign that user up, create a session, sign them in, sign out. Just deletes the JSON web token from the cookie. Cool, let's do it. So, let's hop into, it should have a file here called auth. There's two auth files, there's libauth and then there's actions auth.
+
+[00:08:57]
+So make sure you are in actions auth. You will not be touching libauth, but I might as well give you a tour of it, see why you won't be touching it. This is where all the session stuff is. I guess I could have called this session and not auth to not confuse people.
+
+[00:09:11]
+But you can take a look in here to see what's going on. Pretty much nothing in here is related to Next.js except for just this one thing, which is getting a cookie and setting a cookie, that's it. Everything else is pretty standard for anything in Node or anything in Node at this point.
+
+[00:09:30]
+So, this is how you interact with the cookies. Everything else is just pretty standard. JSON web token stuff has nothing to do with. Yes, question, Mark.
+>> Mark: So Server Actions is like Firebot.
+>> Scott Moss: Yeah.
+>> Mark: So Server Actions is like Firebase Cloud Functions?
+>> Scott Moss: So, is Server Actions like Firebase Cloud Functions?
+
+[00:09:54]
+To my knowledge, Firebase Cloud Functions are serverless functions which can get invoked on certain events, usually through an HTTP event. So not quite, the Firebase Cloud Functions would be more equivalent to an API route in Next.js, and not so much of a Server Action. There really isn't a comparison in JavaScript land.
+
+[00:10:17]
+But if you know other frameworks, this would be something you would see in Ruby, this would be something you would see in PHP, this would be something you would see in Elixir. So actually a very common pattern, it's just that we've never really had it in JavaScript to be able to execute some logic on the server initiated from the client.
+
+[00:10:36]
+So, I can't think of an equivalent thing that has existed since frameworks came to be in 2013 or 2012, 2013, that this compares to in JavaScript land. But to other frameworks, they've been doing this for a very, very long time.
+>> Speaker 4: Would it be fair to say that Server Action is basically an API route, but Next.js and the React standard kind of implement all the background details of setting up that endpoint and all that stuff, and it's just more declarative?
+
+[00:11:16]
+
+>> Scott Moss: That's exactly right. Yeah, and I was just about to talk about that. So, this directive, this use server directive, there's a lot of ways to use it. We're gonna use it on the file level. So by putting use server at the top, every single thing, every action that gets exported here, is essentially a route, it's an API route.
+
+[00:11:36]
+That's what's gonna happen. The compiler is gonna create an API route for each one of these and the route is obfuscated from you. It's kinda like CSS modules, you don't really know what the name of it is and you don't really care, it's just a route. And when that route gets hit, it's gonna execute the function that is exported.
+
+[00:11:52]
+And that's essentially what it's doing. So yeah, we can't beat physics. So it still has to cross the network boundary, there's no way around that. So HTTP still has to happen, it's just you're not responsible for setting up. From your perspective, you're just making a function and exporting it, and everything else is done for you.
+
+[00:12:12]
+One thing to note is, because these functions that we're about to make execute on the server, that means they don't have access to the window, they don't have access to things on the client. So you can't do client things, you can't do Dom things. You will get an error, just like you would in any server-side Node code trying to access the window, right?
+
+[00:12:33]
+It also means you can access things on a server. So if you have an ORM, you have a database, you have environment variables, you can access those things in this function, which gets imported into a React component on the client. I know it sounds crazy, but the magic is, this directive hints at the compiler of what module bundle to put this code.
+
+[00:13:00]
+So, now in Next.js, when your code gets built, there's a lot of different ways it gets built with pages, but let's just say you have two different bundles. You have client-side modules, and then you have server-side modules. If in this file we're doing all this Node stuff that will not work in a browser and we import one of these functions into a component that gets bundled on the client, that would break, because you can't do FS on the browser.
+
+[00:13:27]
+And if this thing used FS, it would break, right? So they have to separate those. There's two separate bundles. There's the server modules and then there's the client modules. And the code that you use for Server Actions are going to be server modules. So you have access to everything on your server, and you don't have to worry about that being exposed to the client.
+
+[00:13:51]
+Even though you might be importing this function to the client, that code isn't gonna show up on the client. It literally would not work, it would break. So there are some optimizations happening through the use of intelligent looking at these directives, is making sure those modules are bundled together.
+
+[00:14:07]
+And that's some of the stuff you get with Next.js.
+>> Speaker 2: Can we configure the actual local host and ports on the server-side so we can deploy those server-side modules on a server and then direct the client to reach to that API that is created by Next.js so that is configurable?
+
+[00:14:33]
+
+>> Scott Moss: I mean, there's nothing stopping you from making your own custom server, and deploying that somewhere else. In fact, Next.js has documentation on how to make your own custom server and eject from theirs, and then you can deploy that separately. So yeah, you could totally do that if that's a thing that is gonna be necessary.
+
+[00:14:49]
+I have no experience doing that whatsoever. I just know that it's possible.
+
