@@ -1,0 +1,125 @@
+[00:00:00]
+>> Speaker 1: When we use the loading.tsx in the background, does it know it's related to the suspense component in the layout?
+>> Scott Moss: I got rid of this, the loading.tsx is essentially the fallback that gets placed inside of a suspense for your children that gets added for you. So as you can see in the layout, I don't have the suspense anymore.
+
+[00:00:27]
+I got rid of it. I mean, it's still being imported at the top, but I'm not using it. The suspense is no longer here in the layout. If you have the loading, you don't need the suspense. Next.js will do essentially what we did. It will wrap this in a suspense for you, and then for the fallback, it will use this component.
+
+[00:00:42]
+So you're essentially telling next.js, wrap the children in a suspense and use this JSX as a fallback.
+>> Speaker 2: So it just automatically goes in between your layout and its children.
+>> Scott Moss: Yep. Cool. Any other questions? Yep.
+>> Speaker 1: Just to make sure I'm understanding the terms. Suspending versus caching is the same as dynamic versus static.
+
+[00:01:10]
+
+>> Scott Moss: Ooh, yeah, in the regards to what Next.js understands, if you suspend something, you're telling Next.js that I always want this to be dynamic. This could change at any time. So I want this to be live every time. Every time someone goes to this route, always hit the server, always run this function, always calculate it again, just like an API route, just always go and do it again.
+
+[00:01:38]
+Caching is like, actually, I don't want this to be run every time. I want this to be stored in a cache. And you can do that on a page level. You can do that on a function level. You can go as nested as you want with the use cache.
+
+[00:01:55]
+So in that case it would be static. But those caches can have expiration times on them, so they're not completely static. They can expire and then be executed live again. So it's not like completely static as in it will never change, it's just, I want you to cache this up until I tell you to stop caching it or until it expires.
+
+[00:02:17]
+Whereas suspense is never cached. I think the way they model it now that it's just coming to me, it's basically just how an API route would work. If you put a network caching layer in front of an API route, something like Cloudflare or something like that, or whatever you use for caching, it could be any type of CDN, proxy, whatever.
+
+[00:02:41]
+There's always a TTL. You can warm up the cache when you mutate the database. When you write to a table, you might go clear the cache or expire or evict things out of the cache because the data is old now. You might put some new things in there.
+
+[00:02:58]
+They modeled it after that. So it's like if you put a suspense on something, you're just gonna go to the database every single time. It's never gonna be cached. But if you wanna add some type of network caching layer, then you would say use cache and then that would put a cache in front of whatever async operation you're doing up until you want it to expire.
+
+[00:03:20]
+And you can expire it manually or you can expire it with a ttl. So that's kind of the way I think about it. It works the same way as like you would cache API routes, just a different flavor of that.
+>> Speaker 3: In terms of the data access layer functions again, so we're kind of calling the get current user within these components, right?
+
+[00:03:39]
+Like new issue, for example, for deleteIssue button that one is use client. So that one was a client one. So would that have an issue using those data access error functions and like that if we were to call that in there?
+>> Scott Moss: Okay, so you're saying-
+>> Speaker 3: Since it's a client sizes use client, would that cause issues like calling those Dell functions in there since those are server related?
+
+[00:04:06]
+
+>> Scott Moss: Well, delete issue. Cuz you're saying deleteIssue has a dependency on, can you take me to delete issue, please? Okay, that was where. Maybe I didn't make it yet. I didn't make it yet. Okay, well, first of all, let's look at deleteIssue will be coming from action. So it would be a server action and not a data access layer function.
+
+[00:04:32]
+So yeah.
+>> Speaker 3: That one's fine. But so we were calling the actual new issue, for example, we were calling the get current user, which is one of those data access layer functions, right? I see. We wouldn't be able to do the same thing in that delete issue button, correct?
+
+[00:04:48]
+
+>> Scott Moss: You can call these functions in server actions if you want, cuz these are just regular node JS functions. They have no idea what they're going to like. You can call them if you want, because they both have access to the same thing. They both are expected to be ran during some type of request cycle, whether that's during a server action or a react server component.
+
+[00:05:08]
+So the expectation is that they should have access to the same thing no matter when they're called. So that is a good pattern. Some people will just have these just be like, these are functions that will just run on a request, whether it's a react server component or whether it's a server action.
+
+[00:05:25]
+And then inside your server actions you can pull these in. But I don't think you would pull server actions into these though. It would be the other way around. That answer your question?
+>> Speaker 3: Yeah, somewhat. I mean, so is like the delete Issue, but is that a server side component.
+
+[00:05:40]
+
+>> Scott Moss: Delete Issue? This button right here, this is a client component.
+>> Speaker 3: Client component.
+>> Scott Moss: Yes, this is a client component. So it can use server actions. Right, cuz you can use. So this is the part that I was talking about. So far we've used server actions with the use action state hook but you can can just call this.
+
+[00:05:59]
+You can just put this on an on click and call it and it'll work. It'll work just fine. Cuz I want you to think of when you see a server action is like this is a function that is essentially doing a fetch. You can just call a server action from any interaction in a client component, just like you can do the same thing with a fetch.
+
+[00:06:22]
+So the client component doesn't care. It's just gonna call this. In this case, we're doing it. We haven't talked about it, but we're gonna do a usetransition. And this is how you would get the similar functionality we got from use action state but without having to use a form.
+
+[00:06:41]
+In this case, this would be like, what is this? HandleDelete I'm guessing it's on a click, so. So on a click call handleDelete and this just starts a transition and I'll talk about that later. This is like a react specific thing, but I don't have to. I could just call await deleteIssue without this transition.
+
+[00:06:56]
+And it'll just do it because essentially this is just a fetch that's going to the server, it's doing a thing and it's coming back. It's almost as if you made this function yourself and literally put fetch inside of it. So there's no issue with it using an action.
+
+[00:07:13]
+Now if you try to use one of these functions inside of delete Issue, it would not work.
+>> Speaker 3: Right, that's what I figured.
+>> Scott Moss: Yeah, it would not work because you don't have Use Server at the top. It'd be like, this is just a regular node function. In fact, I don't think it would even compile.
+
+[00:07:32]
+I think it'll just break as soon as you try to, what's something in here that I know doesn't work like this does not work on the browser. This would break immediately because it doesn't know because you didn't give it a directive. It's like I just assumed this is client side JavaScript, so it's just gonna try to bundle it.
+
+[00:07:50]
+It's gonna try to bundle this whole file into the client. And if that works for some reason, it's definitely not gonna execute because there's no way in hell this works in the browser. There's no way in hell, well, maybe Drizzle works in the browser, I don't know. But a lot of this database stuff doesn't work in a browser.
+
+[00:08:07]
+So it's going to break then.
+>> Speaker 1: So many of those other components within that directory, like new issue, for example, those don't have a directive up top. So those are just like server components by default?
+>> Scott Moss: Yes, if you don't have a directive up top, you are essentially gonna be a server component.
+
+[00:08:24]
+Or if your parent, like for instance, if those components are rendered in something that's a client component, then it's assumed that those components are client components too, so they'll inherit from their parent if you don't have something. Pages are different because they're top level. There's nothing above a page.
+
+[00:08:39]
+So by default those are react server components unless you explicitly say Use Client, everything else kind of just inherits from its parent. And then you'll run into issues is when like for instance, if I make a component that's using hooks and I don't put use client at the top and I import that and somewhere in that chain, that hierarchy, there is a server component.
+
+[00:09:03]
+It's gonna error out and be like, you got to put use client on this component, you're using hooks. But if in that chain there was all client components, it wouldn't error out because like, you're just in a client component. So to avoid that, it's good to be explicit about whether or not you're in a server or not.
+
+[00:09:20]
+Unless you're in a page. A page I think it's fine. You don't always have to put if it's client or not. But for everything that's not a page, you should explicitly put if you're in a client or not.
+>> Speaker 2: If we didn't have the experimental flag on, I know you said that it would be caching by default.
+
+[00:09:39]
+Would supplying a loading state in the router disable that caching and would like tell next.js that it would be a dynamic?
+>> Scott Moss: No.
+>> Speaker 1: Okay.
+>> Scott Moss: No. [LAUGH]
+>> Speaker 1: It really wants to cache for you.
+>> Scott Moss: Yeah, that has no effect on whether it caches or not.
+>> Speaker 1: Okay.
+
+[00:09:55]
+
+>> Scott Moss: Nothing to do with it. The loading is still a thing and it will still apply a suspense, but it would only show it the first time and then the second time it'll be cached. So yeah, it has like look man, the caching before dynamic I O and use cache was crazy.
+
+[00:10:12]
+
+>> Speaker 2: Got you. So that's the three day session on caching and validation.
+>> Scott Moss: It is literally saying like it's in the docs like and I'll link it. You wanna check it out but in my opinion, man, use Canary, use this until it's done. It's way better. Everything else is really, really difficult in my opinion.
+
