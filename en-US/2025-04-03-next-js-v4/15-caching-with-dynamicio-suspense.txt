@@ -1,0 +1,104 @@
+[00:00:00]
+>> Scott Moss: Okay, so how about this? Let's get the issues now. I think now that we've signed in, we can redirect to our dashboard. Let's get the issue. So to get the issues, we need to do a few things. We need to create the getIssuesfunction, which is super easy.
+
+[00:00:14]
+We need to actually make a page on the dashboard that's not garbage [LAUGH]. And this is where the data access layer functions come in. You can see I'm just calling a function here. You've never been able to do this in React. You could not put a async in front of a React component before until now.
+
+[00:00:30]
+And now you can block rendering until something async is done. And this is where it's different. We've all been in this cult where we just had to learn that, God, this looks like a regular function, but it's not. It keeps rendering when things change. So you have to write your functions in a stateless way.
+
+[00:00:51]
+Especially, man, that transition from React classes to arrow functions was rough. So now that we've been gaslit into writing our React components in a stateless way, guess what? Now you gotta go back and just treat them like regular functions. They're just regular functions. You can put async in front of them, you can weight things, then you can return something.
+
+[00:01:15]
+And guess what? This won't run until this is done, just like a regular function. It's just a regular function now. So to me it's much easier to understand because if I would have showed someone that knows JavaScript very well but have never used a React component, and asked them, what do they think is happening?
+
+[00:01:31]
+There's no way they would tell me, yeah, when you change that state, it re-renders. No, they would not. They would not understand that. They're like, it's just a function that gets called, and you can use these closures. Well, you can't use a closure, sorry. Or there's a hook for that.
+
+[00:01:47]
+They're like, what are you talking about? Okay, you don't have any of that [LAUGH] in server components. It's literally just a regular function that returns jsx, and you can make it async. So pretty simple, in my opinion. But okay, let's do that. So a couple things we gotta do.
+
+[00:02:04]
+First, let's create our getIssues. I'm just gonna copy it, you should too cuz it's pretty simple. That's gonna go in our data access layer.
+>> Scott Moss: Pretty simple, it just queries the database to find any issues with the user. Actually, it's describing every issue out of the database. So we have a data leak here.
+
+[00:02:28]
+We should honestly be only checking for issues that belong to the user, but clearly we're not doing that. But yeah, you should do that. [LAUGH] And the way that you would do that is, you would do a where clause here, but I don't feel like writing that code.
+
+[00:02:42]
+So we're gonna get the issues, we're gonna order them, pretty simple. And then the next thing you wanna do is, let's just go to our dashboard page. Let's go here, and let's make this an async function. And then we're gonna say, issues = await getIssues. And let's see if this does what I think it's gonna do.
+
+[00:03:07]
+And I don't think it's gonna work, which is intentional, but let's see what happens. Let me log this.
+>> Scott Moss: Okay, so we got that. I'm gonna go here. There we go, that's what I wanted to see. So we have this error here. This is cool, cuz you guys, you're coming in when it's a lot easier now.
+
+[00:03:26]
+If you would have tried to use this six months ago, I mean, I think it is on video of me trying to teach caching six months ago. And I was like, yeah, I don't know. Now it's like, it's pretty straightforward. This is great. So this is saying, hey, you try to go to /dashboard, but the component accessed data.
+
+[00:03:46]
+As in you called some function on the server, or you access headers, or you access parameters, or you access short parameters, or you access some short-lived cache. It's basically saying, hey, this seems like a dynamic component. This does not seem like a static component. It's not gonna be the same every single time.
+
+[00:04:08]
+So we're forcing you to tell us what you want to do with this component. Technically, there's three options. Let's just say two for now. You have two options. You can say, always treat this as dynamic, and I'll show you how we're gonna do that. Or you can tell us where you want to cache this component.
+
+[00:04:28]
+You have to do one of the two. And that's what it's saying. And I like that. Now by default, the current version of Next.js does not do this. We are using something that is coming to the current version very soon. I already talked to the Next.js team, which is why I'm confident of using it, called dynamicIO.
+
+[00:04:51]
+DynamicIO is a flag that I have set. It's already set in yours on a canary version of Next.js. And what this does, I already have it pulled up. They had a whole blog post about it in October. So let me just give you a backstory. Caching in Next.js 13, all the way up to 15, it was on by default, essentially, in many different places.
+
+[00:05:13]
+They had caching on the router level, caching on the data level. It was just caching everywhere, and it was on by default. So things were happening that you didn't think were happening on your page. And the Next.js team, I think their philosophy was fast by default. I think that's what they were pitching back then.
+
+[00:05:31]
+It's like, by default, this is really fast, because they just cached everything for you. But people did not like that. They didn't like you just caching all their stuff. There were a lot of issues around that. So they've since decided, all right, we're not going to force you to opt out of our caching.
+
+[00:05:50]
+We're not gonna give you a choice. You tell us, you have to pick, though. If you don't pick, we're gonna throw an error, but you have to pick. You have to tell us, do you want this to be dynamic or do you want this to be cached? And then the third option is partial or hybrid, and we'll talk about that later, but you have to pick one of those two.
+
+[00:06:07]
+So this blog post kinda walks through the different use cases. TLDR, they created their own directive called use cache. This is not something that's part of the React spec. This is something that Next.js created. The React team has never created something called use cache as a directive. They do have a hook called use, don't be confused with that, but use cache, the directive, this is a Next.js thing.
+
+[00:06:33]
+This is you saying, I want this page to be cached, right? That's what this is saying. If you want it to be dynamic, you would wrap the page that's fetching the data in a suspense. If you don't know what React suspense is, it's basically like, you can stream in a component after it's done doing its asynchronous workload, and the rest of the page won't be blocked because of it.
+
+[00:06:58]
+So it's a great way to be like, I have parts of my page that are static, but then some parts are dynamic. Load the static stuff up immediately, and then stream in these parts when they're done. And it's a really good experience. So that's what a suspense allows you to do.
+
+[00:07:12]
+So by wrapping a page that does data fetching in a suspense, we tell Next.js, this is always dynamic. By putting a use cache at the top of that page, we tell Next.js, this is always static. So TLDR, that's kinda what the dynamicIO does. It gets way more complicated, but that's all we're gonna talk about cuz that's all we really need to know.
+
+[00:07:35]
+Okay, now in the case of getting all issues, we don't want this to be cached forever. So we probably, for now, let's just say we want this to be dynamic. So how do we make sure this is dynamic every time? Well, we have to wrap this in a suspense.
+
+[00:07:50]
+So there's two ways we can do this. We can create a component out here that we call in here that's wrapped in a suspense, or we can go to the layout component that already renders this and put the suspense there. I'm gonna do the latter. So I'm gonna go to our layout component in our dashboard layout, and I'm gonna put a suspense in here around the children.
+
+[00:08:23]
+
+>> Scott Moss: Like that, import Suspense from React. Suspense takes a fallback. For now, I'm just going to put a div.
+>> Scott Moss: We're gonna fix this in a minute, but I just want you to see this. I'm gonna put a div that it says loading. So this fallback gets showed in place of that component loading.
+
+[00:08:49]
+This is the loading page for this page.
+>> Scott Moss: Okay.
+>> Scott Moss: Let's save that. Let's go back to our page. And I don't have that error anymore, it's gone. Because I told Next.js, this is always dynamic by wrapping it in a suspense. So I chose, so Next.js is not gonna warn me.
+
+[00:09:14]
+So now if you're in that new mode dynamicIO, that is coming to Next.js, you won't have to put a flag on it. If you have a page that's doing one of those things, it listed it, but pretty much fetching data, touching headers or cookies, search params, short-lived caches, anything like that is telling Next.js that this is a dynamic page.
+
+[00:09:38]
+So it's like, we don't know what you want to do with this, so you have to tell us, what do you want to do with this? Should we always keep this dynamic like every other framework ever out there, or do you wanna cache some parts of this? So that's why it's throwing the error.
+
+[00:09:53]
+I think that's a really good approach. It forces you to choose. By default, when you're developing, put everything in suspense. Just put everything in suspense while you're developing. And then once you figure out what you wanna cache, then start caching stuff.
+>> Speaker 2: So without that flag, it would be back to caching everything?
+
+[00:10:12]
+
+>> Scott Moss: Yeah, without that flag, I would need three days to explain caching to you. Absolutely, a whole different world. Just insane, in my opinion, powerful. But I don't know, it's really hard. It's really hard to grok, in my opinion. It's like you have to do a lot of gymnastics to opt out of caching.
+
+[00:10:36]
+And even then, I swear, sometimes I'm like, why is this still cached? The caching is so good, you can't get away from it. So I like this approach better, it's simple. You explicitly say, cache this, or you explicitly say, never cache this.
+
