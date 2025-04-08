@@ -1,0 +1,62 @@
+[00:00:00]
+>> Melkey: So we just finished confirming that we now are able to create tokens for our users, we've seen these token we can use them. And now let's take it one step further into routing this with Middleware and actually having proper authentication. Cuz right now, we just get the token, but it's really not doing much for us, right?
+
+[00:00:20]
+There's a lot of different ways that we can use authentication tokens, like making sure that the workout belongs to the correct user. And we're gonna explore this in the next couple of submodules. So, let's actually start this off in our user_store.go file. Cuz what we're going to be doing here is we're gonna be adding a few things.
+
+[00:00:44]
+We're gonna be setting ourselves up for our Middleware, okay? So you can see we have our User struct here, and this is great. What I'm going to add is var AnonymousUser. And this is going to be simply an empty user struck, okay? Now, why would we need something like this?
+
+[00:01:09]
+Well, if we think about it, users who join our app, our web app, whatever it is, they don't have to be logged in the first time to use it, right? When you before even register for account, you are technically considered an anonymous user. So we are going to be leveraging this ability of creating this variable, which was going to be used as validation in our Middleware to determine if a user is a, anonymous, not logged in, or if they are in fact logged in and they are a full user with the struct fills, okay?
+
+[00:01:42]
+So this is gonna set ourselves up. I'm gonna add a new method here, so func u, it's gonna be a method on user. Okay, I'm gonna say IsAnonymous, all right? It's gonna return a boolean. And all it's going to do is return u, so compare it to an AnonymousUser.
+
+[00:02:01]
+So if the user is an empty user struck, we know they are anonymous. Else they are logged in. We are anonymous. And the next function we wanna build here is we want to also retrieve who a token belongs to. Cuz right now, if two of Jack Doe and John Doe both create their tokens and they submit a request with that token, we need to identify who does that token belong to and what privileges does that token have.
+
+[00:02:32]
+And can they do things to certain workout apps that, for example, if I create a workout and I'm John Doe, I don't want Jack Doe deleting it or doing stuff to it. So I want to make sure that my authorization token is correctly adhered to, and to do that, we start by creating a new function called GetUserToken, all right?
+
+[00:02:54]
+So take a scope, a tokenPlainText, both of which are gonna be of type string. And it's simply going to return a User and an error. So we get user token. Did we implement it? No, we did not. Okay, let's go func. So we're gonna implement the GetUserFunction here, we used s, so we can do (s *PostgresTokenStore) like so, okay, and then we do GetUserToken.
+
+[00:03:25]
+Okay, GetUserToken has to adhere to scope, which would be a string, and then plainTextPassword, also a string. And then here it's gonna return a pointer to User as well as an error. Let's give ourselves more room. Okay, and then here, what we're going to do is retrieve the hash of the token.
+
+[00:03:49]
+I'm gonna try to compare it to the color of this function. So first, we'll do tokenHash is going to be sha256, we'll bring it for you. I'm gonna do sum256, and it will be a slice of bytes like so. Now put in the token, the plaintextPassword like so.
+
+[00:04:12]
+
+>> Melkey: Oops.
+>> Melkey: Then we can go ahead and create our query. Okay, so this query is gonna be the, I would say, most advanced query we'll do. I think it might be the last query we'll do. But this is going to be actually an inner join. So we're gonna be selecting the values from our user table and matching them with the values from our token table, okay?
+
+[00:04:40]
+So we do an INNER JOIN based on the ID of the token, so the token user ID field as well as the user id field. Okay, so it's gonna be a little more complicated than the ones we've seen before, but it's not gonna be too atrocious. So here we can do SELECT.
+
+[00:04:57]
+We'll do u.id, and u is gonna be representing of the user's table, u.username, u.email, u.password_hash. And these are values from our user table, so u.bio u.created_at, u.updated_at, like, so. FROM users u, so we're saying that the users table, instead of writing user.id, user.bio, we can just use the shorthand notation of u.
+
+[00:05:29]
+And we can do INNER JOIN tokens t ON t.user_id = u.id. Okay, and we can say WHERE t.hash = the first value passed in AND t.scope = the second value we passed in. And we have to check the expire, and t.expiry > than the third value.
+>> Melkey: And that third value is gonna be time.now.
+
+[00:06:06]
+So I'm gonna compare it to the current time. I wanna execute this to the expiry of something that's in our tokens table. So here we can declare our new user. So let's say User like so.
+>> Melkey: We can do PasswordHash. It's gonna be a password struck.
+>> Melkey: Oops.
+
+[00:06:31]
+
+>> Melkey: Okay, and then we can declare our error. I'm gonna call this, so s.db.QueryRow, I'm gonna pass in that query, and then the three values we wanna pass in. So first would be, let's copy the slice of tokenHash like so, then the scope. All right, and then the last one will be time.Now.
+
+[00:06:55]
+And here, we'll do Scan. I'm gonna scan the values, all right? So the values that we're gonna scan into are gonna be user.ID, user.Username, user.Email, user.PasswordHash.hash, user.Bio, user.CreatedAt, and user.UpdatedAt. Make sure add the comma. If err is sql.ErrNoRows. Okay, so if there just doesn't happen to be any of the values and return just the empty set, we can just return nil and nil.
+
+[00:07:46]
+
+>> Melkey: Make sure this is a pointer.
+>> Melkey: Okay, if error does not equal to nil, we can just return nil and the error itself. And then lastly, can return user and nil.
+

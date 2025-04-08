@@ -1,0 +1,104 @@
+[00:00:00]
+>> Melkey: I figured since we're already in the workout store, let's just create the update workout function as well, and then we can scaffold both of those into the workout handler, okay? So right underneath the get workout by ID function, we just created, we're gonna create our news function, func pg is gonna be PostgresWorkoutStore, and this can be called UpdateWorkout, like so.
+
+[00:00:25]
+It's gonna take one argument, which gonna be a workout, which can be a pointer to our workout, and it's gonna return our error or a error, which could be nil. Now, updating a workout requires us to go into two different tables, and if we update one part of the workout, something happens.
+
+[00:00:44]
+We don't want that, we wanna adhere to the asset principle and databases. So because of that, we're gonna again create our transaction here, like we did in the create workout. So here, let's go ahead and create our transaction variable and an error. We can say pg.db and we can say Begin like so.
+
+[00:01:02]
+We can quickly check for the error if our error does not equal to nil, we can just return that error. And like we did above, we can just defer any rollbacks, so transaction not Rollback like so. All right, so now once that is defined, we can go ahead and start creating the queries for updating our workout.
+
+[00:01:23]
+So here I'm gonna just create the Query here.
+>> Melkey: Okay, and this is gonna be fairly simple, we're gonna do update the workouts table. I'm gonna Set the title to value 1, description to value 2, duration_minutes to value 3, and calories burned to value 4, like so. Where the id is going to be value 5, okay?
+
+[00:02:01]
+So now this query when we call it expects five variables that we will parse in, okay? And luckily for us these all exist into the argument we parsed in which is the workout, okay? And just like we did before, we are going to now call this query, we're gonna first create a results variable and error.
+
+[00:02:20]
+And this is gonna be tx.Exec, like so, parse in the query and then the five functions it expects in the order they appear. So workout.Title, workout.Description, workout.DurationMinutes.
+>> Melkey: Workout.CaloriesBurned, okay? And the last one which needs to forget, workout.ID. With that, always check the error, so if error does not equal to nil, let's go ahead and just return that error.
+
+[00:02:53]
+And now what we wanna do, if there's no error, we would like to know, did this work? Cuz again, you could update something technically that doesn't exist. It's not gonna error out, but the query can just say, yeah, nothing was updated. So we wanna know how many rows were affected through this operation.
+
+[00:03:10]
+It can do something like rows affected, okay? Err, is going to be result dot this nifty little function called RowsAffected, which returns the number of rows affected by update, insert, or delete, okay? Little comment there, not every database or driving may support this, Postgres and PGX does indeed support this.
+
+[00:03:32]
+
+>> Melkey: All right, and again, we can just check some errors. So if err does not equal to nil, let's go ahead and return that err. And then we can check if rowsAffected is zero, so if rowsAffected is zero like so we can just return our sql that err, no rows like we saw above.
+
+[00:04:00]
+
+>> Melkey: So this point, just like we did with the with the get, we have only completed that first portion, the workout part of our struck, which is a high level. But now we have to do the entries, okay? So with entries, it can get complicated, and there's two ways someone can handle this.
+
+[00:04:22]
+So you can actually, from the requester, get the request of the ID of the individual entry you wanna update, iterate through it, find the ID and update it like so. Or you can do what I'm gonna implement, which is a full-on patch update. We're gonna actually delete all the worker entries as a whole and then we're gonna reinsert the workout entries, okay?
+
+[00:04:45]
+So this seems like a bit of a small potentially, but what we're going to do is in the caller, we're gonna first get the workouts which we saw earlier. We're gonna have all the workout entries, and then we're gonna match the request from our client to see if there's any differences for fields they wanna update.
+
+[00:05:01]
+And I'm gonna send all of that into this function here. Okay, and we can, you can do both, both are fairly effective, this one is just easier to implement. This one's easier to implement, but potentially more at fault for things to go wrong, whereas the other solution, where you iterate through work at entries, parse them by ID, make that ID, something that you request from your client.
+
+[00:05:23]
+Maybe it's a little bit more complicated, but a little bit more secure. So I'll leave it up to you if you wanna change it up, but we'll have a working solution here with this approach. So we can start this by just declaring a new error and using the transaction Exec one more time.
+
+[00:05:39]
+I'm gonna build this query in line, so use the backticks. We're gonna simply just write DELETE FROM workout_entries WHERE workout_id equals the first value, and that value can pass in right away with workout.ID. We're getting yelled at that no new variables exist on the left side. So if you're getting this, just remove this local of the walrus operator.
+
+[00:06:08]
+All right, let's check that err, if err does not equal to nil, you just simply return the err. Otherwise, we can iterate through the workout entries that we get from our client call, and then insert those individually into our database. So here, we can do entry in range workout.Entries, like so, we create our new query.
+
+[00:06:41]
+And this here is gonna be INSERT INTO workout_entries, make sure you spell that right, I keep typing entires. We can type in all the fields we wanna insert, so we can do workout_id, exercise_name, sets, reps. The duration in seconds, notes, and order index, like so. And again, should be eight values that we're inserting, so we can do VALUES.
+
+[00:07:22]
+
+>> Melkey: 3, 4, 5, 6, 7, 8. And for some people maybe asking why is it like that money symbol? That's just Postgres native, that's how we do it in Postgres, how you pass variables via Postgres drivers. I think in no SQL, it's different, I forget what it is in other database drivers, but I know in Postgres, it is the money symbol.
+
+[00:07:46]
+And I realize I've a typo here, so make sure that this is VALUES, oops, like so.
+>> Speaker 2: Are you missing a item and the insert query?
+>> Melkey: Let's see, Worker ID, 1, 2, 3, 4, 5, 6, 7, what am I missing?
+>> Speaker 2: Wait, I think.
+>> Melkey: Yeah, good catch.
+
+[00:08:11]
+
+>> Melkey: So, duration, seconds, weight, notes, order, index, yep. And so, now that we have the query defined, we can then execute this with our tx.Exec. Let's put in query and in the order at which these variables come in. So when it was noted that weight was missing, I specifically put it after duration seconds, and I'm gonna adhere to that when I pass that variable into the order here.
+
+[00:08:35]
+So I'm just gonna open this up just to make it a little bit easier to read, okay? I'm gonna put workout.ID, and then, entry.ExerciseName, entry.Sets, entry.Reps, okay? Entry.DurationSeconds, entry.Weight, entry.Note.
+>> Melkey: And the last one is entry.OrderIndex. Okay, we have to just check that err, so if err does not equal to nil, let's just return the err.
+
+[00:09:14]
+And then the last compiler error that we should be getting is that we're not returning anything, but we can just simply return tx.Commit.
+>> Speaker 3: I guess, to recap, instead of finding specifically, like two point the transaction and updating just that one, just get rid of it.
+>> Melkey: Yeah, this is like a full patch update, so we're just eliminating all the entries and we're gonna reinsert them.
+
+[00:09:37]
+And as is, this puts more emphasis on the API layer. So we'll see once we hook this up into our workout handler, we actually do a get workout call to get everything. And then we match if there's any updates to the entries from our caller's payload, and then we call this function to insert them.
+
+[00:09:56]
+
+>> Speaker 4: One quick question on the tx.Exec call where you delete, I didn't really understand why we needed to get rid of the colon there to get rid of that err?
+>> Melkey: So this is a compiler err and what this is saying so you may be kind of wondering why this is erroring out like let's say here it's not right like, right?
+
+[00:10:18]
+Above, so if I were to just remove result a bunch of things are gonna go red, just heads up. If we do this and I ignore the first response, we're gonna get the same err here, no new variables on the left side. And the reason for that is because the compiler ignores the first response, which is this result, and only cares about err.
+
+[00:10:40]
+But since we've already declared err way above here for the first time, the compiler doesn't allow us to redeclare a new variable with the same name. We can rewrite err, right? Like so, so now it's fine, but we can declare a new variable, which is what this shorthand form syntax does, it declares new variables for us.
+
+[00:11:01]
+So if we kinda go all the way back, we have result. It's fine here, but at the bottom here, we don't really care about the result from this particular delete query, which is why we can remove the short form colon operator here and just rewrite what that error is, or reassign it, the value from tx.Exec.
+
+[00:11:22]
+
+>> Speaker 4: Got, so because you have the result there, it's assigning result and kind of ignoring the fact that error was already.
+>> Melkey: Exactly because result is in fact new, it's going to give us the brand new variable result and then reassign err.
+

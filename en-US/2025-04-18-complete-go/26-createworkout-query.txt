@@ -1,0 +1,97 @@
+[00:00:00]
+>> Melkey: So we're gonna create a light to, it's two functions, but one is like a gimme. The one that actually matters is going to be the CreateWorkout. So we're gonna do a func, we're gonna set a method receiver as pg, and this is gonna be our PostgresWorkoutStore, I'm gonna call this CreateWorkout.
+
+[00:00:17]
+Now, the CreateWorkout we are about to define with the arguments and the return have to be the exact same that we defined it in a few lines above to the create workout interface method up there, okay? So to do that, we'll just do name is gonna be workout, but the type is what really matters.
+
+[00:00:36]
+It's gonna be a pointer to workout, okay? And just like our interface dictates, it has to return a type Workout or a pointer to Workout and an error, okay? So here we're gonna actually get pretty deep into the SQL. Here, we're gonna start a transaction, tx error is going to be pg.db.Begin.
+
+[00:01:04]
+This is gonna tell us we're gonna do a transaction which we can commit at the end. The reason I wanna commit this transaction at the end is because our workout is not only gonna have it's own workout property, but remember all those one too many relationships, those also need to be committed into the workout entry database.
+
+[00:01:20]
+And if something happens in between, let's say we're about to commit our workout, something like freezes our communication channel and we don't have the workout entries, we're actually going against asset principles in database communications, right? So we commit at the end and if something were to happen, we actually have a function that allows us to rollback.
+
+[00:01:41]
+So what does that look like? So here, if our error does not equal to nil for whatever reason, we can simply just return nil and error. However, we're gonna do a defer transaction rollback. So if anything happens in this function that causes it to just die or cause anything to error out or any kind of nasty things, we can roll back that transaction to a state before we call this function.
+
+[00:02:10]
+
+>> Speaker 2: Do you defer on that, wanted to call regardless though when X is the function?
+>> Melkey: What do you mean?
+>> Speaker 2: That's misunderstanding. So if we defer the rollback.
+>> Melkey: Yeah.
+>> Speaker 2: And then we do the insert statement, right? Everything goes well, we leave the function, won't rollback still be called?
+
+[00:02:29]
+
+>> Melkey: Yeah, because we have this active transaction, this tx, we're gonna be using tx with a bunch of our queries. So we're gonna use tx dot query row a few times. And let's say, in between the two transactions, if we do two methods on query row, something happens, it's going to collect that into the tx struct.
+
+[00:02:51]
+So here, this returns tx, tx is a struct with all these kind of things here, and it's gonna kind of continuously collect any errors in the status of our transactions. So when we rollback it's going to validate, if there's any errors, if there are it's says no and nothing essentially happens, but if it rolls back the transactions to previous day.
+
+[00:03:14]
+
+>> Speaker 2: So do you commit then if there is no error in it-
+>> Melkey: Yeah, so if there is no errors, you'll commit.
+>> Speaker 2: Okay, gotcha-
+>> Melkey: And we actually specify that at the end, we actually have to call tx dot commit.
+>> Speaker 2: Gotcha.
+>> Melkey: Yeah.
+>> Speaker 2: All right, thanks.
+
+[00:03:27]
+
+>> Melkey: Okay, so here we're gonna get pretty nasty. We're gonna create query, we're gonna define our query, okay? Old school style, it's not really old school. Just INSERT INTO workouts and the values we're gonna pass in are title, description, duration_minutes, and calories_burned. I'm gonna open this up cuz that's not the only thing I'm gonna be inserting into this or writing into the SQL, just like so, okay?
+
+[00:04:03]
+Then I'm gonna pass in the VALUES. So here post stress notation uses the money symbol, $1, $2, $3, and $4. The reason why it's four is cuz we are inserting four values, title, description, duration, minutes, and calories burned, okay? And then we want RETURNING id that's correct, yeah.
+
+[00:04:28]
+So we have our query defined. Here we're gonna do error is going to be our transaction, that tx that we've initialized, and we're gonna do QueryRow. And QueryRow is gonna take our query and all those values, the four values it expects. And how do we get those? Well, they belong on workout.
+
+[00:04:46]
+So workout.Title, workout.Description, workout.DurationMinutes, and workout.CaloriesBurned. And here we need to scan this, we do a dot method. So .Scan into the address of the ID that we wanna scan into, which is address.workoutID. I'm gonna zoom out, just everyone can kinda see the full query function here. Next always check the error, so if error does not equal to nil, we want to just return nil and the error, all right?
+
+[00:05:30]
+At this point we also need to insert the entries. And so how can we do that? Well, if you remember entries is a slice, what we can do is for, ignore the index values cuz we don't care, entry in range workout.Entries like so. We now have the ability to gather the values of every individual entry that someone may submit with their response, with their payloads from the client or whatever.
+
+[00:06:06]
+So here we can create another query in line like this. And we can say INSERT INTO workout_entries, and then the values we want to insert in here is going to be workout_id, exercise_name, sets, reps duration_seconds, okay? Weight, notes and order index.
+>> Melkey: Okay, this followed the same pattern we saw above.
+
+[00:06:44]
+Next, have to pass in the VALUES. So VALUES, it's gonna be one because there's eight, workout id, exercise name, sets, reps, duration, weight, notes, order index, we have to do this eight times.
+>> Melkey: Eight.
+>> Melkey: Like so. And we can also do RETURNING id. Next thing we gonna do is just basically execute the query.
+
+[00:07:16]
+We can do err is, again, our transaction, I'm gonna query this row. We're gonna pass it this new query and all of those arguments. So the first one is workout.ID, and then all the other ones belong on the entry struct. So it can be entry.ExerciseName, entry.Sets, entry.Reps, entry.DurationSeconds, entry.Weight, entry.Notes, and entry.OrderIndex.
+
+[00:07:53]
+
+>> Melkey: Okay, I'm just gonna zoom out, I'm gonna zoom back in real quick. The next thing we need to do is just scan this into entry.ID like so. Now last part, check these errors too. So if error does not equal to nil, let's go ahead and return nil and the error, right?
+
+[00:08:15]
+And now, outside of that for loop for when we're ranging over our workout entries, here is where we're going to do error equals transaction.Commit. So commit commits the transactions for all of the entries that we've kinda queued up, okay? And in here we can do one final check, if err does not equal to nil, return nil and err.
+
+[00:08:41]
+And the final return here to satisfy it all will be return workout and nil
+>> Speaker 3: My LSP is mad at me because we're not checking if there's an error for rollback, unless you check that I didn't get it.
+>> Melkey: We check error for rollback up here and then defer, I mean, at that point, this is where we could use something like just an anonymous function to defer create error equals tx.rollback if error does not equal to nil, check that.
+
+[00:09:12]
+I've typically used just for rollback my LSP, I thought my LSP was pretty picky, but I'm not getting that error, but-
+>> Speaker 3: Yeah, I don't know, that's weird, maybe it's just mine being odd.
+>> Melkey: That's weird mine even was not saying that, but it's cool that's yours. Are you using Go PLS?
+
+[00:09:30]
+Wow me too, [LAUGH] okay. I'm gonna quickly just scaffold the next function. We're not gonna put a lot of logic into this, but we're just gonna make sure that we have the second function fulfilling our interface here, which is called get workout by ID. So let's quickly just create our function, make our method receiver the PostgresWorkoutStore like so, and then let's call the function GetWorkoutByID.
+
+[00:09:54]
+This function should take an ID of int64, and it's going to return two things for us, two types, our pointer to workout and the error. And within the function body, I'm gonna quickly just create a workout, so just create a new workout like so. You don't have to put any fields in it, you can just make it empty.
+
+[00:10:14]
+And then one line below it, let's go ahead and return the workout and nil, cool. And the reason why we're doing this is because of our interface, all right? Which again, quick reminder, is defined right here.
+

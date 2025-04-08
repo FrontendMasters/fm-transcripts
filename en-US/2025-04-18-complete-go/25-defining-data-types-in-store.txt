@@ -1,0 +1,65 @@
+[00:00:00]
+>> Melkey: We've closed the loop on a bunch of different things here. We've set up a lot of the project here. We have a database, a lot of things for the backend communication here. And we're gonna take this just a few steps further. We might get kind of halfway through this kind of submodule.
+
+[00:00:18]
+But the part that we want to focus on now is if we go back to internal, into store is now we are fully equipped to start working in the workout store, okay? And the reason why I'm excited for this is the workout store is going to be the section of our application where we'll be doing logic that communicates with that database.
+
+[00:00:40]
+We'll be again writing SQL, we'll be doing all that scary stuff that people freak out about, like SQL injection. All of that is going to be all defined here. So like always, when I look at a file, especially a new package, I ask myself, am I going to handle data?
+
+[00:00:55]
+The answer is yes because I'm going to be communicating to a database. If the answer's yes, I typically think of a struct. So here we're gonna create our type Workout, it's gonna be a struct, okay? And this struct is gonna have many different fields. The first one's gonna be ID of type int.
+
+[00:01:13]
+It's gonna also include this json tag, okay, this is called a struct tag. Go allows a bunch of different struct tags on fields of structs, and they all have different purposes. So the json one helps us for encoding and decoding JSON into a struct. So if you get a payload from our frontend that has a JSON that matches this tag, we can easily decode that into our Workout struct and vice versa.
+
+[00:01:38]
+So here we can do ID. The next field we're gonna have is Title, whoops, string.
+>> Melkey: Like this, we're gonna also have a Description.
+>> Melkey: All right, we're also gonna have DurationMinutes, it's going to be an int.
+>> Melkey: CaloriesBurned, and this is gonna be an int "json:"calories_burned. And now the last field we're gonna have here is Entries.
+
+[00:02:28]
+And Entries is going to be a slice of a new struct we're gonna have called WorkoutEntry, okay? And here we'll just put it as entries, like so. Our compiler's gonna yell at us, rightfully so, we don't know what a WorkoutEntry is just yet. But we can easily change that with type WorkoutEntry is a struct, okay?
+
+[00:02:52]
+Int should follow a lot of those same parameters, so ID int json:"id". We're gonna have our ExerciseName, it's gonna be a string, "exercise_name". Sets is going to be an int, I'm gonna do that as json:"sets". Now the next fields are Reps, and Reps, because of the constraint we said earlier in our SQL, this is actually gonna be a pointer to an int because we want to explicitly check Reps for being nil or naught, okay?
+
+[00:03:33]
+So here we can do json, it's gonna be reps, have DurationSeconds, okay? It's also gonna be a pointer to an int, duration_seconds.
+>> Melkey: Okay-
+>> Speaker 2: Typo on seconds.
+>> Melkey: Yes, [LAUGH] thank you. We'll have Weight, which will be a pointer to a float64.
+>> Melkey: Weight, and then we need two more, so Notes is gonna be a string json:"notes".
+
+[00:04:17]
+And then the last field is OrderIndex, right, so OrderIndex, and this is going to be an int json, write this as order_index, like so. Now we have our two structs, great. So we have these two structs, I'm gonna quickly also now create something we've seen before, which is going to be the handler equivalent.
+
+[00:04:42]
+So I'm gonna type PostgresWorkoutStore. This is gonna be a struct, so a third struct, and this is gonna hold db DB. Now why, what is this, what is this thing, why is it called Postgres? Tell Postregs we're using Postgres, end of story. However, from a pragmatic perspective, this is a really bad naming, right, because it directly says this WorkoutStore is bounded to Postgres, okay?
+
+[00:05:11]
+What if one day we use Postgres, but the next day we have to use MongoDB? What if we get a new CTR company and they say, hey, absolute to move Postgres we have to use this other database. But we're completely bounded by PostgresWorkoutStore right? But there is a good solution to this.
+
+[00:05:28]
+Before I show the solution, I also wanna just finalize the constructor for this PostgresWorkoutStore. So let's go ahead and create func NewPostgresWorkoutStore. I'm gonna say this is a db sql.db, and we'll just return a PostgresWorkoutStore like so. And here we'll return an address to PostgresWorkoutStore {db: db}. Okay, now back to the PostgresWorkoutStore.
+
+[00:06:02]
+So yeah, what happens if we have to switch databases? That happens a fair amount of times, right, like new constraints, new features, what do we do? It'd be a real shame if we have to go back and rename all the instances of Postgres to something else. Well, luckily for us, Go gives us the ability not to have that.
+
+[00:06:21]
+And this following thing is called essentially decoupling our database. But what we're going to use is an interface. And an interface is simply a collection of method signatures, that's all it is. It's not a new type, it is not a function. It is literally a collection of method signatures.
+
+[00:06:43]
+And when you have something that satisfies all of the method signatures in an interface, you can use that type as that interface type. So I'll demonstrate here, we do type WorkoutStore now as just an interface, okay, until we spin this up with two functions, CreateWorkout. CreateWorkout's gonna take a pointer to a Workout, and it's gonna return two things, pointer to a Workout and an error.
+
+[00:07:14]
+And it's also going to GetWorkoutByID and it's going to take an id of int64, and it's going to return a Workout or an error.
+>> Melkey: So right now our interface is complete. This is it, this is how it's going to look like. But if you notice, our interface is just called WorkoutStore and we have PostgresWorkoutStore.
+
+[00:07:39]
+So right now, even though we're bounded to our PostgresWorkoutStore and we're gonna have our logic that communicates to our database using Postgres native things, it doesn't mean that our application layer also needs to be changed. Because our application layer, it's going to accept the WorkoutStore interface. It is never going to accept directly the PostgresWorkoutStore struct, okay?
+
+[00:08:04]
+We're gonna define all the logic using PostgresWorkoutStore, right, cuz that's what we're using to make sense. But if it comes to migration, all we have to do is make the relative functions for this new database, but that's it. The migration's containerized in this data store layer. Our application layer will not care, it won't even know the difference because all it's going to do is communicate via the WorkoutStore interface.
+

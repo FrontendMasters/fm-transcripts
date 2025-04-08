@@ -1,0 +1,163 @@
+[00:00:00]
+>> Melkey: So we just created our new token SQL table, and we run the migration to get that working. Next, let's go ahead and write a package that will allow us to generate these tokens. So in internal, go ahead and make a new one called tokens, a new folder called tokens, and then within tokens, make a new file called tokens.go.
+
+[00:00:18]
+It's not gonna be in store is going to be in internal. So within internal, make a new folder called tokens, and it was in that make a new file called tokens.go. Because I want it to be its own separate package and not part of the store package. So here we can do package tokens, as opposed to package store.
+
+[00:00:36]
+Either would be fine. The structure I'm choosing is gonna be packaged tokens, even though we're going to be going back into the tokens.go file in store..
+>> Melkey: Okay, cool. So again, this is gonna require a struct, so we can do type Token struct, and it's gonna have the field that we just basically saw in our SQL table.
+
+[00:00:58]
+So first, we're gonna have a plain text which is going to be a string. We gonna have a json representation of that, and just say token.
+>> Melkey: Okay, I'm gonna have the hash, which is gonna be a slice of bytes. Excuse me. Json, we wanna not pass this around to our client, so let's omit that.
+
+[00:01:18]
+Or specifically, just dash it out so it does not get sent out. We have our UserID, there's gonna be an int. We also do not want to reveal who is calling this or what users calling this. They should know if they are the ones truly calling it. We do not need to pass any ID or any PII text.
+
+[00:01:38]
+Next we'll have an expiry, we'll make this time.Duration, okay? Or sorry, time.Time.
+>> Melkey: We'll use a duration function after, okay? Here we'll pass in expiry.
+>> Melkey: And then scope which is going to be a string. And again, the caller does not need to know the scope of this at all.
+
+[00:02:06]
+
+>> Melkey: [COUGH] So we have our token struck, and instead of making like a constructor, we're just gonna have one function that just generates the token, okay? So, it's gonna be pretty straightforward function. All it's going to do is from nothing, we're gonna create this token, and then that token will be inserted into the database.
+
+[00:02:25]
+So here we'll do, yeah?
+>> Speaker 2: You got a missing.
+>> Melkey: Right here? Hell yeah, thank you. Okay, so here we'll do func GenerateToken. Okay, and it's not a method receive, run token. You may think that, but if you think about it, we need to first create a token to have methods on the token, right?
+
+[00:02:44]
+And because this function will be responsible creating the token, it needs to come first, chicken versus the egg. So here, we'll have user ID, it's gonna be an int. It's gonna have also a time to live, which will be time.duration. And to have a scope, which is gonna be a string, and this is going to return a pointer to our token and an error, all right?
+
+[00:03:05]
+So let's go ahead and assemble our token here. So let's make the address of token like so, UserID. We'll just pass in userID directly. Expiry is gonna be time.Now.
+>> Melkey: .Now, okay? And we'll do add the TTL, the time to live. So whatever time is .now, if you want your token slip for 24, hours, 10 hours, one hour, one minute, we're basically saying whatever the time is now, add that TTL to it, okay?
+
+[00:03:33]
+So we know what timestamp this will expire at.
+>> Melkey: And also the time package can go is very nice.
+>> Melkey: And then the scope will be the scope, okay? Here we're gonna make an empty bytes of 32 characters. So here, we'll use the make function like so, we'll have our slice of bytes, okay, and then we'll put 02 bytes like, so
+>> Melkey: Next, we're actually going to use the rand package.
+
+[00:04:04]
+So random, this is built into go. We'll do rand.read, I'm gonna pass in those empty bytes.
+>> Melkey: Just gonna basically fill in the slice of bytes, which is the random assortment of random characters.
+>> Melkey: If the error does not equal to nil, this is gonna be an internal server error, meaning the random library or our system something's going on.
+
+[00:04:28]
+So we can just do return nil and error like so, okay? And then for token, plain text, what we're gonna use is base 32.
+>> Melkey: Standard encoding, okay? This is gonna be us actually encoding the plain text password into our token.
+>> Melkey: Gonna say with padding.
+>> Melkey: Base 32, no padding.
+
+[00:04:56]
+And then we're gonna do encode to string, we're gonna pass in the empty bytes like this, okay? And just to kind of explain what this is, so with padding creates a new encoding, identical with this, except with a specific padding character or no pattern to disable padding. So padding is typically seen as like for UTF-8.
+
+[00:05:14]
+Sometimes I believe it's the extra equal sign at the end if there's an empty character, empty slot. So that's what the width padding does. It just pads up if you send a value that doesn't fully meet the length of what you set your encoder to be, it just pads it with, typically the equal sign at the end.
+
+[00:05:36]
+
+>> Melkey: Okay, so now we have the token, plain text. What we're going to do is create our hash, which means sha256 should bring it into crypto/sha256.
+>> Melkey: Then we're gonna use the sum 256. Functions returns a shot 256 check some of the data. All of this, I'm just being honest, is us not creating our own hashing algorithm.
+
+[00:06:01]
+This is built in to go the shot 256 library, the crypto library, and the random library. It's just us essentially, we're rolling our own auth using algorithm hashing tools created by much smarter people than me, and in use by a lot of people. So again, I think rolling your own auth, some people think this is the part where you're actually making your own algorithm, like doing all this stuff.
+
+[00:06:28]
+That's not really what it is. We're leveraging tools, sometimes external tools, but because of, I guess, the richness of the ghost standard library, we can use these tools that are available to us.
+>> Melkey: Okay, so here we can just pass in a slice of bytes, and then what we're gonna pass in is token.Plaintext, all right?
+
+[00:06:51]
+And then here all gonna say is token.Hash like so is going to be hash, bring in that entire slice, and here we're gonna return token and nil. And so one thing I realized that I may have forgot to mention is the scope. Tokens, the way we are using them, could have many different scopes.
+
+[00:07:19]
+We can have authentication scope, but you can also have authorization scope. You could have mod scope, admin scope, grandfathered in scope, right? And these are just basically levels of privilege that we can assign to a user communicated through tokens that can be used across our application, okay? So here in our instance, because we're using authentication, we can create a const, all right?
+
+[00:07:43]
+And this const could be called ScopeAuth for right now we can just make this equal the string authentication like, so. Cool, so now we have a method of creating tokens. So generate token, and we have the token struct, we can then go back to our store here. And within store, we can finally create tokens.go.
+
+[00:08:07]
+And the reason why I didn't create the other file in the store is because that other file, as we just saw, has nothing to do with the database. And so for me, I like that separation here this file in particular, let me just quickly spin it up package store.
+
+[00:08:21]
+This is gonna be our tokens.go talking directly to our database. So we'll be inserting those values. So I thought it makes more sense to separate them. But if I'm being honest, you can't keep them in one file. I'll leave it up to you if you want to change it up and whatever makes more sense to you, okay?
+
+[00:08:35]
+So in this case, we don't actually need to create a struct, because we already have it from our tokens package. But we can do is not a func, but we can create a type to handle our Postgres token store, right? So we can do PostgresTokenStore. This is gonna be a struct, and it's gonna have a field db.
+
+[00:08:55]
+It's gonna be of type sql.DB which you've seen plenty of times. With this, we can create our new constructor. So func new Postgres token store, okay? It's gonna take a db like so, it's going to return a pointer to Postgres token store like so, and we can return the postgres token store db, all right?
+
+[00:09:18]
+This should be pretty familiar to us already, and with a store, we can also do something called type token store as an interface.
+>> Melkey: Now, the chances of changing the underlying structure of a token store is still fairly high because all really doing is changing that constructor, that new Postgres token struct, so it's as equal across the board, right?
+
+[00:09:44]
+So that's why you would it's not necessarily saying you're changing from a sha256, algorithm token, or even stateful versus stateless. All this is saying is you no longer use Postgres to store your token. So that's why it's still applicable to have a interface on it as well. The methods on this interface are gonna be token, which is going to be of type token, which can do token.to bring it in.
+
+[00:10:17]
+
+>> Melkey: I think my editor is gonna do it for me. So here, let's just move all this github.com/melkey. Let me remind myself of what it is. FemProject, cool, and that's a little helpful thing if you forget like me.
+>> Melkey: Okay, and then it's just slash-
+>> Speaker 2: Is it tokens?
+
+[00:10:45]
+
+>> Melkey: It's token, cool. Yeah, so don't forget the internal and don't forget the the plural of tokens. Okay, cool, so then over here, it's not token, it's tokens. And then we can put token like that.
+>> Melkey: Okay, so insert this is gonna be what's actually gonna be communicating with the database.
+
+[00:11:03]
+We're gonna be taking that generate token and actually inserting it into the database. All we really need this is to have an error, and then two more methods will be createNewToken, all right? And this gonna include information like the userID, which we know is gonna be an int, ttl, which is time.Duration.
+
+[00:11:22]
+It's also gonna have a scope which is a string, and this is going to return a pointer to tokens.token and an error, okay? And then one more method we can have is deleteAllTokensForUser, right? And let's say someone gets hacked. Let's say someone wants to just delete all their tokens they haven't been on for a long time.
+
+[00:11:45]
+They got banned, whatever it is, you can just easily make a function which takes user ID int and scope string. You can do error like so.
+>> Melkey: So we have our three methods we know exactly what we need to implement. Let's go ahead and do that. So Postgres token store, let's do CreateNewToken.
+
+[00:12:02]
+We'll start with this and like, the signature already tells us, we just have to user ID. It's gonna be int.
+>> Melkey: Ttl is time.Duration scope is string.. This is gonna return a tokens.Token and an error.
+>> Melkey: Okay?
+>> Melkey: So here we can do token error is gonna be tokens.GenerateToken.
+
+[00:12:27]
+I'm gonna pass in the user ID, the ttl and the scope.
+>> Melkey: I'm gonna check the errors, we're gonna return nil and error, if there is one. Otherwise we're gonna do error is going to be t.Insert, even though it doesn't exist just yet. But since we know the token signature, insert is going to take our tokens, we're gonna drop it in here, and we can say, return token error.
+
+[00:13:01]
+
+>> Melkey: Next method, let's do Postgres token store. Let's go ahead and just create the insert one since we've already referenced it. All right, so token is going to take token tokens.Token, like so. And it's going to return the error or a error, okay? And here we're gonna create our query insert into tokens, okay?
+
+[00:13:30]
+And here we're gonna be inserting hash_id, expiry, and scope
+>> Melkey: Values are gonna be 1, 2, 3, and 4, like that, okay? And very easy, we can just do error is gonna be t.db.Exec. Pass in the query and the four values we need, token and the orderly appear If you're in, so token.Hash, token.UserID, token.Expiry, and token.Scope.
+
+[00:14:09]
+
+>> Speaker 2: For the t.insert?
+>> Melkey: Yeah.
+>> Speaker 2: Was that insert, it's a Postgres token store, which doesn't have the insert on it.
+>> Melkey: That's what we're building right now.
+>> Speaker 2: Okay, so it's just not there yet.
+>> Melkey: But yeah, the, the function building now is the insert on the t.Postgres token store.
+
+[00:14:29]
+
+>> Speaker 2: Gotcha.
+>> Melkey: Yeah.
+>> Melkey: Yeah, so now if we do return error and you save, your error should go away on the t.insert. Because now the Postgres token store struct does have a method on it called Insert. Rewriting this last function, so we do t we have PostgresTokenStore, and the last function you wanna create is going to be DeleteAllTokensForUser.
+
+[00:14:55]
+This is gonna take a userID of type int and the scope, which going to be a string. It's going to turn an error for us. And quickly create a query like so. It's gonna be DELETE FROM tokens. Oops, where scope equals the first value passed in.
+>> Melkey: And user_id = the second value.
+
+[00:15:29]
+
+>> Melkey: Then we can just execute this with t.db.Exec, pass in the query, pass in the scope first, and then the userID. And then we can go ahead and return error like so.
+
