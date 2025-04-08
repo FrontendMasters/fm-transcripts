@@ -1,0 +1,101 @@
+[00:00:00]
+>> Melkey: Sweet, so with that created, we can actually hop back into our WorkoutHandler. So if you wanna go into the WorkoutHandler, this is in the API package. When we were querying these functions, we got preliminary kind of responses of created a workout, and we show that we can parse the slug from a query that we are hitting using Chi, right?
+
+[00:00:25]
+We're using the params workout ID right up here. So we're gonna kind of up this up a little bit. We are no longer just going to return these random things, we're actually gonna try and communicate through our client, to our API, to our database. I'm gonna start with our handle, create workout down here.
+
+[00:00:46]
+So right now it should have just a simple print statement. Go ahead and just nuke that. We no longer need that. I'm gonna start off by creating a variable to store the workout, okay? So we can do var workout. It's going to be of type, store.workout, like so.
+
+[00:01:01]
+And I'm gonna decode this. We're gonna declare an error, and this is gonna be JSON. So try to see if this is brought in. It's a standard package in Go, the JSON package. I'm gonna json.NewDecoder, okay? And we're gonna decode the r.Body. And just a quick reminder, r is the pointer to our HTTP request that we're getting from the caller.
+
+[00:01:25]
+This could be client, this could be whatever it is, just us testing a different terminal, but the contents of the request are going to be in r.Body. And what we're essentially doing here is we are using this JSON package to first of all, create a strut for us that's going to parse the r.Body.
+
+[00:01:46]
+And we're gonna parse the contents of r.Body into our workout here. So do .Decode, and then parse in the address of workout.
+>> Melkey: Now, the reason this works is because if we go back to our store.workout, we have our JSON tags here. JSON ID, title description, duration minutes, calories burned, and entries.
+
+[00:02:11]
+So when we expect r.Body, the body of the request, it's going to have these JSON fields with the appropriate values. But it allows us to easily decode that content into our workout here, our variable that we declared just above. Let's go ahead and handle this error cuz our compilers matter to us.
+
+[00:02:31]
+We can do if error does not equal to nil. We can do a few things. First, we're gonna quickly just do a fmt.PrintLn, I'm gonna say error, okay? This is not permanent, this is just for us as we build this out, okay? So if there's any unforeseen errors, we'll see this in our terminal that's running our Go server, okay?
+
+[00:02:55]
+But this is not really a good way to handle errors, I'll show you how we can improve this in just a little bit. But I'm a fan of, let's get something working that does a preliminary job and then we can improve on it. So with that, we now also have to handle the error for the caller, okay?
+
+[00:03:10]
+So that first error statement is for us to see what's going down in our backend. This is to respond to the caller that tells them, hey, I couldn't process your request. So we can pass in the ResponseWriter w, and the message could be failed to create workout, all right?
+
+[00:03:26]
+And then the status code. So we can do http.StatusInternalServerError, also known as 500. Once you have that, please make sure you add the return, cuz if you don't, your client's gonna see the error message, but then you're gonna continue on with your function. Which is something you definitely do not want to handle.
+
+[00:03:41]
+Missing return series is pretty common, it happens, so just make sure you add it. Now, the cool part is, I have a question, if anyone has the answer right away let me know. But right now how do we have access from the scope of this function, from the scope of this package, or API package page, how can we possibly hit the database?
+
+[00:04:04]
+
+>> Speaker 2: Through the app struct.
+>> Melkey: Through the app struct? That's a pretty good answer, but it's not necessarily the app struct. It's actually gonna be through our WorkoutHandler struct, okay? So right now, when we first created, I purposely left it empty because I wanted to demonstrate how we can add on to this truck to do things for us that can kind of connect with other parts of our application.
+
+[00:04:30]
+So here, the WorkoutHandler is just simply the handler for us to create these methods on. But now what we can do is, If we go up here, we can open up this struct and we can include a new WorkoutStore, all right? Which can be of type store.WorkoutStore. And I wanna emphasize this part a little bit.
+
+[00:04:55]
+WorkoutStore is what? Does anyone remember?
+>> Speaker 3: The database.
+>> Melkey: It's the interface.
+>> Melkey: The WorkoutStore is the interface, right? It's right here. And this is kind of the highlight I want to incorporate when we first created this. From the perspective of our API layer, all it knows is this interface.
+
+[00:05:15]
+It doesn't know about our PostgresWorkoutStore or any of the methods and logic that we created on it. And why does this matter? Is again, if for one, whatever reason you have to swap your database, you have to of course always make the changes in your database layer. If you're gonna swap from Postgres to like Mongo or something else, that work has to be done.
+
+[00:05:34]
+But from the perspective of your API layer, your API is not gonna have to change at all. As long as your migration from one database to a new one adheres to your interface, your API layer can be left untouched. Which I think is a very powerful thing, it's decoupling the database.
+
+[00:05:51]
+And, yeah, we're gonna see how we can fully leverage that. So now that we have this struct, we have to also modify our constructor, okay? So now WorkoutHandler is gonna also accept a WorkoutStore argument, which if type store.WorkoutStore, all right? And then here in the return, you can just put wWorkoutStore is WorkoutStore, like so.
+
+[00:06:14]
+
+>> Speaker 4: Can you, like in JavaScript, I think you can just use the variable if there's the same variable name and property name and variable name that you're passing to it.
+>> Melkey: You mean like kind of deconstruct it like-
+>> Speaker 4: Just a shortcut to-
+>> Melkey: Like that?
+>> Speaker 4: Yeah.
+
+[00:06:27]
+
+>> Melkey: Yeah, you can do that. You can do that. I like to be very explicit even though I don't have to be. Okay. I think it'll also do the same with like structs and declaring structs. They're not to be explicitly declared, but I'm gonna be as explicit I can throughout this course.
+
+[00:06:42]
+And typically, I think it's a good pattern, if someone looks at your code and maybe they're not familiar with that, to be explicit, but that's neither here nor there.
+>> Speaker 5: Is that JSON decoder the same or similar to unmarshaling?
+>> Melkey: Yeah, it's very similar. They have the decoder.
+
+[00:07:00]
+They are very similar, you can kind of use one versus the other. On marshaling, from what I've seen, is better used for internal, kind of within your own application. If you're gonna have to do something with JSON, you kind of craft it and then send it to maybe another package or something.
+
+[00:07:18]
+The NewDecoder is typically what's seen when you are accepting json payloads through HTTP or something like that. But I do believe you can use them interchangeably, I just think the NewDecoder is a bit more designed for handling requests over server calls. All right, so now that we have a bit of our structure set up, what we're going to do is create a new variable called WreatedWorkout, and in error.
+
+[00:07:45]
+And here we're gonna use wh, and you should see now a new field called WorkoutStore, and then we can click CreateWorkout, okay? And we can pass in our workout like so. And this CreateWorkout is, in fact, the CreateWorkout function we just created in the new PostgresWorkoutStore, but because we're using an interface that satisfies the method signatures, doesn't really matter.
+
+[00:08:08]
+All right, and now, as always, let's make sure we handle that error. So if error does not equal to nil, let's just quickly do a fmt.PrintLn for us so we can keep that error. Remember, this is not a permanent solution. And you go ahead, you can just copy and paste it just to save yourself some time.
+
+[00:08:25]
+The HTTP error message from above. Don't forget the return. And then we wanna kind of remind the caller, or tell the caller, hey, we accepted your request. So what we can do here here is w header. We're going to set a field. I'm gonna type Content-Type like so, ,application/json.
+
+[00:08:54]
+And at the end, we can do json.NewEncoder, okay? So new encoder returns a new encoder that writes to w, which is our response writer. And here we can pass in w, and we're gonna encode what we want, which is the created workout. So this pattern here is a pretty powerful pattern that allows us to have more flexibility with different quote unquote, layers of our application.
+
+[00:09:23]
+Here we're demonstrating the API layer to our database layer, but you can imagine this goes beyond the scope of those two preliminary things. You can have multiple different layers, especially if you have specific packages that are doing microservices and they have a struct and they have function calls.
+
+[00:09:36]
+You can kind of mess around with how you handle and orchestrate the different handlers across your application.
+

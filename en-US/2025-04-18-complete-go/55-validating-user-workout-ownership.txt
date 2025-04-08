@@ -1,0 +1,82 @@
+[00:00:00]
+>> Melkey: Okay, so with all of that, we do have to make some modifications on our existing code. Specifically, if we go back into our workout_store here, we now know that our workout right here has a new field so we can do User ID. This can be an int json:user_ id and what I want to do is add another function here similar to the get token user function we saw in our token handler.
+
+[00:00:29]
+I wanna create a function called GetWorkoutOwner, so we can do GetWorkoutOwner inside of our workout store interface. ID is gonna be an int 64 and what this is gonna respond with is an int and an error because it's going to respond, you can make this respond with the full user, if you want.
+
+[00:00:50]
+I'm just gonna make it pretty easy to respond with the ID of the user who owns that workout, okay? Cuz these are primary keys, so they're unique by nature. And so we know that in our case, our primary key is just 1, 2, 3, 4, not the best, but you can do UUIDs and have the same effect here, okay?
+
+[00:01:09]
+So if we go into create workout, we do have one thing we definitely need to address, and that is, every time we create a workout, we need to insert that user ID now, okay? So here, let's put the first argument as user_id, that's gonna be in front of title.
+
+[00:01:26]
+So you should have user_id, title, description, duration_minutes and calories_burned. Let's make sure we add a fifth value here, okay? And then a few lines below we have the the QueryRow, excuse me, right after the query, we can add workout.UserID, okay? And this is gonna guarantee that we have the ability now when we insert our workout that's associated with the user ID.
+
+[00:01:56]
+And we don't have to worry about the one to many relationship for the workout entries, since that could be related back to the workout, and that will have the associated owner or user ID with it. So if we scroll all the way down, we're gonna start implementing that new function method we have, so we can do func pg.
+
+[00:02:16]
+You can see PostgresWorkoutStore, okay? GetWorkoutOwner, excuse me. It's gonna take the workoutID, which is of type int64. All right, it's gonna return an int, error like so. And here we can do var userID is gonna be an int. We're gonna go ahead and create our new query like so.
+
+[00:02:47]
+I'm gonna do SELECT user_id from workouts, WHERE id = 1. Okay, you want an only value we will pass, and here we can do pg.db.QueryRow, pass in that query here, and then we're gonna pass in the workoutID like, so.
+>> Melkey: Okay, here we can call our Scan method, we're gonna Scan the result into that user ID.
+
+[00:03:25]
+If the error does not = nil, what we're going to do? Is just return 0 and specifically the error, otherwise, let's go ahead and return that userID and nil. All right, so now we just have to make some last finishing touches into the actual handler. So now if we go to workout_handler over here.
+
+[00:03:48]
+We don't really care what the handle get worked by ID let anyone read any workout. I think where we start to care is, handling if we want to update a workout and especially creating a workout because like you saw in the data store, we've now inserting a user ID.
+
+[00:04:08]
+So we need to make sure we get that user ID field in our handle create workout, okay? So, where we can do this, is let's say right here, we're gonna extract the value of the current user. So we can do currentUser like so, we can just put middleware.GetUser like this.
+
+[00:04:31]
+We can pass an r, okay? And here we can say just extra validity check, we don't really need to do this, but here if currentUser == nil, or current user == store.AnonymousUser. We can just simply write this out.
+>> Melkey: Error, we can just say you must be logged in, okay?
+
+[00:05:02]
+So now that we have this current user and we know that they are not anonymous and they do have this current user.id field, what we can do is workout.userID equals currentUser.ID like that. All right, so now we know in the workout struck, we'll have the user ID associated to it.
+
+[00:05:26]
+So when every new user gets created or every new worker gets created, they'll have a user ID associated with it. All right, now there's a few functions typically or just namely update and delete that we need to just finalize here, okay? So again, the core issue that we're solving is the fact that someone can create a workout and someone else can delete it, or someone else can update it, which we don't wanna do.
+
+[00:05:49]
+We want owners to delete and update their existing,workouts, okay? So we can do this very easily, so here, right after the, let's see where can we put this and decode it. I guess we can even put it all the way down here, so underneath the check, so we're in the update workout function.
+
+[00:06:18]
+And then right underneath all those up the request, we can do the same thing of getting the currentUser. So we can do middleware.GetUser (r), all right, we can do the same check if currentUser == nil or currentUser == store.AnonymousUser. We can simply just send them that they are unauthorized and we can return out of this.
+
+[00:06:49]
+
+>> Melkey: Okay, error must be logged in to see this.
+>> Melkey: Okay, next we can actually get if we know the current user, we still need to identify who the owner of the workout is. So what we can do is workoutOwner err, okay? We can use wh.workoutStore and GetworkoutOwner, this function here, you can pass in that (workout ID).
+
+[00:07:29]
+
+>> Melkey: Okay, and here we can do some pretty cool checks here, so if our err does not = nil, we can do a few things. So here, we can do if errors, we can do.Is, so we've seen this before when we did our testing for our database error, can do sql.ErrNoRows, okay?
+
+[00:07:52]
+Here we can write quickly, copy and paste this down here,
+>> Melkey: Okay, so it's not that it's a bad request, but here it's going to be a StatusNotFound, okay? And in here we'll say error: workout does not exist, okay? Or some sort of error order doesn't exist, okay?
+
+[00:08:25]
+Otherwise, outside of the scope of the if errors is error no rows, what we can write is internal server error, so something seriously messed up happens. So StatusInternalServerError, you can do error and just type internal server error like so, it makes a return from both cases here. All right, so now we know the current user, we have the workout owner as well.
+
+[00:08:53]
+What we can do is, if a workoutOwner does not = currentUser.ID. We can basically know that this is an incorrect attempt at modifying someone else's workout, okay? So here we can just grab this.
+>> Melkey: So you chose JSON, not status, internal server error, but we can do StatusForbidden.
+
+[00:09:21]
+All right, you can do error: you are not authorized to update this workout like so. Right at that finish line, the only thing we have to do is now modify the delete workout, okay? So this should handle updating the workout, here we're going to also modify our handle, delete workup ID with the exact same way.
+
+[00:09:42]
+And a lot of this could be abstracted into its own separate function, especially the retrieving the current user, a lot of that is pretty rinse and repeat. We can actually just go ahead and just copy the current user and even the workout owner bit all the way up here, right?
+
+[00:10:00]
+So current user, all the way down to our last error check of get workout owner. And if you go back into the handle, delete, workout, right above the delete workout function call on workout store, you can just go ahead and paste this. All right, so I'll go a little slow, but we have the currentUser from our middleware.
+
+[00:10:21]
+We have the workout owner that we have as well and then we just simply need to make that last check, so if workoutOwner does not = currentUser.ID. We can then bring back that StatusForbidden, return that we saw right over here, or nope. Where is it? Right over here, return, and just paste it over here.
+

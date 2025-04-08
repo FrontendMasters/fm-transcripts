@@ -1,0 +1,89 @@
+[00:00:00]
+>> Melkey: So with a new middleware handler, let's go back to our app.go and add this new middleware handler. So in application we have our token handler. Let's add middleware, like so, okay? And this is gonna come from the middleware.User middleware package. Okay, it gets auto imported.
+>> Melkey: So we have an error.
+
+[00:00:23]
+So, GetUserToken, let's see what's going on. So PostgresTokenStore, this sort of, okay, PostgresUserStore, there you go. Now it's happy. I put the wrong PostgresTokenStore on the method receiver there. Make sure it's PostgresUserStore, or else you get errors that the interface you're using isn't satisfied there. We'll do the middleware, I guess we can call it handler, okay?
+
+[00:00:55]
+And here we can just say, middleware.UserMiddleware, like so. And then here, because we're going to be instantiating a struct, we don't really necessarily need a constructor every single time, we can instantiate it in place like this. So we can do middleware.UserMiddleware. And then user store will be that UserStore variable.
+
+[00:01:16]
+And down here we can do middleware, is middleware handler, like so. All right, we have one more spot to modify, which would be in routes.go. And this is gonna be a pretty interesting one. So here you can see that we have all of these methods declared. We have a get methods, post, put, delete, etc, etc.
+
+[00:01:35]
+So CH actually offers us this really cool way of grouping a bunch of these functions together. And then we can basically facilitate if any of them are going to require a middleware or not. So it gives us more control and granularity over kinda, this access layer to what a logged in user, not logged in user, and admin user can hit and access through our different methods here, our different routes.
+
+[00:02:04]
+So, we can do this by, right underneath the rchi.NewRouter, you can do r.Group. You can see here, group creates a new inline mux with a copy of the middleware stack. It's a useful group of handlers along the same routing path that use an additional set of middlewares, okay?
+
+[00:02:22]
+So again, you can also group them by /V1. You can have your V1 routes here. You can also group by V2 and have your new modified routes there. But an aspect that I like about this is it allows us to add a middleware into this group and have the functions within the group kind of adhere to them, okay?
+
+[00:02:42]
+So here we can do an anonymous func. So func, r will be a chi.Router, like so. Open the function body up. First argument will be r.Use. Or not argument, but the first thing we'll write is Is r.Use. And then we put app.MiddlewareAuthenticate as a first class citizen. And we can actually just see our .use, use appends more middlewares onto the router stack.
+
+[00:03:11]
+So exactly what we just built as our middleware, we can now append it to the existing Chi muck stack. So can do r.Use and app.MiddlewareAuthenticate. So I had to repeat myself, I just want to make sure that was clear, okay? And then we can go ahead and take the workouts/{id} GET method, and all these methods here.
+
+[00:03:34]
+Okay, so the handle GetWorkoutByID, CreateWorkout, UpdateWorkout, DeleteWorkout. Actually, we don't even need to bring in the CreateWorkout, we can leave that out. Actually, let's bring these ones, yeah. So the GetWorkout, CreateWorkout, UpdateWorkout, and DeleteWorkout, we can take these and drop them within the group that we just defined.
+
+[00:03:55]
+And then you should have three methods outside of that grouping, which is HealthCheck, HandleRegisterUser, and HandleCreateToken, okay? So now if we save and we restart our server.
+>> Melkey: Okay, no obvious scary errors. You can go here into one of our other terminals. Clear., we can do the health check.
+
+[00:04:17]
+So curl localhost:8080/health, everything should be working accordingly. But you may be thinking, why do we just spend all this time to do something that has really no benefit? Cuz if you notice, if you go back to our middleware here in the method, regardless of the case for a person without any auth headers or all of this logic, the end is still the same.
+
+[00:04:47]
+We're still just going to set the user and then serve the HTTP, the next function that's in the chain HTTP method, right? But really, we haven't done anything. Okay, so if we go back to our routes here for a second, here, it's grouped with this authenticate method. Okay, cool, so all requests are gonna be injecting with anonymous user or a logged in user.
+
+[00:05:12]
+But as far as the scope of these functions, they actually don't care. They're gonna act the same way. There's no logic telling them to behave differently depending on what that value is within the context. So in the next bit, we're actually going to introduce a new function that's actually going to wrap each individual protected route, and it checks if the user in the request context is an anonymous user and logged in user.
+
+[00:05:41]
+And then what to do. Do we want to give them access to the rest of the route, or do you want to just say block them and say, hey, you cannot access these routes at all? So if we go back into our middleware right here, we can go all the way to the bottom and can give ourselves some more room.
+
+[00:05:58]
+So, I just want to very much emphasize the point of what happened, right? We just blanketed a bunch of routes with this middleware. And all this authenticate method does is insert user that's anonymous or insert user that's not anonymous. That's it. And so, this following function is going to be able to receive that context, call the getUser function and from the getUser function, depend or decide what to do, pass or no pass.
+
+[00:06:28]
+So, how does that look? We can do func, is gonna be a user middleware, and here we can call this function requireUser.
+>> Melkey: Okay, a requireUser, it's also going to have that same ability to pass on to the next HTTP function right away. It's gonna be http.HandlerFunc, like so, and to respond with an http.handlerFunc, all right?
+
+[00:06:55]
+And right away we can return http.HandlerFunc. We're gonna call it an anonymous function. So, Func w HTTP ResponseWriter, pointer to HTTP request. I'm gonna open this up, and here we're gonna do, user is going to be getUser, pass in r. And here we're gonna evaluate. If user.is anonymous, I'm gonna do utils.writeJSON.
+
+[00:07:27]
+I'm going to respond with w. And here I'm gonna do HTTP status unauthorized.
+>> Melkey: Oops.
+>> Melkey: Okay, utils.envelope, and here we can just say error. And say, you must be logged in to access this route. Okay, and then we can return.
+>> Melkey: Next we can just do next.serverHTTP(w, r).
+
+[00:08:07]
+And that's all those functions going to do, cuz the heavy lifting was already done by the authenticate middleware that's injecting what that anonymous user or user struck is. And getUser is gonna be a very simple function that just extracts the value from that.
+>> Melkey: So now, if we go back to routes, these functions here, we can actually do something pretty cool.
+
+[00:08:35]
+We can do app.Middleware, and we can do RequireUser, and we can wrap these functions around it, like so.
+>> Melkey: Okay, so you can see we had this app.WorkoutHandler handle getWorkuoutID. And now we're passing it and wrapping around this app.Middleware.RequireUser function.
+>> Melkey: Okay, so then we can do app.Middleware RequireUser.
+
+[00:09:12]
+
+>> Melkey: Can do it to all of them. Or if you want, you can even add it to a upper header of the use function. Having it fully authenticate via this required user. I'm being a little bit more specific and individually wrapping each and every single HTTP function I want a user to be present for.
+
+[00:09:33]
+There's many different ways you can handle it. You can have your authenticate, you can even have another function here, so r.Use, and you can have another one that checks all the required users, if you want. And that can be part of the grouping. Or we can just handle them individually like this.
+
+[00:09:54]
+
+>> Melkey: And now, if we go back to our Go, let's bring down the server. Go run main.go like so. Okay, that all works. If we go back to the exact same terminal, if we run the exact same curl, this should work, because status is unavailable, right? But if you do some like curl localhost:8080/workout/2, you can see you must be logged in to access this route.
+
+[00:10:21]
+Because I just called it as some random nobody, right? Some anonymous user. Again, the specific person would probably ask, why are we blocking access to getting workouts? This is just an example. This is a very just core example. Probably you want to have the ability for anonymous users to look at workouts and peruse and check out your app to an extent.
+
+[00:10:45]
+And maybe you do these kind of blogs on creating a workout, updating a workout, dealing a workout. But the the core here is that we're demonstrating that you can fully block access to routes that you control and that you choose.
+

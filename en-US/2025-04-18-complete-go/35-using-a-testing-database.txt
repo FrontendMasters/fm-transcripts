@@ -1,0 +1,75 @@
+[00:00:00]
+>> Melkey: So as we wrap up the core CRUD portions of the application. We can start moving on to a different aspect of Go entirely, and that's gonna be testing. Now testing is a pretty wide topic. You obviously have unit tests, mock testing, integration testing, manual testing, beta environment testing.
+
+[00:00:20]
+I mean, testing at itself, could be an entire course. And for this particular course, I want to incorporate testing techniques I think are very valuable from a practical sense, but also valuable from a sense of what others might have to say. [COUGH] So I have this slide here, there is some great books by this really wonderful author, Thorsten Ball.
+
+[00:00:47]
+And Thorsten has written some really good books, two in particular is writing a compiler in go and writing an interpreter in go. And in these two books, he actually goes with a different approach of teaching. He goes with test-driven development. So he actually writes test first and then the functions to couple it, which I think is very good.
+
+[00:01:07]
+I personally don't adopt TDD all that much, I think a lot of times running test over and over and over again can become appetitive. But that's not to say that the style that Thorsten chose to write his books is wrong by any means, it's just different flavors for different people.
+
+[00:01:23]
+And so what we're gonna do here is we wrote the code, we gonna couple it with some unit tests for our database, okay? And I have this video here, which I'm going to click, I'm not gonna play it. But in this video, this is Mitchell Hashimoto, actually. And Mitchell Hashimoto is the creator of Ghostty.
+
+[00:01:46]
+And he is at GopherCon in 2017 talking about different testing parameters and different test fixtures in go. And one particular thing I wanted to highlight from this talk, I'll link it in these slides so you can go ahead and watch it, is the notion of table-driven tests. And we're gonna be using table-driven tests.
+
+[00:02:07]
+And the syntax here should look fairly familiar. Maybe there's some quirks here that if you're a first time go developer, you may be asking yourself, what does this mean? But the part I wanna highlight is the use of the anonymous struct here, right? We've talked about this when we were designing structs in the first place.
+
+[00:02:26]
+And structs, especially anonymous structs, are very helpful and useful when it comes to table-driven tests, okay? So we're gonna be adopting table-driven tests in our code base here. We're gonna be doing quite a bit of tests. I'm actually going to approach this in a systematic way. I'm gonna show you how to write a test.
+
+[00:02:46]
+I'm not gonna show you how to write all the tests, just because it gets very repetitive. It's like over and over and over, the same thing, right? So I kinda wanna drill down the concept of, what it is to write a test, how we go about it, why I chose to do things I chose to do.
+
+[00:02:59]
+And then you can feel free to accept it, use any kind of testing approaches you feel that you're comfortable with, and we can move forward with that. So before we get started, there is one aspect I really want to break down, and that's currently how our application looks like.
+
+[00:03:15]
+And if you really, really look at it, it's just, essentially, two main files, right? Three things include main, and if we kind of ignore app and routes. We have our workout store function, which is directly writing to our database. We've confirmed it works, we have a database running, we know it works.
+
+[00:03:29]
+And we also have this file here, which we know also works, because it's accepting our request, it's able to handle them and this is our handler. So the test I'm going to first approach is gonna be focusing on the workout store, all right? And you may be thinking, okay, well, how can we truly test this?
+
+[00:03:47]
+Or what functions can we write that will test the integrity of the function we wrote here? And there's many different ways that we can approach this, and the approach I'm going to use is actually going to be spinning up a test database. So we're gonna be spinning up another database that is going to be just specifically used for testing.
+
+[00:04:09]
+Maybe you're asking, well, what's the point if we have our current database here, that is, the container_name: "workoutDB". And the way I look at this is, in production, I would assume most of the time you'll have a dedicated database running on some hosted sever. Whether it's AWS DynamoDB, whether you have a separate database on a provider, [COUGH] like Superbase or some like that.
+
+[00:04:34]
+Those are different ways that you can kind of have a production level database. Here, this database that we see is simply like our beta local database, right? And it persists our data, we have the volume persisting that we can bring it back. We can tear it down, bring it back up, and the data will still be there.
+
+[00:04:52]
+The reason why I wanna have a test database is this test database is going to only exist to validate the integrity of our SQL. So we're actually going to be writing values into this database, we're gonna be retrieving them, and we'll be checking to see if they're correct or not.
+
+[00:05:07]
+Is it storing the values it needs to store, is it retrieving the values it needs to retrieve, is it updating the values correctly? So here we're gonna actually have a test database, which we're gonna use only for this test case here for a data base layer. And this is just one approach, right?
+
+[00:05:23]
+This is my personal opinion. With testing, I'm actually very opinionated, as much as I like to meme on tests, I'm a very, very opinionated tester. I truly think, if you're testing, you really wanna truly test something, not for the sake of writing some garbage unit test to prove to your senior engineer team that you have tests.
+
+[00:05:41]
+But you actually wanna get value out of your tests, right? It's not about writing tests for the sake of telling people you write tests, it's you get anything out of your tests. And for me, writing a fake to mimic my test database is kind of a waste of time.
+
+[00:05:56]
+I believe in mocks, and I believe mockery, and we're gonna use potentially mockery, if we have time. But if I'm interested in testing a database, I wanna know, am I testing the database? And so that's my philosophy to it. It's a bit more, I guess, rigid, but I do hope that once we see it working, there is some of appreciation to it.
+
+[00:06:17]
+And if it's not your kind of cup of tea, that's totally fine, go with whatever you feel is necessary. But because we're also not using an ORM and we have our own SQL, we are literally writing SQL ourselves. We're processing the rows individually, I wanna know, really, if we're doing it correctly.
+
+[00:06:33]
+So in the dockercompose.yml file, right underneath the db, we're gonna create another service called test_db. Again, you can just watch your spacing and to save us time, go ahead and just do the old Ctrl+C, Ctrl+V here. Do like this, [COUGH] and then underneath, after the container_name, workoutDB, just append test to it.
+
+[00:06:55]
+It's still gonna be the exact same image that we're going to pull. The volumes, so on the right we have /database/postgres, we just do a -test-data, the rest is fine. And the last part you need to make sure is the port here. I know some people who have Postgres already running on their machine faced a bit of an issue with the port 5432, and they may have moved their original db to 5433, or to another port.
+
+[00:07:22]
+Whatever is you have to do, just make sure that your test db is not on the same port as your regular db above. [COUGH] And again, it's fine if the right hand side of the colon is 5432, that is, the port of the container. So since these are gonna be two separate individual containers, they're not gonna be intersecting each other with what ports they are going to be binding the software with.
+
+[00:07:47]
+Cool, all right, now, since we have this, we can save this. And if you go back to your document post, mine is still running, I'm gonna go ahead and nuke this. I'm gonna bring it down, and then I'm just gonna do docker compose up --build. And now you can see, not only do I have the workoutDB running as per usual, I've now actually pulled and created a workoutDB_test.
+

@@ -1,0 +1,85 @@
+[00:00:00]
+>> Melkey: Okay, good stuff, so now we're able to create workouts, and we're able to have the correct tooling to validate that something's inserted, we can look at any error messages, and we can debug them as we see. So the next part we're gonna do is do the rest of the handlers, wo we wanna get the work ID, update the work ID, and eventually delete them as well, okay?
+
+[00:00:24]
+So we're gonna work back into the workout store, so this file here, the one that has our interface and our struck. And the first thing we're going to do, and as always, if you have an interface in your application code, what I would always recommend is add the function definition here first.
+
+[00:00:44]
+You can see here we have our Create and GetWorkout, let's add a new one for UpdateWorkout, like so. UpdateWorkout is gonna take an argument of a pointer to a Workout, and it's going to return an error. So that's simply the function definition for our workout store interface, okay?
+
+[00:01:06]
+And I think an appropriate part for us to pick up where we left off is finishing up the GetWorkoutByID, cuz right now it's just simply a scaffold of the function. So we're gonna start right here. Now, for this one, we're gonna follow the same pattern, so let's go ahead and create our own query, like so, okay?
+
+[00:01:26]
+We're gonna SELECT id, title, description, duration_minute, and the calories_burned from our workout table, okay? So FROM workouts, and we wanna make sure WHERE id equals the one value we're gonna pass in, right? If we're gonna have a bunch of workouts in the table, we want to retrieve the one by its identifiable ID, which in our case is simply just ID, okay?
+
+[00:01:57]
+Once you have that query ready, we can then declare the error here as pg.db, and here, we're actually gonna do query row. So this executes a query that's expected to return at most one row, okay? So different functionalities, we have query row, we have query execute a bunch of different things that we can use from the driver and the native SQL package and go.
+
+[00:02:23]
+So it depends on what your use case is, right? But here, we're gonna pass in the query and then the one argument our query expects, which is id, all right? And then here, we're gonna scan all those fields that we're selecting into its appropriate fields, quick reminder, these have to be addresses, right?
+
+[00:02:42]
+These have to be pointers that we're gonna scan this into the pointer of our workout. So what we can do here is reference the address of our workout, we can put in the order they come in, so it's ID, then it's workout.Title, Description, description, DurationMinutes,
+>> Melkey: And the last one is calories burned, like so.
+
+[00:03:12]
+So all you have to do is make sure you match the appropriate fields from our workout struct to the fields we're selecting from the query above. Now, we have to appropriately check our error, so we're gonna check two fields here, okay? So the column one is, if our error does not equal to nil, we're gonna return nil and the error, we've seen this before.
+
+[00:03:33]
+However, there is a chance that someone may be querying a workout that just doesn't exist. Which that's not an error that is simply a behavior of what may happen with a relational database, right? The Postgres is gonna error out, if you try to [INAUDIBLE] something that doesn't exist, it's going to return, this thing doesn't exist.
+
+[00:03:51]
+So we have to account for that, and SQL, the native package in go gives us that tool to help do that. So we can do if error and we can check does it equal to sql error, NoRows, okay? So this is returned by Row scan when DB query row doesn't return a row, all right?
+
+[00:04:13]
+So in this case, what we're going to do is just simply return nil and nil.
+>> Speaker 2: This data structure just simply, or an interface that just returns nothing.
+>> Melkey: Which one of this?
+>> Speaker 2: The sql.ErrNoRows?
+>> Melkey: Yep, if you go into it, it's actually a variable that's created from an errors.New.
+
+[00:04:31]
+So the native errors package, it just creates this variable that we can use.
+>> Melkey: So like you can literally replace this with errors.New and return that if you want, but it's gonna satisfy the error constraint, that's why we can put it as an error.
+>> Speaker 3: It always end up returning early in this case though, if you have error not equal to nil before that, or do I misunderstand?
+
+[00:04:52]
+
+>> Melkey: Let's see, if error is not equal to nil, return nil error otherwise it will always return, yeah, you're right actually, these should be swapped. Yeah, so first we check if it's empty or if it matches an ErrNoRows, then it's gonna nil, and then we check if there's an error.
+
+[00:05:08]
+Good, catch, cool, so at this point, right here, we're able to retrieve the entire workout, but we still have to retrieve all the entries. Remember, like a one too many relationship. So if we only really cared about those high level items on our workout, we can consider this done, but we need to go ahead and query the individual entries that belong to this workout.
+
+[00:05:35]
+So to do this, I'm gonna quickly make a comment, let's get the entries. Okay, and to get the entries, it's gonna be a pretty interesting approach here, but it always starts with our entryQuery.
+>> Melkey: Okay, here we're gonna select all the fields that we care from our our entries, so id exercise_name, sets, reps, duration_seconds, weight, notes and then the last field is order_index like so, FROM workout_entries.
+
+[00:06:17]
+The entries table where the workout_id equals to the [INAUDIBLE] we're going to pass in. Okay, I'm gonna ORDER BY the order index so we get adhere to the order they are represented in our database. Now since this is a one-to-many relationship, this query can respond with multiple different results from the workout entries table.
+
+[00:06:48]
+So we have to handle this in a bit different way than the query row above, so how do we do this? We need to clear rows and error as pg.db, or we simply just write Query, and here we're gonna pass in our entryQuery and the one argument this query expects, which is just id, okay?
+
+[00:07:08]
+We're gonna check the error, so if error does not equal to nil, I'm gonna return nil and the error.
+>> Melkey: Otherwise, before we move on, we want to defer rows.close, okay? So we make sure that we close any lingering connections to the database and any lingering return results from this query here.
+
+[00:07:35]
+Again, gonna prepend it with our defer function keyword, okay? So now, we have these rows, we're gonna iterate through each single one, every result could be one, could be a ton, right? We don't know, but we really don't care. So what we can do is for rows.Next, right?
+
+[00:07:52]
+So it's gonna iterate through the next result of our rows. Here, we're gonna create within the function of this for loop, we're gonna do var entry is gonna be of type WorkoutEntry like so. And here we're gonna do err is going to be rows.Scan. We can potentially make this a little bit easier to read instead of making it one giant line.
+
+[00:08:17]
+I can stack them here, it just because the screen has to be a little bit zoomed in. So here we can do entry.ID, I'm gonna scan all this into the appropriate fields. We can do entry.ExerciseName, entry.Sets
+>> Melkey: entry.DurationSeconds.
+>> Melkey: Wait, notes and then entry.OrderIndex.
+>> Melkey: Okay, so your scan should have ID, exercise name, sets, reps, duration seconds, wait notes and the order index.
+
+[00:09:09]
+So, individual going through every return result and a passing those results into its individual entry workout entry type. Here we're gonna check if there is any error, so if error does not equal to nil, we can simply return nil and the error. And in the last part, we can do workout.Entries and we can use the fact that entries is a slice to append to it.
+
+[00:09:37]
+So we can do workout.Entries equal append, to pass in the existing slice, which is the workout dot entries, and then we can pass in the newest entry, like so. So that's gonna actually be the completion of the get workout by ID function
+
