@@ -1,0 +1,102 @@
+[00:00:00]
+>> Brian Holt: So, let's make our server directory. So, new folder, we're gonna call it server. We gotta do two things here that's kind of interesting. So first of all, we're gonna create this new file called, what did I call it, main.js.
+>> Brian Holt: We have to kinda like patch over the node module system so that it knows how to handle JSX and so that it knows how to handle React server components.
+
+[00:00:30]
+So the first one is actually pretty easy to do, const reactServerRegister = require react-server-dom-webpack-that one /node-register. That's exactly what this does, it's patching the require essentially. And then all you have to do is you just invoke it.
+>> Brian Holt: And this will now take care of all the patching that we need to do, and we need to do the same thing again with babel.
+
+[00:01:09]
+So const babelRegister = require @babel/register, this one, and then you say babelRegister. And you gotta give it an ignore, I'm gonna copy and paste that because I do not wanna mess that up. It is a gnarly regex, so give me a second, we'll go grab that, and just a second we're gonna do plugins, and this needs to be an array as well.
+
+[00:01:47]
+This is gonna be @babel/transform-modules-commonjs.
+>> Brian Holt: I think I got that, okay, yep.
+>> Brian Holt: Okay, and then after we do all of this, we're going to require./server, which we're gonna write in just a second, and then just run it. That's what the second parentheses is, it's just run that function.
+
+[00:02:19]
+Okay, let's go grab that gnarly string just because or the regex because nobody wants to type that and get it wrong. This is gonna be in the RSC server, section three, yeah. This one, nobody wants to type that.
+>> Brian Holt: But don't transpile anything in dist server or node modules.
+
+[00:02:49]
+That's what it's saying. So one of the interesting things about this, this will yell at you if you don't have that conditions, React server that we saw before. This will yell at you, it's like, this only works when this is on the server. So that's one thing to keep in mind.
+
+[00:03:04]
+Why is this in a separate file? Someone might ask why can't I just put this at the top of my server.js is because all subsequent requires have to be hooked into this, and the only way to do that is to have it in a separate file.
+>> Brian Holt: Seems a little weird, but that's just like you can't patch it and then immediately use it.
+
+[00:03:24]
+You have to patch it and then all subsequent requires will be patched. Okay, this is how that works. Okay, so now we can have server.js here. Everything in here will be used using the patched requirements system, which is great. It's what we want. Now, we actually get to do our app, which will be fun.
+
+[00:03:50]
+So const path = require node:path const readFileSync = require node:fs const Fastify = require Fastify
+>> Brian Holt: Const fastifyStaticPlugin = require @fastify/static const React = require react.
+>> Brian Holt: Const renderToPipeableStream, if you remember that one we talked a little bit about earlier, we're gonna use that now.
+>> Brian Holt: = require, and this is react server webpack/server.
+
+[00:05:03]
+
+>> Brian Holt: Now interesting again, this is not coming from Reactdom like we're used to, right? It's coming from the webpack one. Same API works exactly the same way, but now it's gonna be ran through Webpack as it comes out.
+>> Brian Holt: And then const AppImport = require sourceApp.jsx. Now, why do I call this App Import is because this is CommonJS, it's we're importing an ES module, which means that we have to pull default off of it.
+
+[00:05:42]
+So const App = AppImport.default. That's just how the two things can interope together.
+>> Brian Holt: Okay, I wonder if I can even show you this before I get too much further. If we do npm run dev client, this should work because this should be able to build our project.
+
+[00:06:10]
+And if we look here in dist, so this is our built project now. The part that I care about is this client manifest. This is kind of the interesting part. This was generated for us. And this tells you like, hey, if you hit client.jsx, this is the chunks that it relies on, this is the names that are associated with it.
+
+[00:06:33]
+This is not meant to be human-readable, right? But this is like the file that we're gonna read, and we have to provide it to this mapping of where everything is. So this is like the mapping, go ahead.
+>> Speaker 2: Where does client.jsx come into play? I get what it does, but how does it get delivered to the client?
+
+[00:06:54]
+I don't see import anywhere.
+>> Brian Holt: It's a good question, I think that comes from our webpack config.
+>> Brian Holt: Right there.
+>> Brian Holt: So we built our webpack config, this is going to point at the client.jsx file, which is then going to get built out and included in our client-side bundle.
+
+[00:07:19]
+But you'll notice that our server never refers to client.jsx, cuz it can't, right, it's all browser stuff. Yeah, good question, so the build system knows about it, is the simple answer to the question.
+>> Brian Holt: Okay, so manifest.json, we're going to import this file, and then we're going to, or we're gonna read that file rather, and then we're going to pass it to Webpack.
+
+[00:07:51]
+Okay, so const MANIFEST = readFileSync. And we're just gonna say path.resolve to that pathway, right? So it's gonna be dirname,../dist/react-client-mannifest.json, that's utf8. And then we're gonna turn it into an object. So we're gonna say const MODULE MAP = JSON.parse MANIFEST. So this is now ready to be passed into that Webpack config or that Webpack plugin.
+
+[00:08:48]
+PORT, you can say whatever port you want this to run on = process .env.PORT.env.PORT or 3,000. So you make this configurable.
+>> Brian Holt: That's what I need, it's done. This is just a fart to have it for me cuz I've worked with so many cloud providers that yet, that relies on the port being there.
+
+[00:09:17]
+So feel free to also just say 3000, that's totally fine with me as well.
+>> Brian Holt: Okay, we're gonna start our fastify server const fastify = equals Fastify, I gave it a better logger this time, just so we can see more of what's going on. Logger transport target, and then we're gonna give it pino-pretty.
+
+[00:09:49]
+This is just helpful so that you can see a bit more what the server is doing. And pino-pretty it's a more human-readable format for logs.
+>> Brian Holt: Okay, fastify.register, we're gonna do our fastifyStaticPlugin, fastifyStaticPlugin, and root path, that join dirname, dist, and prefix assets like that.
+>> Brian Holt: So serve everything in the dist directory under assets in terms of just the prefix.
+
+[00:10:40]
+And then we have to do it again for our CSS, right? So it's more or less the same thing, you might even just copy and paste it if you feel like it. But this is gonna be for public, and it's gonna go out, and then we don't have a prefix on this one.
+
+[00:10:55]
+This is just gonna say decorateReply false. I'm trying to remember exactly what decorateReply does, and I don't remember, I'll stop my head. Fastify.get, so if they ask for a /, we're just gonna say async function rootHandler, request, reply, and return reply.sendFile, index.html. You might be wondering where the path is, and it's defined by this, so it's gonna find the index.html, and it's gonna send that.
+
+[00:11:40]
+
+>> Brian Holt: And then we have to do our fastify.get/react-flight, and this is gonna be the interesting part.
+>> Brian Holt: Function ReactFlightHandler, just FY, the reason why I actually named these functions, despite the fact you don't have to, you can just literally call it that. It makes the stack traces way easier to read, right?
+
+[00:12:05]
+Because it's going to say the problem was in rootHandler, as opposed to the problem was an anonymous function, right? This is all for stack traces, request, reply, okay, we'll do this in a second. Let's just finish out everything else that we can just focus on the flightHandler one.
+
+[00:12:27]
+Module.exports, cuz remember, we're invoking this in main.js we have to export the server = async function, start, and wrap in a try-catch, await fastify.listen port:PORT. You need a catch or else that's not valid, catch err, and fastify.log.error, error, and then you'll just say process.exit 1. Okay, so log out the error if you hit an error, and then exit 1 is basically exit with an error.
+
+[00:13:15]
+Anything that's non-zero with Linux is an error when it exits, right? This is the status code, so it could be 1, it could be 150 it doesn't matter, 1 is just generally the one that people use.
+>> Brian Holt: Okay, pretty bog standard, fastify app, nothing here is really gonna be that terribly exciting, I mean, this is different, right?
+
+[00:13:40]
+Resolving this, getting some of this stuff up here from renderPipeableStream. But again, standard deviation from writing a normal server side rendered kind of app.
+
