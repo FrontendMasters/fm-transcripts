@@ -1,0 +1,126 @@
+[00:00:00]
+>> Brian Holt: We are going to talk about some limitations of React Server Components, so I alluded to this earlier, but actually several times, that you cannot have server components be children of client components. And I guarantee you that's going to frustrate you, because you're going to have times as like, I have this client component that has to keep a bunch of state, and somehow I need to give that state to my server component that I want to be a server component so that I can, like, make an SQL request based on client state or something like that, and it's just annoying, right?
+
+[00:00:38]
+Like, it's just something that you want to do and you cannot do given the limitations of the system. And I guess the good news slash maybe slightly patronizing news is that you just write it like you used to, right? Like if you write it as if you didn't have React Server Components, you create an API, you call the API with the parameters that you want, they need to call you to do this stuff, and return it; that's exactly what we would have done before.
+
+[00:01:03]
+It's just what you do now, I'm gonna give you one kind of half workaround that works sometimes for you, but it's not gonna work in that particular case. I just told you where you have some client states that you need to call te database with, now you're just gonna have to do the way that i just described., Let's go ahead and hop into it, let's make another folder called "WhoAmI?
+
+[00:01:26]
+And we're going to create, inside of there a new file, and I'm going to call it page.js, because you have to, then I'm going to import. ClientPage from, ./clientpage, and I'm going to import WhoAmI from, WhoAmI
+>> Brian Holt: Okay, so WhoAmI is going to be a
+>> Speaker 2: server component,
+
+[00:02:02]
+
+>> Brian Holt: and client page, as you probably guessed, is going to be a client component. And I need to get WhoAmI, this one here, to be a child of client page, and how do I do that? Well, we can kinda cheat a little bit, keep in mind that all of your server components run essentially before, and then all the client-side stuff is always gonna happen after, cause that's all gonna happen on the client, which is inherently before the server, right?
+
+[00:02:31]
+So how do we kind of exploit that a little bit? The props have to be known, right? The interface between the client and the server components, to be known because the server component is going to run at essentially like build time or like at the beginning of the invocation of the route.
+
+[00:02:47]
+So we can build children beforehand, right? So we can pass it in as children, that'll get pre-rendered, and then you send that through to be rendered by the client component. So let me just demonstrate what I mean here, export default async function WhoAmI page. Okay, and we're going to return client page with ID equals one, and then we're going to make a child of this WhoAmI this is the hack.
+
+[00:03:20]
+This can still be a server component because this is going to happen at the same time, this is gonna happen essentially at build time. When I say build time, I mean like the moment that the function is invoked, and then we can have the client page just accept that as a child and then render it out.
+
+[00:03:38]
+So this is still going to happen before this does, right? This is just going to be complete, and this is going to render out complete markup. Let's get a little bit further, and if it still doesn't make sense, I'm seeing a lot of furrowed brows. Let's start with, WhoAmI JS first.WhoAmI.js, Import async database from promiseqlite3, and I want to be able to call the database here to figure out who this person is.
+
+[00:04:12]
+So it's just going to say async function get WhoAmI again, normally take in some ID and you would actually detect based on their session who they are. We're just going to assume that they're user one, I'm going to say const db equals await async database Syncdatabase.open./notes Db. And then you're going to return Db, get, select star from users where ID equals question mark, and then you would normally put in whatever we need there, but we're just gonna put one in there for now.
+
+[00:05:06]
+And then we're gonna say export default async function WhoAmI, and we're just going to return, or we need to the first, so const user = await getWhoAmI. And then we'll say return,
+>> Brian Holt: diviv, h1 WhoAmI and you're going to say,p> You are (user.name), and your id is (user.id).
+
+[00:06:00]
+
+>> Brian Holt: Okay, total server</p> Component, I want to render this as a part of my client page. And let's say I want to be able to do things like change the username or something like that from the client page, so I actually take real user input in there so you can kind of mix and match them together using this pattern.
+
+[00:06:16]
+In fact, let's do even just that, let's go make a client page.js.
+>> Brian Holt: We're going to import an update username that we'll write here in just a second from dot slash update username, and we're going to export default function, client, WhoAmI page. And we're going to take in children and ID, okay, and then we're going to return div children, right?
+
+[00:07:00]
+So it's just going to blindly render out whatever's in children, which is going to be our server component, and then we'll put in a form here as well, and we'll have an action. The action will be from update username, and In here we'll have H2, enter new username, and we'll have an input type=text, name=username Name equals username, placeholder equals username.
+
+[00:07:39]
+So something like that, then we'll have another input, let's see, I mean, you've probably seen these before, but hidden become or type equals hidden becomes very useful with these kind of forms. If you need to pass more back to the server, so I'm just gonna say name equals ID.
+
+[00:07:59]
+And value ecosystem ID, obviously, like, don't put sensitive information this is actually going to make it to the client. In fact, we should have a discussion about that momentarily, about why that's very easy to do with server components. Well, let's finish this first button type, people's submit, yeah, I mean, let's talk about that momentarily, right here.
+
+[00:08:27]
+Let's say I had like in my WhoAmI, let's say I had const, you know, open, AI, secret, or whatever, right? Equals process, dot, m dot, open, AI, secret, or something like that, right? Let's say this is my key to call it my ChatGPT interface with this is a server component that's very okay.
+
+[00:08:53]
+This is here right now, but it's really easy, let's say somewhere someone just says, Use client, right? Now this is very much in danger of being exposive. This entire thing is going to make it into my bundle, right? All of a sudden my OpenAI secret is now suddenly available in my bundle, seems problematic, right?
+
+[00:09:19]
+Could be a problem, so you're essentially one used client away from database leaks [LAUGH], which is really problematic. We're not gonna talk about it today, and I think it's still in beta, but there's a react.js tainted, I think is what they call it, yeah. So you can essentially say taint this value, make sure that this never makes it to the client, so that's what you would do with these secrets.
+
+[00:09:46]
+You'd say taint this it'll actually, like, fail your build, or it'll, like, fail or something like that, like, we detected that you use this object where you're not supposed to, or that we detect the string somewhere, so that, there it is, experimental taint, object reference, right? There's a couple of these APIs for specifically this reason, neither here nor there, but I just wanted to point out, like, that is something that should be on your mind when you're doing these is like?
+
+[00:10:13]
+I am like, one secret or one line away from leaking secrets
+>> Speaker 3: it's. Line you use frequently, right?
+>> Brian Holt: Yeah, and, like, it's very reasonable that you're, like, looking at a server component later, gonna go back and say, I probably need to, like, use state here, use client, right?
+
+[00:10:29]
+
+>> Speaker 3: If we want to inspect the build for these sorts of things that may be unintentionally passed. Like, what's the best way for me to, like, look at my current blob of client code, or is there not a good way to do that?
+>> Brian Holt: I don't know, yeah, if you figure it out, let me know.
+
+[00:10:45]
+[LAUGH].
+>> Speaker 4: So your server component A is async, you're exporting async function, and you're calling the database import. Isn't your bill going to complain about the fact that your component is async.
+>> Brian Holt: Which one
+>> Speaker 4: Your WhoAmI for example, if you change that to be used client,
+>> Brian Holt: Yeah,
+
+[00:11:07]
+
+>> Speaker 4: It would be silly, hey, you can't use an async function here, and you can't use this asynchronous SQL thing like
+>> Brian Holt: Correct
+>> Speaker 4: A little bit of protection.
+>> Brian Holt: You're right, you do because this would fail, right? Because this doesn't work in the browser, you're correct that async won't work here, but like, not all of your server components are going to be async, and not all of them are going to use things.
+
+[00:11:30]
+Some of them are just gonna be like, displaying information, right? So it's it's a thin layer of armor, right? Or maybe wouldn't rely on it, I'll put it that way, okay, we're going to do update username. Just really quick, update username.js,and use server, this has got to happen on the server.
+
+[00:11:56]
+This is another server action import async database from SQLite and we're going to import redirect from next navigation. Because once someone submits this form we want to navigate them back to the home page, right? Export, default.
+>> Brian Holt: Async function update username and takes in form data and
+>> Brian Holt: Console.log Update
+>> Brian Holt: Username called with form data, Username = formdata.get username and const id = formdata.get.ID.
+
+[00:12:57]
+And then you say, if I don't have either of those, if no username or no ID, you just throw new error.
+>> Brian Holt: And, okay, and then we're just going to read from the database Const DB equals await async database, dot, open, dot, slash notes dB, and then await dB, dot, run Update users, set name equal to question mark, where id equals question mark, and you do username and id and then redirect and then redirect to home.
+
+[00:13:57]
+Pretty straightforward, kind of the same thing, yeah, I'm really good at writing error messages, I just want you to know that. WhoAmI, my name is Brian, and your ID is one. What's my new name going to be not Brian, throw people off, and you can see you are not Brian.
+
+[00:14:23]
+And if I look at my notes now, you can see that all this is going to not Brian, but critical part being here is that this part, if you remember, that's still a server component, right? This part, it's client component, this is how you can kind of mildly mix and match them.
+
+[00:14:42]
+You kind of have to reframe of how these things would work because it's really tempting to say, like, I want this child to be a server component of this client thing and I want to just pass it in. If you can figure out how to reframe the problem so that you're just passing in server components to client components, then you can take advantage of this pattern, and if you can't, then you just got to do use useEffect or React Query or something like that.
+
+[00:15:03]
+Yeah, I'm going to say this is the thing that annoys me the most about writing lots of React Server Components, this pattern, it's a constant source of minor friction. Yeah, if you want to do something where it is governed, like you do want to pass client state back into a server component somehow you got to refresh the page or like, like re navigate yourself to the page so that the server runs again.
+
+[00:15:26]
+Not a great pattern most of the time, right? Most times you're just going to say, make a request from the client.
+>> Speaker 5: So in the client page.js, we just made, that's the client component, right? You don't need to use the useClient on that one?
+>> Brian Holt: That's funny, I didn't, but I was supposed to, I mean, exactly to this point, right?
+
+[00:15:56]
+You come to these places where it actually doesn't matter, yeah, cause I originally, had this form is like you state and stuff like that I realized later afterwards I didn't need to, but yeah, to your point, this actually, this all could be just server components, but I wanted to show you, like, when you have this problem of them living side by side, this is how you do it.
+
+[00:16:22]
+That's funny, unintentional bugs there, which actually, maybe I'm so good at programming that my brain just wouldn't let me do the inefficient way of doing it, that's what I'm gonna tell myself.
+

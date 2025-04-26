@@ -1,0 +1,153 @@
+[00:00:00]
+>> Brian Holt: Normal client side thing, we need to take this a step further, cuz now we're gonna have this balance. Some of this is gonna happen on the servers, and then something needs to happen on the client to actually render this, right, or take over the rendered app. So in other words, we have to have this app, and everything that's a child of the app needs to be able to happen both in client and on server.
+
+[00:00:22]
+But we need something that's actually going to instantiate it on the client side, that's not going to run on the server. So we're gonna create this client.js file, it's gonna be really short, import hydrateRoot. This is really similar to the create root, but hydrate basically assumes that whatever's coming in is going to be server side rendered, right?
+
+[00:00:46]
+So it's like, here is existing markup, make sure it's a good markup, and then take over the app. That's what hydrateRoot does, versus create root basically says, here's a component. Blow away anything that's on the interior of here, and then render my stuff into it.
+>> Brian Holt: Import createElement as h and import App from ./App, okay?
+
+[00:01:15]
+HydrateRoot (document.getElementById "root"),
+>> Brian Holt: And right there,
+>> Brian Holt: h(App).
+>> Brian Holt: Okay, that's it. If you remember, from complete intro to React, this looks really similar to what we would normally write there as well. The other nice thing to do here is let's say you do have Google Analytics or you have other stuff that needs to run in the browser, this is safe.
+
+[00:01:49]
+This is a safe area that you can do anything that needs to happen on the browser, because this will only execute on the browser, none of this will happen on the server side.
+>> Speaker 2: Actually, one other question on that. Is this considered a security boundary where you can trust that nothing's going to execute or could this be circumvented if someone is trying to get data to execute in the server side of the build?
+
+[00:02:15]
+
+>> Brian Holt: I guess say more, who are we worried about here?
+>> Speaker 2: I was just saying, if you have code upstream, can you reasonably assume that there are no areas where this would execute on the server side of the build?
+>> Brian Holt: This could never execute on the server side, is that what you're asking me?
+
+[00:02:33]
+
+>> Speaker 2: Yeah, exactly.
+>> Brian Holt: Yeah, exactly, because we won't import this. On the server, we're going to import app, and we're not going to import client, so both client and app will import app separately.
+>> Speaker 2: Okay, I got you.
+>> Brian Holt: Yeah, so this client will never get imported into your server, yeah.
+
+[00:02:52]
+But you still wrote clients. So if there's a security problem with client, it's cuz you wrote it. [LAUGH] Okay, so do you trust yourself? I don't trust myself. Okay, so we're going to create a new file here that's gonna be server.js. And this is gonna look pretty similar to before, except it's gonna be a bit simpler, because we're gonna have Fastify to help us out now.
+
+[00:03:17]
+So import fastify from fastify, import fastifyStatic from fastify/static, import (readFileSync) from node:fs. If you wanna copy and paste all of these imports, I don't really have a problem with that. I'm just gonna keep writing them, because I'm a glutton for punishment. Import (fileURLToPath).
+>> Brian Holt: Import path, {dirname} from no path, we're gonna have to do Notepad.
+
+[00:04:00]
+We're gonna have to do the same song and dance with the dirname that we did before. You are free to again copy and paste that from your previous one. That's literally what I do when I go from project to project. It's like I look at my previous projects, like, all right, how did I do this again?
+
+[00:04:14]
+And then I just copy and paste it. RenderToString, this is kind of a fun one. RenderToString, notice that there's, we did static before, right? And now, we're gonna do renderToString. That seems like they should be the same thing, right? Why are they different? StaticMarkup, like you saw in the previous one, there is no additional React information added to the string.
+
+[00:04:36]
+Whereas renderToString is actually gonna still have all the React metadata that it needs to hydrate and all the proper hooks and all that stuff that it needs to take over on the client side. So you use renderToString when you intend on hydrating, use renderToStaticMarkup when you don't intend on hydrating.
+
+[00:04:54]
+Now, you might ask, what happens if I use renderToString and then just don't hydrate it? It still works, it's just bigger than it needs to be, so that's the difference. We could also do renderToPipeableStream. This would work and then you stream the markup. So React will give partial chunks to the client to be able to render.
+
+[00:05:17]
+We're about to do that with React server components, so I wanted to show you both, but that would work here as well.
+>> Brian Holt: Okay, import {createElement} from React as h, and then import App from ./App.js.
+>> Brian Holt: Okay, again, you can copy and paste this from our previous project, you can ask ChatGPT for it.
+
+[00:05:50]
+You can type it out with me as well, but it's just const _ _filename = fileURLToPath (import.meta.url), and then const _ _dirname = dirname _ _filename, and now const. Now, this __dirname will be correctly of where we are executing our project from. I believe that they're gonna fix this for future versions of Node, because maybe I've complained enough, but certainly people have complained enough.
+
+[00:06:28]
+We just expect this to be defined, and it's useful everywhere, right?
+>> Brian Holt: They're trying to get away from like globals, right? I respect the concept, but in practice, it's just annoying.
+>> Brian Holt: Okay, const shell, this should look familiar to you, readFileSync (path.join _ _,
+>> Brian Holt: (__dirname, "dist"). So we're actually gonna grab the built version instead of this generic version here, why?
+
+[00:07:05]
+Well, because the built version will have the correct script tag URLs in them. I'll show you here in a little bit, but that's why. And this is utf8,
+>> Brian Holt: const app = fastify or you can put express, anything here, and then we're gonna say app.register(fastifyStatic). We need to serve our index.html, we need also to serve our script file that we're about to generate.
+
+[00:07:43]
+
+>> Brian Holt: Okay, give it the root, this is all Fastify stuff. If you don't really understand Fastify, it's not the point of this course. We're just setting up Fastify to work.
+>> Brian Holt: And prefix:, this is where it's gonna get the files from. Now, we get to write some of the fun part.
+
+[00:08:05]
+First thing we're gonna do is we're gonna say const parts = shell.split on ROOT, just like we did before. We did replace, and now we're gonna do split, why? When someone connects and says, hey, I want this, we wanna immediately give them the first part, right? We wanna give them the head tag, that's the really the part that I care the most about.
+
+[00:08:27]
+Because while we're rendering the app, like, running all of the React component stuff, they can be downloading the CSS. They can be downloading the script tags. They can be downloading all that stuff that that, you know, that stuff that we put into the head tag. So we can basically make it as concurrent as possible rather than as sequential as possible.
+
+[00:08:47]
+And then once the app finishes, then we can just flush out the second part of this.
+>> Brian Holt: So on a get "/", right, on the homepage. We wanna run this function req, res, request and response, okay? Reply.write, and you just write parts [0]. So this is like flushing out the first part of the head tag, just like what you were saying.
+
+[00:09:15]
+Now that that's been sent to the user, then we'll do all the React stuff. So order here actually is somewhat important, that's really what I'm getting at. RenderToString, h App,
+>> Brian Holt: And reply.raw.write (reactApp).
+>> Brian Holt: Okay, then reply raw, right parts one,
+>> Brian Holt: And then reply.
+>> Brian Holt: And I did rec res here, actually really meant to do reply.
+
+[00:09:58]
+Sorry about that. So not res but reply, that's just too many years of writing an express. Raw.end, so actually the reply.raw really is res, right? It's the res object coming directly from Node.js.
+>> Brian Holt: Okay, and then here you're just gonna say an app.listen on whatever report you wanna put it on, I put it on 3,000, I don't really care.
+
+[00:10:34]
+Put it on 80 if you want to. I'm joking, don't put it on 80, cuz then you have to run it a pseudo, and then that's how I mine Bitcoin on your computer.
+>> Brian Holt: Okay, this is cool though, because this is succinct. This is exactly what you wanna do with server side rendering, flush the head, send the app, send the last part.
+
+[00:10:54]
+And the order here ends up being really important, just that the user can get everything, cuz there's a real temptation to do this first, but then the user's unnecessarily waiting. In our case, our app is microscopic, so who cares, right? But if you have a big app, which is the only time you really wanna do server side rendering, then you wanna flush that head as fast as possible.
+
+[00:11:20]
+Remember, in our package.json, we have this vite build that we put in there, this is cuz we do need to build our app here. In our case, it doesn't really matter, because there's not a lot to be built here, but still we need it to be built and to have the index.html have the correct script tag here.
+
+[00:11:42]
+Did I need to put a script tag in here and I missed it? I did, okay, that's good that we checked that. So in your index.html, we also need to refer to clients.js.
+>> Brian Holt: So we're gonna put a script tag here in the head, right? Because on that first load, we want to start loading that JS file while we're rendering the app.
+
+[00:12:04]
+So I know most of us are used to probably putting this here at the end, but our hack here is we're gonna say async defer type = module. And this is gonna say, start downloading this, but it's okay if you keep rendering the rest of the app. If you don't put that there, it's just gonna stop, which is not what we want, we want to continue doing everything else.
+
+[00:12:32]
+
+>> Brian Holt: ./ and then we want it to load client, right, not app.
+>> Brian Holt: So yeah, we do need this build process more, because we have multiple files, multiple modules that we needed to glue everything together.
+>> Brian Holt: Okay, now, I believe let's just do it from here, cuz this looks better.
+
+[00:12:59]
+
+>> Brian Holt: First things first, we gotta build, right? Because then we load the built files into our node server, so I'm gonna say npm run build.
+>> Brian Holt: And you can see here now we have a dist, and we have an index.html, looks pretty similar, right? This is just raw built feed files, and you can notice we got this weird assets index hash.
+
+[00:13:26]
+And then here's our JavaScript file, this really blew up, didn't it? But it's React, right, this is all the React stuff. In fact, it says it right there, license, React. And now, we should be able to go over here and say npm run, what do they call it, start?
+
+[00:13:45]
+Okay, running, no one's yelling thus far, localhost 3000, and you can say, Hello Frontend Masters. This is beautiful design, chic design by Brian, as I like to call it. I mean, let's make this a million times bigger, but it's still interactable, right? This React is still running on this page, but this is always the fun test.
+
+[00:14:13]
+If you view page source, notice that it's coming with complete markup, right?
+>> Brian Holt: Which is pretty cool.
+>> Brian Holt: Now, we're running on local hosts, everything is infinitely fast here, so it's really hard to be able to tell the difference here. But imagine this coming with a whole slew of markup, it will allow our browser to render all that stuff first before trying to instantiate all the interactivity pieces of it, make sense?
+
+[00:14:46]
+If you are seeing hydration errors, it's like 99% probability that you white spaced somewhere. In fact, we'll see if we can actually just intentionally cause it, so you can see what I'm talking about.
+>> Brian Holt: The reason I'm harping on this is cuz I spent myself a good hour being what is going on?
+
+[00:15:06]
+It's the same markup, right? It's very frustrating. So I think if I do this, and I save that and I got to rebuild.
+>> Brian Holt: Deep run build, npm run start, and then I refresh my page here. Everything's still gonna work, right, React is still working. But I think it's gonna say,
+>> Brian Holt: Yeah, and then this is the hard part as well, we're in the Minified React error, 418, cuz it's the production build, right?
+
+[00:15:45]
+It's not the dev build, yeah, hydration failed.
+>> Brian Holt: And does it say? No, it's funny that they don't even mention that it could be white space, cuz that's actually what it is for our particular thing. So that's what this is, I wonder if I can even show you, will it work?
+
+[00:16:11]
+Maybe, view page source again, don't do that.
+>> Brian Holt: Yeah, so this is why it's doing it right there, it's cuz doesn't expect this white space, it expects everything to be all in one line,
+>> Brian Holt: Subtle bug, right? Most time you're not writing this directly, most time your frameworks doing this for you, so that's why they don't really take too much care about it.
+
