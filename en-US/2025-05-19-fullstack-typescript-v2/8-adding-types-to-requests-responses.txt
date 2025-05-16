@@ -1,0 +1,72 @@
+[00:00:00]
+>> Steve Kinney: Because we've got the server open just through sheer luck. We talked a lot about the problems on the client side and the fact that you don't know what the API was truly giving you. So let's be fair, and let's talk about what we get out of the box, cuz we have the same problem here as well.
+
+[00:00:18]
+And so for instance, in an Express app, you've got a request and a response, a request has, it could have a body.
+>> Steve Kinney: Say body equals rec.body, a request could have params, which is if we look kind of like at the get anything that can be put in the path, that can be on there as well.
+
+[00:00:47]
+And then a request can have a query which is any kind of query string that is in there as well and then there is kind of, which we'll see when we look at the types, a little bit, something kind of called locals, which is just other stuff that you jammed onto the request.
+
+[00:01:05]
+What is other stuff grabbing, like an auth token that was on the header right? That could be an example, lots of other things that you could choose to as you kind of like as it goes through middleware that you wanna pass on there and do stuff with can be on there.
+
+[00:01:21]
+The important part here though, is like it's kind of a wild west, right? You literally can just jam stuff onto the request or response objects as we go through so, it's really hard to tell and so you end up with a lot of kind of interesting types. For instance, body, by default, is any, which is a version of the problem like, it's effectively what the body is of a fetch request when we get the response on the client, right?
+
+[00:01:54]
+So the problems exist in both places, params is allegedly like a key value store of strings as both the keys and the values. Obviously, this one, it's not much of anything, because there's no params on it. Query looks to be this very special type, it's just another object where, if we grabbed so we said some like even this, like completed, which is, if we wanted to filter just the completed tasks and see those independent of the incomplete ones.
+
+[00:02:25]
+You can see added by default, it is maybe a string, maybe this parsed queues, maybe an array of strings, maybe undefined, so not any. Insofar as a string, or an array of strings, or an object of strings, or undefined. So not any, but close enough to any to be problematic, right, so we have a bunch of versions of these as a thing, right?
+
+[00:02:59]
+And if we look at the implied types of request and response, you'll notice two things, one, they stress me out, right? There's four, five generics in there, right, of things that it could be, I don't make the rules I get it, it's frustrating. We will navigate it, and we'll see how the tooling will help us but the first little part of, it becomes a fine art of remembering what all of these are.
+
+[00:03:32]
+So there's a few things that we can do obviously, if your brain is going, I can validate them with Zod, 100%, you're right, you can, and we will. But let's talk about some of the patterns without Zod just to catch everyone up, and then we will go and do some schema validation on both the server and the client as well.
+
+[00:03:51]
+So out of the box, effectively, what you're getting is and just to make matters worse, this is a type request
+>> Steve Kinney: But the important part is, it is not the type like that in the Dom cuz express predates, a lot of these other things. There is a request and a type response from express that are different than the built in, Dom request and response web APIs.
+
+[00:04:22]
+So we can say this is a request and this is a response, right now, that is what you get for free by it being the callback for a get or a post or whatever. So, you're not getting too much out of there, but you can kind of see that this is the default type in this case, which, yeah, it's stressful.
+
+[00:04:42]
+So one of the things you can do, I'm gonna kind of pull up an example real quick is, so that's the type in a nicer format, which is nice to see. You can do something, for instance, with our task where you can define what should be on the params and what type it should be, just like you would do with the fetch request, right?
+
+[00:05:06]
+You can then say that, okay, cool, it's a request, the params user Id is gonna be a string, and now you will get the auto complete. You will get the IntelliSense knowing it's a string, what's the problem with this approach? You're in the same place you were with a Fetch Request where TypeScript will believe you, and you can hope that you're right, right?
+
+[00:05:31]
+And when you are right, life is good, right? But we're not talking about when life is good, we're talking about the unhappy path here. So you can do stuff like that as well and again, there's a lot of trust involved in there. So if we look at ID, that one is maybe a string, right?
+
+[00:05:50]
+I think pretty sure, let's see if the typing goes.
+>> Steve Kinney: It does have it for the type, but for anything like the prams, or like the body, we go down to this post, this is any, right? And so we can begin to flush it out a little bit, right?
+
+[00:06:14]
+And so if we look at that type that I had up here before, you can see cool, we start out the dictionary, then we get to the response body, why that one first? I don't make the rules, I have no idea, right? I think it's so you can validate that you're responding with the right stuff.
+
+[00:06:33]
+And then the request body, then the query params, and then the other stuff that you can jam on to the objects. So in this case if we wanted to kind of make this type a little bit better, we could do something like, so if I wanted the body to exist.
+
+[00:06:51]
+Once again, I'm going to now have to remember which order it was in, it was third, right? Pretty sure it was third, we could say type, create, task, request, love it, naming things is the hardest part here. Where we could say that, sure, but actually that's just the body.
+
+[00:07:18]
+So we can take that and we can say that a type create task, request, equals request. The first part, yeah, just could be an empty object, cuz there are no path parameters, see, I already am forgetting what it is. The response, in this case it should actually be void I believe, and linting is very angry with me because it's like you shouldn't be doing that, like I know.
+
+[00:07:50]
+And so now we can say that a request is this create task request, right, it does respond with a message. So then the response is message string, yeah, and so you can see now the task is this, create task body, and it's all typed correctly. The response was validated because, like that one, at least we have control of, we might not know what we're receiving thing, but we do know what we're responding with.
+
+[00:08:21]
+If there were query params, though, we'd still be out of luck, and we'd have to type those. And I'm not doing this because it doesn't actually solve the core thesis of this workshop. Which is, I can type whatever I want here, and IntelliSense will be happy but like if garbage comes in who knows what happens.
+
+[00:08:40]
+And so we need ways to better, actually figure out our things the way that we think that they are, right? And so what we might choose to do is try to start by looking at our app, figuring out where the like implicit ennies are. And then start to come up with ways to make sure that they are what we think they are, which is good again, we're gonna do this with some schema validation, right?
+
+[00:09:08]
+Say, hey, when this thing comes in, let's make sure it is the thing we think it is, cuz if not, we think about errors as a bad thing. If you throw the error on purpose, because things are broken, that's not bad, right? That is the intended purpose in this case.
+
