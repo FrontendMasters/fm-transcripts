@@ -1,0 +1,84 @@
+[00:00:00]
+>> Steve Kinney: Hello, my name is Steve. Let's talk about TypeScript. We're not gonna talk about TypeScript in one code base, we're gonna talk about TypeScript across code bases, right? Cuz I think there is a getting the value prop of TypeScript I think at this point, I'm going to assume that you've signed up for the newsletter, right?
+
+[00:00:19]
+But there are some additional problems that come along when we have to deal with this gnarly little thing called reality, which is, a lot of times we end up with maybe one or two different kinds of forms that our code takes. And each and every one of those individually, can be type safe and perfect and everything, not a single any to be found, everything's great.
+
+[00:00:48]
+The problem is in the middle, right? There's a lot of trust that happens that the things you receive from the other side of the HTTP wall, in a lot of cases, adheres to the same types. And particularly when it's in different code bases, but even in general, right, there's not a lot of really great ways, and there's a few we'll obviously talk about them, that's why we're spending this time together.
+
+[00:01:15]
+But not a lot of great built in ways to just make sure that you are actually getting what you think you are getting, right? So, all of that type safety that you have in your application, is usually based on a lot of trust, right? That everything coming over the wire actually adheres to that type, and then you work them to those assumptions, and then you carry on with your merry way.
+
+[00:01:38]
+One of the things we are talking about today is how to actually take the very optimistic amount of trust that you might have, and turn that into a little bit more of a pessimistic trust, right? Where you are a lot more confident that everything is the way that you think it is because you trust, because you have verified, you trust cuz you have validated.
+
+[00:02:01]
+And so, we're gonna look at some strategies for keeping all of your types and all of your data the way that you think it is across an application. Cuz it's actually a little bit more complicated than this as well, right? It's not just, does the API give you back what you think you're getting back, right?
+
+[00:02:18]
+Is the client sending payloads in the way that you think it is? There's other things involved normally, right? Is stuff coming out of the database the way that you think it is, right? Is stuff going in the way that it ought to, right? And the strategies, luckily, are roughly the same.
+
+[00:02:36]
+So kind of thinking about all the different ways that parts of our application interact with other parts, right? And this, again, we're not gonna take this to its national conclusion, this slide, but this, again, is probably a little bit simplistic. If there are a bunch of microservices, add another box every microservice, right?
+
+[00:02:53]
+If you've broken other pieces out, add another box for every kind of different piece that you've broken everything into, a lot of that kind of breaking stuff apart, is really helpful for us to build scalable large code bases. But for every problem that we solve, we introduce a little bit more complexity, and with that complexity come a few new problems.
+
+[00:03:12]
+So, we're gonna talk a lot today about how to solve those problems and how to basically make sure that your pager does not go off at 2 in the morning, like mine has more than once. So let's kind of look at the core thesis that we're going to try to solve today in a new a bunch of different ways, which is, a lot of times we'll have some, this is obviously a very simple like fetch request.
+
+[00:03:33]
+We're just fetching some data from the API, right? We've seen it before, call fetch, make sure the response is okay, translate into JSON, hope it's JSON, right, so on and so forth. And we can have a perfectly typed client side app, but we have some problems here, which is out of the box, that response to JSON, very quietly.
+
+[00:03:59]
+It's of the type, any, and any is kind of an interesting one, because if you have one, any, it just bypasses everything, right? Nothing stops it, right? And so, a lot of times you'll see in your own code, you can use something like unknown, which is assume nothing about this, I will have to check everything myself.
+
+[00:04:17]
+Any will just pass right through any type check that you have. Even if, in this case, you didn't even type that any, nobody in your team put that any there, that was courtesy of the browser or of the Fetch API, and the types that come along with that, right?
+
+[00:04:33]
+And so, there are strategies for at least getting some type annotations around it. But a lot of those things are flawed. I can just say, hey, this getTask is actually gonna return a promise with a task in it, sounds good, right? And now, it is what I think it is.
+
+[00:04:54]
+Emphasis on what I think it is, right? Because I'm just saying, I could have gotten back literally anything from the API. I'm just going to tell TypeScript that it's what I think it is, and hope for the best. And that's useful for stuff like IntelliSense, but is it actually giving me any actual safety?
+
+[00:05:15]
+Probably not, it's giving me safety after I've let it into the house, right? But I don't actually know what I let it in. Cuz again, it is actually still that promise any, but we're just saying but pretend it's a task that comes out of here, cuz any will pass through anything, and so, it passes right through.
+
+[00:05:34]
+There's nothing yelling at you saying, you didn't return a promise that resolves to a task. Because the any slides right through it, but at this point in your client side code base, you can just pretend and everything else will adhere, as if it was a task. The problem being, maybe it isn't, right, and it is one of those bugs that will definitely get you just often enough, cool.
+
+[00:05:59]
+So, obviously the problem exists on the other side. So this is like an express route, right, where we've got a request body and out of the box, as we can see, guess what that request body is? Any, right? So, effectively, the browser, the client side code, is doing a lot of trust that the API is giving what we think it ought to give.
+
+[00:06:21]
+But on the same side, the server also exhibiting an equal amount of trust, right? That in this case, it is actually going to be the request body that we think it is, right? Again, we have similar strategies that we can try, right? We can do all sorts that we kind of do a bunch of conditionals to see, so on and so forth.
+
+[00:06:43]
+But again, at the end of the day, there is a certain amount, anything coming from the outside world is an unknown, but it's not even an unknown, isn't any. So, what we need to do is kind of understand that kind of the type gap of where things happen.
+
+[00:06:58]
+And so, here is some very, very accurate, objective, data-driven science for you, in which I sat there and thought about all the times I have had to go to a blameless postmortem for an incident. And this is my very scientific review of what the cause was. As you can see, 53% of the time was the backend team changed the API without telling us.
+
+[00:07:25]
+The other very scientific 29%, was somebody upgraded something and that changed the API without telling anyone. And then there's always the one where someone deleted an S3 bucket. That's always a thing that can happen too, we're not gonna cover that one today, that one you're still on your own for.
+
+[00:07:44]
+But for the 72 percent, no, I don't know, can't do math, live math, live edition. We're gonna kind of cover ways and infrastructure that you can build to make sure the lion's share of this pie graph of made up numbers, doesn't happen to you. This is, again, just my feels across three or four different jobs.
+
+[00:08:07]
+But this is gonna be a problem that we try to solve today, which is, how do we make sure that a change to the API doesn't break something? And again, I like to throw shade at the backend engineers cuz I'm a frontend engineer, it goes both ways, right?
+
+[00:08:22]
+And the idea is, we're gonna look at how to solve for that in both directions. And also the database, cuz the database is sometimes the worst offender, which is, is SQL gonna call that true or false, or is it gonna call it one and zero, right? And JavaScript, most of the time, it doesn't matter because zero is falsy and one is truthy, but you can imagine a world where in some way, shape, or form, it might bite you.
+
+[00:08:48]
+Great, so that's the problem that we seek to solve and we're gonna try to close that gap. I didn't fully introduce the little out course website where I put up all all my notes, but it is here. There is a repo to grab as well, that has the example out there we're gonna work on today.
+
+[00:09:05]
+And then the one of the things I wanna call out is, also just literally all of my notes, more than we will ever get to today as well, right? And so, if there are little kind of more esoteric things as well, and you're kind of looking at how to do, I might have just, they are my notes, they're up there though.
+
+[00:09:24]
+And then as well as if you want to kind of double back and look at something that you heard me say so on and so forth, it might be in here as well.
+

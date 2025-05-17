@@ -1,0 +1,75 @@
+[00:00:00]
+>> Steve Kinney: So I did the classic time honored tradition that we've seen from cooking shows all of our life, which is, I took a break, put it in the oven, and pulled it out of the oven. So you did not have to watch me copy and paste a bunch of SQL queries.
+
+[00:00:17]
+And really, all we did was we created, same way you would have maybe a client in the browser, we did the same thing on the database level. Again, as you can see, we'll know, because we did the schema validation on the server side that these types are good.
+
+[00:00:35]
+We don't have to worry about stuff on the way into our application. Whenever we leave from the client into the server, server into the database, database back into the server, anytime we're crossing those boundaries where the types aren't respected. Because we're leaving one code base and entering another one, the database counts, right, cuz that's just not our code at all.
+
+[00:00:55]
+And we'll see some ways around that. And so, all this does, now we've got getAllTasks, which will then take the parameters that we care about. It will make sure that whatever we get back from the database is correct. It's the very same queries that we had before that were all up top, just in a nice little reusable thing, right?
+
+[00:01:15]
+And again, this takes the same manual thing we did with the request and responses and does it again on the database layer. So if kinda we go back to that context now, I have the database, I create this client, and again, the client, I'll just look at it real quick, task.getAllTask, deleteTask, createTask.
+
+[00:01:38]
+And even like, if we look at the deleteTask, well, that returns void. But it is properly typed, right? It'll know that needs some ID which is a number. It does return a promise that is void, so on and so forth. So it's the same database queries I had before, both wrapped in both type-safety on the way in, and then Zod parsing on the way out of the database to make sure it is what I think it is.
+
+[00:02:02]
+So every time we cross that boundary, we validate, right? Trust but verify. So now we have access to this, and we can begin to flesh out some more of the procedures that we want the client to call. So now, effectively, through tRPC, the client is going to call functions on the server as if they were kind of available on the client.
+
+[00:02:26]
+The server is gonna talk to the database, passing everything along, validated. Cuz the inputs are gonna be validated from the client to the server, we have that parsing from the database. We did it by hand. We'll look at a library for doing it automatically in a second. And every step, every time we cross that boundary, we enforce the types.
+
+[00:02:46]
+And we'll get an error if they're not true, which then we can figure out how to navigate. But the meat that I wanna talk about here is this is effectively the part that we care about, right? And so we have a method called getTasks, createTasks, and all they're really doing is they're grabbing that client that we wrote, that will do the database calls.
+
+[00:03:04]
+That was the same one we could and do actually now use in the Rest version, and we validated the input automatically, like we did with that middleware. It's like, yeah, there was some setup, but you watched me all do it manually before. So we've got getTasks, createTasks, we have updateTasks.
+
+[00:03:22]
+Shocker, what this is gonna look like.
+>> Steve Kinney: Maybe I could spell, I don't know. PublicProcedure.input is gonna be the updateTaskSchema. And that's going to be, in this case, again, a mutation. A mutation is just some change to the database. What's kind of cool about it is, again, those are also things that if you wanted to, one could subscribe to as well.
+
+[00:03:55]
+Okay, the other one doesn't have the ID, so I guess we're gonna need, the input is gonna have to be, we're gonna allow the ID on this one again.
+>> Steve Kinney: I think, yeah. Can I think of this when I omit the ID, cuz I made other decisions earlier.
+
+[00:04:18]
+We're gonna
+>> Steve Kinney: Actually, we'll do this.
+>> Steve Kinney: I'm gonna make one on the fly. I just need the ability to get both the ID and the other piece in there as well. It's always the game time decisions that we end up regretting. So we'll just make one on the fly here.
+
+[00:04:56]
+And we're gonna say,
+>> Steve Kinney: Call it
+>> Steve Kinney: Task is gonna be this, and then something I can coerce into a number. So this is just gonna be an object where we get the ID and then everything about a task other than the ID, which my REST implementation didn't need, but this one does.
+
+[00:05:35]
+I made decisions along the way while live coding that I could have privately dealt with in the comfort of my own home, but now have to expose you all to game time decisions that I had to make. And I like this more, so that's the thing. Okay, so then, yep, we can go ahead, we've got that updatTask.
+
+[00:05:56]
+And like I said, the absence of red squigglies is giving me a lot of faith that everything is kinda working. So I've got the ability to get all the tasks, create a task, update the task, delete a task. These are just calling those same SQL queries that I put into a little object that I don't ever have to think about the SQL queries again.
+
+[00:06:18]
+Every code base has some squarely code, if you just hide it under some nice layers of abstraction and never have to see it again, it's totally okay. But these are what the functions that I'm going to expose to the client are, and I will be able to call these with some of these functions.
+
+[00:06:37]
+Again, you can get as granular and as crazy as you want here. This feels good for now, I just need to take this little router that I made exposing everything and put it over where I was missing it earlier.
+>> Steve Kinney: Right, and so we've got this adopter, what are the other things I need to do?
+
+[00:07:03]
+We just need to hook up the middleware at this point. So we've got this, and then we'll go ahead, if I didn't do it already when I got distracted. Yep, so we can say, app.use, this is the only real change, other than the slightly refactoring. App.use, and we're gonna say, under the API thing we're gonna say, create, it's like, how did I spell it this time?
+
+[00:07:37]
+Cool.
+>> Steve Kinney: There it is. We'll go ahead and we'll just add that in there as well.
+>> Steve Kinney: So this is the only thing I'm really adding to the Express app. Is a new piece of middleware saying, expose a new endpoint at /api, and then if we go, make sure I save everything, cuz that's gonna be the next thing that bites me.
+
+[00:08:09]
+We've got the actual procedures that we're exposing, and the adapter is putting an additional /trpc. So I put in the middleware, /api, /trpc, right? But all we're doing is creating Express middleware and hooking it on, this can literally, like be its own library. You can move it to that shared directory, whatever you want, as long as you expose this adapter and then use as middleware your Express server, and again, this does not have to just be Express.
+
+[00:08:39]
+It works with tons of other different web servers. That just happens to be the one that we have. [INAUDIBLE] A little bit of boilerplate of creating the middleware.
+
