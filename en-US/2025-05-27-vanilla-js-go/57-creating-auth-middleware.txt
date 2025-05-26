@@ -1,0 +1,117 @@
+[00:00:00]
+>> Maximiliano Firtman: So now we have our JSON Web Token ready, so it's client-side, available in local storage and also in our store, and now it's time to use it. But before doing that, do you have any question on JSON web tokens? Why are we doing that? Why is it important?
+
+[00:00:24]
+
+>> Student: What's the benefit over the session token?
+>> Maximiliano Firtman: Well, the benefit is that when you are using a session token, actually, you need to save session data server-side, so you need an in-memory storage or file system storage. So you need resources from the server. So that's the main advantage of using this technique, is that you're relying on saving the data client-side, but because it's encrypted and you are the only one having the key.
+
+[00:00:53]
+You are the only one that can decrypt the data, so then you don't need to spend any actual resource. Server-side, no memory, no database, no file system, specifically target the data from the user. And that's important when you have millions of users. So that's the main advantage, actually.
+
+[00:01:16]
+
+>> Maximiliano Firtman: Okay, so, the final part of our project is to actually get favorites and watch lists working okay? And we know how to work with pages, so making the page for favorites and watch lists actually pretty straightforward at this time. So when you create the routes the components, we will do that.
+
+[00:01:36]
+But the main problem is that to actually get the data, we need new APIs. So we wanna get the data, and also we wanna push new data, because when we are getting into a movie, we know that we have some buttons here to add to favorites and add to watch list.
+
+[00:01:56]
+So we need to create those API handlers server-side. That's actually also pretty straightforward, but there is one catch here. For calling those APIs, I actually must be logged in, okay? So we need to read, we need to send from the client, and also read from the server that JWT that token, decrypt the token and get the user's email from there, or the user's ID in case you're using an ID and not the email, and then make the queries over there.
+
+[00:02:31]
+So that means that if you go server-side to main.go, actually, we will need to add more routes here, okay? Example here after authentication. So I'm going to start writing them, and then I will refactor it. So I need to handle another func, for example this can be,
+>> Maximiliano Firtman: API, and we can use the same account as we were using before in this folder.
+
+[00:03:01]
+And we can say favorites and something similar. And we need to create then another handler for this. So that's actually simple to solve. So let's say we will create one, GetFavorites. It's not there, so it's give me an error. The thing is that get favorites will need to actually read the token, decrypt the token, and do that.
+
+[00:03:25]
+And also we will do another one for watch list that actually needs to do the same thing. So it needs to open the token, read the token, and encrypt the token, get the email, go to the database. It seems like we may have in a real project many APIs, sometimes hundreds of APIs that will need to work with the JWT, with the token.
+
+[00:03:50]
+So there should be a better idea or a better way to do that instead of doing it manually on every situation. And for that, we will use the idea of a middleware. A middleware is a design pattern where we can set some piece of software that's why it's sending with where it's a middleware, it's a middle software, a piece of software that we put in the middle of two pieces.
+
+[00:04:15]
+So in this case, one piece is gonna be GetFavorites and GetWatchlist, and the other one is gonna be our multiplexer from HTTP. We want the middleware there. That middleware will, for example, work with the, in this case, the JWT. It will decrypt the JWT, it will check if it's bad, and it will return an error.
+
+[00:04:38]
+Yeah, if it's not valued, and if it's valued, it's gonna parse data, for example, the email through something known as the context to the next software. So for example, GetFavorite, GetWatch list. So the idea is that then these handlers will receive the email automatically, okay? So if we get there, we will get the email.
+
+[00:05:00]
+So that's why we should create this idea of a middleware first, in case you're following along with the readme, we will be at h1 creating the middleware. The middleware is just another function, so we don't have any special thing in Go that states, this is a middleware, okay?
+
+[00:05:20]
+It looks like a handler, actually, but the difference is that we will use it as a middleware. So, if I take this middleware, I need to put that in the handler. So, in account handlers, typically, we keep the factory, new function at the end or at the beginning, and main just not mandatory.
+
+[00:05:45]
+And then we can save that middleware, okay? So the middleware is going to be used. Then, every time we have a route that needs authentication, okay? We are talking about, in this case, any kind of route, there can be also static files. We don't have that right now because we are managing that client side, but if server-side, there is a full folder that you don't wanna serve, if the user has no JWT, no token, then you can also use that middleware.
+
+[00:06:19]
+Okay, so now we have the handler. So what's the idea? The idea is that we will use that middleware to wrap when we were actually trying to do this, now we will wrap this somehow, we will finish this in a second. We will say, accounthandler.Auth middleware, and the middleware will receive the next handler as an argument.
+
+[00:06:46]
+So this is a part where we will parse the new handlers that I didn't create yet, okay, but to understand what we're doing, okay, the idea is that this will look like something like this. Okay, it will look something like this. Then I will need to refactor this a little bit.
+
+[00:06:59]
+So then I need to create the other handlers. Also, we need to understand that the handlers, we need to talk to our data store. Remember, we have a data repository. That is the one that is connecting to the database, okay? So when you go to the database and we check the account repository, okay, in the list of functions that we have.
+
+[00:07:23]
+We already have saved collection, and we already have get account details that will also give me all the favorites and movies in the watch list, okay? So we already have the data repository ready. We just need the handlers, so HTTP can actually handle those and request that. So going back to handlers, now I need to create the missing handlers, okay?
+
+[00:07:53]
+And in h2, you have the handler SaveToCollection and also GetFavorite, and GetWatchlist. Those are just going to our data repository, and they're grabbing the data or saving the data. You can see that this one, as we did before, they are working sometimes with data coming from post. Remember that we can send data from post, so we are decoding the body.
+
+[00:08:19]
+We have already done this before and explained this before. So we are decoding the body that we are sending from the client in a structure. For example, in this case, it's gonna say that movie into that collection. Remember, collection is an abstract concept that we have here to work with favorites and watchlist.
+
+[00:08:38]
+And the part that is new for us is that we need the email to get favorites and to get the watch list, and also we need the email to save into the database. So we need the user, and we are getting that from the context. This is how this works.
+
+[00:09:00]
+R the request, receives an object, actually value known as the context. In this case, inside the context is like a dictionary, okay? It's a bag, and that bag is going through all the middlewares that you may have. So when you have middlewares, the idea is that we have the multi Multiplexer of HGDP.
+
+[00:09:20]
+So this is an HGDP request is coming to Go. Go takes that, and typically that request go through a series of middlewares. You can have as many middlewares as you want. For example, one can check security, the other one can verify the data is not coming with some bad data, or wherever, then the other one can do logging.
+
+[00:09:42]
+So maybe it's creating a load of every request. And so we have a lot of middlewares. Each middleware will take the request, and we'll parse the request to the next middleware until we end up in the final handler. Well, each middleware can also talk with the context and can use that bag that we are parsing through to store data for the next middleware.
+
+[00:10:05]
+So in this case, our middleware for authentication is actually adding the email where this email is coming from, from decrypting the JWT. So that's why when we get into get favor is we already have the email in the context, because the previous middleware actually decrypted it from JWT, and now we are ready to use it, okay?
+
+[00:10:31]
+What happens if there were no email, if the token were not the right one, or someone is trying to hijack the token? Well, we need to check the middleware and see what happens. But actually what will happen is that it's going to throw an error because the middleware has also access to the response writer.
+
+[00:10:53]
+So if the middleware think that there is an error, it will stop there. In that case, it's not gonna pass the execution to the handler, okay, make sense? Here we are parsing the token. We are getting the data here. If it's an invalid token, we are sending to W, so to the response writer, an error.
+
+[00:11:14]
+In this case, that was unauthorized, this is 401, okay? The same happens if, for example, if you are trying to get the claims from the token. If you remember, the claims are like the metadata that we are saving, that so far we were saving the email from the user and the expiration, okay?
+
+[00:11:33]
+So we are getting that data, and this is where we are getting the email from the claims, and then saving it in the context for the next part, okay? Does it make sense? So now that we have the handlers ready, it's time to finish this idea. So something to have in mind is that middlewares are not expecting a function like this, so we need to call, you will see this in a second.
+
+[00:12:02]
+You will need to call handle with the middleware, and then inside the middleware, you're going to parse HTTP handle func, in this case, GetFavorites, something like that. Also, by the way, you have this in README at the end. You have the three handlers. So now that we know what we are doing, we can just paste the three so we have three new handles, account favorites, account watchlist, and account save-to-collection.
+
+[00:12:48]
+Okay, and they're passing through the middleware. Func above looks like you parse an endpoint, but you don't have to do that in the middleware? Lemme see if I understand. Are you saying that here when I'm saying handle function, I'm not passing the endpoint.
+>> Student: Yeah.
+>> Maximiliano Firtman: Yeah, because it's a middleware, because I'm parsing that to a middleware.
+
+[00:13:15]
+This is like a pipe, okay? So when you are working with middlewares, you have a pipe. You have the final hander, and then, you have the request. So the URL or the path is needed only on the request when you open the pipe. When you open the pipe, you parse the data and the initial data, the initial request.
+
+[00:13:36]
+So you check the URL there. Then In the pipe, you have several middlewares that will be looking at the request, doing something with a response, or not doing something with the context or not. And passing the request to the next middleware until it got to the end of the pipe, and the end of the pipe is actually the handler.
+
+[00:13:53]
+So that's why you define the URL only at the beginning of the pipe, not on every part of the pipe. That makes sense?
+>> Student: Yeah, that makes sense. Yeah, I just wasn't sure if the signature for that method. It seems like Go is smart enough to know that it doesn't need it anymore, since it's being parsed as middleware, then.
+
+[00:14:13]
+
+>> Maximiliano Firtman: Yeah, exactly.
+>> Student: Okay.
+
