@@ -1,0 +1,85 @@
+[00:00:00]
+>> Richard Feldman: All right, let's get to our final exercise, which is for part six. So now you can see we not only have this whole big long list of, includes up top but we also have ifdef Linux here for our sys slash send file. We're gonna build this thing, that was 5 again, and I'm still listening on port 8080, so let's do that.
+
+[00:00:24]
+Great listening on port 8080, so now you can see if I refresh and try to load the front end masters page it doesn't work at all, that's okay, though. That's because we haven't completed the exercise yet. So right now we're seeing a blank page, but when we're done with the exercise, we will actually see something much nicer than a blank page, which is a working front end masters homepage.
+
+[00:00:42]
+Okay, so this one, unlike the others, does not have a bunch of different things to jump around and do. If you want to, you can spend some time looking through some of the source code here. I did decide to use the pound define style here instead of constant, just in case you are running one of those Linux distros that doesn't support it.
+
+[00:00:59]
+But if you're on macOS, you could just do constant here. We're doing the, jpeg, css png, jpej, JS, etc. We're doing the fancy switch thing right here. All the stuff that we talked about, and now we are using that to actually send back this content type header. So you may recall this was the last missing piece we had at the end of the previous section where it wasn't recognizing like any of the CSS or anything like that.
+
+[00:01:25]
+The reason that nothing is loading is that the one thing that we are missing here is that I have not actually implemented the call to send file. So this is the only section of the thing that requires any modification. So the entire exercise is basically just go check out the docs for these and try to implement the two different calls to send file.
+
+[00:01:45]
+Worth noting that something we are doing here is we are actually making these variables of byte sent and send failed locally. Now you got to remember here that these are not actually different scopes. This is not like there's no curly braces around this. These are basically out dented and only one of the other is going to get actually included in here, which is relevant because we end up using it later.
+
+[00:02:07]
+But they are indented because they're inside the ifdef. So that's what's going on there is like we're defining one or the other here. They do actually have different types, which is kind of funny. But nevertheless, we can still like do subtraction on them because C is loosey goosey with its integer conversions, fortunately for our sake, in this case.
+
+[00:02:24]
+So basically, just need to go look at the docs for these two things. And I will warn you this, well especially the MacOS 1 is a little bit funky, but just take a few minutes and go through and see if you can get it working.
+>> Richard Feldman: So for this one, unlike the others, I'm actually just gonna just walk you through the solution rather than typing out by hand.
+
+[00:02:51]
+Mostly because all the typing out by hand accomplishes is essentially, I go look at the docs, and then look at what we're doing. So essentially, I want to just mainly talk through the differences between these two. So the Linux version, as you see from the docs, if you went and looked those up, we send the two file descriptors first.
+
+[00:03:07]
+Now, if you look at the MacOS docs, one of the things that's most striking about the difference here is that the Linux one just returns how many bytes were successfully sent. So this is very similar to what we saw with like read will return how many bytes B Bytes were actually read.
+
+[00:03:21]
+Also, if you like try to write, potentially it might not write all the bytes if the thing that it's trying to write to had some sort of limit setup. Same kind of deal here, where basically it's saying, hey, here is you told me that you wanted to send this many bytes, but it's possible that I sent fewer bytes than that.
+
+[00:03:37]
+Now this is very important to know, because we actually do want to potentially put these in a loop. So this is actually how we're doing the chunking here. We're basically saying Ok, if you didn't send all the bytes that I told you to send, that's fine. I'm just going to decrement, how many bytes we have remaining to send.
+
+[00:03:52]
+Go back to the top of the loop and just keep doing it again over and over again until all the bytes finally get successfully sent. Now how do we get this actual byte sent value? This is one of the ways where Linux and macros APIs differ. So in the Linux one, send file just returns it.
+
+[00:04:10]
+And then our job to detect whether or not sending failed is the usual check for the return value was -1. If it was sent failed, then Ok, fine, we break. This is a pretty unfortunate scenario where, if this were a production HTTP server, as opposed to just a little local one.
+
+[00:04:27]
+We might wanna try to do some extra work, to try to more gracefully handle these errors. But basically, in this case, because we're doing the send, what's happening here is that if we already sent some number of bytes. Well, the first bytes that we sent at the very beginning of the of the thing that we're sending over the network are 200 okay?
+
+[00:04:47]
+Because as far as we know, by the time we got here, we're all set. We're good, we're ready to rock. Unfortunately, it turns out that things stopped being okay partway through, because sending actually itself fails. It's too late, we already sent the 200. So the browser's, great, everything was fine, and then it just doesn't get the rest of the file.
+
+[00:05:05]
+We can try to gracefully handle this by basically doing something along the lines of Ok, well, we remember that we already do the partial send. So let's actually go and retry it and try to send the rest of the bytes as best we can. Or maybe we try to do something like send some sort of extra content that comes back and just displays a big, no, it was truncated message on the screen.
+
+[00:05:28]
+And then maybe we also detect, well if we didn't send anything yet, if we were in the first iteration of this loop. Now we can just go ahead and send a 500, so lots of potential ways we could try to make this error handling better. This is not really specific to send file.
+
+[00:05:39]
+This is just in general. If we're writing to the socket, and whether it's via send file or via right and that operation fails after we've already sent some amount of data, we're going to potentially have this problem. But yeah, so we need to know whether sending fail and we also need to know how many bytes were sent and the MacOS API for this or the the BSC one.
+
+[00:06:00]
+Very different, so here we're actually doing basically the number of bytes that were sent is actually equal to stats.st, size, or at least we're assuming that as the starting point. And then we send the address of that, and basically it will use that both for getting what is the actual size?
+
+[00:06:19]
+What is the actual number of bytes that you want to send. And then also, when we call send file, it will, after reading that to see how many bytes we want to send, it will override it with how many bytes it actually sent. Again, funky C APIs. [LAUGH] I look at this and I say, I think the Linux one makes more sense to me.
+
+[00:06:36]
+This seems nicer to use, but the BSD authors decided to do it this way, and so if you want to do it on MacOS, this is what you got to use. The other notable difference here is that there's a couple of extra flags here. So this version of sendfile is more configurable than this version.
+
+[00:06:52]
+Now, this is an example of sometimes operating systems will add new functionality that's not available in other operating systems. A classic example of this that happens today is IOU ring. You may have heard of this. This is something that's available in Linux. It's very nice for certain types of high performance IO operations, especially over the network.
+
+[00:07:10]
+It's just not available in Mac OS, they don't have a direct equivalent of IOU ring. And so if you're trying to write a cross platform like networking library, that uses IOU ring, what you end up with is. If dev on Linux is huge because IOU ring is very different in terms of how it sets up its abstractions for doing this type of network stuff, then the other ways that other alternatives use it.
+
+[00:07:33]
+And so there it's not just two lines of code, it's a very big difference. And these little differences in arguments that we see here are a much smaller example of that. Where it's I don't really know what these options do, but clearly Mac OS supports some degree of additional configuration that the Linux one does, because it's strictly sending more arguments over.
+
+[00:07:54]
+Okay, so at the end of this, we do that and then we've actually set, I've sent all the stuff that we want, very cool. I'm just gonna copy this over here from the solutions. And now, finally, we have our index, the root page. This still works. If I click on the blog link, this still works.
+
+[00:08:10]
+And the cool part is, I've downloaded this locally, this is basically a copy of the Frontend Masters website that I just downloaded all the HTML and CSS and all the fonts and everything into my local directories. And there it is, beautiful. The entire frontendmasters.com website served locally, blazing fast.
+
+[00:08:28]
+[LAUGH] See about 300 lines of code that we built from scratch in the course of this workshop using no third party dependencies, just raw, close to the metal operating system stuff. And it all works, look at that.
+

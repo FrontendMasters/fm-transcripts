@@ -1,0 +1,168 @@
+[00:00:00]
+>> Richard Feldman: So we've handled this case where we GET /blog or /blog/ with a slash after it. And now we're gonna need to do a little bit more work to start handling automatic file extensions. So this being a static http server, we need to actually figure out based on the incoming requests file extension, whether or not we should send a particular content type or another.
+
+[00:00:20]
+So for example, for a PNG, if we're getting a GET of a /blog.png, we want to make sure that not only do we open blog.png and send those bytes from the file system over, but we also wanna make sure that we're sending back a content type header that reflects this is a PNG.
+
+[00:00:36]
+Same thing with CSS and JS and all that. So for example, we might wanna say, look, let's see if the file extension we're gonna kind of hand wave away. Let's assume that we've gotten the file extension cuz it's basically the same exact parsing stuff that we did back in part three, except that instead of looking for spaces, we're looking for dots and stuff like that.
+
+[00:00:53]
+So we're gonna kind of hand wave that away cuz it's stuff we've already learned. But we are gonna talk about some sort of C-specific quirks that result once we've already gotten the extension. So let's say I wrote this code. And I'm like, great, I've got my extension, it's a string and this is the memory address of a string.
+
+[00:01:09]
+I wanna say, if extension double equals PNG, the question is, under what circumstances does this code run? What do you think? What has to be true about the program for this to run? Well, we might like it to be true that if extension is the string png, that's when this runs.
+
+[00:01:31]
+Unfortunately, that is not the answer. That's the answer we hope we would get, but it's not the answer we get. The problem is, this is a number and this is a number, so this is gonna run when those two numbers are the same number. [LAUGH] In other words, this is gonna run only if their memory addresses are exactly identical.
+
+[00:01:47]
+It doesn't care about the contents of the string at all. It's not looking at the contents of the string. This is just doing two numbers and comparing them to see if those two numbers are the same number. That is a problem, because that is not what we want at all.
+
+[00:01:57]
+Now you would also hope that taking this a step further, that we could do a nice switch on this and say, I would like to switch on the extension. So this is a switch statement like you find in many languages, case png colon, then we would say, content type is image/png, and then do a break, just like we would in, for example, JavaScript.
+
+[00:02:15]
+But once again, nope, these are two numbers, [LAUGH] number, number. And this is not gonna work unless we happen to have exactly the same memory address for those. If you've ever heard of the concept of reference equality versus value semantics, this is exactly what's going on there. Reference equality, basically, is a fancy name for the two memory addresses that we're getting in identical.
+
+[00:02:36]
+Now, there is a way that we can do this using a built in C function which is called strcmp, which is short for string compare. And string compare will take the memory address of two different null terminated strings, and it will go one byte at a time and keep going until either the bytes are different or it reaches the end of both strings, the null terminator.
+
+[00:02:54]
+And all of the bytes in between and the two null terminators were identical. And we're like, great, these two strings are equal, and strcmp will return zero. Otherwise it returns something non-zero that tells you about which one's longer, or different, or something like that. But for our purposes, if we wanted to do that, we would say, great, if (!strcpm(extension "png")).
+
+[00:03:14]
+Now, this will actually run when we hope it would. We'll also say, great, this is gonna run if whatever extension, again, assuming that we've already parsed it out, is actually the bytes of that string or [LAUGH] the bytes PNG. Then we run this and set our content type to image/png and all is good.
+
+[00:03:30]
+And then of course we wanna do the same thing for the CSS and text/css. We do that, and then JS, application Javascript and HTML and text statement. We're gonna do a lot of strcmp calls here, which is a little bit unfortunate, because strcmp is running through every single byte in every single one of these, which means that the more file extensions that we support, the more we are walking through every single one of these.
+
+[00:03:51]
+So in order to detect if this was HTML, we first had to go compare it to PNG and let that fail, and then compare it to CSS, let that fail. Each time we're marching through as much of this as we need to until they're different. It's kind of rough.
+
+[00:04:04]
+It's kind of a lot of comparisons there. [COUGH] Now, what we're about to do, I wanna give you a little bit of a disclaimer. I would not claim that this is idiomatic C code. I would say it is defensible C code. If you're reading something like Postgres, I bet you can find tricks like this in Postgres, like the trick that we're about to do.
+
+[00:04:24]
+But this is not something I would normally expect for a static web server. I'm doing it for a couple of different reasons, but two reasons more than any. One, it's faster, and two, it's more ergonomic. Also, I guess it's a way to give you an example since this is a workshop of demonstrating an interesting trick that you can do in C that is a really good example of how you can make C programs go faster by doing some pretty heinous C specific tricks that you would just not find in any other language.
+
+[00:04:50]
+But it is gonna be a lot faster, and the ergonomics are actually gonna be a little bit better in terms of the getting to actually use the switch statement. So here we go. We're gonna do a fancy trick now. [COUGH] Here are some of these file extensions we wanna support, PNG, CSS, JS, and HTML.
+
+[00:05:06]
+So here are the bites that correspond to HTML. So H is 104, T is 116, M is 109, L is 108. And here are the bits that go into HTML. So if we have an array of these four bytes, this is what the bit pattern looks like side by side.
+
+[00:05:21]
+You may recall all the way back in part two, we talked about how we get to decide how we interpret memory. These ones and zeros, they are our ones and zeros. We can look at them however we want. In fact, if we want to, we can look at these four bytes as one gigantic, 32 bit integer, if we want.
+
+[00:05:38]
+Same ones and zeros, we're choosing to interpret that as an integer. We can do that. We're allowed to do that. This is the particular integer we have there. It's 1,752,460,652, which as everyone knows means HTML. But I mean, really, it does, right? If you think about it, these are the ones and zeros.
+
+[00:05:57]
+We can interpret the ones and zeros as either UTF-8 bytes, or we can interpret them as this one number. We're allowed to do either of those. PNG, here are the ones and zeros for that. We can almost interpret this as a 32 bit integer, except for the fact that it's not 32 bits.
+
+[00:06:12]
+We're actually eight bits shy there, because png doesn't happen to be enough bytes there. But if we wanted to, we could just kind of slap an extra zero byte on the end there, and now we have another 32 bit integer. That 32 bit integer is 1,886,283,520, which as everyone knows means PNG.
+
+[00:06:28]
+Maybe you can kind of see where this is going. As long as we only need to care about things that are four bytes or fewer, we can treat these things as integers. JS will get another couple extra bytes in there. Now this is, again, this is not standard operating procedure.
+
+[00:06:44]
+This is not how you normally do things. This relies on a number of assumptions. One, that we only care about file extensions that are four bytes or fewer. Two, that we're okay with all of this padding nonsense with [LAUGH] backslash zeros and whatnot. And three, that we actually are okay with reinterpreting these bits in memory as integers when clearly they are not originally integers.
+
+[00:07:03]
+But we can do it. [COUGH] So if we did that and we actually got them as 32-bit integers. Hey, now the fact that switch wants to match on two numbers is not a problem cuz guess what, we have two numbers. We got integers. So if we want, we could just say, hey, if the extension is stored as an actual integer, and we are intentionally storing it as an integer rather than the address like we normally would for a string.
+
+[00:07:25]
+And we just said PNG is 1 billion, 800 and whatever [LAUGH] million, this would just work. This would just straight up work. And basically we would need to do this cast thing. So we would say, okay, this is a memory address and basically, this part is saying cast it, that is like treat the extension as if it is an int address.
+
+[00:07:46]
+In other words, the address into a 32 bit integer as opposed to the first byte at a multi-byte string, which we've seen before. And then there's this extra star, which basically means, now that I've said I want to interpret this address as a different type of address, now just go ahead and give me whatever's at that address.
+
+[00:08:05]
+So this turns it from an address into an actual int. So star parentheses, whatever int star, basically means, step one is convert the address into the address of something else, and then step two is now that I've said it's a different type of address, go give me that thing.
+
+[00:08:21]
+You can also do bracket zero at the end. We saw that technique before, that would also work if you wanted to do the turning it into the underlying thing that way. But yeah, so now, as long as we're okay with writing out these horrendous constants like HTML = 1,752,000,000, yada, yada, yada, this actually does work.
+
+[00:08:40]
+So, this is simultaneously a performance improvement because now instead of having to go one byte at a time, we get to use the fact that the CPU can actually work on entire four byte integers in one single instruction. You just be like, hey, are you this integer, are you this integer, are you this integer?
+
+[00:08:54]
+Done, much, much faster. But also we're benefiting from the fact that ergonomically, we now actually get to use switch instead of having to do if strcmp, if then strcmp, blah, blah, else if then strcmp, blah, blah, blah, blah. This is definitely, I would say, easier to read. This part, not so much.
+
+[00:09:10]
+[LAUGH] This is just a bunch of nonsense. [LAUGH] Obviously when you look at code like this, you're like, someone has been doing something that they probably should not have been doing. Also, by the way, in switch statements, at the end you do have a default case, which is basically like, here's what we do as the fall through if none of the above cases match.
+
+[00:09:28]
+So pretend we have the PNG and HTML and JS and CSS and all the other ones we wanna support. The fallback here is basically saying, if this is not an extension type that we actually recognize and know how to handle, default to application/octet-stream. So some of the ones that we're not gonna bother handling are .wff, so WAF files for fonts, or WAF2.
+
+[00:09:47]
+Fortunately, fonts actually want to be application/octet-stream, which is very convenient because WAF2 is 5 bytes. So the fact that we don't need to handle that one, [LAUGH] you just let that be handled by the default case, works out very well for our extremely hacky, if everything is 4 bytes or fewer turn it into an integer trick.
+
+[00:10:04]
+Okay, I do wanna note by the way that these numbers actually vary based on the endianness of your processor. Endianness is a Gulliver's Travels joke. There's a whole history about what this means and all that stuff. We're not gonna get into it for this workshop because it's not gonna come up.
+
+[00:10:19]
+Everybody's processor who's gonna be using this workshop is gonna be the same endianness, so it's not gonna matter. But it is worth noting that there are big endian and little endian CPUs out there in the world. And so theoretically that is something you would need to worry about.
+
+[00:10:31]
+But for our purposes, we don't care, it's not gonna come up. But just so if you wanna look that term up later, you can kind of learn more about how integers get represented and some different CPUs that are more exotic than what we're using here. Okay, [COUGH] all right, so now let's see if we can improve on this situation.
+
+[00:10:47]
+These hard coded numbers, this is not gonna work. I mean, this is just a total obviously disaster. Nobody would find this readable code. This is just like, you'd have to do these magical calculations ahead of time. We can do better, fortunately. And to do better, we're gonna use bit shifts.
+
+[00:11:01]
+I promise this is not just an excuse to learn about bit shifts, we're actually gonna [LAUGH] make use of them for real here. Okay, so let's say that we have some different like bit patterns here. So we have four bytes here, and this first one is zero, the second one is two, so it ends in one followed by zero.
+
+[00:11:18]
+Second one is four, and ends in four followed by 11. And this last one is three, it ends in 11. So then we have another bit pattern here, and these are basically shifted over by one. So you can see that the one here has been shifted over one position, the one here has been shifted over one position, the one here has been shifted over one position, and so has this one.
+
+[00:11:35]
+And basically, this first bit that was here either could be shifted off the end and just discarded, and we add a zero at the end. Or it could wrap around, which in this case would be the same thing, cuz this one happen to be a zero anyway. So we can't really tell if it wrapped around or was discarded and an extra zero was added in.
+
+[00:11:51]
+But the point is that all of this bits were shifted, they shifted over one position. Now that we performed this operation, we can observe that we now have new integer values corresponding to each of these bytes. So this one is still 0, this one's now 4 because that's what happens when you shift over by one.
+
+[00:12:06]
+This one's now 8 and this one's now 6. Once more, if we bit shift one more time over to the left, here we have 0, 8, 16, and 12. If you look at these numbers, you might notice an interesting pattern. Bit-shifting everything to the left doubles them. So this 2 becomes 4, and then if you bit shift again, it becomes 8, 4 becomes 8 and then becomes 16, 3 becomes 6 and then becomes 12.
+
+[00:12:27]
+This is actually a performance optimization that is one of the things that the C compiler, among many other compilers, will do automatically for you when it detects that it can. So, as it turns out, doing an actual multiplication instruction in the CPU is significantly more expensive for the CPU to do than a bit shift operation.
+
+[00:12:46]
+So what will happen is that if the compiler detects that, I see that you're multiplying by two or a power of two, I will just silently turn that into a bit shift of that many [LAUGH] things, so that it can effectively do the doubling less expensively than having to do an actual multiplication thing.
+
+[00:13:04]
+Now there is a downside here when it comes to overflow, which is that, hey, what if the bit shift throws some of these extra zeros off the end and discards them, what then? But actually, as it turns out, C's multiplication does that too. [LAUGH] So you have the same problem either way, it's just a question of how it's gonna handle it.
+
+[00:13:22]
+But one thing to note about that is that C's optimizer basically assumes that, it likes to make use of what it calls undefined behavior, which is basically in the C specification. It says multiplying two integers together in C and then ending up with an integer that's too big to fit in your bits, which can absolutely happen.
+
+[00:13:39]
+If you have 32 bits here and you multiply two sufficiently large numbers together. For example, all ones except one zero at the end here. If you multiply those together, you're gonna get a number that's way too big to fit in 32 bits. C says officially, it is undefined behavior to do that, which basically means that if you do that, the C compiler is free to do absolutely anything that it wants because it's going to assume that that never happens.
+
+[00:14:01]
+So, make sure that that never happens, programmer, and you're like, well, so what happens? Is it gonna segfaults or throw an exception, or it's like, no, I not even gonna tell you what's gonna happen, you're just gonna find out, so don't do it. Could be anything. There's this old joke about undefined behavior means that literally, the C compiler is allowed to cause goblins to fly out of your nose if you, [LAUGH] multiply two numbers that are too big together, that's what undefined behavior means.
+
+[00:14:27]
+It means, literally, anything is allowed to happen, including nasal goblins. So it's like kind of like don't do it. And part of the reason that it says that is because it wants to be free to say yeah, look, I wanna be able to do these optimizations like turning multiplies by powers of two into bit shifts, which are faster.
+
+[00:14:43]
+But they're faster and they might have slightly different behavior in terms of overflow than the multipliers. And so in order to get that performance benefit, it needs to assume like, yeah, it's just never gonna happen and you need to be responsible for making sure it doesn't happen. Okay, now the reason we're learning about bit shifts is because if we were to take the bytes for h and then the bytes for t and m and l, and we were to bit shift them strategically.
+
+[00:15:05]
+And say, okay, we take this t and we bit shift it over by 8 and take the m over by 16 and the l over by 24. Sorry, and then we do a bitwise OR, which is basically saying take all of these bits and then if both of them are zero, then the resulting one is also zero.
+
+[00:15:23]
+If either one of them is one, then the resulting one is one. And so this effectively means that all of those bit shifts that are sort of adding all those zeros at the end sort of become harmless. Essentially, what this does is it causes us to end up with h, t, m and l in exactly the array like pattern that we want.
+
+[00:15:40]
+So h is gonna be first, and then t is gonna be next, m is gonna be next, then l is gonna be next after that. And then if we call to int on that, it's going to actually, sorry, we could write a function called to int, which we can call, passing these things, which will just do the bit shifts for us.
+
+[00:15:54]
+And then what this will basically do is this will turn these things into an actual integer like we want. So then ideally we would like to be able to say, instead of const int png equals this horrendous, hard coded number, we'd like to be able to call to int and just say, look png/0 HTML, yada yada.
+
+[00:16:13]
+This is much more readable than this, I think we can all agree. It's not quite as readable as a string literal, but I can clearly see, okay, this one's the PNG one, this one's the HTML one. It's a lot harder to make a mistake, or to detect that I've made a mistake than I have if I have these weird, hard-coded numbers here.
+

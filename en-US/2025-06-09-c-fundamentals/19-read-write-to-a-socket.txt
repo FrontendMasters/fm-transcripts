@@ -1,0 +1,126 @@
+[00:00:00]
+>> Richard Feldman: Next thing we need to do is we need to actually, read a request out of the socket. So the first way we're gonna do this is, I'm gonna start by just saying, I'm gonna make a char of a request array. This is going to end up being the string that we're going to send to our to path function.
+
+[00:00:16]
+So what we wanna do is, we wanna just get the bytes from the network into this slot, and I'm gonna pass this address off to our to path function that we wrote back in part three, yeah. And basically, I'm hard-coding, max request bytes plus 1, allocating this many bytes on the stack.
+
+[00:00:36]
+So there are two reasons I'm doing this. One, as we saw in the previous section, if I can avoid using malloc, I would like to avoid using malloc. And two is because, I mean, I guess this is kind of a naturally, like we're gonna chunk it up type of a thing when you are getting request bytes in from the network.
+
+[00:00:49]
+But also just as a matter of like security, you generally do want to pick a maximum upper limit on how many bytes you're allowing for your HTTP requests. If you say, yeah, you can send me a 16 gigabyte HTTP request, and I will just parse that whole thing, no problem, come on, bring it on in.
+
+[00:01:06]
+You're just asking to get DOS [LAUGH] somebody is gonna send you some gigantic thing and just watch the laugh as your server just sits there trying to parse the entire thing. So you want some sort of max request bytes anyway. This is one of those cases where it's not only is it the fastest in terms of performance and also the nicest in terms of not having to deal with any freeing stuff because we're not using malloc, but also just from a security perspective, this is kind of what you wanna do.
+
+[00:01:31]
+Okay, then we're gonna make something called addrlen, which is the size of this address. I'm just using that because we're gonna reuse this later, and I wanna have to keep calling size of address over and over. And then, the next thing we're gonna do is while 1, does anyone know what while 1 does?
+
+[00:01:46]
+Infinite loop, yes, exactly, same thing as while 2, except again, this is C. So often, you'll see literally, I bet if you search GitHub for wild parentheses, one, you'll find quite a lot of those in C repos. And basically what's happening here is we're just essentially saying, look, inside this loop, what I'm about to do, and we're gonna see the actual code for this in a sec.
+
+[00:02:05]
+I'm just going to run a function that just says, wait, do not advance, do not run the next line of code until a request has come in on this socket on port 8080. And once it does then we're gonna start handling stuff, and the reason is so, one is because, all we wanna be listening on this indefinitely.
+
+[00:02:21]
+This is how static HTTP servers work, they just keep working until you Ctrl C 11 and shut them down manually. That's exactly what we wanna do, we wanna just keep listening for the request to come in, as they keep coming in we wanna keep handling them, and that's all our program is gonna do.
+
+[00:02:34]
+So this program, by design, is never going to exit unless maybe there's some sort of unexpected error that we don't think we can recover from, cool. Okay, so here is the body of the while loop. So we're basically gonna start off by saying, okay, I need to get a request socket file descriptor.
+
+[00:02:51]
+We'll talk about why we're doing that in a sec, and I call a function called accept, which takes the socket file descriptor. So remember that the socket was something we set up outside the while loop. This is a second file descriptor that setting inside the while loop. We're doing this once again, this weird like, socket address thing, the casting.
+
+[00:03:08]
+This is exactly the same trick that we were doing back here for bind, if you remember this thing where we're doing the parsing the address of this and then casting it to the socket, or then passing the size of the address. Same exact thing that we were doing there except this time, we're doing it for accept instead of bind.
+
+[00:03:24]
+So the difference between accept and bind is that if we were doing a multithreaded application, which we're not. But if we were, then we would want to be able to say, okay, I want to, in parallel, be able to process multiple requests at the same time on different cores of my CPU.
+
+[00:03:40]
+So you might imagine that we would say, okay, I'm gonna call accept, and we're not gonna do any multithreading in this course, this is a C fundamentals, not C multi-threading, which is a whole thing. But conceptually, if you imagine we're like okay, I'm listening on this port. I have accepted something that is, say, I waited until some new thing came in, I got it.
+
+[00:03:58]
+I'm like, great, I've got this handle to the file descriptor for this particular request, the bytes that are coming off of this. Now, I wanna read those bytes. I wanna do various operations on those bytes, other than read, which we'll see in a later part. Maybe I wanna just say, look, just hey, just throw that on a different CPU core, I wanna have that, go and do those things.
+
+[00:04:22]
+If you imagine, if we just had our one socket file descriptor from outside the loop, like the one and only socket file descriptor for this entire thing, well, how would you possibly do that? Because now I'm saying, okay, we got this one request, and I'm like, yeah, I wanna read that one, but then I wanna get another one and run that on a different core and get another one run that on a different core.
+
+[00:04:38]
+If all of those have the same socket file descriptor, then why say go read, it's like which one are we even talking about, we only have one, so what does read even mean in that context. So the purpose of accept returning it's own file descriptor is essentially to say, just hand this off.
+
+[00:04:54]
+Every time one of this comes in, well, cool, this file descriptor refers to a socket that's specific to that request. So you can go handle that over here, accept got another one, great, throw that on a different CPU core with its own file descriptor. We got another one, great, somebody else go and work on that.
+
+[00:05:09]
+Then they can all be totally separate because they've all got their own special file descriptors, which one you read from them gets the data from that one request. Also, because this is a file descriptor, we do need to close it before we get this back, or else will leak.
+
+[00:05:24]
+Technically speaking, if you wanted to be absolutely really pedantic about it, you maybe should kind of close the original socket, but it's like we're in an infinite loop, so do we really need to close it, who's gonna know? So, I didn't bother to close it because we're going into this infinite loop.
+
+[00:05:40]
+So if we wrote a close after the infinite loop, it would never get reached anyway, so who cares, but if we did an early return, I guess you technically should do that. But at the end of the day, once the program itself exits, the operating system is gonna close all these for you anyway.
+
+[00:05:53]
+So you don't really need to bother to accept as a matter of just kinda bookkeeping peace of mind, feeling a little itch when you open something without closing it, that type of thing. It's not gonna matter one way or the other. Okay, [COUGH] so basically wait for that, and we talked about that request queue that can stack up as we're processing these.
+
+[00:06:10]
+Basically, as soon as the queue gets a new connection, dequeue it as a new socket, and then we can do stuff with that socket, which is what we're gonna do in the middle here. So again, this is sort of dot.dot, that was all the stuff we saw on the previous slide.
+
+[00:06:23]
+Now we're gonna call that same read function that we used for file I/O, it's exactly the same function. And now we're just giving it the socket file descriptor instead of the file on the file system. And again, Unix loves this file descriptor, C loves file descriptors, it just reuses the same function.
+
+[00:06:40]
+So when we call read on this socket file descriptor, it's exactly as we call it on a file descriptor from the file system. It works exactly the same way. We say give it the destination, I'm gonna stop all over that, this is req, that's a way that we'd allocated with max request bytes.
+
+[00:06:57]
+We tell it how many we wanna read up to this many, exactly the same way we did in part four, and then we get back the number of bytes read. We check to see if that was -1, etc. So now, we have populated our request with the contents of what came in over the network on port 8080, cool.
+
+[00:07:16]
+Now, we're basically sort of home free, we can just proceed doing the same kind of stuff that we did before. So we say, call to path like we did everything we've been building up to at this point, we give it the req. It stomps all over those bytes, but that's fine because we're done with them [LAUGH], we don't need to ever look at the requests ever again.
+
+[00:07:32]
+We've got our path here, we're gonna do the whole fd equals open, read only. And remember to close it again because we don't wanna file descript or leak on that one either, get the metadata, all of that stuff, read the contents, yada, yada. And now, basically, we just say write 1 contents length, to write those contents to standard out.
+
+[00:07:52]
+Now, at this point, we haven't quite made a static HTTP server because what we do is we listen on port 8080. Whenever we get a request on port 8080, we process it, we turn it into a file and then we basically just say, okay, I've open this file and I've read this content.
+
+[00:08:06]
+So index.html or blog index.html, whatever, and then I just write it to standard out, I just spit it out onto the screen, and that's it. That totally works, but of course, that's not quite a static HTTP server, but we have come a long way [LAUGH] we are now doing like, almost the entire thing.
+
+[00:08:21]
+If I run this code in, and then I open up a browser and type in localhost port 8080, it's actually gonna do all this stuff like for real, and we're gonna process the requests. We're gonna open the contents of like index. If I type in localhost 8080/blog, it's gonna print out the contents of blog/index on HTML, all of that's gonna work right here using all this stuff that we've done up to this point.
+
+[00:08:43]
+And all I have to do if I wanna make it a real HTTP server, instead of writing to standard out, just write it to the socket, that's it, right there, bam. Just same function as we did in hello world, hello metal. The same exact thing, write 1, we just changed the 1 that was hard-coded to write to standard out, and instead, just say, write it back to the socket.
+
+[00:09:01]
+And now, instead of printing it out to stand it out, it's gonna print it out back to the socket, which means that the browser is gonna see the response. So essentially, at that point, all we need to do is make sure that like contents is actually formatted as an HTTP response [LAUGH] instead of the raw contents of the file, and we're all set.
+
+[00:09:19]
+So in order to do that, we can actually just like, keep the content says its own right, and we can just manually write 200 okay and then a blank line, which as it turns out is the requests, sorry, the response format that we need. And that's it, that's all we really need to do.
+
+[00:09:35]
+We can basically just say all these things up here, write this header, and then write the contents, and we're done, that's it, cool. So to recap, all the stuff we did in this while loop, first, accept waits for a new connection and then gives us a file descriptor.
+
+[00:09:51]
+So importantly, accept will not run the next line of code, it just sits there and waits. It's just blocks and then does not let the program advance until a new connection comes in off the queue, if there's a queue of them backed up. And then gives us a file descriptor, which is a socket that's specific to that 1 connection coming from the browser.
+
+[00:10:10]
+Then we can call read on it, these are getting the actual bytes that the browser was sending us. If we want, we can call read multiple times, we can chunk it up, no problem. It works the same way as read does on the file system. Then we call to path, which was the function that we wrote back in part three, to parse those request bytes into a file system path like index.html or blog/index.html, whatever, based on the request that we got from the browser.
+
+[00:10:32]
+And then we do the open fstat read thing that we did in the previous section to get the file's full contents. And then finally, we write the full contents of the file back to the socket after that little HTTP 200 okay, header in there. And then we actually get to see this thing work [LAUGH], cool.
+
+[00:10:49]
+So, to summarize everything we talked about. First, open the socket. So opening the socket is as simple as just doing some little boilerplate stuff, in some cases with some kinda funky APIs. But hopefully everybody was able to roll with those being a little bit strange, but at least understandable.
+
+[00:11:03]
+Well, maybe not being 100% clear on exactly why they decided to do that, the way that they did. Then listening for the connections, so that's basically where we say, bind it to a particular port, and then now that port is going to send things to those sockets. We talked about reading from a socket, where inside the while loop we're doing accept to turn those individual connections into their own sockets.
+
+[00:11:24]
+And then we can just read from those just using the exact same read function that we did in the file I/O section. And then finally, once we've read those in there, we take the request that we read in, we call to path on it, read from the file system to get the contents of that file, and finally, write the contents of that file back out to the socket, bam.
+
+[00:11:39]
+Using exactly the same write that we did all the way, part one, hello world on the metal. Same exact right function accept instead of one, we just write it to the socket.
+

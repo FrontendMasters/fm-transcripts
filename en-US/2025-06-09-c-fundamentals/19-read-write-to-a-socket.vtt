@@ -1,0 +1,1054 @@
+WEBVTT
+
+1
+00:00:00.016 --> 00:00:02.650
+&gt;&gt; Richard Feldman: Next thing we
+need to do is we need to actually,
+
+2
+00:00:02.650 --> 00:00:04.548
+read a request out of the socket.
+
+3
+00:00:04.548 --> 00:00:08.832
+So the first way we're gonna do this is,
+I'm gonna start by just saying,
+
+4
+00:00:08.832 --> 00:00:11.262
+I'm gonna make a char of a request array.
+
+5
+00:00:11.262 --> 00:00:15.436
+This is going to end up being the string
+that we're going to send to our to path
+
+6
+00:00:15.436 --> 00:00:16.099
+function.
+
+7
+00:00:16.099 --> 00:00:20.335
+So what we wanna do is,
+we wanna just get the bytes from
+
+8
+00:00:20.335 --> 00:00:25.420
+the network into this slot, and
+I'm gonna pass this address off
+
+9
+00:00:25.420 --> 00:00:30.430
+to our to path function that we
+wrote back in part three, yeah.
+
+10
+00:00:30.430 --> 00:00:32.495
+And basically, I'm hard-coding,
+
+11
+00:00:32.495 --> 00:00:36.249
+max request bytes plus 1,
+allocating this many bytes on the stack.
+
+12
+00:00:36.249 --> 00:00:37.495
+So there are two reasons I'm doing this.
+
+13
+00:00:37.495 --> 00:00:40.362
+One, as we saw in the previous section,
+if I can avoid using malloc,
+
+14
+00:00:40.362 --> 00:00:41.854
+I would like to avoid using malloc.
+
+15
+00:00:41.854 --> 00:00:45.935
+And two is because, I mean, I guess this
+is kind of a naturally, like we're gonna
+
+16
+00:00:45.935 --> 00:00:49.973
+chunk it up type of a thing when you are
+getting request bytes in from the network.
+
+17
+00:00:49.973 --> 00:00:53.933
+But also just as a matter of like
+security, you generally do want to pick
+
+18
+00:00:53.933 --> 00:00:58.427
+a maximum upper limit on how many bytes
+you're allowing for your HTTP requests.
+
+19
+00:00:58.427 --> 00:01:02.144
+If you say, yeah, you can send me
+a 16 gigabyte HTTP request, and
+
+20
+00:01:02.144 --> 00:01:06.054
+I will just parse that whole thing,
+no problem, come on, bring it on in.
+
+21
+00:01:06.054 --> 00:01:10.808
+You're just asking to get DOS [LAUGH]
+somebody is gonna send you some gigantic
+
+22
+00:01:10.808 --> 00:01:15.485
+thing and just watch the laugh as your
+server just sits there trying to parse
+
+23
+00:01:15.485 --> 00:01:16.690
+the entire thing.
+
+24
+00:01:16.690 --> 00:01:19.087
+So you want some sort of
+max request bytes anyway.
+
+25
+00:01:19.087 --> 00:01:22.572
+This is one of those cases where it's
+not only is it the fastest in terms of
+
+26
+00:01:22.572 --> 00:01:26.286
+performance and also the nicest in terms
+of not having to deal with any freeing
+
+27
+00:01:26.286 --> 00:01:30.345
+stuff because we're not using malloc, but
+also just from a security perspective,
+
+28
+00:01:30.345 --> 00:01:31.971
+this is kind of what you wanna do.
+
+29
+00:01:31.971 --> 00:01:35.035
+Okay, then we're gonna make
+something called addrlen,
+
+30
+00:01:35.035 --> 00:01:36.855
+which is the size of this address.
+
+31
+00:01:36.855 --> 00:01:39.327
+I'm just using that because we're
+gonna reuse this later, and
+
+32
+00:01:39.327 --> 00:01:41.579
+I wanna have to keep calling
+size of address over and over.
+
+33
+00:01:41.579 --> 00:01:44.684
+And then,
+the next thing we're gonna do is while 1,
+
+34
+00:01:44.684 --> 00:01:46.828
+does anyone know what while 1 does?
+
+35
+00:01:46.828 --> 00:01:50.426
+Infinite loop, yes, exactly, same thing
+as while 2, except again, this is C.
+
+36
+00:01:50.426 --> 00:01:54.286
+So often, you'll see literally,
+I bet if you search GitHub for
+
+37
+00:01:54.286 --> 00:01:58.520
+wild parentheses, one, you'll find
+quite a lot of those in C repos.
+
+38
+00:01:58.520 --> 00:02:01.970
+And basically what's happening here is
+we're just essentially saying, look,
+
+39
+00:02:01.970 --> 00:02:05.370
+inside this loop, what I'm about to do,
+and we're gonna see the actual code for
+
+40
+00:02:05.370 --> 00:02:05.983
+this in a sec.
+
+41
+00:02:05.983 --> 00:02:10.379
+I'm just going to run a function that just
+says, wait, do not advance, do not run
+
+42
+00:02:10.379 --> 00:02:14.685
+the next line of code until a request
+has come in on this socket on port 8080.
+
+43
+00:02:14.685 --> 00:02:18.447
+And once it does then we're gonna start
+handling stuff, and the reason is so,
+
+44
+00:02:18.447 --> 00:02:21.582
+one is because, all we wanna be
+listening on this indefinitely.
+
+45
+00:02:21.582 --> 00:02:26.003
+This is how static HTTP servers work, they
+just keep working until you Ctrl C 11 and
+
+46
+00:02:26.003 --> 00:02:27.387
+shut them down manually.
+
+47
+00:02:27.387 --> 00:02:30.032
+That's exactly what we wanna do,
+we wanna just keep listening for
+
+48
+00:02:30.032 --> 00:02:33.148
+the request to come in, as they keep
+coming in we wanna keep handling them, and
+
+49
+00:02:33.148 --> 00:02:34.631
+that's all our program is gonna do.
+
+50
+00:02:34.631 --> 00:02:39.614
+So this program, by design, is never going
+to exit unless maybe there's some sort
+
+51
+00:02:39.614 --> 00:02:43.761
+of unexpected error that we don't
+think we can recover from, cool.
+
+52
+00:02:43.761 --> 00:02:46.432
+Okay, so
+here is the body of the while loop.
+
+53
+00:02:46.432 --> 00:02:48.968
+So we're basically gonna
+start off by saying, okay,
+
+54
+00:02:48.968 --> 00:02:51.183
+I need to get a request
+socket file descriptor.
+
+55
+00:02:51.183 --> 00:02:55.010
+We'll talk about why we're doing that in a
+sec, and I call a function called accept,
+
+56
+00:02:55.010 --> 00:02:56.888
+which takes the socket file descriptor.
+
+57
+00:02:56.888 --> 00:02:59.525
+So remember that the socket was something
+we set up outside the while loop.
+
+58
+00:02:59.525 --> 00:03:03.679
+This is a second file descriptor
+that setting inside the while loop.
+
+59
+00:03:03.679 --> 00:03:08.125
+We're doing this once again, this weird
+like, socket address thing, the casting.
+
+60
+00:03:08.125 --> 00:03:11.473
+This is exactly the same trick that
+we were doing back here for bind,
+
+61
+00:03:11.473 --> 00:03:15.411
+if you remember this thing where we're
+doing the parsing the address of this and
+
+62
+00:03:15.411 --> 00:03:18.977
+then casting it to the socket, or
+then passing the size of the address.
+
+63
+00:03:18.977 --> 00:03:23.033
+Same exact thing that we were doing there
+except this time, we're doing it for
+
+64
+00:03:23.033 --> 00:03:24.329
+accept instead of bind.
+
+65
+00:03:24.329 --> 00:03:28.341
+So the difference between accept and bind
+is that if we were doing a multithreaded
+
+66
+00:03:28.341 --> 00:03:30.052
+application, which we're not.
+
+67
+00:03:30.052 --> 00:03:33.563
+But if we were, then we would
+want to be able to say, okay,
+
+68
+00:03:33.563 --> 00:03:38.369
+I want to, in parallel, be able to process
+multiple requests at the same time on
+
+69
+00:03:38.369 --> 00:03:40.055
+different cores of my CPU.
+
+70
+00:03:40.055 --> 00:03:43.646
+So you might imagine that we would say,
+okay, I'm gonna call accept, and
+
+71
+00:03:43.646 --> 00:03:47.581
+we're not gonna do any multithreading in
+this course, this is a C fundamentals,
+
+72
+00:03:47.581 --> 00:03:49.995
+not C multi-threading,
+which is a whole thing.
+
+73
+00:03:49.995 --> 00:03:53.372
+But conceptually, if you imagine we're
+like okay, I'm listening on this port.
+
+74
+00:03:53.372 --> 00:03:58.269
+I have accepted something that is, say,
+I waited until some new thing came in,
+
+75
+00:03:58.269 --> 00:03:58.865
+I got it.
+
+76
+00:03:58.865 --> 00:04:03.743
+I'm like, great, I've got this
+handle to the file descriptor for
+
+77
+00:04:03.743 --> 00:04:08.463
+this particular request,
+the bytes that are coming off of this.
+
+78
+00:04:08.463 --> 00:04:10.596
+Now, I wanna read those bytes.
+
+79
+00:04:10.596 --> 00:04:14.471
+I wanna do various operations
+on those bytes, other than read,
+
+80
+00:04:14.471 --> 00:04:16.496
+which we'll see in a later part.
+
+81
+00:04:16.496 --> 00:04:20.164
+Maybe I wanna just say, look, just hey,
+just throw that on a different CPU core,
+
+82
+00:04:20.164 --> 00:04:22.092
+I wanna have that, go and do those things.
+
+83
+00:04:22.092 --> 00:04:25.254
+If you imagine, if we just had our one
+socket file descriptor from outside
+
+84
+00:04:25.254 --> 00:04:27.753
+the loop, like the one and
+only socket file descriptor for
+
+85
+00:04:27.753 --> 00:04:30.311
+this entire thing, well,
+how would you possibly do that?
+
+86
+00:04:30.311 --> 00:04:33.488
+Because now I'm saying, okay, we got
+this one request, and I'm like, yeah,
+
+87
+00:04:33.488 --> 00:04:35.730
+I wanna read that one, but
+then I wanna get another one and
+
+88
+00:04:35.730 --> 00:04:38.767
+run that on a different core and get
+another one run that on a different core.
+
+89
+00:04:38.767 --> 00:04:42.970
+If all of those have the same socket
+file descriptor, then why say go read,
+
+90
+00:04:42.970 --> 00:04:46.772
+it's like which one are we even
+talking about, we only have one, so
+
+91
+00:04:46.772 --> 00:04:49.129
+what does read even mean in that context.
+
+92
+00:04:49.129 --> 00:04:53.445
+So the purpose of accept returning it's
+own file descriptor is essentially to say,
+
+93
+00:04:53.445 --> 00:04:54.496
+just hand this off.
+
+94
+00:04:54.496 --> 00:04:57.226
+Every time one of this comes in,
+well, cool,
+
+95
+00:04:57.226 --> 00:05:01.641
+this file descriptor refers to a socket
+that's specific to that request.
+
+96
+00:05:01.641 --> 00:05:04.847
+So you can go handle that over here,
+accept got another one, great,
+
+97
+00:05:04.847 --> 00:05:07.830
+throw that on a different CPU core
+with its own file descriptor.
+
+98
+00:05:07.830 --> 00:05:09.934
+We got another one, great,
+somebody else go and work on that.
+
+99
+00:05:09.934 --> 00:05:14.027
+Then they can all be totally separate
+because they've all got their own special
+
+100
+00:05:14.027 --> 00:05:18.386
+file descriptors, which one you read from
+them gets the data from that one request.
+
+101
+00:05:18.386 --> 00:05:20.984
+Also, because this is a file descriptor,
+
+102
+00:05:20.984 --> 00:05:24.889
+we do need to close it before we
+get this back, or else will leak.
+
+103
+00:05:24.889 --> 00:05:28.925
+Technically speaking, if you wanted to
+be absolutely really pedantic about it,
+
+104
+00:05:28.925 --> 00:05:32.666
+you maybe should kind of close the
+original socket, but it's like we're in
+
+105
+00:05:32.666 --> 00:05:36.197
+an infinite loop, so do we really
+need to close it, who's gonna know?
+
+106
+00:05:36.197 --> 00:05:40.582
+So, I didn't bother to close it because
+we're going into this infinite loop.
+
+107
+00:05:40.582 --> 00:05:44.032
+So if we wrote a close after the infinite
+loop, it would never get reached anyway,
+
+108
+00:05:44.032 --> 00:05:45.882
+so who cares, but
+if we did an early return,
+
+109
+00:05:45.882 --> 00:05:47.597
+I guess you technically should do that.
+
+110
+00:05:47.597 --> 00:05:50.257
+But at the end of the day,
+once the program itself exits,
+
+111
+00:05:50.257 --> 00:05:53.154
+the operating system is gonna
+close all these for you anyway.
+
+112
+00:05:53.154 --> 00:05:56.217
+So you don't really need to bother
+to accept as a matter of just kinda
+
+113
+00:05:56.217 --> 00:05:59.549
+bookkeeping peace of mind, feeling
+a little itch when you open something
+
+114
+00:05:59.549 --> 00:06:01.447
+without closing it, that type of thing.
+
+115
+00:06:01.447 --> 00:06:04.122
+It's not gonna matter one way or
+the other.
+
+116
+00:06:04.122 --> 00:06:06.500
+Okay, [COUGH] so
+basically wait for that, and
+
+117
+00:06:06.500 --> 00:06:10.767
+we talked about that request queue that
+can stack up as we're processing these.
+
+118
+00:06:10.767 --> 00:06:13.421
+Basically, as soon as the queue
+gets a new connection,
+
+119
+00:06:13.421 --> 00:06:16.696
+dequeue it as a new socket, and
+then we can do stuff with that socket,
+
+120
+00:06:16.696 --> 00:06:19.028
+which is what we're gonna
+do in the middle here.
+
+121
+00:06:19.028 --> 00:06:21.081
+So again, this is sort of dot.dot,
+
+122
+00:06:21.081 --> 00:06:23.946
+that was all the stuff we
+saw on the previous slide.
+
+123
+00:06:23.946 --> 00:06:26.935
+Now we're gonna call that same read
+function that we used for file I/O,
+
+124
+00:06:26.935 --> 00:06:28.361
+it's exactly the same function.
+
+125
+00:06:28.361 --> 00:06:32.181
+And now we're just giving it the socket
+file descriptor instead of the file on
+
+126
+00:06:32.181 --> 00:06:33.076
+the file system.
+
+127
+00:06:33.076 --> 00:06:36.278
+And again,
+Unix loves this file descriptor,
+
+128
+00:06:36.278 --> 00:06:40.557
+C loves file descriptors,
+it just reuses the same function.
+
+129
+00:06:40.557 --> 00:06:42.958
+So when we call read on this
+socket file descriptor,
+
+130
+00:06:42.958 --> 00:06:46.140
+it's exactly as we call it on a file
+descriptor from the file system.
+
+131
+00:06:46.140 --> 00:06:47.676
+It works exactly the same way.
+
+132
+00:06:47.676 --> 00:06:52.220
+We say give it the destination,
+I'm gonna stop all over that,
+
+133
+00:06:52.220 --> 00:06:57.474
+this is req, that's a way that we'd
+allocated with max request bytes.
+
+134
+00:06:57.474 --> 00:07:01.421
+We tell it how many we wanna read up to
+this many, exactly the same way we did in
+
+135
+00:07:01.421 --> 00:07:04.400
+part four, and
+then we get back the number of bytes read.
+
+136
+00:07:04.400 --> 00:07:07.210
+We check to see if that was -1, etc.
+
+137
+00:07:07.210 --> 00:07:11.997
+So now, we have populated our
+request with the contents of
+
+138
+00:07:11.997 --> 00:07:16.504
+what came in over the network
+on port 8080, cool.
+
+139
+00:07:16.504 --> 00:07:18.365
+Now, we're basically sort of home free,
+
+140
+00:07:18.365 --> 00:07:21.272
+we can just proceed doing the same
+kind of stuff that we did before.
+
+141
+00:07:21.272 --> 00:07:25.085
+So we say, call to path like we did
+everything we've been building up to at
+
+142
+00:07:25.085 --> 00:07:26.755
+this point, we give it the req.
+
+143
+00:07:26.755 --> 00:07:30.082
+It stomps all over those bytes, but that's
+fine because we're done with them [LAUGH],
+
+144
+00:07:30.082 --> 00:07:32.190
+we don't need to ever look
+at the requests ever again.
+
+145
+00:07:32.190 --> 00:07:37.764
+We've got our path here, we're gonna
+do the whole fd equals open, read only.
+
+146
+00:07:37.764 --> 00:07:41.367
+And remember to close it again because we
+don't wanna file descript or leak on that
+
+147
+00:07:41.367 --> 00:07:45.148
+one either, get the metadata, all of that
+stuff, read the contents, yada, yada.
+
+148
+00:07:45.148 --> 00:07:49.447
+And now, basically,
+we just say write 1 contents length,
+
+149
+00:07:49.447 --> 00:07:52.412
+to write those contents to standard out.
+
+150
+00:07:52.412 --> 00:07:56.866
+Now, at this point, we haven't quite made
+a static HTTP server because what we do is
+
+151
+00:07:56.866 --> 00:07:58.396
+we listen on port 8080.
+
+152
+00:07:58.396 --> 00:08:02.296
+Whenever we get a request on port 8080,
+we process it, we turn it into a file and
+
+153
+00:08:02.296 --> 00:08:06.346
+then we basically just say, okay, I've
+open this file and I've read this content.
+
+154
+00:08:06.346 --> 00:08:10.446
+So index.html or blog index.html,
+whatever, and then I just write it to
+
+155
+00:08:10.446 --> 00:08:14.104
+standard out, I just spit it out
+onto the screen, and that's it.
+
+156
+00:08:14.104 --> 00:08:18.146
+That totally works, but of course,
+that's not quite a static HTTP server, but
+
+157
+00:08:18.146 --> 00:08:21.963
+we have come a long way [LAUGH] we are now
+doing like, almost the entire thing.
+
+158
+00:08:21.963 --> 00:08:26.622
+If I run this code in, and then I open up
+a browser and type in localhost port 8080,
+
+159
+00:08:26.622 --> 00:08:29.730
+it's actually gonna do all
+this stuff like for real, and
+
+160
+00:08:29.730 --> 00:08:31.767
+we're gonna process the requests.
+
+161
+00:08:31.767 --> 00:08:34.055
+We're gonna open
+the contents of like index.
+
+162
+00:08:34.055 --> 00:08:36.164
+If I type in localhost 8080/blog,
+
+163
+00:08:36.164 --> 00:08:40.008
+it's gonna print out the contents of
+blog/index on HTML, all of that's
+
+164
+00:08:40.008 --> 00:08:43.987
+gonna work right here using all this
+stuff that we've done up to this point.
+
+165
+00:08:43.987 --> 00:08:47.459
+And all I have to do if I wanna make it
+a real HTTP server, instead of writing to
+
+166
+00:08:47.459 --> 00:08:51.013
+standard out, just write it to the socket,
+that's it, right there, bam.
+
+167
+00:08:51.013 --> 00:08:54.810
+Just same function as we did
+in hello world, hello metal.
+
+168
+00:08:54.810 --> 00:08:58.539
+The same exact thing, write 1, we just
+changed the 1 that was hard-coded to write
+
+169
+00:08:58.539 --> 00:09:01.701
+to standard out, and instead,
+just say, write it back to the socket.
+
+170
+00:09:01.701 --> 00:09:05.752
+And now, instead of printing it out to
+stand it out, it's gonna print it out
+
+171
+00:09:05.752 --> 00:09:09.822
+back to the socket, which means that
+the browser is gonna see the response.
+
+172
+00:09:09.822 --> 00:09:11.507
+So essentially, at that point,
+
+173
+00:09:11.507 --> 00:09:15.481
+all we need to do is make sure that like
+contents is actually formatted as an HTTP
+
+174
+00:09:15.481 --> 00:09:19.356
+response [LAUGH] instead of the raw
+contents of the file, and we're all set.
+
+175
+00:09:19.356 --> 00:09:23.860
+So in order to do that, we can actually
+just like, keep the content says its own
+
+176
+00:09:23.860 --> 00:09:28.026
+right, and we can just manually write
+200 okay and then a blank line,
+
+177
+00:09:28.026 --> 00:09:32.696
+which as it turns out is the requests,
+sorry, the response format that we need.
+
+178
+00:09:32.696 --> 00:09:35.492
+And that's it,
+that's all we really need to do.
+
+179
+00:09:35.492 --> 00:09:40.412
+We can basically just say all these
+things up here, write this header, and
+
+180
+00:09:40.412 --> 00:09:44.647
+then write the contents, and
+we're done, that's it, cool.
+
+181
+00:09:44.647 --> 00:09:48.039
+So to recap, all the stuff we
+did in this while loop, first,
+
+182
+00:09:48.039 --> 00:09:51.977
+accept waits for a new connection and
+then gives us a file descriptor.
+
+183
+00:09:51.977 --> 00:09:54.801
+So importantly,
+accept will not run the next line of code,
+
+184
+00:09:54.801 --> 00:09:56.220
+it just sits there and waits.
+
+185
+00:09:56.220 --> 00:09:59.735
+It's just blocks and then does
+not let the program advance until
+
+186
+00:09:59.735 --> 00:10:04.047
+a new connection comes in off the queue,
+if there's a queue of them backed up.
+
+187
+00:10:04.047 --> 00:10:05.983
+And then gives us a file descriptor,
+
+188
+00:10:05.983 --> 00:10:10.303
+which is a socket that's specific to that
+1 connection coming from the browser.
+
+189
+00:10:10.303 --> 00:10:11.422
+Then we can call read on it,
+
+190
+00:10:11.422 --> 00:10:14.216
+these are getting the actual bytes
+that the browser was sending us.
+
+191
+00:10:14.216 --> 00:10:17.666
+If we want, we can call read multiple
+times, we can chunk it up, no problem.
+
+192
+00:10:17.666 --> 00:10:20.474
+It works the same way as read
+does on the file system.
+
+193
+00:10:20.474 --> 00:10:24.534
+Then we call to path, which was the
+function that we wrote back in part three,
+
+194
+00:10:24.534 --> 00:10:28.283
+to parse those request bytes into
+a file system path like index.html or
+
+195
+00:10:28.283 --> 00:10:32.741
+blog/index.html, whatever, based on
+the request that we got from the browser.
+
+196
+00:10:32.741 --> 00:10:36.151
+And then we do the open fstat read thing
+that we did in the previous section to get
+
+197
+00:10:36.151 --> 00:10:37.402
+the file's full contents.
+
+198
+00:10:37.402 --> 00:10:41.814
+And then finally, we write the full
+contents of the file back to the socket
+
+199
+00:10:41.814 --> 00:10:45.103
+after that little HTTP 200 okay,
+header in there.
+
+200
+00:10:45.103 --> 00:10:49.557
+And then we actually get to see
+this thing work [LAUGH], cool.
+
+201
+00:10:49.557 --> 00:10:51.118
+So, to summarize everything
+we talked about.
+
+202
+00:10:51.118 --> 00:10:52.651
+First, open the socket.
+
+203
+00:10:52.651 --> 00:10:56.589
+So opening the socket is as simple as
+just doing some little boilerplate stuff,
+
+204
+00:10:56.589 --> 00:10:58.660
+in some cases with some kinda funky APIs.
+
+205
+00:10:58.660 --> 00:11:02.042
+But hopefully everybody was able to roll
+with those being a little bit strange, but
+
+206
+00:11:02.042 --> 00:11:03.164
+at least understandable.
+
+207
+00:11:03.164 --> 00:11:07.324
+Well, maybe not being 100% clear on
+exactly why they decided to do that,
+
+208
+00:11:07.324 --> 00:11:08.545
+the way that they did.
+
+209
+00:11:08.545 --> 00:11:12.581
+Then listening for the connections, so
+that's basically where we say, bind it to
+
+210
+00:11:12.581 --> 00:11:16.631
+a particular port, and then now that port
+is going to send things to those sockets.
+
+211
+00:11:16.631 --> 00:11:20.748
+We talked about reading from a socket,
+where inside the while loop we're doing
+
+212
+00:11:20.748 --> 00:11:24.381
+accept to turn those individual
+connections into their own sockets.
+
+213
+00:11:24.381 --> 00:11:27.457
+And then we can just read from those just
+using the exact same read function that we
+
+214
+00:11:27.457 --> 00:11:28.598
+did in the file I/O section.
+
+215
+00:11:28.598 --> 00:11:32.313
+And then finally, once we've read those in
+there, we take the request that we read
+
+216
+00:11:32.313 --> 00:11:35.548
+in, we call to path on it, read from
+the file system to get the contents of
+
+217
+00:11:35.548 --> 00:11:39.453
+that file, and finally, write the contents
+of that file back out to the socket, bam.
+
+218
+00:11:39.453 --> 00:11:42.830
+Using exactly the same write that
+we did all the way, part one,
+
+219
+00:11:42.830 --> 00:11:44.244
+hello world on the metal.
+
+220
+00:11:44.244 --> 00:11:49.513
+Same exact right function accept instead
+of one, we just write it to the socket.
+

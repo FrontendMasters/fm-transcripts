@@ -1,0 +1,950 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:03.358
+&gt;&gt; Richard Feldman: This optimization that
+we've done here, if you want to call it,
+
+2
+00:00:03.358 --> 00:00:06.795
+that relies on number one,
+knowing extensions fit in four bytes.
+
+3
+00:00:06.795 --> 00:00:09.931
+If it were really common to see file
+extensions that were more than four bytes,
+
+4
+00:00:09.931 --> 00:00:11.555
+this would probably be a terrible idea.
+
+5
+00:00:11.555 --> 00:00:15.399
+Assuming it's not a terrible idea already,
+also knowing memory is just ones and
+
+6
+00:00:15.399 --> 00:00:18.181
+zeros, and that we can
+reinterpret them however we want.
+
+7
+00:00:18.181 --> 00:00:21.184
+Also, using a language that
+supports doing this sort of thing.
+
+8
+00:00:21.184 --> 00:00:22.049
+And finally,
+
+9
+00:00:22.049 --> 00:00:26.597
+just basically having this sort of
+will to actually implemented this way,
+
+10
+00:00:26.597 --> 00:00:31.589
+even though it and maybe it's a safer less
+complicated way you could do it, okay?
+
+11
+00:00:31.589 --> 00:00:35.619
+So I just want to talk very briefly
+about this function called sendfile.
+
+12
+00:00:35.619 --> 00:00:40.270
+So you might have notice that what
+we've been doing here is essentially we
+
+13
+00:00:40.270 --> 00:00:44.482
+say okay, we get a request in,
+we read the requests, we parse it.
+
+14
+00:00:44.482 --> 00:00:45.149
+We get out the file.
+
+15
+00:00:45.149 --> 00:00:48.518
+We want to do we say okay, cool,
+we've got our socket file descriptor.
+
+16
+00:00:48.518 --> 00:00:50.337
+We're gonna put that on the shelf for
+a second.
+
+17
+00:00:50.337 --> 00:00:51.502
+We are just read the request in.
+
+18
+00:00:51.502 --> 00:00:55.477
+We're gonna go read the from a file
+descriptor off the file system to read
+
+19
+00:00:55.477 --> 00:00:58.160
+all that into our local
+little buffer variable.
+
+20
+00:00:58.160 --> 00:01:01.225
+And then we're just gonna turn around and
+immediately call write,
+
+21
+00:01:01.225 --> 00:01:05.043
+passing the socket file descriptor to just
+send those bytes right from over from this
+
+22
+00:01:05.043 --> 00:01:06.997
+file descriptor to that file descriptor.
+
+23
+00:01:06.997 --> 00:01:10.065
+And unfortunately, we have this like,
+sort of annoying thing, of like,
+
+24
+00:01:10.065 --> 00:01:12.221
+first we have to, like,
+read them into our buffer.
+
+25
+00:01:12.221 --> 00:01:14.978
+And not only is that annoying,
+because it means we have to, like,
+
+26
+00:01:14.978 --> 00:01:16.995
+do this extra step,
+of like, reading it in, and
+
+27
+00:01:16.995 --> 00:01:19.287
+we got to figure out the size
+of the buffer and all that.
+
+28
+00:01:19.287 --> 00:01:21.570
+That's kind of annoying, but
+also separately, and like,
+
+29
+00:01:21.570 --> 00:01:23.853
+in dealing with the memory
+implications of that, and like,
+
+30
+00:01:23.853 --> 00:01:26.845
+considering we want to use malloc are
+going to use chunked reads and yada yada.
+
+31
+00:01:26.845 --> 00:01:29.086
+But also it's just less
+efficient in general,
+
+32
+00:01:29.086 --> 00:01:32.111
+if you're able to sort of let
+the operating system hang out and,
+
+33
+00:01:32.111 --> 00:01:35.079
+like, do its own thing,
+rather than, like, jumping back and
+
+34
+00:01:35.079 --> 00:01:39.134
+forth between OS functions and what's
+called user space functions, where, like.
+
+35
+00:01:39.134 --> 00:01:43.246
+The functions in our program, it's better
+to let the operating system do more stuff.
+
+36
+00:01:43.246 --> 00:01:46.785
+So sendfile is this very convenient
+function that essentially lets us say,
+
+37
+00:01:46.785 --> 00:01:49.728
+I'm gonna give you two file
+descriptors and a number of bytes.
+
+38
+00:01:49.728 --> 00:01:52.561
+I'm just like, hey, just take
+this many bytes from that one and
+
+39
+00:01:52.561 --> 00:01:55.356
+send them over there,
+which is exactly what we want to do here.
+
+40
+00:01:55.356 --> 00:01:58.659
+And that allows us to cut out
+that intermediary of the reading
+
+41
+00:01:58.659 --> 00:02:02.438
+it into the buffer and then turning
+around and immediately writing.
+
+42
+00:02:02.438 --> 00:02:05.769
+If I had to guess, I would guess that
+this, using sendfile right here,
+
+43
+00:02:05.769 --> 00:02:07.499
+I didn't actually benchmark this.
+
+44
+00:02:07.499 --> 00:02:11.318
+But I would guess that this is
+a significant chunk of the explanation for
+
+45
+00:02:11.318 --> 00:02:14.384
+why this thing is outperforming
+the rust and other ones.
+
+46
+00:02:14.384 --> 00:02:17.797
+Also, they're probably doing a lot of
+other [LAUGH] general overhead kind of
+
+47
+00:02:17.797 --> 00:02:19.891
+stuff, but this one,
+if I had to guess would?
+
+48
+00:02:19.891 --> 00:02:24.268
+I would guess that this one's maybe
+the most significant thing to avoid this,
+
+49
+00:02:24.268 --> 00:02:25.404
+like handoff work.
+
+50
+00:02:25.404 --> 00:02:28.573
+So basically, source file takes a source
+file descriptor, a destination file
+
+51
+00:02:28.573 --> 00:02:31.929
+descriptor, and then a number of bytes,
+and it just says, cool operating system,
+
+52
+00:02:31.929 --> 00:02:35.076
+you're gonna take this many bytes from
+the source file descriptor, namely.
+
+53
+00:02:35.076 --> 00:02:37.486
+In this case,
+our file that we've opened, and
+
+54
+00:02:37.486 --> 00:02:41.604
+then send them right over to the socket
+for the file descriptor as a destination.
+
+55
+00:02:41.604 --> 00:02:45.597
+Okay, now here's where things
+get a little bit tricky.
+
+56
+00:02:45.597 --> 00:02:47.663
+So here is the type of sendfile.
+
+57
+00:02:47.663 --> 00:02:50.480
+So it's like, you have the out file
+descriptor, so that's the one that we're
+
+58
+00:02:50.480 --> 00:02:52.726
+writing to in file descriptor,
+one that we're reading from.
+
+59
+00:02:52.726 --> 00:02:54.344
+This is sort of optional offset.
+
+60
+00:02:54.344 --> 00:02:57.196
+If you want to say, like,
+I don't want to read from like,
+
+61
+00:02:57.196 --> 00:03:00.750
+the very start of this file descriptor,
+maybe I want to, like, start,
+
+62
+00:03:00.750 --> 00:03:04.393
+500 bytes in for some reason, and
+then finally the count of the bytes.
+
+63
+00:03:04.393 --> 00:03:07.555
+Here is another way you
+can have a sendfile work.
+
+64
+00:03:07.555 --> 00:03:10.138
+This one returns an int
+instead of a size_t.
+
+65
+00:03:10.138 --> 00:03:12.849
+It takes a file descriptor instead
+of a second file descriptor.
+
+66
+00:03:12.849 --> 00:03:15.945
+It takes an int called s, and
+we'll talk about that in a sec.
+
+67
+00:03:15.945 --> 00:03:18.171
+It does take the offset,
+but it's over here, and
+
+68
+00:03:18.171 --> 00:03:19.925
+it takes like a length instead of like.
+
+69
+00:03:19.925 --> 00:03:22.894
+Being a size t, it's an off t address.
+
+70
+00:03:22.894 --> 00:03:26.773
+And then we have this sf-hdtr,
+which is a sure, and
+
+71
+00:03:26.773 --> 00:03:31.456
+then we have some flags, so
+like, what's the deal with this?
+
+72
+00:03:31.456 --> 00:03:33.317
+Why are we talking about this thing?
+
+73
+00:03:33.317 --> 00:03:39.364
+Unfortunately, this is what send file is
+on Linux, and this is what it is on Mac.
+
+74
+00:03:39.364 --> 00:03:42.146
+They have the same name and
+they do the same job, but
+
+75
+00:03:42.146 --> 00:03:45.600
+they have totally different types,
+totally different APIs.
+
+76
+00:03:45.600 --> 00:03:48.960
+Now, fortunately, we have been so
+far pretty insulated from this.
+
+77
+00:03:48.960 --> 00:03:51.482
+But here we have encountered
+our first example, and
+
+78
+00:03:51.482 --> 00:03:53.832
+there are other ones in there where,
+although,
+
+79
+00:03:53.832 --> 00:03:56.945
+yes, C at a language level is going
+to compile to the same stuff.
+
+80
+00:03:56.945 --> 00:04:01.091
+The libraries are not always identical
+when you go to different operating systems
+
+81
+00:04:01.091 --> 00:04:03.207
+or different operating system flavors.
+
+82
+00:04:03.207 --> 00:04:06.806
+So here's the Linux manual page for
+sendfile.
+
+83
+00:04:06.806 --> 00:04:10.277
+You notice that like the pound
+include here is sys/stenfile.h.
+
+84
+00:04:10.277 --> 00:04:12.911
+This doesn't even exist on Mac OS.
+
+85
+00:04:12.911 --> 00:04:15.731
+And we see that this has the, I would say,
+
+86
+00:04:15.731 --> 00:04:19.607
+nicer of the two APIs for sure,
+type that we saw earlier.
+
+87
+00:04:19.607 --> 00:04:21.499
+This is the manual page for that on Linux.
+
+88
+00:04:21.499 --> 00:04:25.108
+And then here we have, this is the
+actually the BSD version, because Mac OS
+
+89
+00:04:25.108 --> 00:04:28.799
+is built on top of BSD, which is a
+different flavor of Unix from Linux there.
+
+90
+00:04:28.799 --> 00:04:33.327
+So, like different parts of the Unix tree,
+Linux and BSD.
+
+91
+00:04:33.327 --> 00:04:38.232
+And here we have three includes
+[LAUGH] to get their sendfile,
+
+92
+00:04:38.232 --> 00:04:40.838
+none of which are sendfile.h.
+
+93
+00:04:40.838 --> 00:04:43.680
+[COUGH] and basically, at the end of
+the day, you look at these and you think,
+
+94
+00:04:43.680 --> 00:04:45.605
+like, hey,
+what happened to portable assembly?
+
+95
+00:04:45.605 --> 00:04:48.014
+Well, you may recall back
+when I introduced that term,
+
+96
+00:04:48.014 --> 00:04:51.039
+I did mention there's a little bit
+of a caveat that oftentimes, and so
+
+97
+00:04:51.039 --> 00:04:53.363
+far up to this point,
+we have been able to dodge this.
+
+98
+00:04:53.363 --> 00:04:56.887
+Like, none of the APIs that we've been
+using have happened to have been different
+
+99
+00:04:56.887 --> 00:04:59.100
+on different operating systems,
+but they can be.
+
+100
+00:04:59.100 --> 00:05:01.166
+And this is a case where
+they target totally are.
+
+101
+00:05:01.166 --> 00:05:03.946
+[COUGH] so the next question is,
+okay, well,
+
+102
+00:05:03.946 --> 00:05:07.834
+wait a minute, so I get it that
+these are two different things.
+
+103
+00:05:07.834 --> 00:05:10.317
+Does this mean I have to have
+two separate code bases now,
+
+104
+00:05:10.317 --> 00:05:13.940
+like just because I want to use sendfile,
+because it's obviously the best tool for
+
+105
+00:05:13.940 --> 00:05:15.254
+the job of what we want to use.
+
+106
+00:05:15.254 --> 00:05:18.188
+And now I need to, like, fork my code
+base and have one that's for Linux and
+
+107
+00:05:18.188 --> 00:05:20.487
+one that's for Mac OS, and
+they're totally identical.
+
+108
+00:05:20.487 --> 00:05:21.864
+Except for this one part.
+
+109
+00:05:21.864 --> 00:05:25.869
+Fortunately, no we can do something
+better than this using target-specific
+
+110
+00:05:25.869 --> 00:05:27.090
+preprocessor macros.
+
+111
+00:05:27.090 --> 00:05:30.475
+So I mentioned that earlier
+that on the Linux version only,
+
+112
+00:05:30.475 --> 00:05:32.788
+we need to include a sys/sendfile.h.
+
+113
+00:05:32.788 --> 00:05:34.114
+Here's how we can do that.
+
+114
+00:05:34.114 --> 00:05:37.848
+Basically, one of the other preprocessor
+directors we can have is ifdef.
+
+115
+00:05:37.848 --> 00:05:41.112
+And what this means is basically if,
+at some point.
+
+116
+00:05:41.112 --> 00:05:47.952
+And anybody who we have imported has
+done a pound define of __linux__.
+
+117
+00:05:47.952 --> 00:05:52.177
+And we don't even care what it was defined
+as we're just like, did anyone define that
+
+118
+00:05:52.177 --> 00:05:55.306
+in any was there a pound define
+at a point, at any point of this?
+
+119
+00:05:55.306 --> 00:05:59.014
+If so, then I want to just process this
+preprocessor directive immediately,
+
+120
+00:05:59.014 --> 00:06:01.439
+which is just gonna copy
+paste all of that in there.
+
+121
+00:06:01.439 --> 00:06:05.723
+And then here is the pound end,
+if that goes with the ifdef.
+
+122
+00:06:05.723 --> 00:06:08.153
+Essentially, what this is doing is saying,
+yeah,
+
+123
+00:06:08.153 --> 00:06:10.320
+I'm going to trust that
+the C compiler knows.
+
+124
+00:06:10.320 --> 00:06:13.257
+Are we building for Linux or
+building this binary for Mac OS?
+
+125
+00:06:13.257 --> 00:06:15.238
+And it's going to define,
+
+126
+00:06:15.238 --> 00:06:19.896
+like the pound define at the very
+beginning for me, __linux.
+
+127
+00:06:19.896 --> 00:06:23.194
+If it's Linux,
+then we'll see the Apple one in a sec.
+
+128
+00:06:23.194 --> 00:06:27.112
+And therefore I can now write in
+the middle of my C code, just like, hey,
+
+129
+00:06:27.112 --> 00:06:31.879
+if we're building for Linux, there's just
+different source code here, magically.
+
+130
+00:06:31.879 --> 00:06:36.208
+And if we're building for Mac OS,
+there's other different source code here.
+
+131
+00:06:36.208 --> 00:06:39.662
+So to go through the the actual like,
+sendfile version of this.
+
+132
+00:06:39.662 --> 00:06:42.509
+Like down below after we've
+done the include there.
+
+133
+00:06:42.509 --> 00:06:46.868
+Basically, we say elif Linux, we have
+Selenix specific code, and then elif,
+
+134
+00:06:46.868 --> 00:06:49.732
+which is the pre-processor directive for
+else if,
+
+135
+00:06:49.732 --> 00:06:52.160
+you can already kind of
+see why Zig was like.
+
+136
+00:06:52.160 --> 00:06:54.258
+We're just gonna let you run
+the language at compile time.
+
+137
+00:06:54.258 --> 00:06:57.313
+We're not gonna have if,def, and
+elif, and endif, and define.
+
+138
+00:06:57.313 --> 00:07:01.293
+And it's like no, we'll just, you just
+do the language at comp time is fine.
+
+139
+00:07:01.293 --> 00:07:04.883
+And also, for some reason, Linux is like
+lowercase, but then Apple is uppercase.
+
+140
+00:07:04.883 --> 00:07:06.940
+I'm not exactly sure
+what's going on there.
+
+141
+00:07:06.940 --> 00:07:08.194
+And then finally, we have an else.
+
+142
+00:07:08.194 --> 00:07:12.181
+And then basically, you can also have
+a pound error, [LAUGH] which is basically,
+
+143
+00:07:12.181 --> 00:07:14.833
+well, what happens if
+neither of these are defined?
+
+144
+00:07:14.833 --> 00:07:17.650
+Well, I would rather just get
+a build time error saying like,
+
+145
+00:07:17.650 --> 00:07:21.225
+hey, you're trying to build for
+something that doesn't have sendfile, and
+
+146
+00:07:21.225 --> 00:07:23.188
+like we kind of rely on that,
+so error out.
+
+147
+00:07:23.188 --> 00:07:26.570
+Or of course, this could be, if we didn't
+want to do this error, we could just say
+
+148
+00:07:26.570 --> 00:07:29.530
+like, well, this is the part where
+rather than using send file at all.
+
+149
+00:07:29.530 --> 00:07:32.654
+We're just going to fall back on the thing
+that we've already used where we like read
+
+150
+00:07:32.654 --> 00:07:34.824
+it into a buffer and
+then like write it from the buffer out.
+
+151
+00:07:34.824 --> 00:07:38.814
+So be a little less efficient, but
+at least it'll still work if we're
+
+152
+00:07:38.814 --> 00:07:42.412
+targeting something other than Linux or
+OS, such as windows.
+
+153
+00:07:42.412 --> 00:07:46.284
+Also worth noting that I mentioned at the
+very beginning of this course that we're
+
+154
+00:07:46.284 --> 00:07:49.371
+not doing Windows-specific APIs here,
+in large part because,
+
+155
+00:07:49.371 --> 00:07:51.018
+they have all these differences.
+
+156
+00:07:51.018 --> 00:07:55.408
+So if you can imagine this difference in
+sendfile, this would have also existed for
+
+157
+00:07:55.408 --> 00:07:57.867
+basically everything else we've seen here.
+
+158
+00:07:57.867 --> 00:08:01.533
+So like open, write, read,
+all of those have different names and
+
+159
+00:08:01.533 --> 00:08:03.367
+different APIs and Windows, but
+
+160
+00:08:03.367 --> 00:08:07.834
+the structure of the code would be about
+the same if we wanted to support Windows.
+
+161
+00:08:07.834 --> 00:08:09.640
+Basically, what we would have is
+just a whole bunch more of these.
+
+162
+00:08:09.640 --> 00:08:12.769
+So we would have like,
+we're gonna do a read, okay,
+
+163
+00:08:12.769 --> 00:08:14.938
+if def windows do it the windows way.
+
+164
+00:08:14.938 --> 00:08:17.085
+Otherwise do it, this way.
+
+165
+00:08:17.085 --> 00:08:20.758
+If we wanna do it open, okay, ifdef
+windows do it this way, otherwise, that.
+
+166
+00:08:20.758 --> 00:08:24.245
+You can imagine that would've made the
+course really kind of clunky to go through
+
+167
+00:08:24.245 --> 00:08:24.917
+if we did that.
+
+168
+00:08:24.917 --> 00:08:28.420
+But it's actually not that wild in terms
+of like how much of an effect it would
+
+169
+00:08:28.420 --> 00:08:32.001
+have on your program other than sort
+of littering these if-ifs everywhere.
+
+170
+00:08:32.001 --> 00:08:33.952
+This of course could lead you to say,
+what I'm gonna do?
+
+171
+00:08:33.952 --> 00:08:37.592
+I'm just gonna like make a generic
+version of open that works on Linux and
+
+172
+00:08:37.592 --> 00:08:40.455
+Mac OS, and Windows, and
+just like write my functions so
+
+173
+00:08:40.455 --> 00:08:43.514
+I can sort of isolate these
+preprocessor macros over there.
+
+174
+00:08:43.514 --> 00:08:46.903
+And then at that point, you might say,
+maybe I'll make a cross-platform standard
+
+175
+00:08:46.903 --> 00:08:49.159
+library and make a library
+that people can just import.
+
+176
+00:08:49.159 --> 00:08:51.918
+So they don't have to do that themselves,
+etc.
+
+177
+00:08:51.918 --> 00:08:55.735
+So this is where you get sort of like
+people who want to use more than just
+
+178
+00:08:55.735 --> 00:09:00.198
+the C standard library, making things
+cross-platform is a common reason to want
+
+179
+00:09:00.198 --> 00:09:02.028
+to read for something like that.
+
+180
+00:09:02.028 --> 00:09:04.601
+Okay, so
+as we're gonna do in the exercise,
+
+181
+00:09:04.601 --> 00:09:08.598
+this is the part where we're like,
+cool, I'm gonna call sendfile,
+
+182
+00:09:08.598 --> 00:09:12.771
+passing like Linux specific arguments or
+macOS-specific arguments.
+
+183
+00:09:12.771 --> 00:09:15.602
+And then we can just
+have things just work.
+
+184
+00:09:15.602 --> 00:09:17.768
+So to summarize everything
+we talked about,
+
+185
+00:09:17.768 --> 00:09:20.396
+we started off talking about
+bit shifts and switches.
+
+186
+00:09:20.396 --> 00:09:24.478
+Basically using the combination of those,
+plus this other kind of wild hack
+
+187
+00:09:24.478 --> 00:09:28.645
+that we're doing to convert things into
+integers that are clearly strings.
+
+188
+00:09:28.645 --> 00:09:32.138
+We talked about preprocessor macros as
+a way to improve the ergonomics of that.
+
+189
+00:09:32.138 --> 00:09:35.692
+So that rather than having to, like,
+write out this hard-coded like,
+
+190
+00:09:35.692 --> 00:09:39.482
+billion plus number, we could actually
+just write some code that at least has
+
+191
+00:09:39.482 --> 00:09:41.780
+the contents of the string
+that we care about.
+
+192
+00:09:41.780 --> 00:09:44.280
+And yet be able to use it in a switch and
+all that.
+
+193
+00:09:44.280 --> 00:09:47.232
+And then finally, we talked about how
+to access platform specific code,
+
+194
+00:09:47.232 --> 00:09:48.243
+because with send file.
+
+195
+00:09:48.243 --> 00:09:53.669
+We actually need to be able to do
+something completely different
+
+196
+00:09:53.669 --> 00:10:00.208
+when it comes to Linux versus Mac OS,
+just because the APIs are so different.
+
