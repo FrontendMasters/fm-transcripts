@@ -1,0 +1,87 @@
+[00:00:00]
+>> Richard Feldman: Okay, so this naturally leads to another question, which is, okay, I don't wanna read 100 bytes, I wanna read all the bytes, however many bytes for the file, that's how many I wanna read. So to do this, we actually have to do another step, which is, we need to go and look at actually run a function that will ask the operating system, hey, how many bytes are in this file?
+
+[00:00:15]
+So basically, there's a couple of steps to the process we're gonna do here. First is, I wanna get the size of the file on disks as a function we can call, it'll do that. Second, I want to make a buffer of however many bytes that is. So I don't wanna make a buffer of 100 bytes, I wanna make a buffer that's exactly that many bytes.
+
+[00:00:29]
+And then three I can call read passing that buffer and then it'll just read that many bytes in there. Great, okay, so here's how we're gonna do that. Yeah [LAUGH] don't worry, we're not actually using all this. So this is what's called stat, and stat is a struct in C.
+
+[00:00:47]
+So a struct, you can kind of think about it like an object in other languages, but a very, very bare bones, very, very minimal object. Really what a struct is in C is, it's maybe more similar to imagine if you just had all these variables one after the other and they were all just contiguously stored back to back in memory.
+
+[00:01:05]
+They're not quite contiguous. There's this thing called alignment padding, but we're not gonna get into alignment in this workshop. But the basic idea here is that there's no extra metadata here at all. So in some languages you can do stuff like, I can iterate over all the fields and they'll give them the strings.
+
+[00:01:20]
+These strings are gone, C is I don't know, forget about that, we're just throwing those out the window. These are just conveniences for the programmer so that it knows that this string means get the first one and this string means get the second one. So if you say start.mode_t, it's, that means get the memory at this offset.
+
+[00:01:36]
+So this is all just one big contiguous chunk of bytes. And in fact, if you wanted to you could try to get access to these different fields on this struct by just taking the memory address of your particular stat instance and just doing the same thing we've been doing with these arrays.
+
+[00:01:51]
+Just like +5, +6, whatever, just add to it and just read the memory at that address, and that's what you're gonna get right here. So essentially, the struct concept in C is a way to essentially have an array of bytes, but with conveniences. So that you can actually refer to different chunks of this big set of ones and zeros by name, rather than having to do all this arithmetic like we've been doing to get the offset right and then cast to this or that.
+
+[00:02:18]
+So it's essentially a convenience for what we're doing. Now we're gonna call this C function in a second, that's going to give us back a stat instance. So it's basically gonna give us one of these values. And then what we're gonna do is we're gonna get the thing that we care about, which is this, st_size, which is the total size in bytes of the file.
+
+[00:02:41]
+Now you might notice the entire struct stat is way more information than just the total size in bytes. This is 144 bytes worth of data, and it's got all sorts of stuff like the inode number, in case you hear that, the user ID of the owner, the group ID, the device ID, last access time, last modification time, all this stuff.
+
+[00:02:58]
+There's all this information about the metadata of the file. And when we do this one function call, it just gives us back that one thing, this whole struct even though all we care about is just this one thing. So here's how we're gonna do that. We're gonna say struct stat metadata.
+
+[00:03:16]
+The struct keyword is essentially kind of int or char or something like that, except that it's saying this isn't one of the built-in types, this is actually a user-defined struct type. And then the next thing you say is the name of the struct. So struct followed by stat.
+
+[00:03:32]
+So stat is the name of the struct that this is gonna be. And we say metadata, once again, we are actually not initializing this memory. So we're not doing an equals. You remember previously, we said, I wanna make this buffer, and I said, (100); which basically means I want you to reserve, this is gonna be an address, and I want you to reserve that many bytes, 100 bytes of memory.
+
+[00:03:55]
+Don't put other stuff in there, because I'm gonna write into this. This is exactly the same thing, except instead of 100 bytes its the 144 bytes that this thing takes up automatically. So the compiler is gonna take care of that for you. But basically, when you get to this program, if you were to look at the assembly language, basically what it's gonna be doing is saying, essentially, reserve 144 bytes worth of stuff, and then just give me back the address to the beginning of that, and I'm gonna write into that.
+
+[00:04:21]
+And just like with read, essentially you call this function called fstat, which basically is fd, I'll talk about the ampersand in a second here, and then metadata. And it's basically gonna be, okay cool, give me the file descriptor, give me the address to write into, and it's just gonna go ahead and write 144 bytes into that memory that contains all of this metadata information about the file.
+
+[00:04:42]
+So after we have run this, now I can go look at my metadata thing and say, .this.that, get the values off of it. But until I've actually called that fstat, I have not populated this metadata thing, and this is just memory garbage. Again, I could say metadata., whatever, st_rdev, whatever, and that's just gonna give me back a couple of bytes of memory garbage, whatever happens to be a memory until I've actually called fstat on it.
+
+[00:05:06]
+Once again, it returns -1 if it fails. So once again, this is where we do the error handling. This time I did a little, because we're actually not using the output of fstat at all, the return value is only used for error handling, which is also a common thing we see in C.
+
+[00:05:23]
+It's really common in that case just to do if, call the thing, double equals -1 and then just handle the errors right there. And if there is no error, then we'll just pass through this if and not do any of that stuff. So what the ampersand does is it basically says, okay, give me the address of the first byte of those 144 bytes.
+
+[00:05:40]
+So unlike arrays, unlike strings, when you have a struct like this, what this is, by default, it's more similar to an individual int or an individual char, where basically if we have an int, that's like a 32-bit integer, which is 4 bytes. Those 4 bytes, if I pass this fd around, that 4 bytes are gonna get copied around every single time.
+
+[00:06:02]
+So whenever you pass this to a function, what the CPU is doing is saying, that's a 4-byte integer, copy all 4 of those bytes into whatever global thing is gonna be used by that function. With structs, you maybe don't want that because this is 144 bytes. So the default behavior of passing around 144 bytes every single time, well, that would mean that something like fstat for example, actually fstat is a bad example.
+
+[00:06:29]
+But if I wanted to pass this around from function to function, that would be a lot of bytes to be copying around just to get the data from point A to point B. So in those scenarios, basically, C gives you a way to say, okay, I don't want all 144 bytes to be copied here.
+
+[00:06:44]
+I just want you to go give me the address, which is gonna be a much more compact 8-bytes. And the ampersand is basically, take whatever thing I've got here and give me the memory address of it. And so this not only does it work with structs, but it also works with anything.
+
+[00:06:56]
+So for example, if I said ampersand fd, that would say, okay, I don't want the actual integer of the file descriptor, I want the address of that file descriptor. In other words, I wanna know where in memory that thing is. So you can do this on absolutely anything.
+
+[00:07:08]
+Anywhere in C, if you're I have a thing, and I got the value at runtime that's actually useful, I wanna see where that thing is stored in memory, stick an ampersand on there, and it'll tell you. It'll just turn it right into that memory address right there. So this is a way to get a struct in this sort of a more array-like, more string-like fashion, which is what fstat expects.
+
+[00:07:31]
+Okay, so we ran fstat. We already handled the error case. We assume there's no error at this point. Now metadata, that struct has 144 bytes populated. And now we can finally print out metadata.st_size. St_size has a, ld is the [LAUGH] escape code there for some reason. Like I said, they just have all these different escape codes.
+
+[00:07:52]
+I don't know where they come up with the naming conventions for these, but for this particular size, that's the one that you need to use in order to print it out. And it will sure enough print it out. And so now we actually know how big our file is.
+
+[00:08:02]
+We know how much memory to reserve, so that when we do our read, we're actually reading the appropriate amount of bytes, rather than that hard-coded 100 bytes. Now, you might have thought this is gonna be really simple, straightforward, and just be, just file., how big are you, [LAUGH] right?
+
+[00:08:16]
+Not quite. [LAUGH] It's a little bit of an extra dance, a little bit of a stomping over memory with other memory, uninitialized memory, that kind of stuff. But the reason we're going through this process is just to give you a sense of this is how things are done in C.
+
+[00:08:27]
+And also worth noting, this is also quite efficient, and when we get to the section on heat memory, we can see how the thing that's more convenient is in many ways less efficient than doing it this way.
+

@@ -1,0 +1,108 @@
+[00:00:00]
+>> Richard Feldman: This optimization that we've done here, if you want to call it, that relies on number one, knowing extensions fit in four bytes. If it were really common to see file extensions that were more than four bytes, this would probably be a terrible idea. Assuming it's not a terrible idea already, also knowing memory is just ones and zeros, and that we can reinterpret them however we want.
+
+[00:00:18]
+Also, using a language that supports doing this sort of thing. And finally, just basically having this sort of will to actually implemented this way, even though it and maybe it's a safer less complicated way you could do it, okay? So I just want to talk very briefly about this function called sendfile.
+
+[00:00:35]
+So you might have notice that what we've been doing here is essentially we say okay, we get a request in, we read the requests, we parse it. We get out the file. We want to do we say okay, cool, we've got our socket file descriptor. We're gonna put that on the shelf for a second.
+
+[00:00:50]
+We are just read the request in. We're gonna go read the from a file descriptor off the file system to read all that into our local little buffer variable. And then we're just gonna turn around and immediately call write, passing the socket file descriptor to just send those bytes right from over from this file descriptor to that file descriptor.
+
+[00:01:06]
+And unfortunately, we have this like, sort of annoying thing, of like, first we have to, like, read them into our buffer. And not only is that annoying, because it means we have to, like, do this extra step, of like, reading it in, and we got to figure out the size of the buffer and all that.
+
+[00:01:19]
+That's kind of annoying, but also separately, and like, in dealing with the memory implications of that, and like, considering we want to use malloc are going to use chunked reads and yada yada. But also it's just less efficient in general, if you're able to sort of let the operating system hang out and, like, do its own thing, rather than, like, jumping back and forth between OS functions and what's called user space functions, where, like.
+
+[00:01:39]
+The functions in our program, it's better to let the operating system do more stuff. So sendfile is this very convenient function that essentially lets us say, I'm gonna give you two file descriptors and a number of bytes. I'm just like, hey, just take this many bytes from that one and send them over there, which is exactly what we want to do here.
+
+[00:01:55]
+And that allows us to cut out that intermediary of the reading it into the buffer and then turning around and immediately writing. If I had to guess, I would guess that this, using sendfile right here, I didn't actually benchmark this. But I would guess that this is a significant chunk of the explanation for why this thing is outperforming the rust and other ones.
+
+[00:02:14]
+Also, they're probably doing a lot of other [LAUGH] general overhead kind of stuff, but this one, if I had to guess would? I would guess that this one's maybe the most significant thing to avoid this, like handoff work. So basically, source file takes a source file descriptor, a destination file descriptor, and then a number of bytes, and it just says, cool operating system, you're gonna take this many bytes from the source file descriptor, namely.
+
+[00:02:35]
+In this case, our file that we've opened, and then send them right over to the socket for the file descriptor as a destination. Okay, now here's where things get a little bit tricky. So here is the type of sendfile. So it's like, you have the out file descriptor, so that's the one that we're writing to in file descriptor, one that we're reading from.
+
+[00:02:52]
+This is sort of optional offset. If you want to say, like, I don't want to read from like, the very start of this file descriptor, maybe I want to, like, start, 500 bytes in for some reason, and then finally the count of the bytes. Here is another way you can have a sendfile work.
+
+[00:03:07]
+This one returns an int instead of a size_t. It takes a file descriptor instead of a second file descriptor. It takes an int called s, and we'll talk about that in a sec. It does take the offset, but it's over here, and it takes like a length instead of like.
+
+[00:03:19]
+Being a size t, it's an off t address. And then we have this sf-hdtr, which is a sure, and then we have some flags, so like, what's the deal with this? Why are we talking about this thing? Unfortunately, this is what send file is on Linux, and this is what it is on Mac.
+
+[00:03:39]
+They have the same name and they do the same job, but they have totally different types, totally different APIs. Now, fortunately, we have been so far pretty insulated from this. But here we have encountered our first example, and there are other ones in there where, although, yes, C at a language level is going to compile to the same stuff.
+
+[00:03:56]
+The libraries are not always identical when you go to different operating systems or different operating system flavors. So here's the Linux manual page for sendfile. You notice that like the pound include here is sys/stenfile.h. This doesn't even exist on Mac OS. And we see that this has the, I would say, nicer of the two APIs for sure, type that we saw earlier.
+
+[00:04:19]
+This is the manual page for that on Linux. And then here we have, this is the actually the BSD version, because Mac OS is built on top of BSD, which is a different flavor of Unix from Linux there. So, like different parts of the Unix tree, Linux and BSD.
+
+[00:04:33]
+And here we have three includes [LAUGH] to get their sendfile, none of which are sendfile.h. [COUGH] and basically, at the end of the day, you look at these and you think, like, hey, what happened to portable assembly? Well, you may recall back when I introduced that term, I did mention there's a little bit of a caveat that oftentimes, and so far up to this point, we have been able to dodge this.
+
+[00:04:53]
+Like, none of the APIs that we've been using have happened to have been different on different operating systems, but they can be. And this is a case where they target totally are. [COUGH] so the next question is, okay, well, wait a minute, so I get it that these are two different things.
+
+[00:05:07]
+Does this mean I have to have two separate code bases now, like just because I want to use sendfile, because it's obviously the best tool for the job of what we want to use. And now I need to, like, fork my code base and have one that's for Linux and one that's for Mac OS, and they're totally identical.
+
+[00:05:20]
+Except for this one part. Fortunately, no we can do something better than this using target-specific preprocessor macros. So I mentioned that earlier that on the Linux version only, we need to include a sys/sendfile.h. Here's how we can do that. Basically, one of the other preprocessor directors we can have is ifdef.
+
+[00:05:37]
+And what this means is basically if, at some point. And anybody who we have imported has done a pound define of __linux__. And we don't even care what it was defined as we're just like, did anyone define that in any was there a pound define at a point, at any point of this?
+
+[00:05:55]
+If so, then I want to just process this preprocessor directive immediately, which is just gonna copy paste all of that in there. And then here is the pound end, if that goes with the ifdef. Essentially, what this is doing is saying, yeah, I'm going to trust that the C compiler knows.
+
+[00:06:10]
+Are we building for Linux or building this binary for Mac OS? And it's going to define, like the pound define at the very beginning for me, __linux. If it's Linux, then we'll see the Apple one in a sec. And therefore I can now write in the middle of my C code, just like, hey, if we're building for Linux, there's just different source code here, magically.
+
+[00:06:31]
+And if we're building for Mac OS, there's other different source code here. So to go through the the actual like, sendfile version of this. Like down below after we've done the include there. Basically, we say elif Linux, we have Selenix specific code, and then elif, which is the pre-processor directive for else if, you can already kind of see why Zig was like.
+
+[00:06:52]
+We're just gonna let you run the language at compile time. We're not gonna have if,def, and elif, and endif, and define. And it's like no, we'll just, you just do the language at comp time is fine. And also, for some reason, Linux is like lowercase, but then Apple is uppercase.
+
+[00:07:04]
+I'm not exactly sure what's going on there. And then finally, we have an else. And then basically, you can also have a pound error, [LAUGH] which is basically, well, what happens if neither of these are defined? Well, I would rather just get a build time error saying like, hey, you're trying to build for something that doesn't have sendfile, and like we kind of rely on that, so error out.
+
+[00:07:23]
+Or of course, this could be, if we didn't want to do this error, we could just say like, well, this is the part where rather than using send file at all. We're just going to fall back on the thing that we've already used where we like read it into a buffer and then like write it from the buffer out.
+
+[00:07:34]
+So be a little less efficient, but at least it'll still work if we're targeting something other than Linux or OS, such as windows. Also worth noting that I mentioned at the very beginning of this course that we're not doing Windows-specific APIs here, in large part because, they have all these differences.
+
+[00:07:51]
+So if you can imagine this difference in sendfile, this would have also existed for basically everything else we've seen here. So like open, write, read, all of those have different names and different APIs and Windows, but the structure of the code would be about the same if we wanted to support Windows.
+
+[00:08:07]
+Basically, what we would have is just a whole bunch more of these. So we would have like, we're gonna do a read, okay, if def windows do it the windows way. Otherwise do it, this way. If we wanna do it open, okay, ifdef windows do it this way, otherwise, that.
+
+[00:08:20]
+You can imagine that would've made the course really kind of clunky to go through if we did that. But it's actually not that wild in terms of like how much of an effect it would have on your program other than sort of littering these if-ifs everywhere. This of course could lead you to say, what I'm gonna do?
+
+[00:08:33]
+I'm just gonna like make a generic version of open that works on Linux and Mac OS, and Windows, and just like write my functions so I can sort of isolate these preprocessor macros over there. And then at that point, you might say, maybe I'll make a cross-platform standard library and make a library that people can just import.
+
+[00:08:49]
+So they don't have to do that themselves, etc. So this is where you get sort of like people who want to use more than just the C standard library, making things cross-platform is a common reason to want to read for something like that. Okay, so as we're gonna do in the exercise, this is the part where we're like, cool, I'm gonna call sendfile, passing like Linux specific arguments or macOS-specific arguments.
+
+[00:09:12]
+And then we can just have things just work. So to summarize everything we talked about, we started off talking about bit shifts and switches. Basically using the combination of those, plus this other kind of wild hack that we're doing to convert things into integers that are clearly strings.
+
+[00:09:28]
+We talked about preprocessor macros as a way to improve the ergonomics of that. So that rather than having to, like, write out this hard-coded like, billion plus number, we could actually just write some code that at least has the contents of the string that we care about. And yet be able to use it in a switch and all that.
+
+[00:09:44]
+And then finally, we talked about how to access platform specific code, because with send file. We actually need to be able to do something completely different when it comes to Linux versus Mac OS, just because the APIs are so different.
+

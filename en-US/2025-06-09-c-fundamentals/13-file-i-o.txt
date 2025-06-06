@@ -1,0 +1,105 @@
+[00:00:00]
+>> Richard Feldman: Now we're going to get into some actual file IO. So up to this point, we've only been working with strings, but of course, in order for our static web server to actually work, we need to be reading these index dot HTML files off of the disk in order to send them back to the browser.
+
+[00:00:11]
+So the browser can do all of its work rendering them and making them look nice. So we're gonna start by looking at how to open a file, and then how to get the size of the file, which is going to be important later. And also reading the contents of the file, of course, something we want to do.
+
+[00:00:24]
+And then finally, we're going to talk a little bit about the stack versus the heap. And in this section, we're gonna see an alternative that we could have used to stomping all over the request that we saw earlier, okay. So just to recap what we did so far, we talked about if we got an incoming request of get /blog.
+
+[00:00:40]
+We wanna translate that into the file path of a blog / index.html with or without a slash on the end. Either case, we handle that in our sort of little cheap unit test, and the exercise is verified that this is all good. Let's suppose that our path is example.txt.
+
+[00:00:56]
+If we wanna open that file for reading, which is what we're gonna do in our static web server. We don't care about writing files at all. This is how we would do that. So there's two pieces to note here. So first we're saying we're calling this function named open.
+
+[00:01:09]
+We're passing in the path and we're giving it this flag that says Read only. This is just a constant that's available for the standard library that basically says, I want to open this file in read-only mode. Other options include, I can say, like, I want to allow writes but not reads.
+
+[00:01:24]
+Or you can say, I want to allow both for our purposes. This is just like a little, nice, little safety measure that we make sure we don't accidentally write to this file, because we really only want to be reading from these. The path again, this is a memory address.
+
+[00:01:36]
+So as we know, this is an integer that's being passed open, and this also is another integer [LAUGH]. So this flag of whether it's read only or rewrite, etc, is just a constant that's an integer. Now open returns an int, which is known as a file descriptor. Now as we're gonna see in a moment, the file descriptor can also be used to do things like reading things from the file or getting the size of the file.
+
+[00:02:00]
+It's basically, a way to avoid having to pass in this path every single time. The operating system has this concept of like, okay, I've opened this file. I've sort of made a little in-memory database of like, yes, this file, this ID, this integer ID, which we call file descriptor or FD for short.
+
+[00:02:17]
+This corresponds to a particular like index into that table. And that table just refers to like the actual paths and it actually does like I-nodes and stuff on disk, but conceptually you can think of it as a way to just not have to keep passing this path around, and okay, this file is now open.
+
+[00:02:31]
+And basically, because there are limited number of these, as we talked about previously, there's like about 4 billion possible ones in int. But actually the operating system will generally restrict you to a much lower number, but you can increase that limit if you want by running some program.
+
+[00:02:47]
+The other thing you have to note, is that it's very important to remember to close your file descriptors when you're done. If you don't, you can have what's called a file descriptor leak, which can have essentially the, well, some bad symptoms, but they're similar to the symptoms of a memory leak.
+
+[00:03:03]
+So open it, get your file descriptor, do things with the file descriptor, and then once you're done and you're, I don't want to do any more stuff with this file, you want to make sure and close it. So first thing to note about handling errors in C is that it is super common to have a C function that returns either a normal looking number.
+
+[00:03:24]
+So in this case, a file descriptor of, 0, 1, 2, 3, 4, whatever, or -1. And -1 is just something you're just supposed to know means an error occurred. So you don't get any help with this. C doesn't say, hey, did you forget to check for the error?
+
+[00:03:38]
+It also doesn't do any automatic propagation try, catch, no. It's just like you run open, it does its thing, and it gives you back a file descriptor. And if that file descriptor happens to be -1, then you're supposed to know, hey, I should check for that and see if there was an error.
+
+[00:03:54]
+So for example, if the path is not found, open will return -1. There is a separate function you can call that will get additional error information. We're not gonna talk about that yet, we'll get into that later. But basically, this is a really important thing to know about calling functions in C.
+
+[00:04:11]
+Whenever you're reading the documentation for any C function, you always wanna check the return value and make sure that you understand what are the special return values that mean an error occurred. And I shouldn't trust the output that it gave me. Cuz it's not gonna throw an exception, it's just gonna silently give you an invalid number.
+
+[00:04:28]
+Okay, so the other thing that you need to do once you've opened it, is you need to actually do something useful with it, just opening it on its own doesn't actually cause anything to be read. Or any metadata to come off of it. So in this case, we wanna actually like read from the file.
+
+[00:04:43]
+Here's how we're to do that. We're gonna call this function called read and read takes a file descriptor, again an integer. It takes a buffer and buffer is, this is our like bracket array syntax. So you may recall this just like everything else returns a memory address. So if we'd said char star that would also give us a memory address.
+
+[00:05:00]
+The reason that we're doing this bracket 100 is basically this means, hey, in the same way that when we had, like, open bracket, close bracket. And we set it equal to be a string bracket, 100 basically says, I want you to reserve space for 100 bytes. And they're bytes because it's char, if I said int, it would be reserved space for 100 ints.
+
+[00:05:19]
+And because I didn't put an equals here, I just put a semicolon, I'm basically saying. Yeah, don't initialize that memory to anything. So if it was a string, it would say, like, okay, initialize the memory to these bytes, the bytes that I wrote in the string. This is an array.
+
+[00:05:31]
+So I could have also said, initialize these to be all zeros, or all ones, or something like that. But what we're doing here is, I'm saying don't initialize it. Don't initialize it at all. Don't put anything in there. I just want you to reserve that memory. Don't use it for anything else, don't put any strings in there.
+
+[00:05:46]
+Don't put any other variables in there. Those are all reserved for me, and give me back the address, the first one that you reserved. And what's the contents of this memory garbage? We have no idea. It could be random stuff in memory. Don't read this thing, or you're gonna, I mean, you can, but you're just gonna get memory garbage.
+
+[00:06:00]
+It's gonna be just like that first exercise. And we read off the end of Hello World. That's what's gonna happen, if you [LAUGH] printf this thing. It's just whatever ones and zeros happen to be at that address. And what the read function does. It says, okay, give me the file descriptor that you already opened.
+
+[00:06:17]
+So this is gonna be our example dot txt. And then it says, give me the memory address that you want to read into. So you may recall in our previous session, we did this thing that seemed like a very strange thing to do in most programming languages where we took this request string.
+
+[00:06:29]
+There was already some data there, and then we just stomped all over it. It's totally normal thing to do in C. It is such a normal thing to do in C that literally the way that you read files in C is to do exactly that. This is the official C standard library approved way to read files is you literally say, give me a memory address.
+
+[00:06:46]
+And it's, cool, I am going to stomp all over those bytes that you gave me. I'm going to just smash whatever's in the file into this memory address and whatever's there is just getting overwritten. And then the final argument is basically like up to how many bytes do you wanna do this?
+
+[00:07:01]
+I'm saying I wanna read 100 bytes. So it's basically, give me the first 100 bytes of this file and just smash into this buffer and just like overwrite, 100 bytes here. So as we've seen before, you can guess what would happen. What if I said 200 here? It's, cool, it's just gonna keep writing right off the end of that.
+
+[00:07:16]
+It's gonna override who knows what memory in my function. We might get a bus error, we might get an abort. Who knows? Could be fun, don't recommend it. You want your program to work, right? You definitely wanna only give it the address that actually has 100 bytes that are safe to write into because that's what Read's gonna do.
+
+[00:07:31]
+C might be the only language where you call a function called read, and the first thing it does is write. The other thing that read does is because it might not actually write 100 bytes, like maybe I say, write 100 bytes into this buffer. Maybe it only, the file isn't that long.
+
+[00:07:45]
+The file is only like 30 bytes. Read will return how many bytes it actually wrote. In other words, like how long the file actually was. So if you get back 100, that might mean the file is 100 bytes long, but it also might mean that it's more than 100 bytes because it's, well, I wrote 100 bytes.
+
+[00:08:00]
+That's how many bytes I wrote into the thing that you gave me. The address that you gave me. Maybe there's more left in the file, I'm not telling you that. I'm just telling you what I actually did. Also, as with the open there is this little fun special case of if the length that it returns is negative one, then that means there was an error.
+
+[00:08:19]
+And we're responsible for handling read errors in that way. So again, you just got to read the docs to know to check for negative one, although, honestly, you start to use these things enough, and it starts to become kind of a habit. It's, all right, what's the special magical value that means an error occurred?
+
+[00:08:31]
+Let's check for that every time we call one of these functions. But you can forget it, and if you do forget it, then you're just going to end up passing this length of negative one somewhere else, and who knows what's gonna happen. Okay, so, yeah, so if I want to print, printf, here's how many bytes we actually read, we can print that out, and it's gonna say, here's the length.
+
+[00:08:51]
+And and that will tell us basically, here's what actually happened. If it was not quite 100 bytes that were read.
+

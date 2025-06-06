@@ -1,0 +1,903 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:01.007
+Bring all that together,
+
+2
+00:00:01.007 --> 00:00:03.725
+we've got our thing back here,
+we've got our struct stat metadata.
+
+3
+00:00:03.725 --> 00:00:07.075
+We're calling fstat and
+the file descriptor, metadata address.
+
+4
+00:00:07.075 --> 00:00:09.909
+We asked,
+what if I wanna read all the bytes?
+
+5
+00:00:09.909 --> 00:00:11.548
+This is the answer to that question.
+
+6
+00:00:11.548 --> 00:00:13.954
+So now that I've got
+my metadata populated,
+
+7
+00:00:13.954 --> 00:00:18.846
+instead of saying char buffer bracket 100,
+I can say char buffer metadata.st_size.
+
+8
+00:00:18.846 --> 00:00:21.513
+And this will basically say,
+now my buffer is,
+
+9
+00:00:21.513 --> 00:00:25.716
+instead of being hard-coded at 100,
+it's going to reserve, again,
+
+10
+00:00:25.716 --> 00:00:29.337
+in the functions memory,
+however many bytes that file size is.
+
+11
+00:00:29.337 --> 00:00:33.966
+But unfortunately, this can very easily
+lead to a segmentation fault if we
+
+12
+00:00:33.966 --> 00:00:36.474
+don't [LAUGH] double up on that, right?
+
+13
+00:00:36.474 --> 00:00:39.303
+So the segmentation fault actually
+can happen even without considering
+
+14
+00:00:39.303 --> 00:00:40.007
+the 100 here.
+
+15
+00:00:40.007 --> 00:00:42.778
+So what can happen here,
+is essentially that,
+
+16
+00:00:42.778 --> 00:00:46.934
+if we have too many bytes for the stack,
+that will result in a segfault,
+
+17
+00:00:46.934 --> 00:00:51.190
+actually because of the guard page
+thing we were talking about earlier.
+
+18
+00:00:51.190 --> 00:00:55.902
+So by default, in most operating
+systems and most programming languages,
+
+19
+00:00:55.902 --> 00:00:58.414
+the stack has a fixed hard-coded size.
+
+20
+00:00:58.414 --> 00:01:01.275
+You can configure it, but it's like,
+the program starts running,
+
+21
+00:01:01.275 --> 00:01:03.610
+you get this much stack space,
+and that's all you get.
+
+22
+00:01:03.610 --> 00:01:06.015
+I'm not gonna go into why that is,
+it's actually a good design decision for
+
+23
+00:01:06.015 --> 00:01:06.704
+a number of reasons.
+
+24
+00:01:06.704 --> 00:01:11.114
+But it does mean that, if you run out
+of stack space, then you get an error,
+
+25
+00:01:11.114 --> 00:01:13.214
+in this case a segmentation fault.
+
+26
+00:01:13.214 --> 00:01:16.998
+Because we are saying,
+however many bytes the file is,
+
+27
+00:01:16.998 --> 00:01:21.522
+I want you to reserve that many
+bytes on the stack with this buffer.
+
+28
+00:01:21.522 --> 00:01:24.887
+If we reserve more bytes than is
+available in the stack, let's say,
+
+29
+00:01:24.887 --> 00:01:28.021
+we have some file that's like
+10 gigabytes or something, and
+
+30
+00:01:28.021 --> 00:01:31.171
+that's just the stack is just not
+that big [LAUGH] in the program.
+
+31
+00:01:31.171 --> 00:01:35.580
+Yeah, you get an error right there, right,
+when you're trying to do this right away.
+
+32
+00:01:35.580 --> 00:01:38.848
+So essentially, if you look at
+your program's entire memory,
+
+33
+00:01:38.848 --> 00:01:42.599
+like all the ones and zeros that
+are reserved for your program's memory,
+
+34
+00:01:42.599 --> 00:01:46.291
+the first section of ones and zeros is
+gonna be the actual executable data
+
+35
+00:01:46.291 --> 00:01:49.283
+itself, plus some constants
+like the strings and stuff.
+
+36
+00:01:49.283 --> 00:01:51.584
+Then after that,
+there's some global mutable variables,
+
+37
+00:01:51.584 --> 00:01:53.173
+there's some space reserved for those.
+
+38
+00:01:53.173 --> 00:01:56.711
+Then you have the stack, and then after
+that, you have all this other stuff,
+
+39
+00:01:56.711 --> 00:01:58.083
+which is basically the heap.
+
+40
+00:01:58.083 --> 00:02:00.921
+So the heap is by far
+the biggest part of memory.
+
+41
+00:02:00.921 --> 00:02:02.992
+This is what malloc essentially uses.
+
+42
+00:02:02.992 --> 00:02:07.963
+And if you wanted to, you could
+solve this problem by saying, okay,
+
+43
+00:02:07.963 --> 00:02:12.692
+I wanna call malloc of that metadata
+size and get back the buffer.
+
+44
+00:02:12.692 --> 00:02:15.128
+And malloc will return you
+an address of this, and
+
+45
+00:02:15.128 --> 00:02:16.812
+then you will solve that problem.
+
+46
+00:02:16.812 --> 00:02:20.232
+But then, of course, now you need to
+remember to free the buffer later on.
+
+47
+00:02:20.232 --> 00:02:23.085
+So putting these two things together,
+if I wanted to,
+
+48
+00:02:23.085 --> 00:02:26.495
+I could say, I'm not gonna worry
+about stack size of this thing,
+
+49
+00:02:26.495 --> 00:02:29.056
+I'm just gonna malloc of
+that exact many bytes.
+
+50
+00:02:29.056 --> 00:02:31.089
+I have plenty of space on the heap for
+that,
+
+51
+00:02:31.089 --> 00:02:33.528
+I don't need to worry about
+overflowing the heap.
+
+52
+00:02:33.528 --> 00:02:38.389
+Then I get the length by calling, sorry,
+then I call read of metadata.st_size, read
+
+53
+00:02:38.389 --> 00:02:43.184
+that many bytes into this buffer, just
+like we did before, except instead of 100,
+
+54
+00:02:43.184 --> 00:02:46.497
+now it's just however many
+bytes are actually in the file.
+
+55
+00:02:46.497 --> 00:02:49.084
+Do my length check and
+then print that I read this many bytes.
+
+56
+00:02:49.084 --> 00:02:52.060
+And then, I need to remember,
+just like I remember the file descriptor,
+
+57
+00:02:52.060 --> 00:02:55.138
+not only did I close the file descriptor,
+but also I need to free the buffer.
+
+58
+00:02:55.138 --> 00:02:58.189
+And these can happen in either order,
+it doesn't really matter if I free
+
+59
+00:02:58.189 --> 00:03:00.656
+the buffer memory or
+if I close the file descriptor first.
+
+60
+00:03:00.656 --> 00:03:01.792
+It doesn't matter,
+
+61
+00:03:01.792 --> 00:03:05.837
+it's just I need to remember to do
+the sort of bookkeeping myself manually.
+
+62
+00:03:05.837 --> 00:03:09.757
+Now, worth noting [LAUGH] that
+another thing that can happen is,
+
+63
+00:03:09.757 --> 00:03:14.691
+remember I mentioned earlier that read
+says, tell me the most bytes to read, and
+
+64
+00:03:14.691 --> 00:03:17.609
+then it returns how many
+bytes I actually read.
+
+65
+00:03:17.609 --> 00:03:21.616
+Now, I think that can also happen is,
+yeah, it can potentially say, look,
+
+66
+00:03:21.616 --> 00:03:25.192
+if you give me a number that's too big,
+I'm just not gonna do that for
+
+67
+00:03:25.192 --> 00:03:27.429
+you, I'm not gonna read that many bytes.
+
+68
+00:03:27.429 --> 00:03:31.633
+So I actually experimented with this and
+found that if I asked, say, hey,
+
+69
+00:03:31.633 --> 00:03:34.927
+read five gigabytes out of this
+file in a single read call.
+
+70
+00:03:34.927 --> 00:03:38.090
+Nock was like, nah, nah, nah,
+that's too many gigabytes,
+
+71
+00:03:38.090 --> 00:03:40.788
+dial it down a little bit,
+that's that's too much.
+
+72
+00:03:40.788 --> 00:03:43.707
+So the fix for
+this is that you read in multiple chunks.
+
+73
+00:03:43.707 --> 00:03:47.726
+So instead of saying, I'm just gonna
+pass in, just read the entire thing.
+
+74
+00:03:47.726 --> 00:03:51.832
+What you do is, you pick a chunk
+size that's smaller than that,
+
+75
+00:03:51.832 --> 00:03:56.015
+and you essentially read one chunk
+at a time into your buffer, and
+
+76
+00:03:56.015 --> 00:03:58.927
+then you can sort of
+deal with that in chunks.
+
+77
+00:03:58.927 --> 00:04:02.847
+And this is sort of the best practice if
+you're working with this in a production
+
+78
+00:04:02.847 --> 00:04:03.381
+setting.
+
+79
+00:04:03.381 --> 00:04:05.463
+Now, a lot of programming
+languages will paper over this.
+
+80
+00:04:05.463 --> 00:04:08.158
+Of course, they're all calling
+read under the hood, and
+
+81
+00:04:08.158 --> 00:04:10.694
+sometimes they'll offer you
+a read chunks function.
+
+82
+00:04:10.694 --> 00:04:14.423
+Or sometimes, they'll just be like,
+yeah, I'll just do the chunks thing
+
+83
+00:04:14.423 --> 00:04:18.271
+automatically for you kind of behind
+the scenes, and just build up a really big
+
+84
+00:04:18.271 --> 00:04:21.914
+buffer usually using a malloc hook
+equivalent on the heap, just for you.
+
+85
+00:04:21.914 --> 00:04:23.926
+But, there's an important
+implication here, so
+
+86
+00:04:23.926 --> 00:04:26.047
+let's keep this in mind as
+we're progressing here.
+
+87
+00:04:26.047 --> 00:04:31.312
+If for just plain old reading
+purposes we want to read in chunks,
+
+88
+00:04:31.312 --> 00:04:35.516
+what does that imply for
+our allocation strategy?
+
+89
+00:04:35.516 --> 00:04:38.939
+Well, hey, if we're reading in chunks,
+stack is perfectly fine at that.
+
+90
+00:04:38.939 --> 00:04:42.050
+Why do we need to go do this
+heap allocation if we're like,
+
+91
+00:04:42.050 --> 00:04:44.722
+I need to pick a fixed size
+chunk to read in anyway?
+
+92
+00:04:44.722 --> 00:04:48.870
+Why don't we just go back to this original
+design with just hard coding the size of
+
+93
+00:04:48.870 --> 00:04:52.843
+the buffer since I need to read only one
+hard coded chunk size at a time anyway?
+
+94
+00:04:52.843 --> 00:04:54.095
+Why not, indeed?
+
+95
+00:04:54.095 --> 00:04:56.984
+And this is also a very common
+pattern that you will see,
+
+96
+00:04:56.984 --> 00:05:00.490
+is when people are doing what's
+called a buffered read, where they
+
+97
+00:05:00.490 --> 00:05:04.631
+need to essentially read in chunks, say,
+read one subset of the file at a time.
+
+98
+00:05:04.631 --> 00:05:08.011
+Which is kind of the best practice anyway,
+in case you have a really big file.
+
+99
+00:05:08.011 --> 00:05:12.436
+It's actually quite common to say, hey,
+I'm just gonna allocate on the stack
+
+100
+00:05:12.436 --> 00:05:16.731
+exactly the memory that I need, because
+I don't need to read the entire thing
+
+101
+00:05:16.731 --> 00:05:20.981
+at a time, I just need to know how big the
+file is so I know kind of when to stop.
+
+102
+00:05:20.981 --> 00:05:23.480
+Even better,
+this is gonna have better performance.
+
+103
+00:05:23.480 --> 00:05:26.864
+And also, now there's no need to remember
+to call free later because we're only
+
+104
+00:05:26.864 --> 00:05:28.077
+dealing with stack memory.
+
+105
+00:05:28.077 --> 00:05:31.176
+We do need to grant to deal with
+the complexity of reading in chunks, but
+
+106
+00:05:31.176 --> 00:05:33.034
+it turns out, we need to do that, anyway,
+
+107
+00:05:33.034 --> 00:05:35.483
+if we wanna support actually
+reading very large files.
+
+108
+00:05:35.483 --> 00:05:38.933
+Okay, so, to summarize all
+the things we talked about.
+
+109
+00:05:38.933 --> 00:05:42.284
+We started out with opening a file and
+then remembering to close it later,
+
+110
+00:05:42.284 --> 00:05:43.103
+very important.
+
+111
+00:05:43.103 --> 00:05:46.794
+Getting its size by using the Fstat,
+and then we talked about structs and
+
+112
+00:05:46.794 --> 00:05:50.442
+how those get populated, and
+all the API considerations around that.
+
+113
+00:05:50.442 --> 00:05:54.227
+Talked about reading the contents
+of the file into an actual buffer,
+
+114
+00:05:54.227 --> 00:05:56.584
+and how we can't do
+reads that are too big.
+
+115
+00:05:56.584 --> 00:05:59.505
+So, although it might make sense
+theoretically, to do a malloc so
+
+116
+00:05:59.505 --> 00:06:02.855
+we can just skip the exact size, and
+not worry about overflowing the stack.
+
+117
+00:06:02.855 --> 00:06:06.407
+Actually, in practice, we end up probably
+wanting to do a chunked read, anyway,
+
+118
+00:06:06.407 --> 00:06:09.127
+because the operating system
+will otherwise give us an error.
+
+119
+00:06:09.127 --> 00:06:12.645
+And then, finally, we talked about stack
+vs heap, and sort of the trade offs there.
+
+120
+00:06:12.645 --> 00:06:14.774
+Stack, you don't have to worry
+about managing lifetimes,
+
+121
+00:06:14.774 --> 00:06:15.827
+remember when you call free.
+
+122
+00:06:15.827 --> 00:06:19.317
+But the heap is much, much bigger, and
+although there's some ergonomic benefits,
+
+123
+00:06:19.317 --> 00:06:20.972
+there are some performance downsides.
+
+124
+00:06:20.972 --> 00:06:25.453
+Number one, malloc and free are definitely
+considerably slower than using the stack.
+
+125
+00:06:25.453 --> 00:06:27.651
+And also there are some
+correctness downsides,
+
+126
+00:06:27.651 --> 00:06:29.472
+where if you call free at the wrong time,
+
+127
+00:06:29.472 --> 00:06:32.687
+it's not just that you might get a memory
+leak if you forget to do it, but
+
+128
+00:06:32.687 --> 00:06:36.085
+also if you call it too soon, you get
+a use after free, which is really bad.
+
+129
+00:06:36.085 --> 00:06:40.122
+And if you call it more than once, you get
+a double free, which can be even worse.
+
+130
+00:06:40.122 --> 00:06:42.825
+Questions about any of that
+before we do the exercise, yeah?
+
+131
+00:06:42.825 --> 00:06:46.487
+&gt;&gt; Student: What's the reason for
+the stack being faster than the heap?
+
+132
+00:06:46.487 --> 00:06:49.778
+&gt;&gt; Richard Feldman: So the reason for
+the stack being faster than heap is,
+
+133
+00:06:49.778 --> 00:06:54.838
+essentially, oops, that, so all of these
+are essentially just ones and zeros.
+
+134
+00:06:54.838 --> 00:06:56.791
+So from that perspective,
+there's no difference.
+
+135
+00:06:56.791 --> 00:07:00.230
+If you're doing a read from the stack or
+a read from the heap, it doesn't matter.
+
+136
+00:07:00.230 --> 00:07:02.711
+If you're doing a write to the stack or
+write to the heap, it doesn't matter.
+
+137
+00:07:02.711 --> 00:07:05.493
+The performance difference is actually
+just in the malloc and free itself.
+
+138
+00:07:05.493 --> 00:07:09.343
+So you can actually look at, there's
+different implementations of malloc, but
+
+139
+00:07:09.343 --> 00:07:12.742
+basically, what malloc has to do is it
+has to basically find in all of this
+
+140
+00:07:12.742 --> 00:07:16.313
+gigantic chunk of heap memory,
+what's an address that's available, and
+
+141
+00:07:16.313 --> 00:07:17.639
+can I give that back to you?
+
+142
+00:07:17.639 --> 00:07:19.006
+And in order to answer that question,
+
+143
+00:07:19.006 --> 00:07:20.767
+it has to do a whole bunch
+of manual bookkeeping.
+
+144
+00:07:20.767 --> 00:07:23.568
+It could have hash maps or something like
+that to be like, okay, well, hang on,
+
+145
+00:07:23.568 --> 00:07:24.904
+I've used this range and this range.
+
+146
+00:07:24.904 --> 00:07:27.718
+So this range over here, wait,
+that one's open, I might call free.
+
+147
+00:07:27.718 --> 00:07:29.432
+I have to be like, okay,
+go mark that as free.
+
+148
+00:07:29.432 --> 00:07:31.462
+And then next time,
+I'm going to try to find you a chunk.
+
+149
+00:07:31.462 --> 00:07:34.422
+And then you have things where it's like,
+there's performance benefits if you
+
+150
+00:07:34.422 --> 00:07:37.292
+can get them to be sort of contiguous so
+it has even more bookkeeping to try to put
+
+151
+00:07:37.292 --> 00:07:39.141
+things in different buckets and
+stuff like that.
+
+152
+00:07:39.141 --> 00:07:42.533
+Basically, if you were to look at what
+the CPU is doing when you call malloc,
+
+153
+00:07:42.533 --> 00:07:46.085
+it's just astronomically more than what
+it's doing when you're just putting
+
+154
+00:07:46.085 --> 00:07:47.213
+something on the stack.
+
+155
+00:07:47.213 --> 00:07:51.939
+So it's just more work, because malloc
+has an implementation that does
+
+156
+00:07:51.939 --> 00:07:54.498
+a bunch of work and free even more, so.
+
+157
+00:07:54.498 --> 00:07:55.650
+Cool, yeah.
+
+158
+00:07:55.650 --> 00:07:59.144
+So is stat a special type of struct?
+
+159
+00:07:59.144 --> 00:08:00.027
+Great question.
+
+160
+00:08:00.027 --> 00:08:02.123
+So stat, no,
+stat is not a special type of struct.
+
+161
+00:08:02.123 --> 00:08:06.828
+This is just the definition that
+whoever wrote stat they just
+
+162
+00:08:06.828 --> 00:08:08.771
+decided to name it that.
+
+163
+00:08:08.771 --> 00:08:12.782
+You could pick any name you want here,
+you can define your own structs also.
+
+164
+00:08:12.782 --> 00:08:15.716
+So basically, if you wanted to define
+your own struct, you would say struct,
+
+165
+00:08:15.716 --> 00:08:17.904
+then the name that you want,
+and they chose the name stat.
+
+166
+00:08:17.904 --> 00:08:20.227
+They could have chosen foo or
+apples or whatever.
+
+167
+00:08:20.227 --> 00:08:25.625
+And then you write all of the fields and
+choose the names for them.
+
+168
+00:08:25.625 --> 00:08:26.734
+Cool, other questions?
+
+169
+00:08:30.835 --> 00:08:33.326
+&gt;&gt; Richard Feldman: Yeah.
+
+170
+00:08:33.326 --> 00:08:35.985
+&gt;&gt; Student: What do you
+think about memory arenas?
+
+171
+00:08:35.985 --> 00:08:37.730
+&gt;&gt; Richard Feldman: Yeah, great.
+
+172
+00:08:37.730 --> 00:08:42.129
+Memory arenas are basically
+an alternative to malloc and free,
+
+173
+00:08:42.129 --> 00:08:46.129
+where you essentially,
+how do I explain this concisely?
+
+174
+00:08:46.129 --> 00:08:50.024
+So I guess it would be like,
+if inside of two path we passed a third
+
+175
+00:08:50.024 --> 00:08:53.199
+argument that was basically
+the memory address to,
+
+176
+00:08:53.199 --> 00:08:57.818
+it's almost like you're making a little
+custom stack of your own [LAUGH] that
+
+177
+00:08:57.818 --> 00:09:01.809
+can kind of like, you can just
+kind of allocate some memory into.
+
+178
+00:09:01.809 --> 00:09:06.008
+But unlike malloc and free, with arenas,
+you never have to free them because you
+
+179
+00:09:06.008 --> 00:09:09.739
+never have to free the individual
+allocations that you make into them.
+
+180
+00:09:09.739 --> 00:09:14.205
+Because they basically say, okay, let me
+reserve a big chunk of memory here, and
+
+181
+00:09:14.205 --> 00:09:17.005
+very time I want an allocation,
+I put it into that.
+
+182
+00:09:17.005 --> 00:09:19.705
+And then once I'm all done
+with the entire arena,
+
+183
+00:09:19.705 --> 00:09:23.648
+I just am like, this arena is gone now,
+so just throw all that away.
+
+184
+00:09:23.648 --> 00:09:27.338
+And then nothing inside of it,
+well, hopefully will leak.
+
+185
+00:09:27.338 --> 00:09:32.757
+Arenas are kind of a deep topic, but
+they're pretty great for performance and
+
+186
+00:09:32.757 --> 00:09:38.258
+also usually a lot easier to deal with in
+terms of lifetimes [LAUGH] than malloc and
+
+187
+00:09:38.258 --> 00:09:38.769
+free.
+

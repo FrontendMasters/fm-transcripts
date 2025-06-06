@@ -1,0 +1,1198 @@
+WEBVTT
+
+1
+00:00:00.072 --> 00:00:02.394
+One other question you might have is,
+well, hey,
+
+2
+00:00:02.394 --> 00:00:05.105
+how come fstat doesn't just
+return the stack stat struct?
+
+3
+00:00:05.105 --> 00:00:09.716
+Why do we have to pass it in like this,
+when it could have instead just said,
+
+4
+00:00:09.716 --> 00:00:14.109
+well, now fstat is going to return
+the stat struct, just give me back,
+
+5
+00:00:14.109 --> 00:00:15.306
+all those things.
+
+6
+00:00:15.306 --> 00:00:19.301
+Well, the short answer is that,
+if you were to return the stat struct,
+
+7
+00:00:19.301 --> 00:00:23.846
+that means that you have to return all
+144 bytes every single time you do that.
+
+8
+00:00:23.846 --> 00:00:28.266
+So if the caller wants to return that,
+they now have to copy all 144 bytes again.
+
+9
+00:00:28.266 --> 00:00:32.684
+So in other words, if I have my function
+that's read the files exact bytes or
+
+10
+00:00:32.684 --> 00:00:37.534
+whatever, and I call that, I call fstat,
+fstat gives me back those 144 bytes.
+
+11
+00:00:37.534 --> 00:00:42.294
+I now have those 144 bytes, but the only
+way I can return them to whoever called me
+
+12
+00:00:42.294 --> 00:00:45.367
+is I have to copy them again and
+return it back to them.
+
+13
+00:00:45.367 --> 00:00:48.627
+And if another caller wants to do that,
+another 144, byte copy.
+
+14
+00:00:48.627 --> 00:00:51.708
+In contrast,
+if you imagine something less expensive,
+
+15
+00:00:51.708 --> 00:00:55.573
+if I'm just passing around the address,
+that's always eight bytes.
+
+16
+00:00:55.573 --> 00:00:59.689
+Sorry, if the thing that's
+gonna call fstat says,
+
+17
+00:00:59.689 --> 00:01:05.123
+fstat just wants the address of
+where it's gonna write those bytes.
+
+18
+00:01:05.123 --> 00:01:06.780
+Okay, I've got eight bytes,
+there's the address.
+
+19
+00:01:06.780 --> 00:01:07.953
+Here you go, fstat.
+
+20
+00:01:07.953 --> 00:01:09.190
+Now you've got what you need.
+
+21
+00:01:09.190 --> 00:01:12.783
+And if I want to make that function get
+called by somebody else, that somebody
+
+22
+00:01:12.783 --> 00:01:16.285
+else also just needs to give that function
+the eight bytes to give to fstat.
+
+23
+00:01:16.285 --> 00:01:17.661
+And if I want to do that again, again,
+
+24
+00:01:17.661 --> 00:01:19.783
+just eight bytes to give to
+that function to give to fstat.
+
+25
+00:01:19.783 --> 00:01:25.724
+So this is an example of how these design
+decisions are not just about ergonomics.
+
+26
+00:01:25.724 --> 00:01:30.396
+It's not just about this one call in
+isolation involves copying eight bytes
+
+27
+00:01:30.396 --> 00:01:31.790
+versus 144 bytes.
+
+28
+00:01:31.790 --> 00:01:36.147
+You also have to think about, well, let's
+suppose we had a whole chain of calls, and
+
+29
+00:01:36.147 --> 00:01:37.962
+what am I sort of pricing them into,
+
+30
+00:01:37.962 --> 00:01:41.652
+as far as how much memory they have to
+be copying around if I want to extract
+
+31
+00:01:41.652 --> 00:01:44.641
+a helper function that just
+calls a chain of these things.
+
+32
+00:01:44.641 --> 00:01:48.908
+So in this case,
+it's not just about what's possible, but
+
+33
+00:01:48.908 --> 00:01:54.096
+also about what is efficient,
+especially as your program gets bigger and
+
+34
+00:01:54.096 --> 00:01:58.798
+you're having more functions
+calling from one place to another.
+
+35
+00:01:58.798 --> 00:02:01.331
+Sorry, the more functions
+you have in a program,
+
+36
+00:02:01.331 --> 00:02:05.312
+the more common it becomes to be passing
+things around based on their address,
+
+37
+00:02:05.312 --> 00:02:09.558
+especially of things like structs, rather
+than the actual entire struct itself.
+
+38
+00:02:09.558 --> 00:02:12.584
+Even though that might be, at least in the
+short term, a little bit more ergonomic.
+
+39
+00:02:12.584 --> 00:02:16.580
+So when you see larger C programs,
+it's very, very common to see tons and
+
+40
+00:02:16.580 --> 00:02:20.963
+tons of functions where all they're doing
+is passing around memory addresses or
+
+41
+00:02:20.963 --> 00:02:25.025
+really, really small things like
+integers or individual bytes or flags or
+
+42
+00:02:25.025 --> 00:02:26.076
+things like that.
+
+43
+00:02:26.076 --> 00:02:29.447
+Seeing C code that passes an entire
+struct, either in the return value or
+
+44
+00:02:29.447 --> 00:02:33.275
+as one of the arguments, is actually just
+a lot less common for this exact reason.
+
+45
+00:02:33.275 --> 00:02:37.802
+They just don't want to pay for
+the copying it around, okay?
+
+46
+00:02:37.802 --> 00:02:39.884
+Now you might also be asking,
+well, okay, fine, fair enough.
+
+47
+00:02:39.884 --> 00:02:45.167
+I understand why we're not
+returning the entire stat struct.
+
+48
+00:02:45.167 --> 00:02:46.918
+So why don't we return a stat address?
+
+49
+00:02:46.918 --> 00:02:50.007
+Why have to take this thing and
+then write the bytes into that?
+
+50
+00:02:50.007 --> 00:02:52.726
+This is a little bit more of a can
+of worms than you might think.
+
+51
+00:02:52.726 --> 00:02:56.210
+So when functions return, that is,
+when you run a function and
+
+52
+00:02:56.210 --> 00:02:59.366
+it runs to completion and
+it either does an early return or
+
+53
+00:02:59.366 --> 00:03:02.616
+it gets to the end of the body and
+just does a normal return.
+
+54
+00:03:02.616 --> 00:03:06.605
+All of the memory for the variable that
+functions just automatically gets freed.
+
+55
+00:03:06.605 --> 00:03:10.095
+You don't have to say with the files,
+we have to do open and
+
+56
+00:03:10.095 --> 00:03:12.455
+we have to remember to close at the end.
+
+57
+00:03:12.455 --> 00:03:14.852
+There's no remembering to
+do clean up on a function,
+
+58
+00:03:14.852 --> 00:03:18.632
+we never have to say, did you remember to
+free up all that memory and release it so
+
+59
+00:03:18.632 --> 00:03:19.988
+that other people can use it.
+
+60
+00:03:19.988 --> 00:03:22.143
+It's like, no, no,
+that's not how functions work.
+
+61
+00:03:22.143 --> 00:03:24.484
+They just automatically,
+sort of magically,
+
+62
+00:03:24.484 --> 00:03:28.111
+have automatic memory management,
+not with the garbage collector, but
+
+63
+00:03:28.111 --> 00:03:29.994
+just by virtue of how functions work.
+
+64
+00:03:29.994 --> 00:03:33.991
+You call them, and then you don't have to
+ever think about all the variables you've
+
+65
+00:03:33.991 --> 00:03:35.014
+allocated locally.
+
+66
+00:03:35.014 --> 00:03:38.054
+That memory just is gone as soon as the
+function itself is gone, which is good,
+
+67
+00:03:38.054 --> 00:03:40.328
+because otherwise calling
+functions would leak memory.
+
+68
+00:03:40.328 --> 00:03:43.698
+[LAUGH] Unless you
+explicitly freeze stuff.
+
+69
+00:03:43.698 --> 00:03:48.018
+But this does mean that it's totally
+unsafe and also totally allowed,
+
+70
+00:03:48.018 --> 00:03:52.844
+at least the C, to return addresses that
+are defined inside the function body.
+
+71
+00:03:52.844 --> 00:03:56.469
+So if you have an int or something like
+that in the middle of your function,
+
+72
+00:03:56.469 --> 00:04:00.570
+you can return that int 'cause it's gonna
+copy the four bytes in the return value.
+
+73
+00:04:00.570 --> 00:04:04.781
+But if you return the address to that int,
+well, now you're in dangerous territory,
+
+74
+00:04:04.781 --> 00:04:07.608
+because if the caller after
+that function has finished and
+
+75
+00:04:07.608 --> 00:04:10.665
+has returned, if the caller holds
+onto that address and says,
+
+76
+00:04:10.665 --> 00:04:13.282
+I think I'll go see what's
+in that memory right now.
+
+77
+00:04:13.282 --> 00:04:16.820
+It might or might not be what it was
+the last time the function ran, and
+
+78
+00:04:16.820 --> 00:04:20.603
+now we're gonna be back into this sort
+of dangerous really hard to debug.
+
+79
+00:04:20.603 --> 00:04:24.618
+Really painful territory of that
+weird bug we saw in the last example,
+
+80
+00:04:24.618 --> 00:04:28.903
+where when we took the line of code and
+moved it up to the top of the function,
+
+81
+00:04:28.903 --> 00:04:31.168
+it caused the entire process to abort.
+
+82
+00:04:31.168 --> 00:04:34.386
+When you return the address to
+something in the middle of a function,
+
+83
+00:04:34.386 --> 00:04:38.328
+basically you are returning an address to
+memory that might get totally overwritten
+
+84
+00:04:38.328 --> 00:04:40.290
+the next time some other function calls.
+
+85
+00:04:40.290 --> 00:04:44.146
+Because from the operating system's
+perspective and from the running program's
+
+86
+00:04:44.146 --> 00:04:47.076
+perspective, that function
+exited that memory is fair game.
+
+87
+00:04:47.076 --> 00:04:50.327
+Anybody is free to write whatever
+they want into that memory.
+
+88
+00:04:50.327 --> 00:04:53.841
+Anytime you call another function,
+it's free to stop all over it, and
+
+89
+00:04:53.841 --> 00:04:57.372
+it's too late to do anything about
+it because the function has exited.
+
+90
+00:04:57.372 --> 00:05:01.606
+So if you do this,
+you're basically just asking for trouble.
+
+91
+00:05:01.606 --> 00:05:04.020
+So yeah, we could return a stat address.
+
+92
+00:05:04.020 --> 00:05:08.029
+But if we did that, we would basically
+be saying, cool, now we're returning
+
+93
+00:05:08.029 --> 00:05:12.129
+an address to some memory that has been
+marked as free and considered fair game.
+
+94
+00:05:12.129 --> 00:05:18.298
+And so as you're reading your stat struct,
+you might say, this all works very well.
+
+95
+00:05:18.298 --> 00:05:21.225
+And you refactor your code a little
+bit to call another function and
+
+96
+00:05:21.225 --> 00:05:24.935
+suddenly instead of getting the nice,
+correct stat values, you're getting total
+
+97
+00:05:24.935 --> 00:05:28.140
+memory garbage, because that other
+function just stomped all over it.
+
+98
+00:05:28.140 --> 00:05:31.556
+Because as far as the program was
+concerned, that function had exited and
+
+99
+00:05:31.556 --> 00:05:32.836
+that memory was fair game.
+
+100
+00:05:32.836 --> 00:05:37.021
+You may recall that when we had this
+function to path that we wrote in
+
+101
+00:05:37.021 --> 00:05:41.224
+the previous section,
+we took in this request, and we were cool.
+
+102
+00:05:41.224 --> 00:05:45.264
+I'm gonna take in this request and
+then I'm going to return an address of
+
+103
+00:05:45.264 --> 00:05:48.328
+the actual path and
+that path is going to be different.
+
+104
+00:05:48.328 --> 00:05:52.038
+And you may recall that it might've seemed
+a little bit strange that we were going to
+
+105
+00:05:52.038 --> 00:05:54.537
+all this trouble to stomp all
+over that request memory.
+
+106
+00:05:54.537 --> 00:05:57.303
+Well, one of the reasons that we did
+that is that, believe it or not,
+
+107
+00:05:57.303 --> 00:05:58.808
+that's actually the safer option.
+
+108
+00:05:58.808 --> 00:06:02.986
+[LAUGH] Because the caller actually is
+responsible for that request memory.
+
+109
+00:06:02.986 --> 00:06:06.083
+When you call this function,
+one thing we know for
+
+110
+00:06:06.083 --> 00:06:10.361
+sure is that this memory right here
+that this address is pointing to,
+
+111
+00:06:10.361 --> 00:06:13.715
+that memory must have already
+existed in the caller.
+
+112
+00:06:13.715 --> 00:06:17.873
+We know that it's not going to disappear
+or get marked as safe to write over when
+
+113
+00:06:17.873 --> 00:06:21.540
+this function exits because the caller
+had to provide this address.
+
+114
+00:06:21.540 --> 00:06:24.918
+It already had to be present for
+the caller.
+
+115
+00:06:24.918 --> 00:06:28.495
+Which means that if we write over this
+memory, we stomp all over it like we did,
+
+116
+00:06:28.495 --> 00:06:32.019
+that also means that, yeah, we did stomp
+all over it, but at least the caller
+
+117
+00:06:32.019 --> 00:06:35.518
+knows that that memory is not being marked
+as free by the end of the function.
+
+118
+00:06:35.518 --> 00:06:38.752
+Whatever we do in the middle of
+this function is not going to
+
+119
+00:06:38.752 --> 00:06:43.251
+affect sort of the lifetime as it's known
+of this thing that's being passed in.
+
+120
+00:06:43.251 --> 00:06:44.708
+So that means that although, yes,
+
+121
+00:06:44.708 --> 00:06:47.769
+we are sort of destroying this thing
+by writing over it, and yes, we do also
+
+122
+00:06:47.769 --> 00:06:51.046
+have to be careful to make sure that there
+is actually room for the index.html.
+
+123
+00:06:51.046 --> 00:06:53.031
+Which in practice it always should be, but
+
+124
+00:06:53.031 --> 00:06:56.465
+we do have to be careful in case we're
+dealing with a weird circumstance.
+
+125
+00:06:56.465 --> 00:06:57.660
+At the end of the day,
+
+126
+00:06:57.660 --> 00:07:01.984
+it is totally fine to return an address
+that is a subset of this address because
+
+127
+00:07:01.984 --> 00:07:06.326
+we know that this memory is all good to
+go because the caller made sure of that.
+
+128
+00:07:06.326 --> 00:07:11.139
+Now granted, if the caller is allocating
+this in the middle of the caller's body,
+
+129
+00:07:11.139 --> 00:07:15.883
+then the caller has to make sure on their
+end, not to accidentally return this path
+
+130
+00:07:15.883 --> 00:07:20.388
+without, I don't know, copying it
+somewhere else or something like that.
+
+131
+00:07:20.388 --> 00:07:26.053
+But, yeah, this is essentially
+why we did that in that way.
+
+132
+00:07:26.053 --> 00:07:28.465
+Cool, yeah, so this is an address
+into an arguments, memory,
+
+133
+00:07:28.465 --> 00:07:29.908
+not into a local variables, memory.
+
+134
+00:07:29.908 --> 00:07:32.051
+That's why that worked.
+
+135
+00:07:32.051 --> 00:07:35.264
+Okay, now this is where we're
+gonna get into the heap.
+
+136
+00:07:35.264 --> 00:07:40.138
+So functions can reserve long lived memory
+chunks using malloc there are other ways
+
+137
+00:07:40.138 --> 00:07:40.843
+to do this.
+
+138
+00:07:40.843 --> 00:07:44.324
+Malloc is actually a wrapper around
+mmap or virtual alloc on Windows,
+
+139
+00:07:44.324 --> 00:07:45.983
+which we're not gonna get into.
+
+140
+00:07:45.983 --> 00:07:50.682
+But for all intents and purposes, malloc,
+which is how most people pronounce it,
+
+141
+00:07:50.682 --> 00:07:54.124
+even though it's short for
+malloc, like memory allocate.
+
+142
+00:07:54.124 --> 00:07:57.460
+This is a super common function that
+you will see used all the time.
+
+143
+00:07:57.460 --> 00:08:00.418
+It is less performant
+than what we're using.
+
+144
+00:08:00.418 --> 00:08:03.170
+What we've been using so far,
+it is not strictly necessary.
+
+145
+00:08:03.170 --> 00:08:04.044
+And in fact,
+
+146
+00:08:04.044 --> 00:08:09.302
+the final version of this web server that
+we've got does not use malloc at all.
+
+147
+00:08:09.302 --> 00:08:12.885
+One of the coolest pieces of advice
+I got about programming in C and
+
+148
+00:08:12.885 --> 00:08:17.268
+I guess low level programming in general,
+is you don't always need to do this.
+
+149
+00:08:17.268 --> 00:08:19.460
+In fact, in many cases,
+you don't need to do this at all.
+
+150
+00:08:19.460 --> 00:08:23.033
+And if you try to think carefully about
+ways to avoid doing malloc by instead
+
+151
+00:08:23.033 --> 00:08:25.641
+doing tricks like what we
+did in the previous section,
+
+152
+00:08:25.641 --> 00:08:28.552
+where we stopping over some
+memory that does need to be used.
+
+153
+00:08:28.552 --> 00:08:31.924
+You can actually end up with
+programs that are believe it or not,
+
+154
+00:08:31.924 --> 00:08:35.432
+less error-prone andin many cases and
+also run faster as a bonus.
+
+155
+00:08:35.432 --> 00:08:37.754
+But having said that, it's important
+to understand what malloc does.
+
+156
+00:08:37.754 --> 00:08:41.421
+So we're gonna go through it even though
+it's not what we're gonna end up using In
+
+157
+00:08:41.421 --> 00:08:45.105
+the final version of this and to sort of
+understand like what its trade-offs are.
+
+158
+00:08:45.105 --> 00:08:48.266
+So basically when you call malloc,
+you can basically say, hey,
+
+159
+00:08:48.266 --> 00:08:50.631
+I want to reserve
+a long-lived chunk of memory.
+
+160
+00:08:50.631 --> 00:08:52.479
+This is not gonna end
+when the function ends.
+
+161
+00:08:52.479 --> 00:08:55.721
+This is just gonna be hanging out there
+and we're gonna make sure that that memory
+
+162
+00:08:55.721 --> 00:08:58.739
+doesn't get touched, doesn't get
+stomped over when the function ends.
+
+163
+00:08:58.739 --> 00:09:02.237
+And when you call malloc, it's gonna
+return Return and address that memory,
+
+164
+00:09:02.237 --> 00:09:05.319
+which you can then continue using
+even after this function returns.
+
+165
+00:09:05.319 --> 00:09:07.132
+However, there's the downside.
+
+166
+00:09:07.132 --> 00:09:10.807
+So by default, every time you call malloc,
+you have a memory leak.
+
+167
+00:09:10.807 --> 00:09:13.236
+When you call malloc, it's saying,
+yeah, it's long lived.
+
+168
+00:09:13.236 --> 00:09:14.002
+And when does that life end?
+
+169
+00:09:14.002 --> 00:09:18.114
+When does that memory get freed and get
+returned back to be potentially used for
+
+170
+00:09:18.114 --> 00:09:18.933
+other things?
+
+171
+00:09:18.933 --> 00:09:22.245
+It's when you implicitly go out
+of your way to call free on it,
+
+172
+00:09:22.245 --> 00:09:26.514
+just like with file open and file close,
+every time you call malloc if you don't
+
+173
+00:09:26.514 --> 00:09:29.079
+wanna leak memory,
+you have to call free on it.
+
+174
+00:09:29.079 --> 00:09:31.803
+And this is where the trouble starts.
+
+175
+00:09:31.803 --> 00:09:35.208
+If you call free at the wrong time,
+you can cause bugs.
+
+176
+00:09:35.208 --> 00:09:38.391
+This is the understatement of the century.
+
+177
+00:09:38.391 --> 00:09:40.382
+Almost all memory safety errors.
+
+178
+00:09:40.382 --> 00:09:43.941
+In practice that results in like
+critical safety errors, exploits and
+
+179
+00:09:43.941 --> 00:09:45.911
+like heartbleed and all these things.
+
+180
+00:09:45.911 --> 00:09:48.288
+Okay, heartbleed was like the if
+conditional thing, fair enough.
+
+181
+00:09:48.288 --> 00:09:50.223
+But, [LAUGH] that was a rare case.
+
+182
+00:09:50.223 --> 00:09:54.042
+Almost all of them are caused by one
+of two things, memory safety errors.
+
+183
+00:09:54.042 --> 00:09:55.485
+One is buffer overruns.
+
+184
+00:09:55.485 --> 00:09:59.165
+So this is the type of stuff we saw all
+the way back in Hello World where you've
+
+185
+00:09:59.165 --> 00:10:01.811
+got your reading into memory
+that you're not supposed
+
+186
+00:10:01.811 --> 00:10:05.168
+to read into because of arithmetic
+errors or malicious arithmetic.
+
+187
+00:10:05.168 --> 00:10:09.727
+And the other is literally using malloc
+and calling free at the wrong time.
+
+188
+00:10:09.727 --> 00:10:12.534
+And there are two flavors
+of this that can happen.
+
+189
+00:10:12.534 --> 00:10:15.608
+One is called a use after free,
+which is basically where you malloc,
+
+190
+00:10:15.608 --> 00:10:18.101
+you get back your address,
+you're using the address.
+
+191
+00:10:18.101 --> 00:10:20.710
+Everything's great,
+you call free on the address.
+
+192
+00:10:20.710 --> 00:10:23.180
+And then you forgot that you
+called free on the address and
+
+193
+00:10:23.180 --> 00:10:25.923
+you try to reference it again
+later after you've called free.
+
+194
+00:10:25.923 --> 00:10:26.907
+So that's use after free.
+
+195
+00:10:26.907 --> 00:10:29.381
+You're using the address after
+you would call free on it.
+
+196
+00:10:29.381 --> 00:10:32.675
+At that point, you have exactly the same
+category of bugs as what we saw in
+
+197
+00:10:32.675 --> 00:10:36.088
+the previous section where you're
+returning an address from a function.
+
+198
+00:10:36.088 --> 00:10:39.975
+That address is to something that was from
+the middle of the function that wasn't
+
+199
+00:10:39.975 --> 00:10:41.129
+created using malloc.
+
+200
+00:10:41.129 --> 00:10:44.755
+In other words,
+maybe it'll work fine if you get lucky and
+
+201
+00:10:44.755 --> 00:10:48.974
+nobody has happened to use that
+memory that's been marked as free.
+
+202
+00:10:48.974 --> 00:10:51.690
+If nothing has happened to overwrite that,
+it's all good.
+
+203
+00:10:51.690 --> 00:10:53.984
+No problems, you won't see any symptoms.
+
+204
+00:10:53.984 --> 00:10:56.572
+If you're not lucky,
+then it's gonna be a total disaster,
+
+205
+00:10:56.572 --> 00:11:00.076
+because what you're gonna get when you
+read that memory is total memory garbage,
+
+206
+00:11:00.076 --> 00:11:02.641
+just based on whatever happened
+to have been overwritten.
+
+207
+00:11:02.641 --> 00:11:03.619
+Whatever ones and
+
+208
+00:11:03.619 --> 00:11:07.410
+zeros somebody else later on
+automatically got written into there.
+
+209
+00:11:07.410 --> 00:11:11.071
+The second variety of use after
+free is called a double free.
+
+210
+00:11:11.071 --> 00:11:15.407
+And a double free is where you
+accidentally call free twice on the same
+
+211
+00:11:15.407 --> 00:11:16.694
+original address.
+
+212
+00:11:16.694 --> 00:11:19.888
+This can be basically the same thing
+as used after free, but worse.
+
+213
+00:11:19.888 --> 00:11:23.294
+[LAUGH] So essentially, what happens on
+a double free is you're coming along like,
+
+214
+00:11:23.294 --> 00:11:24.718
+hey, I'm done with this memory.
+
+215
+00:11:24.718 --> 00:11:25.565
+Great, no problem.
+
+216
+00:11:25.565 --> 00:11:28.533
+I call free on it, and
+I never use that variable ever again.
+
+217
+00:11:28.533 --> 00:11:32.540
+I never try to read from it, but
+I do actually hold onto that address, and
+
+218
+00:11:32.540 --> 00:11:36.107
+although I don't read from it,
+I do call free on it later again.
+
+219
+00:11:36.107 --> 00:11:36.993
+So that's a double free.
+
+220
+00:11:36.993 --> 00:11:38.764
+I freed the same address twice.
+
+221
+00:11:38.764 --> 00:11:42.102
+The problem with that is,
+if somebody in between the first free and
+
+222
+00:11:42.102 --> 00:11:43.722
+the second free called malloc.
+
+223
+00:11:43.722 --> 00:11:47.242
+It's entirely possible that Malik gave out
+that same address from earlier again and
+
+224
+00:11:47.242 --> 00:11:49.037
+said, here you go, here's the address.
+
+225
+00:11:49.037 --> 00:11:52.942
+So when I call free a second time,
+the double free, I'm potentially freeing
+
+226
+00:11:52.942 --> 00:11:56.442
+somebody else's allocation,
+[LAUGH] some other valid allocation.
+
+227
+00:11:56.442 --> 00:11:59.817
+So this, when I say it's like potentially
+even worse than a use after free,
+
+228
+00:11:59.817 --> 00:12:03.246
+The way that it can be worse is that the
+symptom might be somewhere totally like
+
+229
+00:12:03.246 --> 00:12:04.645
+distant from the double free.
+
+230
+00:12:04.645 --> 00:12:07.026
+The second call to free itself
+is like totally harmless.
+
+231
+00:12:07.026 --> 00:12:09.958
+And then all of a sudden this totally
+seemingly unrelated code is just like
+
+232
+00:12:09.958 --> 00:12:11.011
+getting memory garbage.
+
+233
+00:12:11.011 --> 00:12:11.975
+And you're like, what?
+
+234
+00:12:11.975 --> 00:12:12.515
+What's going on here?
+
+235
+00:12:12.515 --> 00:12:13.224
+Is there a use after free?
+
+236
+00:12:13.224 --> 00:12:15.671
+And you look at how that allocation's
+used and you're like, no,
+
+237
+00:12:15.671 --> 00:12:16.947
+I'm calling mallocing, right?
+
+238
+00:12:16.947 --> 00:12:17.587
+I'm never freeing it.
+
+239
+00:12:17.587 --> 00:12:18.816
+I'm never using it.
+
+240
+00:12:18.816 --> 00:12:19.910
+I don't understand what's going on.
+
+241
+00:12:19.910 --> 00:12:20.963
+And the problem actually,
+
+242
+00:12:20.963 --> 00:12:23.947
+is that some totally unrelated code was
+holding on to an address and freed it.
+
+243
+00:12:23.947 --> 00:12:24.684
+Total nightmare.
+
+244
+00:12:24.684 --> 00:12:27.686
+So if you can avoid using malloc and
+free, on the one hand,
+
+245
+00:12:27.686 --> 00:12:31.180
+you might get a new set of problems,
+such as we saw earlier where like
+
+246
+00:12:31.180 --> 00:12:35.322
+you're stomping all over memory and you
+have to be careful not to stomp too far.
+
+247
+00:12:35.322 --> 00:12:36.112
+But on the other hand,
+
+248
+00:12:36.112 --> 00:12:38.787
+it means that you don't have to worry
+about these lifetime issues anymore.
+
+249
+00:12:38.787 --> 00:12:40.453
+You don't have to get it exactly right.
+
+250
+00:12:40.453 --> 00:12:44.620
+Call free exactly the right number of
+times you can just sort of avoid that
+
+251
+00:12:44.620 --> 00:12:46.338
+whole category of problems.
+

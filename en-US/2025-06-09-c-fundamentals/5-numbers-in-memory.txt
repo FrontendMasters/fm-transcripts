@@ -1,0 +1,87 @@
+[00:00:00]
+>> Richard feldman: Building HTTP responses. In this section, we're going to start building our actual static web server. We're not gonna start by having it up and running, listening on port 8080, whatever. We're just gonna do it a much simpler way, where at first we're just gonna work with strings.
+
+[00:00:15]
+So we're gonna build HTTP responses first, and then the next section we're gonna work with dealing with the incoming HTTP requests, still just working with strings. Then we're gonna get into file IO, cuz one of the things that static web server needs to do is to read the files off your disc.
+
+[00:00:27]
+And then finally, we're gonna get to the network IO portion of this. So for now, we're just gonna start off working with strings and learn a little bit more about how C deals with string manipulation and learn a little bit more about the language as we go. So we're gonna start off by talking about numbers in memory.
+
+[00:00:41]
+Like what does that actually look like in C. Byte arrays, null-terminated strings, and finally getting a strings length. This might not seem like it should be an advanced concept, but in C, it's not as trivial as it is in other languages. In memory we have bits. These are ones and zeros.
+
+[00:00:57]
+And essentially, these are what the hardware sees in memory. So you've got a whole bunch of ones and zeros and you can interpret these however you want. The hardware doesn't really care if this section of ones and zeros is conceptually an integer or conceptually a string or conceptually anything else.
+
+[00:01:14]
+The CPU just has instructions that basically say like, hey, tell me some ones and zeros and tell me what operation you wanna do on them. And I will make some new ones and zeros for you. So for example, you could say these ones and zeros represent an integer, and you ask the CPU, I want you to add this to some other ones and zeros that I also am interpreting as an integer.
+
+[00:01:30]
+And it's like, sure, here are the ones and zeros that come out of adding those two together. You could also say the same exact pattern of ones and zeros. Hey, CPU, please treat these as a floating point number and do floating point multiplication or division on them, or something like that.
+
+[00:01:42]
+And the CPU is like, sure, you're the ones and zeros that come out if you do that. Or you could say, treat it as a string, and I'm gonna do something else with it. But most commonly, these ones and zeros are actually grouped into groups of eight, at least in modern hardware.
+
+[00:01:53]
+So 8-bits to a byte. So 8 individual 1s and 0s correspond to 1-byte. And in modern hardware, this is sort of emerged as the standard, where you basically have like, if you're working with memory, you're generally working in terms of bytes. When we specified 13 or 14 as the length of the Hello World string in the last exercise, that was 13 or 14-bytes.
+
+[00:02:15]
+In other words, each group of 8-bits. And essentially, older hardware sometimes would use different groupings of these. So they might have had like, 7-bits was kind of the fundamental thing, or 6-bits. But these days it's like, yeah, 8-bits is the way to go. And we can decide that we want to interpret these bytes as, for example, entire numbers rather than just ones and zeros.
+
+[00:02:36]
+So for example, if you have eight zeros in a row and. That, as you might expect, is interpreted as the number 0. There's nothing but 0s in there. This one is 0 plus 2 to the 0. This is 0 plus 2 to the 1, and this is 0 plus 2 to the 1 plus 2 to the 0.
+
+[00:02:51]
+So what do I mean by that? Essentially, this is how base 2 math works. Now, we as humans, I'm assuming because we have 10 fingers and it's easy for counting. We like base 10 [LAUGH]. That's like kind of what we tend to go with. Decimal meaning, base 10, and this is binary meaning base 2.
+
+[00:03:08]
+So, essentially in base 2 numbers, you have actually the same kind of rules that you do in base 10, where the right most digit essentially corresponds to it's, like in this case, it's either 0 or 1. But in base 10, this'll be 0, 1, 2, 3, 4, 5, 6, 7, 8, or 9.
+
+[00:03:23]
+And then, if you go over one digit, that's gonna be plus 10 to the 1 or something like that. So essentially, the way that you can convert these to decimal is to say all right. I've got a 1 here and that 1 is all the way to the right.
+
+[00:03:37]
+It's the rightmost digit of the thing. So that means we're gonna add 2 to the 0 to that. And here we have it, it's scooted over one more. That's gonna be 2 to the 1. And here we have both of them set, the rightmost and the second rightmost being 1.
+
+[00:03:50]
+So that's gonna be 2 to the 1 plus 2 to the 0. So this works out to be 0, 1, 2, and 3 in decimal. So if you see this bit pattern of all 0s followed by 2, 1s at the very end, that corresponds to decimal number 3.
+
+[00:04:03]
+This one corresponds to the decimal number 2, and this one corresponds to the decimal number 1. That's essentially what we get when we're talking about converting bits from decimal to binary and back. You can memorize these rules and apply them yourself if you want. It's usually not necessary unless you're doing something really, really fancy in terms of performance optimization.
+
+[00:04:21]
+We will do a tiny bit of stuff with bits [LAUGH] towards the very end of the workshop, but that's about it. But if you're curious and you wanna convert these things, there's websites where you can just be like, give me a decimal number and I'll give you the binary out the other side, or vice versa.
+
+[00:04:32]
+Give me a binary number and I'll give you the decimal equivalent. So essentially, it's as simple as that. These are 1s and 0s, and that's a base 2 system rather than a base 10 system. Now, the reason I mention all this is again, the important part here is that in memory, the hardware does not care.
+
+[00:04:50]
+These are all user space, like programmer concepts that we are imposing on top of the hardware. We've decided to Interpret these 1s and 0s in this way. This is not something the hardware is sort of like innately requires, other than the fact that it does have a number of conveniences if you're working in terms of bytes or in terms of other sizes of integers.
+
+[00:05:10]
+Just to go a little bit further with this. So if you had like, to continue the pattern, like you have two 0s and then a 1, that's gonna be a 4. If you have another one at the very end on top of that, that's gonna be a 5.
+
+[00:05:19]
+And then 6 is like, moving over one digit. Seven is three 1s, and then eight is 1 over like that. So just like in base 10, as you keep adding more and more digits, like this is kind of the equivalent of like 999 in decimal. And then once you add one more, it's like, these are all at their maximum possible value.
+
+[00:05:34]
+So we flip over to one more. We add one more digit over in the next column, over and then reset the others to 0. So it's the same kind of stuff you'd see in base 10, just the maximum number is 1 instead of 9. All right, now, I did wanna note, though, that you can take these same 1s and 0s, and you can choose to interpret them in different ways.
+
+[00:05:53]
+For example, instead of interpreting them in groups of eight, where we have like, this is the number 0. This is the number 1. This is 2, and this is 3. We can say, okay, I'm actually gonna take these same exact pattern of 1s and 0s and I'm gonna chop it up differently.
+
+[00:06:06]
+And I'm gonna say, well, actually, I wanna chop it right in the middle here. Instead of having groups of 8, I'm gonna have like groups of 16 and this one is gonna be 1, and then this one's gonna be,1027. Or chop it up in the middle here, and say sorry, and not chop up at all, and just say, this is one gigantic number.
+
+[00:06:21]
+And so this, this whole thing is like, this one right here gives us 131072, this one gives us 1024, and this, two 1s at the end give us 3, just like they did back up here. And now we have some gigantic integer. So this is a way that you can take exactly the same piece of memory and represents it in multiple different ways.
+
+[00:06:39]
+And one of the things we're gonna see over the course of the workshop is that, this is actually a thing that we do in C. The term is casting, meaning that you take the same exact memory and you decide to interpret it in a different way. So this right here would be interpreting this as an array of 4-bytes, 1, 2, 3, 4-bytes, all side by side next to each other in memory.
+
+[00:06:58]
+This would be an array of two integers that are each 16-bit integers. And this would be one 32-bit integer that's not even an array at all. So same memory, but different ways to interpret it. The main takeaway here is that we decide how to interpret memory as the programmers.
+
+[00:07:17]
+And in C, this is a very, very important part of, doing C is deciding how we want to interpret that memory.
+
