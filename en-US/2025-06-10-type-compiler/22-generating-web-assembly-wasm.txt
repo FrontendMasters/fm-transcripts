@@ -1,0 +1,153 @@
+[00:00:00]
+>> Richard Feldman: Let's move on to the final step, generating web assembly. So in this section we're gonna talk about a couple of things. So first we're gonna talk about generating bytecode, and this is going to be sort of a bookend to the middle section, which is gonna be a little bit more freeform than these other sections have been, which is a code tour.
+
+[00:00:14]
+We're basically just going to look through and I'm just going to talk through a bunch of stuff and feel free to ask questions about our WASM implementation here. And then finally, we're gonna talk a little bit about the detail of generating polymorphic functions. I mentioned earlier there are some complications when it comes to this beyond the type complications.
+
+[00:00:30]
+So we're gonna talk about those after the code tour because we're not actually, because it's complicated, I've chosen not to implement that overall. There's multiple ways to do it, but we've chosen not to do any of them in in this. So basically, what we're gonna do is we're gonna talk a little bit upfront about, sort of general concepts of generating byte code.
+
+[00:00:44]
+Then most of what we're gonna talk about right here is we're just gonna walk through the code and talk through at a very high level what it's doing. And then feel free to ask questions. And then we're gonna get back and talk about polymorphic functions. The main point of this course is all the stuff building up to this.
+
+[00:00:58]
+As we're gonna see in a second, once you get the basic idea of this, I think that's the vast majority of the benefit, at least for the purposes of this course, is just kind of understanding how does this actually work? And you can get the idea pretty quickly, I think, based on what we've already learned.
+
+[00:01:11]
+Okay, as we've talked about before, we have this recurring theme. And this will be the last time the theme recurs, because this is the last section, of traversing input and generating output. So start off with source string, do some lexing, get out some tokens, take tokens, parse them, we get a parse tree, do some naming on that, and then we get scope involved, do some type inference on that, and then we get back our type database.
+
+[00:01:31]
+And now we are finally ready for the final stage, which is taking the parse tree and Code Gen to a string. Just kidding, that's not what we're doing now, that's what we already did. What we already did when we did formatting was we basically ran through these steps.
+
+[00:01:44]
+And okay, granted, we didn't have naming and type inference there. But we could, if we wanted to, choose to do those. If you wanna do, you could have your format or be like, yeah, tell me about naming errors and tell me about all the types. It's not gonna use them, it doesn't need them.
+
+[00:01:56]
+Those are sort of optional as far as the format is concerned. But fundamentally, you could just do all these steps if you wanted to with the formatter. And then, of course, if you wanted to take it an actual step further, then we would, instead of generating a string at the end, because it's a formatter, we would keep everything else the same, except that now we are generating WebAssembly bytecode.
+
+[00:02:13]
+And you might have noticed I did sneak something in here, which was the formatter only cares about the parse tree as its input. But if we're generating WebAssembly Bytecode, we actually do need to know that type database, because finally, [LAUGH] it has come to pass that we do finally get some value out of storing all of those IDs in our parse tree nodes, way back in the day [LAUGH], when we were back at section two.
+
+[00:02:35]
+Now we finally get to use them. So now the fact that we have those IDs in our parse tree nodes and we have this fully populated Type DB means that not only do we know the structure of the nodes, where's the conditionals, where are the functions defined, yada yada, but also we know what the types of absolutely every single thing in our program is.
+
+[00:02:52]
+We know the type of everything. There is nothing in our program where the type is a mystery to us at this point, because we did complete type inference on all of it. So now ready to generate some WebAssembly byte code and that's good, because WebAssembly Bytecode is tight.
+
+[00:03:04]
+WebAssembly actually requires you to explicitly specify the types. Some byte codes do not, but machine code also doesn't require that you specify, but it does require that you know it because if you don't know it or you get it wrong, bad things happen. [LAUGH] So essentially, whether you're going to WebAssembly Bytecode or machine code, you basically need to know your types at this point, or you need to do something like the aforementioned other languages that will do some, runtime extra work, where they will wrap up the type information around the thing.
+
+[00:03:30]
+So you'll have not only is this a string, but there's also a little piece of information hanging off the side that says, I'm a string. And so if you know where that little piece of extra information is consistently, you can go ask at runtime, but of course there's performance implications to that and all that good stuff.
+
+[00:03:45]
+So because we have all of our types, we don't need to do that at runtime. We already know what all the types are and we can just tell it to Webassembly directly and have it run faster. Okay, now it is time for the WebAssembly code tour. So basically what I'm gonna do is I'm just gonna sort of walk through our solution here and if you take a peek ahead, I guess you're gonna peak, you could always cheat.
+
+[00:04:03]
+But looking at the exercise, we might end up going through the thing that is in the exercise anyway, but we only have this one WebAssembly implementation. So here we go, let's take a look through it. So fundamentally, what WebAssembly is doing is to recap what we said at the very beginning, what you end up with when you have code generated some web assemblies, you end up with a whole bunch of bytes.
+
+[00:04:23]
+There's a bunch of ones and zeros. If you try to read them as a human, you look at that and you go, this is a bunch of gibberish. I always see a string ther, I see a string there, okay, but then more gibberish, I don't really know what to make of any of this.
+
+[00:04:33]
+This is not designed to be human readable, what it's designed to be is to be streamed efficiently over the network. That's really what its job is. So it can be decoded over the network as it's coming in, and then translated directly, or JITed, just in time, compiled directly into machine code.
+
+[00:04:46]
+So like I said, the reason that we're, the main reason that we're doing this in WebAssembly rather than in machine code, is number one, if we did it in machine code, then it'd have to have a different version for everybody's different machine that you're running. So I'd have to have a version of this for X8664 Intel machines, and another one for 64 bit ARM machines.
+
+[00:05:04]
+And the amount of work that would have to go into this section is a lot bigger, but also just because WebAssembly honestly, is a little bit simpler to understand than those things. A lot of those architectures are very old, they have all the legacy stuff going on, whereas WebAssembly is a lot more modern, and the way it's organized is a little bit more streamlined.
+
+[00:05:23]
+Question, yeah? So in this case, we'd be taking advantage of compiling to WebAssembly, because the folks who did WebAssembly took care of the rest of it for us, is that right? Well, I don't know if I would say it's that they took care of the rest of it for us.
+
+[00:05:35]
+It's more just that for their particular goals, one of WebAssembly's goals is that you could have this bytecode that anyone could compile to, much like JVM bytecode, and then it can be translated efficiently to any individual like actual hardware architecture. So because they did that work, they ended up with making different design decisions than the hardware designers did, because they're just dealing withdifferent trade offs.
+
+[00:06:00]
+Really easy example of this is, we can go into this if you're curious, but basically WebAssembly is designed as a stack machine, which essentially means that the way that WebAssembly sort of manages its own memory is pretty much one to one with the exact push and pop the stack stuff that we were doing ourselves back in part 2.
+
+[00:06:18]
+And then, I guess again, in part three. Whereas the hardware does not have that concept. If you wanna stack, you have to manage that yourself in a much more complicated way than what we or what WebAssembly are doing. But since, of course, we wanna have functions, it's pretty nice to be able to have access to that.
+
+[00:06:35]
+Anyway, so WebAssembly files are organized into sections. So the first type is types, then functions, then memory, exports, code and data. These sections, as Chris mentioned, they come in streaming, right, so the first section, right up front is types. So when I say WebAssembly is a typed system, if you're streaming this over the network, it's right up front, tell me what all your types are.
+
+[00:06:58]
+Basically, these are kind of type aliases where you're saying, I want to give a name to a particular type or stuff like that. That's the very first thing that comes across the wire, then your functions, then some global memory, and then things export. So WebAssembly can export things to JavaScript, the actual code.
+
+[00:07:15]
+So this is the bulk of what we're going to actually be looking at. And then some actual data that read only memory that can go with that. Worth noting that these all have numbers associated with them. So this is a very, very common, recurring theme that we're gonna see here is just that there are magic numbers all over the place, and they correspond to things.
+
+[00:07:33]
+And when we're emitting WebAssembly bytecode, we need to know which magic numbers to emit in the right places in order to get to work. So this is in some ways similar to the format that we did in the sense that in the formatter, we were traversing our parse nodes and then printing out some strings.
+
+[00:07:48]
+Same exact thing here. We're traversing our parse nodes and we're printing out, well, not strings, magic numbers basically. That's the fundamental difference here. So if you're not familiar with this notation, this is hexadecimal integer notation. It's pretty common when you see manuals for things like WebAssembly or CPU manuals.
+
+[00:08:05]
+They use this hexadecimal notation. If we were a more elaborate language and we had fancier types, we would support more types. But this is basically just a list of [LAUGH] here are all the WebAssembly types that we use and care about. So we care about i32 which don't worry about it, we're using it for Booleans, that's it.
+
+[00:08:21]
+F64, that's basically a 64-bit floating point number. That's the classic Javascript number so this is going to correspond to our number type, these are both for functions. This is for a reference to a function, when you're passing it around, this is the actual function definition itself. And then finally they have a special magic number for void, which is basically when you empty block type or you don't have a function with n obody essentially.
+
+[00:08:46]
+These magic numbers, we can kind of see where these come up in here. Yeah, sure, here's an example. If we are encoding, what is this? Yeah, right, parameters. Right, so another detail, like I mentioned at the beginning, we are working on a subset of Javascript here, not just in terms of types, but also in terms of what co-generation capabilities we're supporting here.
+
+[00:09:07]
+So there are a lot of things that are a lot easier to type check than they are to actually implement in pure WebAssembly. And again, since this is for learning purposes, we didn't really go all the way and implement our full type system as limited as it is.
+
+[00:09:19]
+But yes, I just decided we're just only gonna support F64 params, so we should say number, that's it. You can have any param type you want as long as it's a number. So yeah, basically, this is how you tell WebAssembly, I am going to make a new sort of type annotation for this function.
+
+[00:09:39]
+When you're saying, I want to specify this is a function type, you do types.func, which was this magic number, 0x60 in hexadecimal. And then when you wanna say, and by the way, this thing returns an F64 type, that is this magic number. So what's actually getting emitted here?
+
+[00:09:57]
+When we are printing this out, this is basically the same thing that we're doing here. When we say concatBytes, this is a string concat except instead of concatenating strings together for the formatter, we were concatenating bytes together. And instead of the strings that we're concatenating together being the familiar syntax that we had in the input in the first place, instead we were concatenating together are these magical number like bytes that just happen to go together.
+
+[00:10:21]
+So this thing right here, I mean, could just be essentially the same thing as, I don't know, let's say we had some argument's a bad example, whatever, some sort of lambda here, right? I don't know, b+1, something like that. That's what we do in the formatter is we're concantenating these together to develop the string, it's exact the same thing here except that we're concantenating together bytes.
+
+[00:10:45]
+And instead of familiar strings, it's these sort of strange looking magical numbers. And so there are some other differences here. Obviously, I mentioned the stack machine before. When you're compiling or transfiling to a human readable language, you tend to get with that a lot of ergonomics that save you a lot of time.
+
+[00:11:02]
+So you may recall we talked through that syntax sugar example where it was like we invented this plus, plus, plus operator, and then we de-sugared it to x = x + 2. There's a lot of that type of thing going on in here where basically it's like, okay, conceptually I want this to be, I don't know.
+
+[00:11:19]
+I want this to be something that, there's just a function for that in JavaScript, and if I were compiling JavaScript, I would just call that function. But WebAssembly doesn't have that, so I have to actually implement that function by scratch. It has to sort of give it the raw, de-sugared, unfiltered version because I just don't have the convenience there.
+
+[00:11:38]
+That category of thing, I would mainly classify as an inconvenience. It's just the same thing aswhen there's a library, you don't have access to, fine, I gotta write it myself. I would say, and then also, when it comes to concatenating these two together, it's also just magic number constants instead of magic string constants.
+
+[00:11:53]
+The string constants are maybe a little more intuitive, but fundamentally it's not that different. Mainly the way that this, I would say, feels different to me, is just when things need to be organized differently. If we were putting together, I don't know, let's see what's, sure, okay, so the import section, right?
+
+[00:12:10]
+So here's an example of something where WebAssembly has this concept of imports, and basically, any kind of stuff that you want to import from the host environment. In this example, we're using console.log. You don't get to just say, I'm just gonna call console.log because that's on the window object like you can in Javascript.
+
+[00:12:28]
+You actually have to declare upfront, hey, host language, Javascript, here are all the things that I want to import from you. I want to access from you. And in order to give it a flat list of those, that means that you need to have already prepared that list ahead of time, which in turn means that you need to have traversed your entire parse tree and found every single instance of whenever we're doing console log or whatever it is in our language that we want to import from JavaScript.
+
+[00:12:53]
+All of that work has to be done in a separate pass, or if we want to avoid a separate pass, we have to do that trick that we kind of talked about way back in the formatting section. Where, as we're going along, we sort of write down, yes, I just saw a console.ly, let me write that down.
+
+[00:13:07]
+That's gonna be needed for the import section later. And then when you actually get to this point, you have to sort of gather it up and do it. So these are the types of things that I would say feel like the biggest part of doing code generation, not to a human readable language, but rather to bytecode, is just they just have different rules about how they want things to be placed.
+
+[00:13:25]
+And sometimes that requires structural changes that you wouldn't otherwise normally need to do, in addition to the inconveniences of helper functions not being there and you have to write things out, and the inconvenience of the magic numbers other than the familiar strengths. But I mean, the good news is that fundamentally, from a learning perspective, all of those things, I think, are pretty close at hand, once you've done a formatter.
+
+[00:13:47]
+It's not that far of a leap, I would say. It's really just okay, well, you got to learn about that import section thing that we just talked about. You got to learn about the whole, this is the Type section. You got to have your your types in order for that.
+
+[00:14:00]
+Once you understand like the sort of list of things that you need to do differently in the WebAssembly world, or in the x8664 world, or in the LLVM world, all of these things are in the category of what people tend to call compiler back ends. So the compiler back end is basically the thing that's responsible for the code generation piece and the compiler frontend is essentially the other stuff that we're doing, the type checking, the analysis, the parsing, and all that.
+
+[00:14:26]
+So I guess being here at Frontend Masters, it's only appropriate that we sort of relegated the backend portion of the compiler to the very end [LAUGH] of the workshop. Having said all that, so this basically is essentially our whirlwind tour of this code base. If you want, there's quite a lot here to get this to work.
+
+[00:14:43]
+But really, you can even get some bit shifts in there if you're into that kind of thing, also something we did in the C course. But basically, the whole purpose of all of this is just building up to being able to actually run our Node.js tests, as we have been doing all these other things, because Node.js does support wasm execution.
+

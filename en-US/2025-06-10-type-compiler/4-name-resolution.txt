@@ -1,0 +1,93 @@
+[00:00:00]
+>> Richard Feldman: That brings us to part two, name resolution. All right, so here we're gonna talk about declarations and lookups, hoisting, and nested scopes. Okay, so I mentioned in a previous section that we're gonna have this theme of traversing input and generating output, and this is no exception. Here, we are gonna introduce a new form of traversing input and generating output.
+
+[00:00:17]
+So we got our parsing right here, we're gonna kinda we're push that out of the way and then right after parsing, but before Code Gen, this is where we're going to do our name resolution. So, again, this is a step that goes by multiple different names. I'm using the terms naming or name resolution here.
+
+[00:00:30]
+People also call it canonicalization, which I'll talk a little bit about towards the end of this section, which is a little bit, it's like naming plus a little bit of extra, but we're not actually gonna do that here. We're just gonna, in name resolution, do the checking, and then basically, at the end, at the other side, we have our parse tree, and then also a scope that we can do things with if we want to.
+
+[00:00:47]
+But although, in this compiler, we're not really gonna do anything with the scope, it's just going to be kind of an intermediary thing that we use to report the naming errors, and that's it. Okay, so let's talk about declarations and lookups first. So here's our const x = 5 once again.
+
+[00:01:03]
+We're gonna choose a new one, which is const y = x + 1. So essentially, if we want to represent this in memory, we could do this as a scope or nobody could do this as a set. Nobody could do this if you didn't wanna do it as a set is you can just use object literals and actually in the exercises, I am using object literals, so that would be more semantically correct.
+
+[00:01:22]
+So for the slides, I'll do it with sets, but basically, the idea is that, I am going to have a data structure that's going to track what is in scope right now. So in this current scope that we're in, which we can kind of assume is like the top of the file, we're not inside a function or inside a curly brace block or something like that.
+
+[00:01:38]
+At the outset of the program, the scope is empty, there is nothing in scope. And then as we go along, we put things in scope. So we'll say, I encountered this x here as we're traversing through our parse three nodes and we see an identifier of x inside a constant decal.
+
+[00:01:53]
+And we say, well, that means that now x is in scope from now on within this scope, so we just add it to that set. And then later on, when I'm doing this lookup, where I'm saying, I need to go get the value of x, this is exactly where we say, well, is x in scope?
+
+[00:02:05]
+Yes or no. And all we do is we just go and ask that set, okay, do you have x in you? [LAUGH] Is there an x in that set? And if it does, then fantastic, we're all good. And if it's not in there, then that means, this x has been used before it was declared, because if it had been declared already, it would be in that set.
+
+[00:02:20]
+So that's where we give a naming error, we just report, hey, this x right here at this position, which we passed along from our lexing stage, that was not in scope when you use it with the lookup. And so, therefore, report naming error. Assuming that it goes, you all goes well and it does not have a naming error, then we would go on and add y to scope, and now y can be used from now on in the rest of the scope, and so on and so forth.
+
+[00:02:43]
+Now, another thing that you can do is, you can do a check for a duplicate declaration. So basically, this would be not trying to say that there was a naming error of a failed lookup. But for example, if we said const y, and then later on you said const y again, we would probably wanna give an error saying, hey, you can't do that.
+
+[00:03:01]
+Now, in some languages you can. So in Rust, const y followed by const y is totally allowed, and you're allowed to change the type and stuff like that, I believe Elixir also does the same thing. But most programming languages, if you say const y in the same scope, and then later on, you say const y, that's not allowed.
+
+[00:03:17]
+Another variation of that is shadowing, where, again, we're not getting to nested scopes yet, but down the line, that's where if it's in exactly the same scope, it's not allowed. But if one of them is in a nested scope, then it is allowed, and that's called shadowing. So the basic idea here is that, all we do in order to support either shadowing, or no shadowing allowed, or shadowing is allowed, and also this shadowing in the same scope is allowed, where you can just say const y followed by const y.
+
+[00:03:44]
+All of those are handled right here in naming resolution, where we basically either check to see before adding y to scope, whether or not it's already in scope, meaning somebody else declared it, or we don't do that check. And then that check can either be done with or without nesting, which we will talk about when we get to the nesting.
+
+[00:03:59]
+So nested scopes are a common thing that comes up on programming and these add a little bit of a layer of complexity to what we just saw. So let's suppose that I have a function called increment, and I'm doing it in arrow function style, which is all our syntax supports [LAUGH] in this language, we don't support the write out the word function syntax.
+
+[00:04:17]
+So const increment equals, or inc for short, for slide saving purposes, takes an argument called n, and then it returns n + 1 and increments it, very simple function. So let's say, once again, we've got our x equals 5, and then for y, we call increment passing in 3, okay?
+
+[00:04:33]
+So far, so good, now, at this point, it's not enough for us to just say, well, we've got just the one scope. Because if I were to use n down here, that's supposed to be an error, because we have a different scope here at the top level, where we have x and y in increment than we do inside the body of increment.
+
+[00:04:49]
+Now, inside the body of increment, we have a different scope where n is in scope, and so, I'm allowed to do this, but outside of your n is not allowed to be used. However, inside this nested scope, I am still supposed to be able to reference x and y.
+
+[00:05:00]
+Or at least, depending on the sort of capture rules of lambdas and hoisting and things like that, some languages will, and other languages will not allow you to do that. But pretty much every language will, if you move inc down below these two, allow you to do that.
+
+[00:05:12]
+Here is, if we were just doing the naive version of this, like we've done the previous slide, where we're not thinking about nesting, here's what we would do, initialize the new scope. We add increment to the scope. We add n to the scope because, we came along and this needs to be in scope.
+
+[00:05:25]
+That way, when we go here, we can look it up successfully. And then we add x, and now we're already in trouble because now x and n are in the same scope, which is not what we wanted. And then we add y, and that's also a problem because [LAUGH] that's not supposed to be the same scope as n.
+
+[00:05:38]
+So already we can see that the model that we used on the previous slide is not quite sufficient for the nesting case, we need to add some sort of layer of complexity to be able to handle that. So let's start over and actually do it properly with nesting in mind.
+
+[00:05:50]
+So here, essentially, we're still gonna do the scope = new Set(), but basically, we're gonna have an array of scopes. So we're gonna push that set onto the scopes array. And then basically, from there we can just add stuff like increment, and then when we want to start a new scope.
+
+[00:06:06]
+So I'm just gonna call this one inner. This is gonna be exactly the same thing, I'm just choosing a different name for it, that can now represent the scope inside of there. And so, I can do scopes.push(inner). And then while we're inside inner, now I can say inner.add(''n'').
+
+[00:06:18]
+So I'm not adding it to the outer scope, being added to the inner scope. And then at that point, this part gets a little bit fancier, a little bit more complicated, where, now, instead of just being able to say, scope.has, I need to iterate over all my scopes and see if any of the scopes have it.
+
+[00:06:31]
+So that's again, that point of, well, at this point, and we know we have n, but there could have been other stuff above here in the outer scope. For example, if these had moved up, that should be in scope, that I should be allowed to reference from inside this function.
+
+[00:06:45]
+And if I got naming errors saying these are not in scope, that would be an error, that's not what you want your compiler to do. So to guard against that, we have this entire array of scopes, and we keep them around, and we do search all of them when we are trying to say, is this thing in scope properly.
+
+[00:07:01]
+And then finally, it's very important that once we're done with the scope, we end this inner scope, we get to this closing curly brace, we need to get rid of it and and pop it, so just pop it off scope. Just basically get rid of the last one that we were using.
+
+[00:07:13]
+And the reason that's important is that, if you don't do that, then later on you do the same exact search, this is how we always search our scopes now to see if a lookup is valid. Now, you get down and you get down here and you're doing that lookup, all these lookups would be able to find n if we didn't pop that scope, it would just be as if we had no curly braces at all.
+
+[00:07:30]
+We'd basically be back where we started on from. So the whole point of having an array of scopes is basically to be able to push right here, and then to pop when you're done with it, and that allows you to nest. And un-nest and nest, there's nest, nest, nest, nest and un-nest a little bit, and nest some more and un-nest.
+
+[00:07:43]
+So basically, every time you're pushing a scope onto this array of scopes, you are increasing your indentation level, your nesting level. And then every time you pop, you're finishing a scope, it's ending and you're going back up a little.
+

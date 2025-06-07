@@ -1,0 +1,740 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:02.519
+&gt;&gt; Richard Feldman: So I did say that
+I was gonna mention a little bit about
+
+2
+00:00:02.519 --> 00:00:06.658
+generating polymorphic functions, so let's
+sort of talk through that real quick.
+
+3
+00:00:06.658 --> 00:00:10.306
+So a Bool is 1 byte in memory and
+a Number is 8 bytes in memory.
+
+4
+00:00:10.306 --> 00:00:11.560
+This is true in most languages.
+
+5
+00:00:11.560 --> 00:00:13.736
+Actually, in WebAssembly,
+it's a little bit different.
+
+6
+00:00:13.736 --> 00:00:16.422
+For kind of some strange
+[LAUGH] design reasons,
+
+7
+00:00:16.422 --> 00:00:19.116
+they don't support things
+as small as 1 byte.
+
+8
+00:00:19.116 --> 00:00:23.596
+But in most programming languages,
+a Bool is 1 byte, and a Number is 8 bytes.
+
+9
+00:00:23.596 --> 00:00:26.841
+This affects Array&lt;Bool&gt; and
+Array&lt;Number&gt;, like, for example,
+
+10
+00:00:26.841 --> 00:00:29.573
+let's suppose I wanted to
+implement a function called push.
+
+11
+00:00:29.573 --> 00:00:31.600
+And I'm just using
+the TypeScript syntax for
+
+12
+00:00:31.600 --> 00:00:33.636
+this to say this is
+a generic type parameter.
+
+13
+00:00:33.636 --> 00:00:38.218
+Basically, it's like, give me an array,
+and that is an array of T,
+
+14
+00:00:38.218 --> 00:00:40.909
+whatever T is, the T is a type variable.
+
+15
+00:00:40.909 --> 00:00:43.945
+I'm not saying exactly what it is,
+I can push numbers, I can push strings,
+
+16
+00:00:43.945 --> 00:00:44.806
+I can push booleans.
+
+17
+00:00:44.806 --> 00:00:47.427
+Then you, of course,
+need to give me the actual thing to push.
+
+18
+00:00:47.427 --> 00:00:51.567
+Now, the problem with this is, knowing
+what we just learned about WebAssembly,
+
+19
+00:00:51.567 --> 00:00:55.235
+where you have to be very, very
+specific about, this is the operation.
+
+20
+00:00:55.235 --> 00:00:58.393
+It's 64-bit floating point integer.
+
+21
+00:00:58.393 --> 00:01:01.027
+So this is exactly this,
+it's exactly this much memory,
+
+22
+00:01:01.027 --> 00:01:03.732
+the array elements need to take
+up exactly this much space.
+
+23
+00:01:03.732 --> 00:01:07.648
+What do you do when you have a function
+that's polymorphic and yet you have
+
+24
+00:01:07.648 --> 00:01:12.022
+potentially different arguments that
+are like, they just are different sizes?
+
+25
+00:01:12.022 --> 00:01:16.123
+That's just a true thing about them
+in the world, how do you deal with
+
+26
+00:01:16.123 --> 00:01:20.949
+that when you're asked to write machine
+code that is only dealing with one size?
+
+27
+00:01:20.949 --> 00:01:24.460
+So, I mean, I guess you could sort of,
+bottom line is basically like, yeah,
+
+28
+00:01:24.460 --> 00:01:26.661
+push is supposed to add
+onto the end of the array.
+
+29
+00:01:26.661 --> 00:01:28.466
+Tell me, WebAssembly programmer,
+
+30
+00:01:28.466 --> 00:01:31.501
+how many bytes would you like me
+to add to the end of your array?
+
+31
+00:01:31.501 --> 00:01:33.643
+And the answer can't just be T,
+that's not a number.
+
+32
+00:01:33.643 --> 00:01:34.697
+You gotta pick, is it 1 byte?
+
+33
+00:01:34.697 --> 00:01:35.524
+Is 8 bytes?
+
+34
+00:01:35.524 --> 00:01:37.296
+Is it 4 bytes?
+
+35
+00:01:37.296 --> 00:01:39.996
+And the answer varies based
+on who's calling push.
+
+36
+00:01:39.996 --> 00:01:43.574
+So, there are a couple of
+different ways to do this, but
+
+37
+00:01:43.574 --> 00:01:48.544
+really they boil down to two that are more
+popular than really anything else.
+
+38
+00:01:48.544 --> 00:01:50.976
+So the first one is hidden runtime data.
+
+39
+00:01:50.976 --> 00:01:53.636
+Sometimes people will call
+this dictionary parsing,
+
+40
+00:01:53.636 --> 00:01:57.218
+although that also sometimes has to
+do with other forms of polymorphism,
+
+41
+00:01:57.218 --> 00:02:00.069
+like ad hoc polymorphism, but
+it can be used for this too.
+
+42
+00:02:00.069 --> 00:02:04.383
+Basically what this means is, we're gonna
+pay a runtime cost in the form of extra
+
+43
+00:02:04.383 --> 00:02:08.137
+memory that goes along with some
+combination of the function itself.
+
+44
+00:02:08.137 --> 00:02:10.123
+That's being passed to the function,
+
+45
+00:02:10.123 --> 00:02:14.469
+and/or follows the data structure around
+that just is like, hey, I made bytes big.
+
+46
+00:02:14.469 --> 00:02:17.675
+And then the function's like, hey,
+when you get passed in, I need to see that
+
+47
+00:02:17.675 --> 00:02:20.995
+little extra piece of metadata that you've
+got that says how many bytes you are.
+
+48
+00:02:20.995 --> 00:02:26.039
+So I know how many bytes I need to push
+onto the end of this array for you.
+
+49
+00:02:26.039 --> 00:02:30.497
+So basically, if this works, whenever we
+call push with a different type for T,
+
+50
+00:02:30.497 --> 00:02:32.875
+we also pass we being the compiler author.
+
+51
+00:02:32.875 --> 00:02:34.590
+We don't make the programmer
+deal with this.
+
+52
+00:02:34.590 --> 00:02:37.991
+We're just sort of like, yeah, when we're
+generating the WebAssembly byte code, or
+
+53
+00:02:37.991 --> 00:02:40.723
+if we're compiling the JavaScript,
+when we join the JavaScript code,
+
+54
+00:02:40.723 --> 00:02:42.583
+we're just gonna pass
+that information along.
+
+55
+00:02:42.583 --> 00:02:46.541
+There's just gonna be an extra argument
+that function, then you'd know about.
+
+56
+00:02:46.541 --> 00:02:49.268
+As the user, you don't see that thing.
+
+57
+00:02:49.268 --> 00:02:52.356
+What we can do when we're in the code
+generation step is we can just sneak
+
+58
+00:02:52.356 --> 00:02:52.878
+things in.
+
+59
+00:02:52.878 --> 00:02:54.388
+We can code generate whatever we want,
+
+60
+00:02:54.388 --> 00:02:56.693
+it doesn't have to have anything
+to do with what you wrote.
+
+61
+00:02:56.693 --> 00:02:59.992
+And this is a very common technique, it's
+just like you just silently generate this
+
+62
+00:02:59.992 --> 00:03:02.417
+extra thing and you pass it
+around from function to function.
+
+63
+00:03:02.417 --> 00:03:06.644
+Not just to push, but to all the things
+that are leading up to the call chain to
+
+64
+00:03:06.644 --> 00:03:09.436
+that, cuz they all need to
+be able to get it there.
+
+65
+00:03:09.436 --> 00:03:13.324
+Has some runtime memory cost, but
+at the end of the day this is not only
+
+66
+00:03:13.324 --> 00:03:16.877
+a way to contain information like
+how many bytes T takes up, but
+
+67
+00:03:16.877 --> 00:03:19.511
+also you can do lots of
+other things with this.
+
+68
+00:03:19.511 --> 00:03:23.274
+There're plenty of nice language features
+where this is a perfectly reasonable way
+
+69
+00:03:23.274 --> 00:03:25.662
+to implement them,
+including ad hoc polymorphism.
+
+70
+00:03:25.662 --> 00:03:30.563
+Like operator overloading, or
+being able to customize how equals works,
+
+71
+00:03:30.563 --> 00:03:31.976
+or things like that.
+
+72
+00:03:31.976 --> 00:03:35.126
+Now, the downside, of course, is that
+it's not only more memory usage, but
+
+73
+00:03:35.126 --> 00:03:36.390
+also some more runtime logic.
+
+74
+00:03:36.390 --> 00:03:38.023
+You have to decide at runtime, okay,
+
+75
+00:03:38.023 --> 00:03:40.176
+I'm gonna go do this versus
+I'm gonna go do that.
+
+76
+00:03:40.176 --> 00:03:44.198
+Which leads us to approach number 2,
+which is monomorphization.
+
+77
+00:03:44.198 --> 00:03:48.486
+So polymorphism, the poly meaning many,
+so you have multiple morphs,
+
+78
+00:03:48.486 --> 00:03:50.187
+multiple different forms.
+
+79
+00:03:50.187 --> 00:03:53.670
+Monomorphization is where you're like,
+okay, go from many forms down to one.
+
+80
+00:03:53.670 --> 00:03:57.140
+And the idea here is, essentially,
+whenever we call push with a different
+
+81
+00:03:57.140 --> 00:04:00.243
+type for T, we just create
+a specialized version of the function.
+
+82
+00:04:00.243 --> 00:04:03.377
+So this is kind of analogous to what we
+did at the type level when we were calling
+
+83
+00:04:03.377 --> 00:04:04.161
+these functions.
+
+84
+00:04:04.161 --> 00:04:08.130
+Remember we made our duplicated
+special type in our type database.
+
+85
+00:04:08.130 --> 00:04:10.466
+And we just sort of filled it in
+with stuff that was specific to that
+
+86
+00:04:10.466 --> 00:04:12.638
+by unifying it with,
+you're calling it with a number?
+
+87
+00:04:12.638 --> 00:04:16.957
+Great, we'll unify it with number, and
+then our special little version here is
+
+88
+00:04:16.957 --> 00:04:19.764
+just gonna go unify with number,
+and that's fine.
+
+89
+00:04:19.764 --> 00:04:23.405
+Monomorphization is basically taking
+exactly the same idea, except instead of
+
+90
+00:04:23.405 --> 00:04:26.843
+doing it for your types, we're actually
+doing it for the code generation.
+
+91
+00:04:26.843 --> 00:04:30.731
+So literally, like every single time you
+call push with a different type for T,
+
+92
+00:04:30.731 --> 00:04:34.912
+we are generating a entirely different
+copy-pasted implementation of push that's
+
+93
+00:04:34.912 --> 00:04:35.855
+exactly the same.
+
+94
+00:04:35.855 --> 00:04:38.084
+Except instead of 8 bytes,
+it says 1 byte or
+
+95
+00:04:38.084 --> 00:04:41.735
+4 bytes in all the different places
+where that comes up in that function.
+
+96
+00:04:41.735 --> 00:04:44.606
+The rest of the function
+is exactly the same.
+
+97
+00:04:44.606 --> 00:04:48.307
+So inside that function, T is no
+longer polymorphic, it is concrete, or
+
+98
+00:04:48.307 --> 00:04:50.292
+another word for that is monomorphic.
+
+99
+00:04:50.292 --> 00:04:54.394
+So basically, if you look at one of these
+specialized functions that we generated,
+
+100
+00:04:54.394 --> 00:04:58.266
+the copy-pasted and the substituted in
+the specific number for those things,
+
+101
+00:04:58.266 --> 00:05:00.311
+there's no polymorphism left in there.
+
+102
+00:05:00.311 --> 00:05:04.933
+So they don't need this extra
+runtime passing around thing because
+
+103
+00:05:04.933 --> 00:05:08.836
+we've created a specialized
+one that's metamorphic.
+
+104
+00:05:08.836 --> 00:05:13.857
+Now, this does mean that you are doing a
+lot more function generation, you're gonna
+
+105
+00:05:13.857 --> 00:05:18.686
+get maybe ten different versions of
+copy-pasted versions of the push function.
+
+106
+00:05:18.686 --> 00:05:21.582
+But you don't have extra
+runtime data to pass around.
+
+107
+00:05:21.582 --> 00:05:25.620
+Now, there is, on the one hand, some
+debate, and on the other hand also some
+
+108
+00:05:25.620 --> 00:05:29.040
+consensus around which of these
+two approaches is sort of quote,
+
+109
+00:05:29.040 --> 00:05:29.996
+unquote faster.
+
+110
+00:05:29.996 --> 00:05:34.528
+So all of the high performance languages,
+so you're talking your Rust and your C++,
+
+111
+00:05:34.528 --> 00:05:38.767
+if they have polymorphism, they do it
+this way, they do the monomorphism thing.
+
+112
+00:05:38.767 --> 00:05:42.947
+This does involve, your binaries will
+theoretically get bigger potentially
+
+113
+00:05:42.947 --> 00:05:47.013
+because you're generating multiple
+instantiations of these functions.
+
+114
+00:05:47.013 --> 00:05:50.023
+Binaries getting bigger also can
+have an implication on performance.
+
+115
+00:05:50.023 --> 00:05:53.386
+But the general consensus is that
+overall it's the net win and
+
+116
+00:05:53.386 --> 00:05:54.881
+a pretty significant one.
+
+117
+00:05:54.881 --> 00:05:56.142
+And actually the main reason for
+
+118
+00:05:56.142 --> 00:05:58.393
+that is the way that this
+interacts with the optimizers.
+
+119
+00:05:58.393 --> 00:06:02.514
+So if you're monomorphizing, you've got
+your specialized version that's for
+
+120
+00:06:02.514 --> 00:06:05.798
+8 bytes and your other one that's for
+4 bytes or whatever else,
+
+121
+00:06:05.798 --> 00:06:08.027
+those all get to get optimized separately.
+
+122
+00:06:08.027 --> 00:06:11.536
+And so, because getting to optimize
+different versions of a function
+
+123
+00:06:11.536 --> 00:06:13.737
+separately can bring different benefits,
+
+124
+00:06:13.737 --> 00:06:17.497
+especially if they're being optimized
+under different circumstances.
+
+125
+00:06:17.497 --> 00:06:21.540
+Quite often compilers will just choose
+to make different specializations of
+
+126
+00:06:21.540 --> 00:06:22.846
+functions anyway just so
+
+127
+00:06:22.846 --> 00:06:26.276
+the optimizer can get their hands
+on different versions of them.
+
+128
+00:06:26.276 --> 00:06:30.302
+So the downside in practice, if you're
+comparing to a completely unoptimized
+
+129
+00:06:30.302 --> 00:06:34.399
+version that's not doing any inling,
+that's a really significant downside.
+
+130
+00:06:34.399 --> 00:06:36.088
+But it gets sort of murkier and
+
+131
+00:06:36.088 --> 00:06:40.549
+the downside start to fade away a little
+bit if were you actually comparing it to
+
+132
+00:06:40.549 --> 00:06:43.739
+somebody with the optimizer
+is doing a lot of inlining.
+
+133
+00:06:43.739 --> 00:06:47.672
+Generating bytecode, basically just same
+kind of thing as generating strings,
+
+134
+00:06:47.672 --> 00:06:49.838
+except that it's bytes instead of strings.
+
+135
+00:06:49.838 --> 00:06:53.939
+Concatenating bytes together instead of
+strings, magic numbers that are referenced
+
+136
+00:06:53.939 --> 00:06:57.773
+via constants instead of constants that
+are referring to more familiar things.
+
+137
+00:06:57.773 --> 00:07:00.509
+We do a little code touring, kind of
+looked at how that looks in practice.
+
+138
+00:07:00.509 --> 00:07:05.287
+And finally, we talked a little bit
+about generating polymorphic functions.
+
+139
+00:07:05.287 --> 00:07:07.516
+Guess we're a little bit out of order,
+cuz we kind of already went and
+
+140
+00:07:07.516 --> 00:07:08.179
+did the exercises.
+
+141
+00:07:08.179 --> 00:07:11.680
+But on that note, we can go ahead and
+move on to the wrap up,
+
+142
+00:07:11.680 --> 00:07:15.050
+unless there are any questions
+about co-generation.
+
+143
+00:07:20.969 --> 00:07:21.946
+&gt;&gt; Richard Feldman: Yes.
+
+144
+00:07:21.946 --> 00:07:26.264
+&gt;&gt; Speaker 2: The monomorphism that you
+were mentioning earlier kind of as a way
+
+145
+00:07:26.264 --> 00:07:30.674
+of handling polymorphism,
+as representation of polymorphism.
+
+146
+00:07:30.674 --> 00:07:35.483
+Is that a similar mechanism behind
+things like dynamic dispatch?
+
+147
+00:07:35.483 --> 00:07:39.312
+Or would we be doing that
+earlier in the pipeline?
+
+148
+00:07:39.312 --> 00:07:41.063
+&gt;&gt; Richard Feldman: Dynamic dispatch and
+static dispatch.
+
+149
+00:07:41.063 --> 00:07:43.032
+Well, so static dispatch would
+certainly happen earlier.
+
+150
+00:07:43.032 --> 00:07:46.895
+So static dispatch would be something that
+would happen back in the type checking.
+
+151
+00:07:46.895 --> 00:07:50.896
+The static and static dispatch is short
+for statically typed kind of like.
+
+152
+00:07:50.896 --> 00:07:54.045
+So it's all based on types and
+that would happen before this.
+
+153
+00:07:54.045 --> 00:07:57.430
+So you could have static or
+dynamic dispatch and
+
+154
+00:07:57.430 --> 00:08:02.347
+also monomorphization, or
+dictionary passing or something else.
+

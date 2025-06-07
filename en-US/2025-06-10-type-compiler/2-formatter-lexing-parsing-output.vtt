@@ -1,0 +1,2032 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:03.094
+&gt;&gt; Richard Feldman: So in this section,
+we're gonna talk about Lexing, aka
+
+2
+00:00:03.094 --> 00:00:07.872
+tokenization, also scanning, I've heard
+less commonly, parsing and formatting.
+
+3
+00:00:07.872 --> 00:00:09.468
+Okay, so we'll start with Lexing.
+
+4
+00:00:09.468 --> 00:00:12.421
+This is typically what most
+compilers will start out with.
+
+5
+00:00:12.421 --> 00:00:15.570
+You don't have to start out this way, but
+it's so common that we're going to do it
+
+6
+00:00:15.570 --> 00:00:18.094
+in this compiler and just talk
+very briefly about how it's done.
+
+7
+00:00:18.094 --> 00:00:19.123
+So here's the basic idea.
+
+8
+00:00:19.123 --> 00:00:20.253
+We have some source code here.
+
+9
+00:00:20.253 --> 00:00:21.186
+Let's say this is our source code.
+
+10
+00:00:21.186 --> 00:00:23.092
+It says const x = 5.
+
+11
+00:00:23.092 --> 00:00:24.595
+This is valid source code in our language.
+
+12
+00:00:24.595 --> 00:00:27.203
+I forgot to mention earlier
+we support comments.
+
+13
+00:00:27.203 --> 00:00:29.902
+And then we have a comment
+afterwards that says x = 5.
+
+14
+00:00:29.902 --> 00:00:33.437
+So the first thing that we're gonna do,
+and basically that every compiler does,
+
+15
+00:00:33.437 --> 00:00:35.139
+is we've got this source code format.
+
+16
+00:00:35.139 --> 00:00:38.536
+And it is really inconvenient to try
+to write a compiler on top of just
+
+17
+00:00:38.536 --> 00:00:39.261
+source code.
+
+18
+00:00:39.261 --> 00:00:43.180
+So let's try to get it into some other
+representation that is going to make our
+
+19
+00:00:43.180 --> 00:00:45.007
+lives easier as compiler authors.
+
+20
+00:00:45.007 --> 00:00:46.093
+So the first thing that we do is
+
+21
+00:00:46.093 --> 00:00:47.923
+we basically start marching
+through the string.
+
+22
+00:00:47.923 --> 00:00:51.310
+And trying to find interesting they
+call them tokens basically little chunks
+
+23
+00:00:51.310 --> 00:00:53.810
+of text that are sort of
+semantically interesting to us,
+
+24
+00:00:53.810 --> 00:00:55.333
+that we can make a nice tree out of.
+
+25
+00:00:55.333 --> 00:00:58.955
+Eventually, when we get to parsing,
+and then we can traverse that tree and
+
+26
+00:00:58.955 --> 00:01:01.441
+do our analysis in a much
+more nicely semantic way.
+
+27
+00:01:01.441 --> 00:01:05.704
+So C, O, N, S, T, that's what our lexer
+sees and says, I know what that is.
+
+28
+00:01:05.704 --> 00:01:06.830
+This is a const token.
+
+29
+00:01:06.830 --> 00:01:09.479
+So this is how we would
+represent that in our language.
+
+30
+00:01:09.479 --> 00:01:12.453
+You just make a JavaScript record object.
+
+31
+00:01:12.453 --> 00:01:15.184
+By the way, the compiler is going
+to be written in JavaScript,
+
+32
+00:01:15.184 --> 00:01:16.792
+the compiler subset of JavaScript.
+
+33
+00:01:16.792 --> 00:01:20.293
+So we would have an object here,
+and we have a field called type.
+
+34
+00:01:20.293 --> 00:01:22.861
+And the type is going to
+be constant all caps.
+
+35
+00:01:22.861 --> 00:01:25.677
+The reason I put these in all caps is
+just to kind of indicate that like, hey,
+
+36
+00:01:25.677 --> 00:01:26.386
+these are tokens.
+
+37
+00:01:26.386 --> 00:01:28.188
+These are not like the actual syntax,
+
+38
+00:01:28.188 --> 00:01:31.227
+so you can kind of tell when you
+see the all caps thing that means,
+
+39
+00:01:31.227 --> 00:01:34.342
+this is like the name of the token
+as opposed to the actual syntax.
+
+40
+00:01:34.342 --> 00:01:35.222
+We could have named the same thing.
+
+41
+00:01:35.222 --> 00:01:37.642
+We could have said I am
+a const thing whatever.
+
+42
+00:01:37.642 --> 00:01:42.220
+This is regerring to that but
+not actuallly coming from the source.
+
+43
+00:01:42.220 --> 00:01:43.428
+The value for this is null.
+
+44
+00:01:43.428 --> 00:01:46.682
+We'll see later on,
+actually immediately after this.
+
+45
+00:01:46.682 --> 00:01:49.033
+Some tokens have a value
+associated with them.
+
+46
+00:01:49.033 --> 00:01:52.435
+For example, this token has a value
+of x associated with it and
+
+47
+00:01:52.435 --> 00:01:56.952
+then position here is basically where in
+the original file can this be found like,
+
+48
+00:01:56.952 --> 00:01:58.472
+in the actual source code.
+
+49
+00:01:58.472 --> 00:02:00.549
+This comes up for
+things like error messages.
+
+50
+00:02:00.549 --> 00:02:03.144
+If you wanna Print out nice,
+helpful error messages to your users.
+
+51
+00:02:03.144 --> 00:02:05.352
+People generally want to know okay,
+but where in the source code is that?
+
+52
+00:02:05.352 --> 00:02:06.652
+You could be like, I found a Type error.
+
+53
+00:02:06.652 --> 00:02:07.948
+And you're like, where?
+
+54
+00:02:07.948 --> 00:02:09.434
+Where was the type error?
+
+55
+00:02:09.434 --> 00:02:11.542
+You're like, it's a string and
+it was supposed to be a number.
+
+56
+00:02:11.542 --> 00:02:12.659
+You got to guess where.
+
+57
+00:02:12.659 --> 00:02:16.345
+So, yeah, if you want to be able to
+give people nice error messages,
+
+58
+00:02:16.345 --> 00:02:20.544
+you really got to propagate through
+the subsequent steps of compilation where
+
+59
+00:02:20.544 --> 00:02:22.530
+the actual source code position is.
+
+60
+00:02:22.530 --> 00:02:24.478
+This is not something I'm
+going to show on every slide,
+
+61
+00:02:24.478 --> 00:02:27.013
+because it gets kind of tedious to
+have like position all over the place.
+
+62
+00:02:27.013 --> 00:02:29.544
+But just keep in mind that in
+a real production grade compiler,
+
+63
+00:02:29.544 --> 00:02:32.699
+we would be basically propagating the
+original source code position of things
+
+64
+00:02:32.699 --> 00:02:33.768
+like all the way through.
+
+65
+00:02:33.768 --> 00:02:36.780
+Starting from tokenization all the way
+through, pretty much the entire pipeline.
+
+66
+00:02:36.780 --> 00:02:39.919
+Anything that could possibly
+give a user an error at compile
+
+67
+00:02:39.919 --> 00:02:42.617
+time is going to be connected
+back to the source code
+
+68
+00:02:42.617 --> 00:02:45.210
+if you wanna be able to
+show them the source code.
+
+69
+00:02:45.210 --> 00:02:47.242
+All right, so the next token,
+our lecture's gonna see it.
+
+70
+00:02:47.242 --> 00:02:48.480
+It's like, all right,
+we got the cons, great.
+
+71
+00:02:48.480 --> 00:02:52.033
+We parsed pass or sorry, skipped
+pass whatever white space was there.
+
+72
+00:02:52.033 --> 00:02:54.204
+And now we found this thing called X.
+
+73
+00:02:54.204 --> 00:02:54.818
+It's not a keyword.
+
+74
+00:02:54.818 --> 00:02:56.092
+It's not equal sign.
+
+75
+00:02:56.092 --> 00:02:56.811
+It's not a number.
+
+76
+00:02:56.811 --> 00:02:59.308
+Okay, this must be an identifier.
+
+77
+00:02:59.308 --> 00:03:01.720
+So identifier is basically
+a general term for
+
+78
+00:03:01.720 --> 00:03:04.457
+something that's sort of
+the user came up with it.
+
+79
+00:03:04.457 --> 00:03:08.378
+So either it could be a variable like
+this, or it could be a function argument
+
+80
+00:03:08.378 --> 00:03:11.525
+name, or it could be a function name,
+could even be a field.
+
+81
+00:03:11.525 --> 00:03:15.192
+Some languages will or will not
+have separate tokens for fields and
+
+82
+00:03:15.192 --> 00:03:19.267
+objects with the colon after them
+versus just identifiers outside that.
+
+83
+00:03:19.267 --> 00:03:21.428
+In our case,
+we're not even supporting objects, so
+
+84
+00:03:21.428 --> 00:03:24.933
+we don't have that problem to think about,
+so unlike the const one, this one actually
+
+85
+00:03:24.933 --> 00:03:27.739
+does have a value because there
+are different types of identifiers.
+
+86
+00:03:27.739 --> 00:03:30.137
+The whole point of them is that they're
+sort of coming from user space.
+
+87
+00:03:30.137 --> 00:03:31.284
+This is something that the user typed in.
+
+88
+00:03:31.284 --> 00:03:34.614
+They could of put x or y or
+z or whatever else you want.
+
+89
+00:03:34.614 --> 00:03:38.345
+And so we want to store that in our actual
+token, but a lot of tokens such as equals,
+
+90
+00:03:38.345 --> 00:03:41.339
+don't have anything to store so
+for those we just say value null.
+
+91
+00:03:41.339 --> 00:03:43.053
+And notice that the position
+keeps moving up, right?
+
+92
+00:03:43.053 --> 00:03:46.566
+We're now eight characters
+into our source code.
+
+93
+00:03:46.566 --> 00:03:50.803
+Some compilers will store this as
+like a line and column numbers.
+
+94
+00:03:50.803 --> 00:03:53.474
+One reason to do that is that,
+well, a that can be nice for
+
+95
+00:03:53.474 --> 00:03:57.262
+if you're printing out on the command
+line, but also that's what like language
+
+96
+00:03:57.262 --> 00:04:00.011
+server protocol expects is like line and
+column numbers.
+
+97
+00:04:00.011 --> 00:04:03.858
+Unfortunately, it expects them like you
+UTF-16 format, which is really annoying
+
+98
+00:04:03.858 --> 00:04:07.086
+because everybody wants to use UTF-8 for
+their source code encoding.
+
+99
+00:04:07.086 --> 00:04:12.570
+But you also can do it as just as writing
+down the index of however many bytes or
+
+100
+00:04:12.570 --> 00:04:14.297
+characters you are in.
+
+101
+00:04:14.297 --> 00:04:18.175
+That also works and you can convert
+to line and column later on if you
+
+102
+00:04:18.175 --> 00:04:21.789
+want to just by kind of doing
+a very quick rescan for new lines.
+
+103
+00:04:21.789 --> 00:04:25.339
+Basically, that's what zigs compiler does,
+for example.
+
+104
+00:04:25.339 --> 00:04:26.752
+And then finally, we have a number five.
+
+105
+00:04:26.752 --> 00:04:29.713
+So this is not an identifier,
+although it does come from the user space.
+
+106
+00:04:29.713 --> 00:04:32.664
+We actually do this is also very common.
+
+107
+00:04:32.664 --> 00:04:36.524
+Do some sort of analysis to look at the
+shape of this user provided thing that's
+
+108
+00:04:36.524 --> 00:04:38.463
+not a keyword or an equals or whatever.
+
+109
+00:04:38.463 --> 00:04:41.988
+You're like, okay, wait this looks
+like a number literal to us.
+
+110
+00:04:41.988 --> 00:04:45.016
+So it's useful to us later
+on to make that distinction.
+
+111
+00:04:45.016 --> 00:04:49.328
+So you may have noticed that basically
+no programming languages will allow
+
+112
+00:04:49.328 --> 00:04:51.938
+you to start a variable,
+name with a number.
+
+113
+00:04:51.938 --> 00:04:56.112
+I'm sure there are they exist, but one of
+the reasons for this is that it's very,
+
+114
+00:04:56.112 --> 00:04:57.090
+very convenient.
+
+115
+00:04:57.090 --> 00:04:59.830
+And also good for performance if
+when you're doing the lexing stage,
+
+116
+00:04:59.830 --> 00:05:02.252
+you can be like, if I see something
+that starts with a number.
+
+117
+00:05:02.252 --> 00:05:03.129
+Great, this is a number.
+
+118
+00:05:03.129 --> 00:05:05.194
+I don't need to be like, well, wait
+a minute, wait a minute, wait a minute.
+
+119
+00:05:05.194 --> 00:05:08.571
+What might have been, it might have
+been a really funky variable name,
+
+120
+00:05:08.571 --> 00:05:09.595
+let's just hang on.
+
+121
+00:05:09.595 --> 00:05:12.131
+Really a lot nicer, if you can just go,
+yeah, no, that's a number.
+
+122
+00:05:12.131 --> 00:05:16.044
+I saw I see a digit, it's a number and
+then finally, we have a comment.
+
+123
+00:05:16.044 --> 00:05:17.862
+So a lot of compilers, and
+
+124
+00:05:17.862 --> 00:05:23.334
+especially teaching compilers we're
+building a sort of a toy compiler here.
+
+125
+00:05:23.334 --> 00:05:25.708
+We'll just discard comments at this
+stage and we'll just throw them away.
+
+126
+00:05:25.708 --> 00:05:27.791
+We are not gonna do that because
+we are building a formatter and
+
+127
+00:05:27.791 --> 00:05:30.008
+if you're building a formatter,
+you need to keep the comments.
+
+128
+00:05:30.008 --> 00:05:32.684
+If you throw them away,
+then they don't get formatted,
+
+129
+00:05:32.684 --> 00:05:36.157
+they just get thrown in the garbage,
+which is really bad for a formatter.
+
+130
+00:05:36.157 --> 00:05:38.690
+But good news, you can just keep them.
+
+131
+00:05:38.690 --> 00:05:43.149
+So when you are building a compiler that
+wants to share code with a formatter.
+
+132
+00:05:43.149 --> 00:05:46.406
+Lots of formatters have a totally
+separate they do their own lexing and
+
+133
+00:05:46.406 --> 00:05:47.907
+their own parsing or whatever.
+
+134
+00:05:47.907 --> 00:05:51.538
+But if you want to share code with
+your compiler for example, Zig and
+
+135
+00:05:51.538 --> 00:05:54.734
+Rock both have formatters built
+in to the compiler itself.
+
+136
+00:05:54.734 --> 00:05:58.049
+And it's just like using
+exactly the same code.
+
+137
+00:05:58.049 --> 00:06:00.206
+What they will do is they
+will take these comments and
+
+138
+00:06:00.206 --> 00:06:01.834
+either store them as tokens like this.
+
+139
+00:06:01.834 --> 00:06:04.330
+And then later on when you're
+doing the type checking and
+
+140
+00:06:04.330 --> 00:06:06.209
+stuff just be like, It's a comment.
+
+141
+00:06:06.209 --> 00:06:08.812
+Just skip over it, ignore it and
+then the format is like, don't skip over.
+
+142
+00:06:08.812 --> 00:06:12.696
+Actually, I want to keep that or
+you can sort of store them out of band.
+
+143
+00:06:12.696 --> 00:06:13.374
+In other words,
+
+144
+00:06:13.374 --> 00:06:16.578
+you have this sort of separate array of
+like this is where all the comments are.
+
+145
+00:06:16.578 --> 00:06:19.577
+Here's all the line and count column
+numbers of the comments are and
+
+146
+00:06:19.577 --> 00:06:23.271
+then that way, your analysis stages don't
+even see these tokens coming through.
+
+147
+00:06:23.271 --> 00:06:26.857
+But the formatter has a way to sort
+of go out of its way to go get them.
+
+148
+00:06:26.857 --> 00:06:30.857
+The information's still there, but it's
+not necessarily it's in a way that's like
+
+149
+00:06:30.857 --> 00:06:34.199
+a little bit less convenient for
+the formatter, but more convenient for
+
+150
+00:06:34.199 --> 00:06:36.697
+all the other types of things
+that the compiler does.
+
+151
+00:06:36.697 --> 00:06:40.524
+Okay, which brings us to
+the actual concept of formatting.
+
+152
+00:06:40.524 --> 00:06:45.104
+The basic idea behind formatting is that
+we are going to start with some sort of
+
+153
+00:06:45.104 --> 00:06:48.346
+representation in code,
+some sort of structure, and
+
+154
+00:06:48.346 --> 00:06:51.175
+then go from that structure
+back out to string.
+
+155
+00:06:51.175 --> 00:06:54.087
+So here's an example of
+doing this with tokens.
+
+156
+00:06:54.087 --> 00:06:56.321
+So tokens are a totally
+reasonable way to do this, but
+
+157
+00:06:56.321 --> 00:06:58.108
+we are going to see
+another way to do that and
+
+158
+00:06:58.108 --> 00:07:01.505
+some reasons you might want to do it with
+something other than tokens in a second.
+
+159
+00:07:01.505 --> 00:07:03.218
+But let's just run with tokens for now.
+
+160
+00:07:03.218 --> 00:07:07.163
+So we've got our const token, and
+we're like, okay, we have lexed that or
+
+161
+00:07:07.163 --> 00:07:09.877
+tokenized that out of
+the original source code, and
+
+162
+00:07:09.877 --> 00:07:11.619
+now we want to being a formatter.
+
+163
+00:07:11.619 --> 00:07:13.345
+We want to print that back out.
+
+164
+00:07:13.345 --> 00:07:17.736
+So what string should we print out
+when we have this as our token?
+
+165
+00:07:17.736 --> 00:07:19.044
+Anyone?
+
+166
+00:07:19.044 --> 00:07:23.038
+C, O, N, S, T, just exactly what we
+got in right with a space after it.
+
+167
+00:07:23.038 --> 00:07:25.819
+So that's it, it's as simple as that.
+
+168
+00:07:25.819 --> 00:07:27.835
+We got the keyword,
+we translated into this format, and
+
+169
+00:07:27.835 --> 00:07:29.393
+now we're translating it into the output.
+
+170
+00:07:29.393 --> 00:07:32.009
+And the output, what we want is
+to end up with is a .js file.
+
+171
+00:07:32.009 --> 00:07:34.640
+So it's like, yeah,
+I see a C-O-N-S-T, boom,
+
+172
+00:07:34.640 --> 00:07:37.681
+we're just gonna turn that back
+into the source code string,
+
+173
+00:07:37.681 --> 00:07:41.551
+and just push that onto our running tally
+of strings that we're gonna output.
+
+174
+00:07:41.551 --> 00:07:42.231
+Yeah.
+
+175
+00:07:42.231 --> 00:07:46.995
+&gt;&gt; Speaker 2: The subtle distinction Here
+is we're effectively moving between a type
+
+176
+00:07:46.995 --> 00:07:49.110
+and the formatting of the type.
+
+177
+00:07:49.110 --> 00:07:51.010
+Is that fair?
+
+178
+00:07:51.010 --> 00:07:53.860
+&gt;&gt; Richard Feldman: So I would say
+that the main distinction here is that
+
+179
+00:07:53.860 --> 00:07:56.922
+this is the object that we've created for
+ourselves.
+
+180
+00:07:56.922 --> 00:07:59.661
+And we're just gonna be
+iterating over a whole big,
+
+181
+00:07:59.661 --> 00:08:01.349
+long list of these that we made.
+
+182
+00:08:01.349 --> 00:08:04.346
+And we made that from the source code but
+now that's what we're working with.
+
+183
+00:08:04.346 --> 00:08:06.141
+So we're no longer looking
+at the original source code.
+
+184
+00:08:06.141 --> 00:08:09.086
+We're just looking at these tokens
+that we made, and then for each token,
+
+185
+00:08:09.086 --> 00:08:11.706
+you basically have a giant switch
+statement that's like, okay,
+
+186
+00:08:11.706 --> 00:08:12.944
+I see that we got a const token.
+
+187
+00:08:12.944 --> 00:08:15.466
+And then maybe after that we
+get the identifier that says x.
+
+188
+00:08:15.466 --> 00:08:18.310
+We're like, well, I want to put
+that back in the source code, so
+
+189
+00:08:18.310 --> 00:08:20.018
+I'll just stick an X in there, and okay.
+
+190
+00:08:20.018 --> 00:08:21.905
+And then we get another
+token that comes in.
+
+191
+00:08:21.905 --> 00:08:23.020
+It's like, this is an equals.
+
+192
+00:08:23.020 --> 00:08:25.290
+Okay, well,
+let's take an equals in there, and
+
+193
+00:08:25.290 --> 00:08:28.329
+you we kind of proceed through all
+the tokens that we just grabbed.
+
+194
+00:08:28.329 --> 00:08:31.938
+And in our big switch statement okay,
+now it's the number, it's the number 5,
+
+195
+00:08:31.938 --> 00:08:32.577
+put it there.
+
+196
+00:08:32.577 --> 00:08:34.462
+And here's the comment,
+put the comment there.
+
+197
+00:08:34.462 --> 00:08:37.737
+Now that might seem like we
+didn't really do anything,
+
+198
+00:08:37.737 --> 00:08:40.741
+because it's like we had
+it in source code string.
+
+199
+00:08:40.741 --> 00:08:42.437
+And then we turned it into the tokens, and
+
+200
+00:08:42.437 --> 00:08:45.655
+then we turned the tokens back into
+the exactly identical source code string.
+
+201
+00:08:45.655 --> 00:08:47.080
+What was the point of all that?
+
+202
+00:08:47.080 --> 00:08:51.074
+Well, of course, if you already have
+source code that is precisely formatted
+
+203
+00:08:51.074 --> 00:08:54.541
+the way the formatter wants to format it,
+it doesn't do anything.
+
+204
+00:08:54.541 --> 00:08:56.126
+And that's kind of desirable.
+
+205
+00:08:56.126 --> 00:08:57.923
+But if you had a bunch of spaces in here,
+
+206
+00:08:57.923 --> 00:09:01.810
+the fact that we were able to go through
+and grab these tokens and identify like.
+
+207
+00:09:01.810 --> 00:09:04.483
+This is a const like, and
+we got all the space around it and
+
+208
+00:09:04.483 --> 00:09:06.658
+just discarded the spaces and
+kept the token,
+
+209
+00:09:06.658 --> 00:09:09.253
+and turn this into a token
+with all of ther space, etc.
+
+210
+00:09:09.253 --> 00:09:13.278
+Then we turn those tokens back into this,
+hey, it's reformatted.
+
+211
+00:09:13.278 --> 00:09:17.064
+So this is essentially how the formatter
+does its job and provide its value.
+
+212
+00:09:17.064 --> 00:09:21.029
+[LAUGH] It's just by taking source code,
+turn it into tokens, or another
+
+213
+00:09:21.029 --> 00:09:25.651
+representational we'll see in a second,
+and then turning that back into a string.
+
+214
+00:09:25.651 --> 00:09:28.076
+So now let's talk very briefly
+about formatting new lines.
+
+215
+00:09:28.076 --> 00:09:31.399
+So a thing that I've seen in some
+formatters, which I really enjoy,
+
+216
+00:09:31.399 --> 00:09:33.875
+is in a language that
+supports trailing new lines.
+
+217
+00:09:33.875 --> 00:09:38.675
+A way that you can specify that you would
+like the formatter to use a multi-line
+
+218
+00:09:38.675 --> 00:09:43.350
+versus a single-line style, is by
+including or omitting trailing comma.
+
+219
+00:09:43.350 --> 00:09:46.310
+So in this case,
+we have the trailing comma which
+
+220
+00:09:46.310 --> 00:09:51.238
+is kind of what is usually the accepted
+style for multiline JavaScript objects.
+
+221
+00:09:51.238 --> 00:09:52.718
+And then if you have a single line one,
+
+222
+00:09:52.718 --> 00:09:55.376
+it would look weird if you had
+a trailing comma there after this one.
+
+223
+00:09:55.376 --> 00:09:58.927
+So if you don't have the trailing comma,
+you're signaling to the formatter,
+
+224
+00:09:58.927 --> 00:10:00.739
+yeah, please format this single line.
+
+225
+00:10:00.739 --> 00:10:04.033
+And if you do have the trailing comma,
+then you're signaling to the formatter,
+
+226
+00:10:04.033 --> 00:10:05.638
+I want this to be formatted multi line.
+
+227
+00:10:05.638 --> 00:10:07.489
+Cool, okay.
+
+228
+00:10:07.489 --> 00:10:08.626
+Now here's the problem.
+
+229
+00:10:08.626 --> 00:10:13.226
+If we're working in terms of tokens, how
+do we know back before we could possibly
+
+230
+00:10:13.226 --> 00:10:17.300
+have seen the trailing comma,
+that it was time to go in multi line mode.
+
+231
+00:10:17.300 --> 00:10:20.063
+Like in the previous example,
+as we went through the tokens,
+
+232
+00:10:20.063 --> 00:10:23.161
+we were just building up that string,
+just one thing after another.
+
+233
+00:10:23.161 --> 00:10:26.856
+But that wouldn't work well here because
+if we did that, we'd be coming along where
+
+234
+00:10:26.856 --> 00:10:30.572
+like, I see an open curly brace token,
+I see an a, I'll put that in there.
+
+235
+00:10:30.572 --> 00:10:31.985
+I see a 1, I'll put that in there, etc.
+
+236
+00:10:31.985 --> 00:10:34.810
+Then I come along and
+I see this trailing comma no.
+
+237
+00:10:34.810 --> 00:10:39.677
+I needed way more newlines back there and
+indentation that I just totally didn't
+
+238
+00:10:39.677 --> 00:10:43.272
+do because I didn't know it
+until I got later in the tokens.
+
+239
+00:10:43.272 --> 00:10:46.885
+So a way that you can deal with this
+is instead of doing it in terms of
+
+240
+00:10:46.885 --> 00:10:51.159
+just raw tokens, is you can take the next
+step in our compilation pipeline and
+
+241
+00:10:51.159 --> 00:10:53.236
+turn those tokens into a parse tree.
+
+242
+00:10:53.236 --> 00:10:54.285
+There's different names to this.
+
+243
+00:10:54.285 --> 00:10:57.660
+Another common was abstract syntax tree or
+AST for short.
+
+244
+00:10:57.660 --> 00:10:59.978
+I like parse tree because it's
+the thing that the parser makes.
+
+245
+00:10:59.978 --> 00:11:02.419
+So I'm going to use parse tree for
+this workshop, but
+
+246
+00:11:02.419 --> 00:11:05.689
+you ever hear people talking about ASTs or
+EPS X abstract syntax trees.
+
+247
+00:11:05.689 --> 00:11:08.887
+They're talking about parse trees,
+same idea.
+
+248
+00:11:08.887 --> 00:11:11.211
+Okay, so
+here is the token representation of this.
+
+249
+00:11:11.211 --> 00:11:14.907
+So we saw a second ago, I'm going to sort
+of like do a little condensed format,
+
+250
+00:11:14.907 --> 00:11:18.336
+like not write out the entire object,
+some sizzle shorthand notation.
+
+251
+00:11:18.336 --> 00:11:22.561
+So I don't have to try to cram all those
+curly braces on the slide, but basically,
+
+252
+00:11:22.561 --> 00:11:25.271
+it was Const identifier equals number and
+comment.
+
+253
+00:11:25.271 --> 00:11:30.346
+That was the important stuff,
+the information that's in the tokens.
+
+254
+00:11:30.346 --> 00:11:34.831
+Now, if we discard the comment and
+then we're like, okay, let's consider
+
+255
+00:11:34.831 --> 00:11:39.321
+everything but the comment, here is how
+that could look in a parse tree node.
+
+256
+00:11:39.321 --> 00:11:41.558
+So a parse tree is a tree.
+
+257
+00:11:41.558 --> 00:11:43.045
+The token's just a flat, array.
+
+258
+00:11:43.045 --> 00:11:46.584
+It's like a long sequence of them but
+the whole point of the parse tree is that
+
+259
+00:11:46.584 --> 00:11:49.139
+you're now representing your
+code as an actual tree.
+
+260
+00:11:49.139 --> 00:11:52.055
+There's nesting going on, and
+that nesting is going to be useful for
+
+261
+00:11:52.055 --> 00:11:55.089
+us when we're trying to figure out
+what's multi line and what's not.
+
+262
+00:11:55.089 --> 00:11:57.484
+So here, we would say,
+rather than const and
+
+263
+00:11:57.484 --> 00:12:00.511
+identifier being two separate
+tokens in the parse tree,
+
+264
+00:12:00.511 --> 00:12:04.060
+we're going to choose to say we have
+a type of this parse tree node.
+
+265
+00:12:04.060 --> 00:12:07.748
+And the type is this is a constant
+declaration or ConstDecl for short.
+
+266
+00:12:07.748 --> 00:12:11.388
+Decl is a very common abbreviation that
+you'll see in compilers for short for
+
+267
+00:12:11.388 --> 00:12:13.410
+declaration 'cause that's a long word.
+
+268
+00:12:13.410 --> 00:12:16.256
+And then we will have an ID
+field that basically says,
+
+269
+00:12:16.256 --> 00:12:20.384
+this is the particular identifier that
+this constant declaration is named.
+
+270
+00:12:20.384 --> 00:12:21.337
+Then we're gonna have a value for
+
+271
+00:12:21.337 --> 00:12:23.757
+the constant declaration that's being
+basically what comes after the equals, and
+
+272
+00:12:23.757 --> 00:12:24.760
+this is where the nesting begins.
+
+273
+00:12:24.760 --> 00:12:25.738
+So at this point,
+
+274
+00:12:25.738 --> 00:12:29.798
+we basically say everything after
+the equals is another parse tree node.
+
+275
+00:12:29.798 --> 00:12:32.797
+And so in our case, that's going to be
+a parser node that's a little bit simpler.
+
+276
+00:12:32.797 --> 00:12:35.985
+It's just called a type number and
+the value of 5.
+
+277
+00:12:35.985 --> 00:12:39.410
+You can imagine that you could get
+this nesting going arbitrarily long.
+
+278
+00:12:39.410 --> 00:12:42.385
+If you wanted to you could very well
+have instead of a number here in like.
+
+279
+00:12:42.385 --> 00:12:45.720
+Actual JavaScript, you could have
+an object which has multiple fields in it,
+
+280
+00:12:45.720 --> 00:12:47.538
+and then each of those
+fields has an array,
+
+281
+00:12:47.538 --> 00:12:49.475
+and each of those arrays
+has another object.
+
+282
+00:12:49.475 --> 00:12:51.900
+You could get the nesting really,
+really deep here.
+
+283
+00:12:51.900 --> 00:12:54.691
+But the point is that no matter
+how deep the nesting gets,
+
+284
+00:12:54.691 --> 00:12:57.323
+you do actually get to keep
+that structure in memory.
+
+285
+00:12:57.323 --> 00:13:00.786
+You do actually get to traverse this and
+manipulate it however you want,
+
+286
+00:13:00.786 --> 00:13:04.095
+whereas the tokens are really not
+conducive to that kind of nesting.
+
+287
+00:13:04.095 --> 00:13:07.457
+The tokens are just a flat array.
+
+288
+00:13:07.457 --> 00:13:10.940
+And so if we want to do the type
+of analysis that we're doing with
+
+289
+00:13:10.940 --> 00:13:12.189
+the multiline or not,
+
+290
+00:13:12.189 --> 00:13:16.496
+it's much more convenient to have it in
+a tree form than to have it in the like.
+
+291
+00:13:16.496 --> 00:13:21.155
+I have a big flat array and if I get to
+a point and realize I've made a mistake, I
+
+292
+00:13:21.155 --> 00:13:26.202
+have to know exactly where in the array to
+jump back to be able to do analysis, okay.
+
+293
+00:13:26.202 --> 00:13:28.077
+So this is our parse tree node.
+
+294
+00:13:28.077 --> 00:13:31.041
+And basically this is a good
+answer to the question of, like,
+
+295
+00:13:31.041 --> 00:13:33.891
+how do we know back here that
+we wanted to do multi line mode?
+
+296
+00:13:33.891 --> 00:13:37.512
+So essentially, what you can do is, if you
+want to be keeping this metadata around,
+
+297
+00:13:37.512 --> 00:13:39.042
+just like we did with the comments.
+
+298
+00:13:39.042 --> 00:13:42.677
+You can just record that in the parse
+tree node, like as you're going along and
+
+299
+00:13:42.677 --> 00:13:46.056
+seeing the tokens, you start off
+with is multi-line false by default.
+
+300
+00:13:46.056 --> 00:13:48.324
+And then as soon as you hit this
+trailing comma, you're like, well,
+
+301
+00:13:48.324 --> 00:13:49.302
+I'm in the middle of this node.
+
+302
+00:13:49.302 --> 00:13:53.172
+I'll just flip that to true and
+we're all set.
+
+303
+00:13:53.172 --> 00:13:56.034
+And now that's just a very,
+very quick, easy operation to do.
+
+304
+00:13:56.034 --> 00:13:57.685
+You don't need to do any
+backtracking at all.
+
+305
+00:13:57.685 --> 00:14:00.545
+And then later when you come through and
+traverse the parse tree,
+
+306
+00:14:00.545 --> 00:14:03.048
+instead of traversing the tokens
+to do your formatting.
+
+307
+00:14:03.048 --> 00:14:07.447
+Now you just have that right there on
+the node right when you encounter it.
+
+308
+00:14:07.447 --> 00:14:10.204
+So essentially the pipeline
+that we built up to here,
+
+309
+00:14:10.204 --> 00:14:13.896
+originally we had our source string and
+then we converted it to tokens.
+
+310
+00:14:13.896 --> 00:14:16.933
+Then we took our tokens and
+coverted that to a parse tree.
+
+311
+00:14:16.933 --> 00:14:20.809
+So notice that when we made the parse
+tree, we just look at the tokens.
+
+312
+00:14:20.809 --> 00:14:23.084
+We didn't need to go all the way
+back to the source string.
+
+313
+00:14:23.084 --> 00:14:24.850
+We were able to just say like, well,
+
+314
+00:14:24.850 --> 00:14:27.544
+I can translate this concert
+followed by this identifier.
+
+315
+00:14:27.544 --> 00:14:31.907
+Followed by this yadda, yadda directly
+into the parse tree node without having to
+
+316
+00:14:31.907 --> 00:14:33.944
+go ask the source string for any info.
+
+317
+00:14:33.944 --> 00:14:36.996
+And then finally, we can go from
+the parse tree to the output string and
+
+318
+00:14:36.996 --> 00:14:39.185
+then when you've completed
+our formatting job.
+
+319
+00:14:39.185 --> 00:14:42.506
+This is a theme that we're going to see
+throughout the workshop of you got your
+
+320
+00:14:42.506 --> 00:14:44.205
+input and you turn that into an output.
+
+321
+00:14:44.205 --> 00:14:46.930
+And then you take that previous output and
+use that as the input to the next thing.
+
+322
+00:14:46.930 --> 00:14:51.067
+And then that output turns into a
+different output, and so on and so forth.
+
+323
+00:14:51.067 --> 00:14:53.979
+This thing happens to be called lexing or
+tokenization, or
+
+324
+00:14:53.979 --> 00:14:55.855
+I've occasionally heard scanning.
+
+325
+00:14:55.855 --> 00:14:57.105
+This is usually called parsing.
+
+326
+00:14:57.105 --> 00:15:01.479
+That's pretty much the common name for
+this and this is often called code gen,
+
+327
+00:15:01.479 --> 00:15:03.080
+short for code generation.
+
+328
+00:15:03.080 --> 00:15:06.087
+And again you'll find this in all
+sorts of different compilers.
+
+329
+00:15:06.087 --> 00:15:09.370
+It's not only a theme in this course that
+we're going to be doing all these like
+
+330
+00:15:09.370 --> 00:15:12.136
+translating from one intermediate
+representation to another.
+
+331
+00:15:12.136 --> 00:15:14.809
+This is also how modern compilers do it.
+
+332
+00:15:14.809 --> 00:15:18.167
+Production grade compilers do it very,
+very common.
+
+333
+00:15:18.167 --> 00:15:22.340
+Now let's just go indulge
+me in a small tangent.
+
+334
+00:15:22.340 --> 00:15:23.880
+Let's say we built our formatter, and
+
+335
+00:15:23.880 --> 00:15:26.739
+we've decided we're going to go
+a little bit rogue with our formatter.
+
+336
+00:15:26.739 --> 00:15:28.690
+We're going to do something that
+formatters are not supposed to do.
+
+337
+00:15:28.690 --> 00:15:29.852
+We've decided to do it anyway.
+
+338
+00:15:29.852 --> 00:15:31.989
+Our format is going to
+introduce syntax sugar.
+
+339
+00:15:31.989 --> 00:15:36.876
+So we're basically saying, not only is
+this a formatter for JavaScript, but
+
+340
+00:15:36.876 --> 00:15:41.097
+also, if you want x+++,
+not enough, we want x+++ support,
+
+341
+00:15:41.097 --> 00:15:44.076
+so you can have three
+pluses in this formatter.
+
+342
+00:15:44.076 --> 00:15:44.992
+Is it a formatter still?
+
+343
+00:15:44.992 --> 00:15:46.991
+Who knows, but we decided to do this.
+
+344
+00:15:46.991 --> 00:15:51.683
+Let's indulge me and pretend we
+decided we want our formatter to allow
+
+345
+00:15:51.683 --> 00:15:54.555
+you to write x+++ and it'll accept it.
+
+346
+00:15:54.555 --> 00:15:58.843
+So here will be the tokens we would see
+if we were scanning along, we see, okay,
+
+347
+00:15:58.843 --> 00:16:02.941
+there's the identifier x, there's
+PLUS there's PLUS and another PLUS.
+
+348
+00:16:02.941 --> 00:16:07.065
+Then we would translate that
+into a node in the parse tree.
+
+349
+00:16:07.065 --> 00:16:09.190
+Now we could just make up a new
+parse tree node for this.
+
+350
+00:16:09.190 --> 00:16:11.693
+We could say every time I see
+this combination of tokens,
+
+351
+00:16:11.693 --> 00:16:14.781
+I'm going to make a new parse tree
+node that's called PlusPlusPlus.
+
+352
+00:16:14.781 --> 00:16:18.468
+And it stores the identifier that's
+doing the plus, plus, plus on, and
+
+353
+00:16:18.468 --> 00:16:19.607
+that's how it works.
+
+354
+00:16:19.607 --> 00:16:21.176
+We could do that.
+
+355
+00:16:21.176 --> 00:16:24.270
+And at that point, we could say,
+well, I can take my parse tree and
+
+356
+00:16:24.270 --> 00:16:28.110
+just do co generation on that parse tree
+to output string, just like I did before.
+
+357
+00:16:28.110 --> 00:16:32.796
+And instead of just having my giant switch
+statement that's got, my const decals and
+
+358
+00:16:32.796 --> 00:16:35.803
+whatnot, I just add one more case to it,
+saying okay.
+
+359
+00:16:35.803 --> 00:16:37.684
+If I see one of these PlusPlusPlus things,
+
+360
+00:16:37.684 --> 00:16:39.731
+then I'm gonna put that
+in the output string.
+
+361
+00:16:39.731 --> 00:16:43.630
+But of course, you can't put x+++ directly
+into the output string because that's not
+
+362
+00:16:43.630 --> 00:16:46.976
+a thing in JavaScript and if you did that,
+you would have broken JavaScript.
+
+363
+00:16:46.976 --> 00:16:48.163
+That's why it's syntax sugar.
+
+364
+00:16:48.163 --> 00:16:52.488
+What we can do is we can just say, well,
+no, I'm just I'm not going to put x+++
+
+365
+00:16:52.488 --> 00:16:56.715
+out whenever I see one of these nodes,
+I'm just going to emit this in my format.
+
+366
+00:16:56.715 --> 00:16:58.208
+I'm going to just write out the output.
+
+367
+00:16:58.208 --> 00:17:01.271
+JavaScript is going to x = x +2.
+
+368
+00:17:01.271 --> 00:17:03.849
+Now at this point,
+we're not formatter anymore.
+
+369
+00:17:03.849 --> 00:17:05.551
+We are doing more than just
+formatting your source code.
+
+370
+00:17:05.551 --> 00:17:07.942
+We are actually allowing
+new forms of syntax and
+
+371
+00:17:07.942 --> 00:17:12.185
+then emitting something that's different
+from that, not just in formatting, but
+
+372
+00:17:12.185 --> 00:17:14.353
+it actually just is something different.
+
+373
+00:17:14.353 --> 00:17:16.591
+We've basically now
+turned into a transpiler.
+
+374
+00:17:16.591 --> 00:17:21.167
+Now here's the interesting thing,
+that's not a big change.
+
+375
+00:17:21.167 --> 00:17:23.453
+Almost all of the work that we're
+doing here is exactly the same.
+
+376
+00:17:23.453 --> 00:17:29.453
+We just added like one more case to the
+stage of going from tokens to parse tree.
+
+377
+00:17:29.453 --> 00:17:33.087
+And then we added one case to going
+from parse tree to output string and
+
+378
+00:17:33.087 --> 00:17:34.790
+suddenly we're a transpiler.
+
+379
+00:17:34.790 --> 00:17:37.277
+So this is why I wanted to
+start off with formatting.
+
+380
+00:17:37.277 --> 00:17:40.388
+You might think that like making
+a transpiler is like a big, scary whoa,
+
+381
+00:17:40.388 --> 00:17:41.664
+that's like a huge project.
+
+382
+00:17:41.664 --> 00:17:43.540
+It's like not that much
+bigger than a format.
+
+383
+00:17:43.540 --> 00:17:47.083
+Formatter is not that big of a project
+like you now know everything you know need
+
+384
+00:17:47.083 --> 00:17:49.776
+to know to make syntax sugar
+in whatever language you know.
+
+385
+00:17:49.776 --> 00:17:51.076
+It's just that's it.
+
+386
+00:17:51.076 --> 00:17:55.314
+You can make a formatter, and
+making a formatter isn't that much harder
+
+387
+00:17:55.314 --> 00:17:58.589
+than just like doing the like lexing and
+parsing stuff.
+
+388
+00:17:58.589 --> 00:18:01.775
+Then you can make a transpiler, as long as
+you're okay with only doing syntax sugar.
+
+389
+00:18:01.775 --> 00:18:03.584
+And you might think, well,
+who would bother to do that?
+
+390
+00:18:03.584 --> 00:18:06.838
+Well, let me tell you about language
+called coffee script, which at one point
+
+391
+00:18:06.838 --> 00:18:10.067
+was the 11th most popular language on
+Github at the peak of its popularity.
+
+392
+00:18:10.067 --> 00:18:14.880
+Which was granted a very small
+single digit number of year window.
+
+393
+00:18:14.880 --> 00:18:16.818
+But this was the kind of
+stuff that Coffeescript did.
+
+394
+00:18:16.818 --> 00:18:20.291
+It was basically like a language that
+compiled to Javascript without really
+
+395
+00:18:20.291 --> 00:18:21.491
+changing the semantics.
+
+396
+00:18:21.491 --> 00:18:25.497
+Mostly it just had different syntax and
+you can go look at the copy of source
+
+397
+00:18:25.497 --> 00:18:28.415
+code, and
+you're gonna see this same kind of stuff.
+
+398
+00:18:28.415 --> 00:18:31.262
+It really doesn't look a whole
+lot different than a formatter in
+
+399
+00:18:31.262 --> 00:18:31.902
+a lot of ways.
+
+400
+00:18:31.902 --> 00:18:35.153
+Just doing some syntax, sure.
+
+401
+00:18:35.153 --> 00:18:38.841
+Okay, so I mentioned that this is
+gonna be a theme in the course, and
+
+402
+00:18:38.841 --> 00:18:42.145
+I wanna emphasize this again,
+like traversing the input and
+
+403
+00:18:42.145 --> 00:18:45.409
+generating output is something
+that compilers love to do.
+
+404
+00:18:45.409 --> 00:18:48.783
+Source string to tokens, tokens,
+parse tree, parse tree to output string,
+
+405
+00:18:48.783 --> 00:18:51.502
+lexing, parsing code gen this
+is what we're doing right now.
+
+406
+00:18:51.502 --> 00:18:54.313
+And over the course of the workshop, we're
+going to add more and more steps in here,
+
+407
+00:18:54.313 --> 00:18:56.186
+like we're going to get some
+name resolution in there.
+
+408
+00:18:56.186 --> 00:18:58.079
+We're going to get some
+type checking in there,
+
+409
+00:18:58.079 --> 00:19:00.432
+multiple different stages of
+analysis at the end of the day,
+
+410
+00:19:00.432 --> 00:19:02.523
+that's pretty much what
+they're all doing is like.
+
+411
+00:19:02.523 --> 00:19:05.380
+Just take some source in
+Intermediate representation and
+
+412
+00:19:05.380 --> 00:19:09.355
+create another one along the way, and at
+the end of the day, you get your output.
+
+413
+00:19:09.355 --> 00:19:12.350
+Okay, so to summarize all the stuff
+we talked about in part one,
+
+414
+00:19:12.350 --> 00:19:14.124
+we start off by talking about lexing,
+
+415
+00:19:14.124 --> 00:19:17.411
+which is where you start off with
+your raw input source code, string.
+
+416
+00:19:17.411 --> 00:19:21.280
+And you output tokens,
+also known as tokenization or scanning.
+
+417
+00:19:21.280 --> 00:19:24.517
+We talked about parsing, which is where
+you create your parse tree nodes or.
+
+418
+00:19:24.517 --> 00:19:26.855
+Also known as abstract syntax
+tree nodes or AST nodes and
+
+419
+00:19:26.855 --> 00:19:30.137
+this is where you're starting with the
+tokens that you got in the previous step
+
+420
+00:19:30.137 --> 00:19:31.745
+rather than going to the source code.
+
+421
+00:19:31.745 --> 00:19:34.681
+You're disregarding the source code at
+this point, but you are still threading
+
+422
+00:19:34.681 --> 00:19:37.029
+through that position so
+that when you give the error messages.
+
+423
+00:19:37.029 --> 00:19:40.725
+You're still able to connect it all
+the way back to the original source code.
+
+424
+00:19:40.725 --> 00:19:44.486
+And then we talked about formatting where
+your input is the parse tree node or
+
+425
+00:19:44.486 --> 00:19:47.890
+as we saw, depending on your design,
+you may or may not have a need for
+
+426
+00:19:47.890 --> 00:19:49.627
+the parseTreeNode information.
+
+427
+00:19:49.627 --> 00:19:51.836
+Maybe you can just do it with tokens.
+
+428
+00:19:51.836 --> 00:19:57.562
+And then you're outputting
+the actual string.
+

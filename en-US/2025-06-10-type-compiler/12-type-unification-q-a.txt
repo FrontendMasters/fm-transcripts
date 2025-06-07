@@ -1,0 +1,169 @@
+[00:00:00]
+>> Speaker 2: Can you reiterate what the situation in source code would be for a type or b type to end up being resolved to null as their types?
+>> Richard Feldman: We're actually gonna see that. So a really easy example of that, well, I say easy, but we haven't gotten to it yet.
+
+[00:00:14]
+So a polymorphic function, so if you have a function, the identity function where you have an argument. And the argument doesn't get used in the body of the function, the argument ends up just staying null indefinitely basically until it gets called. But it can get called and the calling can cause it to stop being null identity function is the easiest example of that, so we will see some nulls that persist in the database table.
+
+[00:00:39]
+[LAUGH] Let me get to that. Great question, any other questions on this topic? Yeah.
+>> Speaker 3: I on that question, so how many nulls you allow in rust will not allow those states, so you'll be getting errors all over the place. This is more of a design decision for what you are intent, what you want out of your language and compiler like so you have a bunch of null variables that you're not using.
+
+[00:01:02]
+
+>> Richard Feldman: Yeah.
+>> Speaker 3: Some languages are fine with that, some languages flag those as errors, is this kind of a design decision point here?
+>> Richard Feldman: So these are null in the sense of like these are null database entries, which is just like the thing we're using to say, they could also be objects where we just write down the, Instead of having symlink and concrete, we have simply concrete and unbound, and then when we go through initialize them, we can initialize them to an object that says unbound.
+
+[00:01:28]
+It just seemed like null was kind of the natural like way to say that in JavaScript, but yeah, it could be whatever you want.
+>> Speaker 3: Yeah, thank you, that does actually answer my question, thank you.
+>> Richard Feldman: [LAUGH] All right, so that was the scenario where a is null, what about if b is null?
+
+[00:01:41]
+So at this point, we know that we are not in the scenario where a and b were null, because if a and b were null, we already would have taken this path, so now we know that b is null, but a is not null. Again, there's a number of different ways you can handle this.
+
+[00:01:55]
+One of the easiest ways to handle this is basically just be like, what? Since the order doesn't really matter here, I'm just gonna delegate to myself just swapping the argument. So basically just call unify again, passing B for the first argument, a for the second argument. So you're essentially doing the swap, and now you're just gonna come back and then just like, do whatever was was done in here.
+
+[00:02:16]
+The reason you might wanna do that is that at this point, this is all we're doing in terms of unification. But as your type system gets bigger and more complicated, you can have more and more stuff going on in here. And the advantage of doing something like this is, you can just write once don't have to write the symmetrical version where it's like hang on, what if b was null?
+
+[00:02:36]
+Then we already know these things about a because it wasn't in there, but like these other scenarios still might be happening. So it's really just a straightforward way to say like, yeah, I'm just going to punt all that and say like, okay, if a is null, do these things.
+
+[00:02:51]
+If b is null, just pretend b is a and just go handle it using the code I already wrote. So then another scenario that can come up is we say, okay, we now know that a is not null and b is not null, and we also know from resolving symlinks that neither of them is a symlink.
+
+[00:03:04]
+So by process of elimination, we now know that if we make it to here in UniFi both of them have to be concrete. So if both of them are concrete, then the scenario that we really care about is, are they concrete and different? So remember remembering a few slides ago, if we get to this point and we're like, they're both numbers, we're like, that's fine.
+
+[00:03:20]
+There's nothing wrong with them both being numbers, they can just continue to both be numbers and be happy. If one of them is a number, the other one's a string or vice versa, that's when we have a problem, that's where we need to report a type mismatch. So in the future, we will see that Unify can get bigger and bigger, there's more and more of these scenarios.
+
+[00:03:37]
+It turns out that like, concrete and symlinks and the null are not the only possible things that this will end up being, or there can be. If one is concrete, the other is concrete, you can get these sort of nested structures where, like well, what if they're both functions, but the functions might have different argument types?
+
+[00:03:53]
+Well, that still counts as a type mismatch, and we'd have to, like, do a little bit more logic in here, or maybe we start getting into two arrays. We say, okay, well yeah, you're the both arrays but they could have different type variables for their arrays. There's a lot more scenarios than this, but right now we're just starting with like a version of unified that fits on a slide, any questions about this version that we're talking about so far.
+
+[00:04:14]
+So we're just to reiterate we result on the symlink so we don't have to worry about those in here. We're only either a concrete type or a null and then you can still end up returning a assembly, like setting something to be assembly. But basically the only things that we're either doing are we are either updating a or we're doing a swap which might result in b getting updated by the same exact code.
+
+[00:04:32]
+Or we are reporting a type mismatch because we were like, these were both concrete and they had different concrete types. Yeah.
+>> Speaker 4: In the case where they're both null, and we're returning a symlink, the idea is that would be resolved down the chain, further down in the type checker.
+
+[00:04:48]
+
+>> Richard Feldman: Exactly, yeah. So the reason for this case right here is where you're like, okay, both of these, actually this comes up, we can just go back to it real quick. Right, yeah, sure, we're right here, so let's just go and look where it actually happens. So this scenario right here, this is exactly that where we're like, okay, I know a is 0 and the string literal high is 1, but this point, this is a and this is b, they're both null.
+
+[00:05:13]
+There's just nothing, we have no information about either of them that we it's really important that we write this down. But because later on, this one's gonna stop being null, and we will have missed our opportunity to record that it was a symlink if we don't do it right now.
+
+[00:05:27]
+Because as previously noted, we don't symlink them to each other, So we only want to write down one symlink. And the reason for doing a now is so that later on, when we get to high and it turns into a string, we've already written these two are related, and now we've sort of retroactively captured that, a is a string, or at least configured out by traversing the path?
+
+[00:05:47]
+Does that make sense?
+>> Speaker 4: Think so.
+>> Richard Feldman: We can look at another way if you want. [LAUGH] So if you think about it just in terms of, like, the arguments we're passing in, so that unified function was like, it takes two arguments, lik Aa type ID and b type ID.
+
+[00:06:01]
+What we're doing when we go through this process right here, essentially, is we just go through every single one of these type IDs and we just call unify on them based on their node type. So when you have an equals like this, we look at that parse tree node and we're like, I know that conceptually the relationship between these two, is that they should be the same.
+
+[00:06:21]
+When you say a is high, the whole point of naming the constant is whenever I look up a, I wanna get the same type as hig, so unification is our tool for accomplishing that. So what we're doing is we're saying we're calling unify passing zero and one because we wanna say these two are linked, they should be identical.
+
+[00:06:38]
+Whenever I ask for one I should get the same type as the other, anhd yeah, as we saw, there's a few different scenarios where that can come up. But this particular scenario is when we're at the beginning of our process, We don't have information about any of them yet.
+
+[00:06:53]
+And so all we can do really is say, well, unification means they're linked, let's just go ahead and link them, and that's what this is doing. Yeah?
+>> Speaker 5: At which step would we throw things like warning variable a isn't used?
+>> Richard Feldman: Great question. Now, which step would we throw things like warning variable isn't used, so for that one, it depends on exactly what type of thing you were trying to say is not.
+
+[00:07:19]
+So for example, if you are talking about literally, a variable or an argument is unused, both of those can be done just using naming information. Like you don't even need type information at all the scope that we were dealing with previously, that's totally sufficient. We didn't do an example of this, but if you as an exercise, you can imagine, if you're going through the scope.
+
+[00:07:39]
+One of the things you can write down is not just is this thing in scope, but also, has anyone ever actually looked it up? So in other words, changing our scope from a map kind of similar to what we did here, where the map would essentially record a Boolean of like, has anyone looked me up or not?
+
+[00:07:55]
+And then at that point, if you get to the end, right before you pop the. The scope you can go through and look at all the things you're about to pop and say, hang on a sec, are any of these, they're about to go out of scope? So this is the last chance for anyone to look them up, and no, there were no takers.
+
+[00:08:10]
+If that Boolean is still false, nobody looked it up, then right there you can record a warning. It does get a little bit more complicated, if you wanna do things like unused like object fields or unuse like variants, like an enum, or something like that. For those, you actually do need type information, because it's more than just scope, it's about like, here is this defined type, I defined it to have.
+
+[00:08:28]
+This record is a thing, but nobody ever actually used that record that requires it's a more complicated thing to give a warning about, cuz you have to connect it through the type checker. I'm happy to spend time in, answering questions about Unify because it's very important and we're gonna, the next two sections are all about unifying things.
+
+[00:08:46]
+So now is a great time to ask any questions you have about them while we got the code on the screen, yeah.
+>> Speaker 6: Are we gona run our unification to completion, so are we going to say you've got a hundred iterations max?
+>> Richard Feldman: Are we gonna run it to completion or give you a maximum number of iterations?
+
+[00:09:02]
+I haven't really heard of people giving a maximum number of iterations, there is a thing that we're not doing in this course called an occurs check, which is designed to prevent infinite loops.
+>> Speaker 6: That's what I'm asking about, yeah.
+>> Richard Feldman: Okay, yeah. So very briefly, the occurs check, basically, the point of that is like, let's imagine that, [LAUGH] it would be bad if somebody did this, but what if you said, cons to a equals a?
+
+[00:09:23]
+Okay, well, that's not good if you're trying to infer things, you need some sort of safety guard that's gonna prevent that from happening. Now, if it's literally a equals a, that's really easy to detect in the naming stage, because you can be like, well, okay, we're in the middle of defining what a is.
+
+[00:09:39]
+Over here, and you use a so, no, unless you're a function, it's recursion, you can't do that. Similarly, not they don't look exactly like that, but there are scenarios where you can get unification into an infinite loop. Where it's just trying to resolve things that are resolving to each other, and you end up just getting stuck, and the way that you prevent that is with what's called an occurs check.
+
+[00:10:01]
+Which is basically you say, okay, I'm about to go traverse this whole branch of something of like complicated types of, like I said, we don't have those yet. We haven't gotten to functions and whatnot yet, but there become types where you can go so far traversing them in the course of running Unify that you actually end up.
+
+[00:10:19]
+Looping back on yourself without realizing it because there's all these intermediate twists and turns that you took to get there. The occurs check basically says, okay, I'm about to go do some work on this type variable, I'm gonna go traverse the entire tree and I'm not gonna try to do the actual unify.
+
+[00:10:33]
+I'm just gonna try to answer the question, does this type variable like loop back on itself anywhere in here? Because if it does, I need to not run Unify on this, so I'm gonna get stuck. So this is also one of those things where if you're making a production compiler, you really gotta be careful to sprinkle your occurs, checks.
+
+[00:10:49]
+Occurs like 0-c-c-u-r, does this occur in this subtree. So if you look at rocks compiler, there's a lot of like, okay, do this thing, but, wait, do an occur check here to make sure there's no infinite loop, it's one of those things you gotta be really careful about.
+
+[00:11:02]
+And if you forget a curse check, maybe nobody notices, but then maybe someone's like the compiler's hanging, why is that? And they're like, no, I forgot an curse check somewhere, and they hit something, this is gonna be fun to debug [LAUGH] Yeah.
+>> Speaker 7: I Just wanna make sure I understand this, so the first time Unify is run in like the unification process,
+
+[00:11:18]
+
+>> Richard Feldman: Yeah.
+>> Speaker 7: That resolve symlinks and press function will basically always return, null for the type.
+>> Richard Feldman: Yep 100%, yeah
+>> Speaker 7: Then, in theory, the last unify call and unification step shouldn't.
+>> Richard Feldman: Yeah, unless you're in the very specific case of like, a polymer function that we haven't gotten to yet, but yes, for the for the purpose of the things we've learned so far, absolutely 100%.
+
+[00:11:38]
+[LAUGH] Yeah.
+>> Speaker 8: You're leaving futures out of our type inference for now.
+>> Richard Feldman: Yeah. So, right, so when you're in the initial state of everything is null, this function is a hundred percent always going to return null. And then once you've completely populated the table and there's no more nulls than the table, this will never return null.
+
+[00:11:54]
+Great questions, yeah.
+>> Speaker 9: Yeah, I'm kind of curious with JavaScript you can, if you have the addition of a string and a number, forces the number to a string.
+>> Richard Feldman: Yeah.
+>> Speaker 9: How would the, I'm assuming we're doing this more like strong typing if I'm using the term correctly.
+
+[00:12:06]
+
+>> Richard Feldman: Yep.
+>> Speaker 9: I guess, how would this kinda change if we wanted to kind of enforce or allow for type coercion?
+>> Richard Feldman: Strong typing, yeah, so that's another one that's like, that one's so controversial I don't even use it. [LAUGH] Strong typing, I'm pretty sure that the most accurate, if aliens land and you were like, I have to describe to you what strong typing means.
+
+[00:12:24]
+I'm pretty sure strong typing refers to a type system that I the person saying strong typing, that's just what that term means, cuz if you listen to people argue about it, that's like, this is just you like it. So you're calling it strong definitions are all over the place on that one anyway.
+
+[00:12:39]
+So yeah, the question was, let's say that you have the plus operator and the definition of plus operator is not that they both have to be numbers, but rather they could be numbers or strings. That's a rabbit hole, there's a lot of different ways you can do that.
+
+[00:12:50]
+There's like super fancy ways that get into like subtyping territory and there's also like very restricted ways where you can sort of like have a little like secret type variable behind the scenes. That makes it look like subtyping if you are not doing it too carefully, but then if you use it in certain ways, that sort of reveals that there's a hidden type variable, and then maybe it's kind of confusing.
+
+[00:13:12]
+Point is, we're definitely not doing it here, and it certainly can be done in a variety of ways. But there's trade offs abound [LAUGH] when you're doing stuff like that, but definitely life is easier if you choose not to do things like that.
+

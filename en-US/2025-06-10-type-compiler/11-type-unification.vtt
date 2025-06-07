@@ -1,0 +1,1427 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:01.168
+&gt;&gt; Richard Feldman: Support for
+as previously,
+
+2
+00:00:01.168 --> 00:00:03.611
+mentioned that we're gonna
+talk about type unification.
+
+3
+00:00:03.611 --> 00:00:06.655
+So first,
+we're gonna do some unifying of operators,
+
+4
+00:00:06.655 --> 00:00:10.175
+operators in the sense of like plus and
+times binary operators.
+
+5
+00:00:10.175 --> 00:00:12.032
+We're talking about type mismatches.
+
+6
+00:00:12.032 --> 00:00:15.799
+So far we have not done anything that can
+possibly cause a slight mismatch, but
+
+7
+00:00:15.799 --> 00:00:16.440
+now we will.
+
+8
+00:00:16.440 --> 00:00:19.452
+This is aired like support like
+a part-time, and then finally,
+
+9
+00:00:19.452 --> 00:00:21.110
+the actual unify function itself.
+
+10
+00:00:21.110 --> 00:00:24.364
+The function is gonna drive a lot of
+what we're doing throughout the rest of
+
+11
+00:00:24.364 --> 00:00:25.043
+this process.
+
+12
+00:00:25.043 --> 00:00:28.032
+It's a very,
+very important function, unify.
+
+13
+00:00:28.032 --> 00:00:28.685
+Okay, so
+
+14
+00:00:28.685 --> 00:00:34.175
+type unification basically is a way to
+say these two types should be identical.
+
+15
+00:00:34.175 --> 00:00:37.707
+I'm choosing to use the word identical
+here because that's a common one in
+
+16
+00:00:37.707 --> 00:00:41.462
+the literature, but honestly, there's
+no one word that I found that is like,
+
+17
+00:00:41.462 --> 00:00:45.162
+really, really a good one-to-one
+correspondence of what unification is,
+
+18
+00:00:45.162 --> 00:00:47.821
+the best answer to like,
+what is type unification say?
+
+19
+00:00:47.821 --> 00:00:52.820
+It says that these two types are unified
+according to the type unification
+
+20
+00:00:52.820 --> 00:00:54.118
+algorithm [LAUGH].
+
+21
+00:00:54.118 --> 00:00:56.666
+So we're gonna see what the actual code
+looks like, you can kinda just walk
+
+22
+00:00:56.666 --> 00:00:59.264
+through the conditionals and sort of
+understand what it's doing that way.
+
+23
+00:00:59.264 --> 00:01:02.944
+But conceptually kinda fuzzy if you sort
+of squint and it's a little bit hazy,
+
+24
+00:01:02.944 --> 00:01:05.510
+it's kinda like these two
+types should be identical,
+
+25
+00:01:05.510 --> 00:01:09.558
+but it does mean something more specific
+than that, we'll get into what that means.
+
+26
+00:01:09.558 --> 00:01:10.735
+And a very important thing,
+
+27
+00:01:10.735 --> 00:01:14.023
+compared to our previous section,
+where we were only dealing with constants,
+
+28
+00:01:14.023 --> 00:01:16.590
+is that this is a way to impose
+multiple constraints on types.
+
+29
+00:01:16.590 --> 00:01:21.279
+So previously, we just had a equals hi,
+b equals a, c equals b.
+
+30
+00:01:21.279 --> 00:01:25.422
+At no point were any of those types in the
+database impacted by multiple constraints
+
+31
+00:01:25.422 --> 00:01:28.514
+at once, it was always just like
+handing off to someone else.
+
+32
+00:01:28.514 --> 00:01:31.909
+So now we're gonna start talking about
+scenarios, and there's gonna be a lot
+
+33
+00:01:31.909 --> 00:01:35.099
+of them in a type checker where you
+have types that are being constrained by
+
+34
+00:01:35.099 --> 00:01:38.908
+multiple things, and the type inference
+is not just like, I'm just handing off to
+
+35
+00:01:38.908 --> 00:01:41.841
+this thing, but it's like, well,
+this thing is saying this, and
+
+36
+00:01:41.841 --> 00:01:45.428
+this thing is saying this, and sometimes
+that there's a happy agreement there.
+
+37
+00:01:45.428 --> 00:01:48.668
+We're like, good, everybody agrees,
+we're all set, and then, of course,
+
+38
+00:01:48.668 --> 00:01:51.471
+sometimes they disagree, and
+then that's when we have a type mismatch.
+
+39
+00:01:51.471 --> 00:01:54.273
+And a type mismatch error
+is basically the bread and
+
+40
+00:01:54.273 --> 00:01:57.270
+butter of the type of reporting
+that our type checker or
+
+41
+00:01:57.270 --> 00:02:00.411
+type inference system is going
+to do as far as build time.
+
+42
+00:02:00.411 --> 00:02:04.379
+Okay, so
+start off by unifying some operators here.
+
+43
+00:02:04.379 --> 00:02:08.410
+So we'll start off with our classic const
+a = hi, const b = a, but this time,
+
+44
+00:02:08.410 --> 00:02:11.220
+instead of doing a const c
+equals like we did last time,
+
+45
+00:02:11.220 --> 00:02:14.848
+now we're gonna actually run an operator,
+we're gonna do a times b.
+
+46
+00:02:14.848 --> 00:02:18.265
+Now operators can be implemented in
+different ways, in different languages.
+
+47
+00:02:18.265 --> 00:02:21.922
+The way that we are choosing to implement
+them in this language is that it's
+
+48
+00:02:21.922 --> 00:02:25.984
+basically like a hard coded built into the
+language thing where we know that the rule
+
+49
+00:02:25.984 --> 00:02:29.929
+is, anytime you see one of these stars,
+we're saying both things on either side
+
+50
+00:02:29.929 --> 00:02:33.851
+of it have to be a number, and also the
+whole thing is gonna evaluate to a number.
+
+51
+00:02:33.851 --> 00:02:36.467
+There's other languages where you have
+custom operators and stuff like that,
+
+52
+00:02:36.467 --> 00:02:38.066
+where this might not be the case,
+but again, for
+
+53
+00:02:38.066 --> 00:02:39.996
+our simplified subset of JavaScript,
+that's the rule.
+
+54
+00:02:39.996 --> 00:02:43.263
+It's just like we know right now at
+compile time, this has to be a number,
+
+55
+00:02:43.263 --> 00:02:45.951
+this has to be a number, and
+the whole thing is gonna return or
+
+56
+00:02:45.951 --> 00:02:46.971
+evaluate to a number.
+
+57
+00:02:46.971 --> 00:02:47.846
+Given that,
+
+58
+00:02:47.846 --> 00:02:52.789
+what we want is we want our type checker
+to infer two type mismatches here.
+
+59
+00:02:52.789 --> 00:02:55.394
+The first type mismatch is because
+a is set to be a string, and
+
+60
+00:02:55.394 --> 00:02:58.834
+we said this is supposed to be a number,
+but it's not a number, it's a string.
+
+61
+00:02:58.834 --> 00:03:02.068
+And the second thing is that b is supposed
+to be a, so again, using type inference,
+
+62
+00:03:02.068 --> 00:03:03.686
+we should know that b is also a string,
+and
+
+63
+00:03:03.686 --> 00:03:06.693
+therefore b should get its own type
+mismatch, because b is also not a number,
+
+64
+00:03:06.693 --> 00:03:08.475
+and both of these
+are supposed to be numbers.
+
+65
+00:03:08.475 --> 00:03:12.791
+So that's what we're trying to aim for
+here, end up with two type mismatches.
+
+66
+00:03:12.791 --> 00:03:15.707
+So we're gonna start by doing exactly
+the same thing we did last time.
+
+67
+00:03:15.707 --> 00:03:18.549
+It's gonna be a recurring theme throughout
+the course, is just go through and
+
+68
+00:03:18.549 --> 00:03:19.895
+assign type IDs to all these things.
+
+69
+00:03:19.895 --> 00:03:24.358
+So a gets 0, hi gets 1,
+just like last time b gets 2, a gets 0.
+
+70
+00:03:24.358 --> 00:03:28.004
+And then, once again, we're gonna do this
+sort of look-up thing like we did right
+
+71
+00:03:28.004 --> 00:03:31.860
+here, where we say, okay, well,
+once we come down here, what's in scope?
+
+72
+00:03:31.860 --> 00:03:36.349
+I see a is 0, and then b is,
+once again, gonna be 2.
+
+73
+00:03:36.349 --> 00:03:39.787
+So initially, when we just have 0, 1,
+and 2 in here in our type's database,
+
+74
+00:03:39.787 --> 00:03:41.671
+everything's null, just like last time.
+
+75
+00:03:41.671 --> 00:03:46.407
+We're gonna add a little three later on
+that is gonna be the type of the entire
+
+76
+00:03:46.407 --> 00:03:50.259
+multiplication operation,
+like what it actually returns.
+
+77
+00:03:50.259 --> 00:03:54.988
+But for now, we're just gonna start off
+by just dealing with the types of 1 and
+
+78
+00:03:54.988 --> 00:03:59.017
+2, so that's a, b, and hi, so
+0, 1, and 2, a, b, and hi.
+
+79
+00:03:59.017 --> 00:04:04.235
+So a once again is 0, b is 2,
+and then this is a 3.
+
+80
+00:04:04.235 --> 00:04:08.921
+Okay, so at the beginning, again, we have
+exactly the same thing as last time.
+
+81
+00:04:08.921 --> 00:04:13.238
+We first go through and we say, okay,
+a has a relationship with this thing where
+
+82
+00:04:13.238 --> 00:04:17.106
+it's similar to it, and basically
+whatever type this ends up having,
+
+83
+00:04:17.106 --> 00:04:19.758
+that is exactly the type
+that id 0 is gonna have.
+
+84
+00:04:19.758 --> 00:04:22.278
+And then we proceed on to 1, and we say,
+it's a string literal, therefore,
+
+85
+00:04:22.278 --> 00:04:22.963
+it's type of string.
+
+86
+00:04:22.963 --> 00:04:26.296
+So far, so good, and
+then we also continue on with, okay,
+
+87
+00:04:26.296 --> 00:04:28.377
+this thing is whatever that type is.
+
+88
+00:04:28.377 --> 00:04:31.344
+And then the next thing that we know
+is that for sure this is a number.
+
+89
+00:04:31.344 --> 00:04:34.091
+And this, much like with a string literal,
+is just hard-coded.
+
+90
+00:04:34.091 --> 00:04:37.791
+So in exactly the same way that as soon as
+we see a string literal parse tree node,
+
+91
+00:04:37.791 --> 00:04:39.847
+we're like, that its type of string.
+
+92
+00:04:39.847 --> 00:04:45.735
+Anytime we see a multiplication operator,
+we're like, it evaluates to is a number.
+
+93
+00:04:45.735 --> 00:04:49.648
+So we can just write that down without
+having to do any relationship stuff.
+
+94
+00:04:49.648 --> 00:04:51.559
+Okay, so that's the basics.
+
+95
+00:04:51.559 --> 00:04:54.715
+So far, at this point, we've basically
+just done the same kinda stuff that we did
+
+96
+00:04:54.715 --> 00:04:57.343
+in the previous section,
+just with a slightly different example.
+
+97
+00:04:57.343 --> 00:04:59.737
+Now let's make it more interesting.
+
+98
+00:04:59.737 --> 00:05:03.314
+So what we're gonna do next is we're
+gonna do what's called unifying both
+
+99
+00:05:03.314 --> 00:05:06.907
+the operators arguments that are going
+into the star with the number type.
+
+100
+00:05:06.907 --> 00:05:10.425
+So unifying essentially means we're going
+to call this unify function on each of
+
+101
+00:05:10.425 --> 00:05:12.441
+them, passing them as
+one of the arguments and
+
+102
+00:05:12.441 --> 00:05:14.680
+then something else as one
+of the other arguments.
+
+103
+00:05:14.680 --> 00:05:18.891
+In this case, it's gonna be zero and
+number and then two and number.
+
+104
+00:05:18.891 --> 00:05:22.059
+So what does that look like,
+and what does that actually do?
+
+105
+00:05:22.059 --> 00:05:25.506
+So conceptually, I'm gonna start off
+with just sort of like a high-level,
+
+106
+00:05:25.506 --> 00:05:28.010
+kinda fuzzy description of
+the basics of unification.
+
+107
+00:05:28.010 --> 00:05:31.062
+Then we're gonna get into code,
+which is gonna be much more detailed and
+
+108
+00:05:31.062 --> 00:05:33.328
+give you a much sharper
+picture of what this is doing.
+
+109
+00:05:33.328 --> 00:05:37.539
+But at a basic level, if we're zoomed out,
+if I give unify two nulls, that is to say,
+
+110
+00:05:37.539 --> 00:05:40.831
+two entries in the database that
+have not been initialized at all.
+
+111
+00:05:40.831 --> 00:05:44.326
+They're just kinda like still in
+that very early, we just went around
+
+112
+00:05:44.326 --> 00:05:47.838
+assigning things, and nobody really
+knows what these are yet state.
+
+113
+00:05:47.838 --> 00:05:50.166
+If you give it two nulls,
+that says, okay, well,
+
+114
+00:05:50.166 --> 00:05:52.344
+one of these nulls is
+gonna turn into a symlink.
+
+115
+00:05:52.344 --> 00:05:56.527
+I'm not saying exactly which one it is,
+this arrow, by the way, is not returned.
+
+116
+00:05:56.527 --> 00:05:59.667
+This is like, what it's gonna do,
+if that makes sense.
+
+117
+00:05:59.667 --> 00:06:01.760
+So it's gonna symlink one
+of them to the other one.
+
+118
+00:06:01.760 --> 00:06:03.488
+The order is not
+necessarily that critical,
+
+119
+00:06:03.488 --> 00:06:05.085
+the critical thing is the relationship.
+
+120
+00:06:05.085 --> 00:06:08.466
+It's saying this thing, anytime you ask
+it what it is, it's that other one, and
+
+121
+00:06:08.466 --> 00:06:09.988
+now we have linked the two together.
+
+122
+00:06:09.988 --> 00:06:12.690
+Actually, it's pretty important that you
+don't symlink them to each other because
+
+123
+00:06:12.690 --> 00:06:14.385
+then you're like, hey,
+what are your values?
+
+124
+00:06:14.385 --> 00:06:15.234
+You have to go ask that one.
+
+125
+00:06:15.234 --> 00:06:16.060
+Hey, what's your value?
+
+126
+00:06:16.060 --> 00:06:17.702
+You have to go ask that one, and
+then you get an infinite loop.
+
+127
+00:06:17.702 --> 00:06:20.699
+So always only ever wanna have
+one symlinked to the other,
+
+128
+00:06:20.699 --> 00:06:22.235
+not symlinked to each other.
+
+129
+00:06:22.235 --> 00:06:25.367
+The other common scenario that
+you'll see is basically you
+
+130
+00:06:25.367 --> 00:06:28.509
+give unified two concrete types
+that are exactly the same.
+
+131
+00:06:28.509 --> 00:06:30.657
+So basically this one's like,
+hey, I have two strings.
+
+132
+00:06:30.657 --> 00:06:32.408
+Here's a string, and
+then here's another string.
+
+133
+00:06:32.408 --> 00:06:35.260
+This is okay, well, great, clearly,
+both of you are strings, so
+
+134
+00:06:35.260 --> 00:06:38.029
+just stay being strings, and
+we're not gonna make any changes.
+
+135
+00:06:38.029 --> 00:06:41.127
+Same thing if you're both numbers,
+just again, no change necessary.
+
+136
+00:06:41.127 --> 00:06:45.904
+Obviously, the answer is these two things
+unify to be a number, so no big deal.
+
+137
+00:06:45.904 --> 00:06:49.158
+And then of course, we have the case
+where one of them is a concrete type and
+
+138
+00:06:49.158 --> 00:06:52.677
+the other one is a different concrete
+type, and that's gonna be a type mismatch
+
+139
+00:06:52.677 --> 00:06:55.513
+where we actually reporting
+the error to the user saying, hey,
+
+140
+00:06:55.513 --> 00:06:59.136
+according to the unification algorithm,
+you said that this thing was a string and
+
+141
+00:06:59.136 --> 00:07:01.700
+it's also a number,
+those are very much not identical.
+
+142
+00:07:01.700 --> 00:07:05.484
+If we're thinking about this as something
+that's making these types identical,
+
+143
+00:07:05.484 --> 00:07:07.754
+therefore we're gonna
+report a type mismatch and
+
+144
+00:07:07.754 --> 00:07:09.931
+that's gonna be the game over for
+those types.
+
+145
+00:07:09.931 --> 00:07:12.293
+Okay, so let's put this into practice.
+
+146
+00:07:12.293 --> 00:07:14.730
+So at this point,
+we're just gonna focus on these two.
+
+147
+00:07:14.730 --> 00:07:17.528
+So these other ones, they still have
+those types associated with them.
+
+148
+00:07:17.528 --> 00:07:18.834
+The type ids associated with them, but
+
+149
+00:07:18.834 --> 00:07:20.505
+they're just kinda hanging
+out in the database.
+
+150
+00:07:20.505 --> 00:07:25.311
+And the main thing that we're gonna look
+at is unifying these two things with
+
+151
+00:07:25.311 --> 00:07:26.448
+the number type.
+
+152
+00:07:26.448 --> 00:07:29.840
+So essentially, from a function calling
+perspective, again, in the actual code,
+
+153
+00:07:29.840 --> 00:07:30.499
+as you'll see,
+
+154
+00:07:30.499 --> 00:07:33.481
+this will actually be like a JavaScript
+object with more stuff going on it.
+
+155
+00:07:33.481 --> 00:07:36.826
+But if we just think about this
+conceptually as we're calling the unify
+
+156
+00:07:36.826 --> 00:07:40.336
+function, passing a number, and
+then one of these things being a string,
+
+157
+00:07:40.336 --> 00:07:41.971
+that's gonna be a type mismatch.
+
+158
+00:07:41.971 --> 00:07:44.522
+Same thing with the other one,
+it's gonna be a type mismatch.
+
+159
+00:07:44.522 --> 00:07:52.271
+So the whole problem here is that if I
+look up what is the type of a, a is id 0.
+
+160
+00:07:52.271 --> 00:07:56.885
+Id 0 says, go ask 1, 1 says I'm a string,
+b says I'm an id 2, id 2 also points to 0,
+
+161
+00:07:56.885 --> 00:07:59.247
+which points to 1, which points to string.
+
+162
+00:07:59.247 --> 00:08:02.724
+And so
+when unify operates on its two values,
+
+163
+00:08:02.724 --> 00:08:08.778
+it is going with what is at the end of
+the line here, what is the ultimate value?
+
+164
+00:08:08.778 --> 00:08:13.224
+Ultimate in the sense, not the ultimate,
+in the sense of the last one in the chain.
+
+165
+00:08:13.224 --> 00:08:17.372
+If you completely resolve these symlinks,
+you follow them all the way through,
+
+166
+00:08:17.372 --> 00:08:18.965
+what is the actual type there?
+
+167
+00:08:18.965 --> 00:08:21.318
+If you were hovering over this
+in your editor and you asked,
+
+168
+00:08:21.318 --> 00:08:22.224
+what is the type here?
+
+169
+00:08:22.224 --> 00:08:23.471
+That's what unify is getting.
+
+170
+00:08:23.471 --> 00:08:27.414
+So unify is not being given, well,
+okay, technically it is being given,
+
+171
+00:08:27.414 --> 00:08:31.418
+like the zero and the two, but the first
+thing it does is just turn them into,
+
+172
+00:08:31.418 --> 00:08:35.298
+just traverse all the symlinks and
+get me either a concrete type or a null,
+
+173
+00:08:35.298 --> 00:08:38.967
+does something where I'm like there
+is no further hops to traverse.
+
+174
+00:08:38.967 --> 00:08:41.966
+I have traversed as far as possible,
+that's what I'm gonna be considering.
+
+175
+00:08:41.966 --> 00:08:45.368
+And that's why, when it gets these, it's
+like, okay, I see a number and a string,
+
+176
+00:08:45.368 --> 00:08:48.223
+I see a type mismatch, I see a number and
+string, I see a type mismatch.
+
+177
+00:08:48.223 --> 00:08:51.924
+Even though, if you look at each of these,
+it doesn't say number right here or
+
+178
+00:08:51.924 --> 00:08:52.889
+string right here.
+
+179
+00:08:52.889 --> 00:08:56.795
+If you follow the symlinks,
+it does end up saying string, and
+
+180
+00:08:56.795 --> 00:09:00.648
+that's why it ends up unifying
+these two to a type mismatch.
+
+181
+00:09:00.648 --> 00:09:03.954
+So for that perspective, great,
+our goal of inferring two type mismatches,
+
+182
+00:09:03.954 --> 00:09:04.664
+great success.
+
+183
+00:09:04.664 --> 00:09:09.709
+We have succeeded [LAUGH] in inferring
+two type mismatches as desired.
+
+184
+00:09:09.709 --> 00:09:11.586
+So now let's go take a look
+at the actual code here,
+
+185
+00:09:11.586 --> 00:09:14.305
+because this is the part that I think
+is the most important to understand.
+
+186
+00:09:14.305 --> 00:09:16.829
+That was the sort of high-level overview,
+conceptual.
+
+187
+00:09:16.829 --> 00:09:18.538
+Here's how we get the type
+matches out of it.
+
+188
+00:09:18.538 --> 00:09:20.880
+But the specifics of this
+algorithm are very important.
+
+189
+00:09:20.880 --> 00:09:24.722
+So, to recap, we started off
+with turning things into tokens.
+
+190
+00:09:24.722 --> 00:09:26.882
+We've got our source code right here, and
+
+191
+00:09:26.882 --> 00:09:29.173
+we build up multiple
+different tokens here.
+
+192
+00:09:29.173 --> 00:09:32.281
+So this one is type const,
+this one's type identifier.
+
+193
+00:09:32.281 --> 00:09:36.019
+Then we turn those into parse tree nodes,
+which is just a nested form of the tokens.
+
+194
+00:09:36.019 --> 00:09:39.109
+Then we turn those into typed parse
+tree nodes where we added the typeId.
+
+195
+00:09:39.109 --> 00:09:42.536
+And then we started building up our types
+database with all the nulls at first, and
+
+196
+00:09:42.536 --> 00:09:44.084
+then putting in the relationships.
+
+197
+00:09:44.084 --> 00:09:48.463
+And then finally, we have the actual
+code that builds those up.
+
+198
+00:09:48.463 --> 00:09:53.152
+So with all of that in mind,
+here is where we have ended up code-wise.
+
+199
+00:09:53.152 --> 00:09:54.526
+We've done all that other stuff.
+
+200
+00:09:54.526 --> 00:09:57.666
+We have completely populated
+our types database right up to
+
+201
+00:09:57.666 --> 00:10:00.994
+the point of saying we have these
+two additional constraints,
+
+202
+00:10:00.994 --> 00:10:04.630
+which is that the thing to the left
+of the star needs to be a number, and
+
+203
+00:10:04.630 --> 00:10:07.746
+the thing to the right of the star
+also needs to be a number.
+
+204
+00:10:07.746 --> 00:10:10.701
+And I did mention that when we
+are thinking about these things,
+
+205
+00:10:10.701 --> 00:10:14.218
+it's really important that we're not
+unifying based on what's actually
+
+206
+00:10:14.218 --> 00:10:17.786
+in the row in the database, but rather
+after you traverse all the symlinks,
+
+207
+00:10:17.786 --> 00:10:18.757
+what is that value?
+
+208
+00:10:18.757 --> 00:10:22.414
+So the very first thing that unify does,
+cuz it does take two type Ids, is it says,
+
+209
+00:10:22.414 --> 00:10:25.541
+look, just go, I'm gonna call this
+function, resolve symlinks and
+
+210
+00:10:25.541 --> 00:10:28.313
+compress just so you know
+everything that it's doing [LAUGH].
+
+211
+00:10:28.313 --> 00:10:31.181
+[COUGH] And that's basically
+saying give me the typeId,
+
+212
+00:10:31.181 --> 00:10:34.794
+I'm gonna turn that into an actual type,
+so a concrete type or a null.
+
+213
+00:10:34.794 --> 00:10:37.529
+So this point is not an ID anymore.
+
+214
+00:10:37.529 --> 00:10:39.606
+This resolves symlinks and
+compress function.
+
+215
+00:10:39.606 --> 00:10:41.177
+Hopefully, you can guess what it does.
+
+216
+00:10:41.177 --> 00:10:44.526
+It resolves all the symlinks and
+then does path compression.
+
+217
+00:10:44.526 --> 00:10:48.124
+This is the first thing that it does,
+is like, do that for both a and b, and
+
+218
+00:10:48.124 --> 00:10:50.680
+this is exactly the reason that it is so
+important for
+
+219
+00:10:50.680 --> 00:10:53.144
+performance that you have
+the path compression.
+
+220
+00:10:53.144 --> 00:10:55.588
+So if you imagine,
+every single time we're going through and
+
+221
+00:10:55.588 --> 00:10:57.942
+calling this unify function,
+which happens all the time.
+
+222
+00:10:57.942 --> 00:11:01.718
+If you don't have the path compression on,
+you're traversing those long hops over and
+
+223
+00:11:01.718 --> 00:11:02.646
+over and over again.
+
+224
+00:11:02.646 --> 00:11:06.198
+So it's a huge deal for performance that
+we're able to compress those down and say,
+
+225
+00:11:06.198 --> 00:11:07.609
+yep, just one hop, no big deal.
+
+226
+00:11:07.609 --> 00:11:11.297
+Okay, next thing we do is we start
+looking into different scenarios.
+
+227
+00:11:11.297 --> 00:11:13.704
+So the first scenario is basically like,
+okay,
+
+228
+00:11:13.704 --> 00:11:17.462
+let's suppose that even after resolving
+those symlinks, a is still null,
+
+229
+00:11:17.462 --> 00:11:21.059
+which means that, basically,
+we don't have any information about a.
+
+230
+00:11:21.059 --> 00:11:23.512
+The term for this is an unbound variable.
+
+231
+00:11:23.512 --> 00:11:27.234
+It's basically like, yeah, we put it in
+there, we wrote down, this is your ID, but
+
+232
+00:11:27.234 --> 00:11:28.857
+in the database, it's still null.
+
+233
+00:11:28.857 --> 00:11:31.523
+We don't actually know anything
+about this thing at all.
+
+234
+00:11:31.523 --> 00:11:35.912
+So when that's the case,
+the first thing we wanna do is say, okay,
+
+235
+00:11:35.912 --> 00:11:38.542
+we're going to give a some sort of type.
+
+236
+00:11:38.542 --> 00:11:40.375
+For sure,
+we're gonna write something in there.
+
+237
+00:11:40.375 --> 00:11:42.130
+So this is db[aTypeId], and
+
+238
+00:11:42.130 --> 00:11:46.797
+this is why it's important that we have
+the TypeId in addition to the actual type.
+
+239
+00:11:46.797 --> 00:11:50.181
+We look at the actual type when we're
+considering what to do with it.
+
+240
+00:11:50.181 --> 00:11:54.164
+But then we need the TypeId so that we
+know where to store things in the database
+
+241
+00:11:54.164 --> 00:11:57.066
+if we wanna make changes,
+which Unify very often does.
+
+242
+00:11:57.066 --> 00:11:58.554
+So we're gonna store something
+new in the database and
+
+243
+00:11:58.554 --> 00:11:59.631
+we're gonna do a little ternary here.
+
+244
+00:11:59.631 --> 00:12:04.011
+So first we're gonna say, okay, was b also
+null, a was null, but was b null as well?
+
+245
+00:12:04.011 --> 00:12:04.818
+If b was also null,
+
+246
+00:12:04.818 --> 00:12:08.505
+then we're in that first scenario I talked
+about a couple slides ago where it's like,
+
+247
+00:12:08.505 --> 00:12:12.041
+okay, both of these are currently null,
+we don't know anything about them, or at
+
+248
+00:12:12.041 --> 00:12:15.448
+least we didn't, but now we know whatever
+they end up being, they are linked.
+
+249
+00:12:15.448 --> 00:12:17.539
+So we're gonna make a, b a symlink of b,
+
+250
+00:12:17.539 --> 00:12:21.232
+could also just as easily put b as
+a symlink of a here, but we're gonna be
+
+251
+00:12:21.232 --> 00:12:25.131
+a-focused because a was at the top of
+the [LAUGH] null check by coincidence.
+
+252
+00:12:25.131 --> 00:12:28.927
+But then there's also
+the possibility that b was not null.
+
+253
+00:12:28.927 --> 00:12:31.445
+So the next scenario we're
+about to look at is a was null,
+
+254
+00:12:31.445 --> 00:12:34.750
+we don't know anything about a, but
+b already had something going on, and
+
+255
+00:12:34.750 --> 00:12:37.552
+not just a symlink,
+cuz we already resolved all the symlinks.
+
+256
+00:12:37.552 --> 00:12:41.246
+So this means that basically,
+b was a concrete type at this point.
+
+257
+00:12:41.246 --> 00:12:43.597
+So at this point, we know,
+by process elimination,
+
+258
+00:12:43.597 --> 00:12:46.595
+it couldn't be a symlink cuz we
+already resolved all the symlinks.
+
+259
+00:12:46.595 --> 00:12:48.898
+We already had a check to see if
+it was null, so if it's not null,
+
+260
+00:12:48.898 --> 00:12:50.919
+it's not assembling,
+it's gotta be a concrete type.
+
+261
+00:12:50.919 --> 00:12:55.868
+So here, at this point, we're like,
+okay, cool, that means that basically,
+
+262
+00:12:55.868 --> 00:13:00.418
+if we know that b is a concrete type,
+we know that it has the concrete field.
+
+263
+00:13:00.418 --> 00:13:03.279
+That's the shape of the object,
+it's like one of these concrete things.
+
+264
+00:13:03.279 --> 00:13:05.523
+And basically this is just
+saying just duplicate it.
+
+265
+00:13:05.523 --> 00:13:09.285
+We're just gonna say, okay,
+whatever b was, I mean, a was null,
+
+266
+00:13:09.285 --> 00:13:12.266
+we are now just saying,
+boom, just duplicate that.
+
+267
+00:13:12.266 --> 00:13:16.063
+I mentioned previously that this is also a
+place where it's totally reasonable if you
+
+268
+00:13:16.063 --> 00:13:17.705
+want to, to just always symlink it.
+
+269
+00:13:17.705 --> 00:13:21.497
+And just say, well, yeah, I don't wanna
+potentially copy that big concrete thing.
+
+270
+00:13:21.497 --> 00:13:24.439
+What if this is a gigantic concrete type?
+
+271
+00:13:24.439 --> 00:13:25.943
+Totally reasonable, basically,
+
+272
+00:13:25.943 --> 00:13:28.306
+I wanted to just kind of show
+the other way of doing this.
+
+273
+00:13:28.306 --> 00:13:31.524
+But if you want to, you can do exactly
+the same thing we did in path compression.
+
+274
+00:13:31.524 --> 00:13:34.548
+And just say, yeah, I'm not even
+gonna bother with this conditional,
+
+275
+00:13:34.548 --> 00:13:36.343
+I'm just gonna just always symlink a to b.
+
+276
+00:13:36.343 --> 00:13:38.715
+And then, wash my hands of it,
+I'm all done.
+
+277
+00:13:38.715 --> 00:13:42.636
+So, whether or not you have this
+conditional is kind of up to you in this
+
+278
+00:13:42.636 --> 00:13:47.353
+particular scenario, but I do wanna note,
+and I did wanna show the conditional that
+
+279
+00:13:47.353 --> 00:13:50.489
+what's actually happening
+here is pretty important.
+
+280
+00:13:50.489 --> 00:13:53.657
+It's not like you're just sort
+of uncritically just saying,
+
+281
+00:13:53.657 --> 00:13:56.000
+a is just gonna be symlink
+to b like no matter what.
+
+282
+00:13:56.000 --> 00:14:00.820
+If you're not aware of those scenarios,
+you could run into an edge case,
+
+283
+00:14:00.820 --> 00:14:02.621
+like what if b is a symlink?
+
+284
+00:14:02.621 --> 00:14:06.046
+We're not really looking at that here,
+but I think I may have actually,
+
+285
+00:14:06.046 --> 00:14:09.695
+in one of the solutions, I think I may
+have actually done that as one of the edge
+
+286
+00:14:09.695 --> 00:14:12.898
+cases of like, okay, well,
+it is technically possible that.
+
+287
+00:14:12.898 --> 00:14:14.990
+No, it's technically possible
+because we resolve the symlink,
+
+288
+00:14:14.990 --> 00:14:16.084
+I'm thinking of something else.
+
+289
+00:14:16.084 --> 00:14:19.583
+So yeah, definitely at this point,
+either b is going to be null or
+
+290
+00:14:19.583 --> 00:14:24.121
+it's going to be concrete because if it
+were symlink, it would have been resolved.
+
+291
+00:14:24.121 --> 00:14:25.689
+So, putting all that together,
+
+292
+00:14:25.689 --> 00:14:29.273
+it's basically this is another one of
+those scenarios where it's up to your
+
+293
+00:14:29.273 --> 00:14:32.084
+choice as a compiler author
+which design you wanna go with.
+
+294
+00:14:32.084 --> 00:14:33.937
+Either you can copy the concrete thing, or
+
+295
+00:14:33.937 --> 00:14:36.767
+you can do what we did with in path
+compression and just say, yep,
+
+296
+00:14:36.767 --> 00:14:39.517
+they're just symlinked, and
+that's how they're related.
+

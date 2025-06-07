@@ -1,0 +1,105 @@
+[00:00:00]
+>> Richard Feldman: So now let's talk about hoisting. So again, we're gonna start with this x = 5, y = increment 3 example. But this time I'm going to do something that our language does not support, but we're just gonna roll with it for the purpose of the example, where I wrote the function keyword down below it.
+
+[00:00:14]
+So in JavaScript, this is a thing you can do, not in our subset of JavaScript, but in JavaScript in general you're allowed to call a function before it has actually been declared. Now, if we do our same kinda scoping algorithm that we've been doing here, okay, we got a new scope, we push the scope onto it, we add x to that scope, we add y to that scope.
+
+[00:00:30]
+And then later on, we say, if scope has increment, we have a naming error. Well, right here, we have not added increment to scope. So as soon as we hit this thing and we run this code, saying, let's see if we've got increment in our scope, it's gonna say, well, no, you don't have it in scope, so that's gonna be a naming error.
+
+[00:00:46]
+But of course, those are not the semantics we want for this increment, so how do we deal with that? How do we make it so that if we wanted to support this feature, which we don't precisely, because it's not only so complicated here, but it's even more complicated in type checking, so we're definitely not supporting it.
+
+[00:00:57]
+But if we did want to, how would we actually implement this? Well, there's a very straightforward way you can do that, which is just do a second pass. So basically, what we can do is have a separate hoisting pass, where at first we just pretend everybody who's not a function keyword doesn't exist.
+
+[00:01:11]
+[LAUGH] We're gonna scan through all the parse tree nodes and just say, if you are not a function, you stand off in a corner right now, because I am only considering the functions right now. And then I just go through and just add all of them to scope right away at the top.
+
+[00:01:23]
+And so, it's as if, that's why it's called hoisting, you picked them up and hoisted them up to the top. You're basically saying, okay, I'm going to add you to the scope, at the top of the scope, as if you had been defined above everything else. But we're not actually hoisting it, we're not really rearranging the nodes at all.
+
+[00:01:37]
+All we're doing is we're just doing a separate pass where all these other things are sort of ignored for the moment. And then adding it to scope first, such that by the time we come back and do the non-hoisting pass, the regular naming resolution that we've been doing previously, now x and y have been added here.
+
+[00:01:51]
+And it's no problem because they've already been added to scope before. Well, so the actual sequence here would be increments added to scope in the hoisting pass. Then we come along, we add x. Then, before we can add y, we need to process what y is being set to, and that's where we would actually check for the increment.
+
+[00:02:09]
+Yep, it's in scope, it's great, because of the hoisting pass, and then we finally add y scope. So, we're not doing that in this compiler, but this is a common thing that a lot of languages support, is calling functions after they're defined. And this is a very straightforward way to support that, is just being able to do a separate pass over the same exact data structure.
+
+[00:02:26]
+But now we're not mutating the data structure, we're not changing the parse tree nodes. Despite the name hoisting, we're not actually moving the nodes, we're not moving them up. We're just sort of having the effect of hoisting it up the scope conceptually. Any questions about hoisting? Yeah.
+>> Speaker 2: I'm curious, is it common to do a two-pass approach for handling hoisting?
+
+[00:02:45]
+I was also thinking too, would it make sense to just kind of keep track of, cuz is hoisting this function specific thing typically, right?
+>> Richard Feldman: Right.
+>> Speaker 2: This track, okay, whenever we call this function at the end of this first pass.
+>> Richard Feldman: Yeah, it's a great question. So there are definitely a lot of different ways you can do it.
+
+[00:03:00]
+So, if you don't care about modifying the node structure, a way that you can do it is you can basically have, as you're going along, going from tokens to parse tree nodes. You can say, okay, I'm just gonna have a separate list of all the functions that are defined in here.
+
+[00:03:14]
+And then whenever I encounter one, I'm gonna put it in that list. And then that way, when you come through and do your naming pass, you can just look at that list first before looking at the everything else list. So that would avoid the second pass, you're still only doing one pass from tokens to parsing.
+
+[00:03:28]
+And honestly, I'm not aware of exactly how common any given approach is. I think a lot of it just depends on tradeoffs of how much does the compiler care about performance versus how much performance difference they observe if they benchmark it and try multiple ways. But in a lot of cases, these types of things are things where I think people just kind of implemented however they decide to implement it the first time and probably never benchmark it another way.
+
+[00:03:52]
+But yeah, I mean, there's definitely lots of different ways you could do this, this is the most straightforward one I would say. But there are fancier ones that could avoid the second pass if you wanted to, for sure. All right, yeah, then we do the constant equals new set and all that other fun stuff inside the increment function.
+
+[00:04:08]
+Okay, so again, coming back to this theme, traverse input, generate output. So this was the naming resolution step that we added in between parsing and code gen. There is an optional additional thing that we can do here, which is, we can actually change the intermediate representation. So this is what's known as canonicalization.
+
+[00:04:24]
+And you basically, instead of just printing out the same parse tree and just being, yeah, we're gonna keep essentially the same input as before, except now we've got this new scope thing which may or may not be useful later on. Now we have a new thing called a canonical IR.
+
+[00:04:36]
+And basically, the canonical IR is essentially the same kinda thing as a parse tree. But it's been transformed in various ways that are gonna be useful to later stages of the compiler. So some examples of things we might do there is sometimes you do what's called string interning.
+
+[00:04:51]
+We saw there's a lot of identifiers that are coming up, a lot of strings. Doing lots of string comparisons can be way more expensive computationally than doing lots of integer comparisons. So string interning is a thing where, as you're going through the parse tree, every time you see an identifier, you basically put it in a hash map.
+
+[00:05:05]
+It's not really a hash map, but close enough, where you say, okay, I'm gonna go put this thing in the hash map and then get back a unique identifier that's an integer that represents that. And then now in my canonical IR, every time we would have had an identifier in the parse tree, now we just have an integer.
+
+[00:05:21]
+So that means that later on, in future stages of the compiler, when they're traversing that and doing all sorts of, did you have the same identifier here? We're doing those scope lookups, those can be integer lookups, rather than having to be entire string lookups. Obviously, there's a cost of doing the interning in the first place, but again, this is a trade off that some compilers will make.
+
+[00:05:39]
+So there's a bunch of stuff like that, another thing that will commonly happen is de-sugaring. So you'll have multiple different ways to represent something in the parse tree. And then you'll kind of condense that down and just eliminate some of those cases and be, okay, this one's just syntax trigger for that one.
+
+[00:05:52]
+So we're not gonna have two different canonical IR nodes for that, we're just gonna turn the one into the other and then that's it. And then we just have fewer cases in our switch statement in later stages of the IR. So again, not something we're gonna do in this workshop, but a good thing to be aware of.
+
+[00:06:07]
+Okay, so a summary of part 2, things we talked about. So first, we talked about declarations and lookups. So this is basically, you declare something that adds it to the scope set. And then lookups, later on, is when you are actually trying to answer the question, was it in the scope set at the top the time I was trying to do the lookup?
+
+[00:06:22]
+If not, it's naming, otherwise, you're all set. We talked about hoisting, which is where you want to do a lookup, essentially before the declaration. Yeah, like we said, typically for functions. And a way you can do this is just have an extra pass, just for functions. We're not gonna do that in this compiler, but is an important thing to know about, and there are other strategies you can do too.
+
+[00:06:41]
+And then finally, nested scopes, which is definitely something that basically every programming language needs to deal with. And this is where you are not just having a single scope set, but rather an entire array of them. And you're pushing new scopes, new sets onto that array, as we descend into more and more nested sets, and then popping them off as we exit those nested scopes.
+
+[00:06:59]
+And then every time we look through this, we have to go through every single one in the array to see, did anybody in our current scope actually have this thing declared? Because if so, then great, we will allow it, and if nobody had it declared, then that's the point at which we say naming error.
+
+[00:07:13]
+
+>> Speaker 3: How do we keep track of which scope was where between the two stages and two pass? Would we attach scoped tokens?
+>> Richard Feldman: How do we keep track of which scope is where? So in general, I would say that it's pretty uncommon to need to keep track of scope in subsequent phases.
+
+[00:07:31]
+The reason we're okay with doing a push here and a pop here, which is destructive and we're not really writing down which scope was which along the way, is that if you do wanna track that sort of thing, there are other arguably better ways to do it. So I mentioned canonicalization earlier, that's a way that if you want to keep track of things uniquely, and not necessarily which scope they went with, specifically, but rather which ones are semantically different.
+
+[00:07:53]
+A thing you can do in canonicalization, you can say, okay, not only am I going to store what was the integer that corresponds to the string for the identifier, but I can actually make that unique within a scope. So in other words, in four different scopes I have something called n, cuz I really like that variable name.
+
+[00:08:10]
+You could choose to have your canonical IR represent those as four different integers, even though they all map to the same name n. So if you wanted to track that and keep it along, that would be, I think, a more common way of doing that than actually trying to keep the scopes.
+
+[00:08:23]
+Largely because the information you would wanna get out of them is, these scopes can get big to be storing all that from one phase to the next if you really just need it for something straightforward like that.
+

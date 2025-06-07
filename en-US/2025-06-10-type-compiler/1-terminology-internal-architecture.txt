@@ -1,0 +1,66 @@
+[00:00:00]
+>> Richard Feldman: Some terminology we're going to use in this course. So as previously mentioned, there's assembler, which is basically low-level to low-level. So in this case, when I say low-level, I mean not intended to be human readable. Transpiler is high level to high level, that is something that's intended to be human readable, and that's what you get out the other side.
+
+[00:00:18]
+Interpreter is generating, whatever that output target is at runtime, and a compiler is taking it and generating the output at compile time, as opposed to when the program's running. Okay, in addition to spitting out output, another thing that modern compilers do is analysis, so this can include things like name checking.
+
+[00:00:36]
+So this would be like, I defined a variable and then I used it, good job. I used the variable and I never defined it, that's a naming error, that analysis can be done at compile time. This doesn't necessarily have anything to do with the output of the program.
+
+[00:00:49]
+As we're gonna see, you can just cut that step out if you want. But a lot of compilers actually rely on the assumption that the naming analysis has been done. And so, later stages of compilation are kind of assuming that. If there ever was any problem with the names, that they would have been sorted out by now or you would have gotten an error and not made it to this far.
+
+[00:01:06]
+Because if you can't have that assumption, it does make the later stages of the compiler more complicated to implement. So it's pretty common to see compilers that, if you have a naming error, you just won't see any type errors. And the reason for that is that, the compiler compiler was designed to be like, yeah, if there's any naming errors, let's just stop and make them fix that first.
+
+[00:01:25]
+Because otherwise, we would have to deal with the possibility of the names being wrong later in type checking and later, and we don't wanna deal with that, so we just stop. You don't have to do it that way, in the rock compiler, which is the language I've been building for several years now.
+
+[00:01:38]
+We do the hard thing [LAUGH] actually allow you to have naming errors and typing errors coexisting. Another is type checking, type inference, both of those are flavors of type analysis. You can get very, very fancy with this and very, very simple with this. This, course, is gonna be more on the simple side, [LAUGH] cuz we have limited time.
+
+[00:01:54]
+But rest assured, there's a very, deep rabbit hole, how far you can go with a fanciness of type checking. And then finally, optimization is very common analysis paths, this can work in one of two ways. One way is where the optimizer, well, the analysis runs and figures out some ways that your code could run better, and then it tells you what those things are, that would be like pure analysis.
+
+[00:02:13]
+So this is usually more like linters. So an example of this is in Rust, there's a linter called Clippy. Named after the famous, like Microsoft Office, [LAUGH] Clippy animated icon. And one of the things that I'll tell you about is like, hey, you're doing a clone, like a deep clone of this thing, and you don't need to be.
+
+[00:02:29]
+Definitely if you just took that clone out, your code would still work and it would run faster, so maybe you wanna take that out. But the much more common version of this is, it's doing the analysis, and then immediately applying the analysis to your code. And just changing what code it actually spits out the other side, based on heuristics and things that it's going to expect are going to make your code sort of run equivalently, hopefully.
+
+[00:02:51]
+Unless there's a bug or something like that, and such that the optimization is essentially harmless, but it makes your code run faster. So the former kind like the Clippy style is more about, you as the programmer, have more control, but it's also less convenient and way less powerful, much more common is the automated optimization.
+
+[00:03:06]
+We're not gonna do any optimization in this course, you could easily do a whole course on just on optimization. So for our purposes, we're just gonna focus on name resolution and type checking. Okay, so quick overview of the course. So basically, what we're going to be building over the course of this course is, a compiler for a small subset of JS, a very small subset of JS.
+
+[00:03:24]
+We're talking like you get strings, and numbers, and Booleans, and arrays of those and functions, and ternaries, and that's it [LAUGH]. We gave you plus and times for operators. So, that's such a big deal, and cons, okay? Cons to, so, yeah, very small subset of JS. And on top of that, it's actually an even smaller subset than that, because if we were building a production compiler for the subset I just described, it would be several times as long as what we are building.
+
+[00:03:52]
+Because we are omitting all sorts of edge cases and ergonomics, things that the programmer would want and so forth. Because again, the point of this is learning, so we're not trying to build a production grade compiler here. Obviously, no one wants that subset of JS anyway. The whole point of this is just to understand, what does it actually look like when you are building this part of a type checker, this part of naming resolution, or this part of a code generator at the end of the pipeline?
+
+[00:04:11]
+We're gonna build a real compiler, it's just not going to be an awesome compiler [LAUGH]. So we're actually gonna start with formatting, and you might think formatting that's prettier not a compiler at all. We'll see if it's the same thing by the end of the course, source code in, source code out, is it a transpiler?
+
+[00:04:31]
+Is prettier a transpiler? We'll see. So, we're gonna start with a name resolution after formatting. So the first section is gonna be, we're gonna build a very quick formatter. The main purpose of this is, I'm kind of intentionally hand waving away the first two steps of compilation, which are, well, parsing, you can just start with parsing.
+
+[00:04:47]
+You don't need to have a separate lexing or tokenizing step before that, but it's very common. The reason I'm skipping through that is that, Frontendmasters already has a course on interpreters, which goes into depth on that. So if you're curious about those stages of compilation, you can just totally go watch that course, and then learn about how lexicon and parsing works.
+
+[00:05:02]
+So my goal for this course is to kind of speed run through that very quickly and just kind of give a very hand wavy overview of how those work. And then move on to the stuff that we don't have any material for, which is these other things, formatting, name resolution and, of course, type inference.
+
+[00:05:16]
+Yeah, so we're not building TypeScript here, [LAUGH] to no one's surprise. And we're going to be using Hindley-Miller type inference. We'll talk a little bit more about that when we get to the type inference section. But it's a very famous type inference algorithm used by languages like Haskell and Elm and rock the language I'm making.
+
+[00:05:31]
+And, yeah, it's got a lot of nice properties, which we will talk more about when we get to that section. And then finally, the last step that we're going to do is WebAssembly generation, where we're actually going to take all of this stuff that we've used up at this point as inputs and then actually output some WebAssembly and get to see it run.
+
+[00:05:47]
+I will note, though that these are not evenly spaced, so formatting and name resolution are pretty quick early on. Most of what we're going to do today is the type inference part that's broken down into multiple sections, and then at the very end, we're just gonna have one section on the WebAssembly generation.
+
+[00:06:00]
+So, most of what we'll be doing today is type checking and type inference related.
+
