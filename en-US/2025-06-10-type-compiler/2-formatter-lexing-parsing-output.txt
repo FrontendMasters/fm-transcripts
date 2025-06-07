@@ -1,0 +1,236 @@
+[00:00:00]
+>> Richard Feldman: So in this section, we're gonna talk about Lexing, aka tokenization, also scanning, I've heard less commonly, parsing and formatting. Okay, so we'll start with Lexing. This is typically what most compilers will start out with. You don't have to start out this way, but it's so common that we're going to do it in this compiler and just talk very briefly about how it's done.
+
+[00:00:18]
+So here's the basic idea. We have some source code here. Let's say this is our source code. It says const x = 5. This is valid source code in our language. I forgot to mention earlier we support comments. And then we have a comment afterwards that says x = 5.
+
+[00:00:29]
+So the first thing that we're gonna do, and basically that every compiler does, is we've got this source code format. And it is really inconvenient to try to write a compiler on top of just source code. So let's try to get it into some other representation that is going to make our lives easier as compiler authors.
+
+[00:00:45]
+So the first thing that we do is we basically start marching through the string. And trying to find interesting they call them tokens basically little chunks of text that are sort of semantically interesting to us, that we can make a nice tree out of. Eventually, when we get to parsing, and then we can traverse that tree and do our analysis in a much more nicely semantic way.
+
+[00:01:01]
+So C, O, N, S, T, that's what our lexer sees and says, I know what that is. This is a const token. So this is how we would represent that in our language. You just make a JavaScript record object. By the way, the compiler is going to be written in JavaScript, the compiler subset of JavaScript.
+
+[00:01:16]
+So we would have an object here, and we have a field called type. And the type is going to be constant all caps. The reason I put these in all caps is just to kind of indicate that like, hey, these are tokens. These are not like the actual syntax, so you can kind of tell when you see the all caps thing that means, this is like the name of the token as opposed to the actual syntax.
+
+[00:01:34]
+We could have named the same thing. We could have said I am a const thing whatever. This is regerring to that but not actuallly coming from the source. The value for this is null. We'll see later on, actually immediately after this. Some tokens have a value associated with them.
+
+[00:01:49]
+For example, this token has a value of x associated with it and then position here is basically where in the original file can this be found like, in the actual source code. This comes up for things like error messages. If you wanna Print out nice, helpful error messages to your users.
+
+[00:02:03]
+People generally want to know okay, but where in the source code is that? You could be like, I found a Type error. And you're like, where? Where was the type error? You're like, it's a string and it was supposed to be a number. You got to guess where.
+
+[00:02:12]
+So, yeah, if you want to be able to give people nice error messages, you really got to propagate through the subsequent steps of compilation where the actual source code position is. This is not something I'm going to show on every slide, because it gets kind of tedious to have like position all over the place.
+
+[00:02:27]
+But just keep in mind that in a real production grade compiler, we would be basically propagating the original source code position of things like all the way through. Starting from tokenization all the way through, pretty much the entire pipeline. Anything that could possibly give a user an error at compile time is going to be connected back to the source code if you wanna be able to show them the source code.
+
+[00:02:45]
+All right, so the next token, our lecture's gonna see it. It's like, all right, we got the cons, great. We parsed pass or sorry, skipped pass whatever white space was there. And now we found this thing called X. It's not a keyword. It's not equal sign. It's not a number.
+
+[00:02:56]
+Okay, this must be an identifier. So identifier is basically a general term for something that's sort of the user came up with it. So either it could be a variable like this, or it could be a function argument name, or it could be a function name, could even be a field.
+
+[00:03:11]
+Some languages will or will not have separate tokens for fields and objects with the colon after them versus just identifiers outside that. In our case, we're not even supporting objects, so we don't have that problem to think about, so unlike the const one, this one actually does have a value because there are different types of identifiers.
+
+[00:03:27]
+The whole point of them is that they're sort of coming from user space. This is something that the user typed in. They could of put x or y or z or whatever else you want. And so we want to store that in our actual token, but a lot of tokens such as equals, don't have anything to store so for those we just say value null.
+
+[00:03:41]
+And notice that the position keeps moving up, right? We're now eight characters into our source code. Some compilers will store this as like a line and column numbers. One reason to do that is that, well, a that can be nice for if you're printing out on the command line, but also that's what like language server protocol expects is like line and column numbers.
+
+[00:04:00]
+Unfortunately, it expects them like you UTF-16 format, which is really annoying because everybody wants to use UTF-8 for their source code encoding. But you also can do it as just as writing down the index of however many bytes or characters you are in. That also works and you can convert to line and column later on if you want to just by kind of doing a very quick rescan for new lines.
+
+[00:04:21]
+Basically, that's what zigs compiler does, for example. And then finally, we have a number five. So this is not an identifier, although it does come from the user space. We actually do this is also very common. Do some sort of analysis to look at the shape of this user provided thing that's not a keyword or an equals or whatever.
+
+[00:04:38]
+You're like, okay, wait this looks like a number literal to us. So it's useful to us later on to make that distinction. So you may have noticed that basically no programming languages will allow you to start a variable, name with a number. I'm sure there are they exist, but one of the reasons for this is that it's very, very convenient.
+
+[00:04:57]
+And also good for performance if when you're doing the lexing stage, you can be like, if I see something that starts with a number. Great, this is a number. I don't need to be like, well, wait a minute, wait a minute, wait a minute. What might have been, it might have been a really funky variable name, let's just hang on.
+
+[00:05:09]
+Really a lot nicer, if you can just go, yeah, no, that's a number. I saw I see a digit, it's a number and then finally, we have a comment. So a lot of compilers, and especially teaching compilers we're building a sort of a toy compiler here. We'll just discard comments at this stage and we'll just throw them away.
+
+[00:05:25]
+We are not gonna do that because we are building a formatter and if you're building a formatter, you need to keep the comments. If you throw them away, then they don't get formatted, they just get thrown in the garbage, which is really bad for a formatter. But good news, you can just keep them.
+
+[00:05:38]
+So when you are building a compiler that wants to share code with a formatter. Lots of formatters have a totally separate they do their own lexing and their own parsing or whatever. But if you want to share code with your compiler for example, Zig and Rock both have formatters built in to the compiler itself.
+
+[00:05:54]
+And it's just like using exactly the same code. What they will do is they will take these comments and either store them as tokens like this. And then later on when you're doing the type checking and stuff just be like, It's a comment. Just skip over it, ignore it and then the format is like, don't skip over.
+
+[00:06:08]
+Actually, I want to keep that or you can sort of store them out of band. In other words, you have this sort of separate array of like this is where all the comments are. Here's all the line and count column numbers of the comments are and then that way, your analysis stages don't even see these tokens coming through.
+
+[00:06:23]
+But the formatter has a way to sort of go out of its way to go get them. The information's still there, but it's not necessarily it's in a way that's like a little bit less convenient for the formatter, but more convenient for all the other types of things that the compiler does.
+
+[00:06:36]
+Okay, which brings us to the actual concept of formatting. The basic idea behind formatting is that we are going to start with some sort of representation in code, some sort of structure, and then go from that structure back out to string. So here's an example of doing this with tokens.
+
+[00:06:54]
+So tokens are a totally reasonable way to do this, but we are going to see another way to do that and some reasons you might want to do it with something other than tokens in a second. But let's just run with tokens for now. So we've got our const token, and we're like, okay, we have lexed that or tokenized that out of the original source code, and now we want to being a formatter.
+
+[00:07:11]
+We want to print that back out. So what string should we print out when we have this as our token? Anyone? C, O, N, S, T, just exactly what we got in right with a space after it. So that's it, it's as simple as that. We got the keyword, we translated into this format, and now we're translating it into the output.
+
+[00:07:29]
+And the output, what we want is to end up with is a .js file. So it's like, yeah, I see a C-O-N-S-T, boom, we're just gonna turn that back into the source code string, and just push that onto our running tally of strings that we're gonna output. Yeah.
+
+[00:07:42]
+
+>> Speaker 2: The subtle distinction Here is we're effectively moving between a type and the formatting of the type. Is that fair?
+>> Richard Feldman: So I would say that the main distinction here is that this is the object that we've created for ourselves. And we're just gonna be iterating over a whole big, long list of these that we made.
+
+[00:08:01]
+And we made that from the source code but now that's what we're working with. So we're no longer looking at the original source code. We're just looking at these tokens that we made, and then for each token, you basically have a giant switch statement that's like, okay, I see that we got a const token.
+
+[00:08:12]
+And then maybe after that we get the identifier that says x. We're like, well, I want to put that back in the source code, so I'll just stick an X in there, and okay. And then we get another token that comes in. It's like, this is an equals.
+
+[00:08:23]
+Okay, well, let's take an equals in there, and you we kind of proceed through all the tokens that we just grabbed. And in our big switch statement okay, now it's the number, it's the number 5, put it there. And here's the comment, put the comment there. Now that might seem like we didn't really do anything, because it's like we had it in source code string.
+
+[00:08:40]
+And then we turned it into the tokens, and then we turned the tokens back into the exactly identical source code string. What was the point of all that? Well, of course, if you already have source code that is precisely formatted the way the formatter wants to format it, it doesn't do anything.
+
+[00:08:54]
+And that's kind of desirable. But if you had a bunch of spaces in here, the fact that we were able to go through and grab these tokens and identify like. This is a const like, and we got all the space around it and just discarded the spaces and kept the token, and turn this into a token with all of ther space, etc.
+
+[00:09:09]
+Then we turn those tokens back into this, hey, it's reformatted. So this is essentially how the formatter does its job and provide its value. [LAUGH] It's just by taking source code, turn it into tokens, or another representational we'll see in a second, and then turning that back into a string.
+
+[00:09:25]
+So now let's talk very briefly about formatting new lines. So a thing that I've seen in some formatters, which I really enjoy, is in a language that supports trailing new lines. A way that you can specify that you would like the formatter to use a multi-line versus a single-line style, is by including or omitting trailing comma.
+
+[00:09:43]
+So in this case, we have the trailing comma which is kind of what is usually the accepted style for multiline JavaScript objects. And then if you have a single line one, it would look weird if you had a trailing comma there after this one. So if you don't have the trailing comma, you're signaling to the formatter, yeah, please format this single line.
+
+[00:10:00]
+And if you do have the trailing comma, then you're signaling to the formatter, I want this to be formatted multi line. Cool, okay. Now here's the problem. If we're working in terms of tokens, how do we know back before we could possibly have seen the trailing comma, that it was time to go in multi line mode.
+
+[00:10:17]
+Like in the previous example, as we went through the tokens, we were just building up that string, just one thing after another. But that wouldn't work well here because if we did that, we'd be coming along where like, I see an open curly brace token, I see an a, I'll put that in there.
+
+[00:10:30]
+I see a 1, I'll put that in there, etc. Then I come along and I see this trailing comma no. I needed way more newlines back there and indentation that I just totally didn't do because I didn't know it until I got later in the tokens. So a way that you can deal with this is instead of doing it in terms of just raw tokens, is you can take the next step in our compilation pipeline and turn those tokens into a parse tree.
+
+[00:10:53]
+There's different names to this. Another common was abstract syntax tree or AST for short. I like parse tree because it's the thing that the parser makes. So I'm going to use parse tree for this workshop, but you ever hear people talking about ASTs or EPS X abstract syntax trees.
+
+[00:11:05]
+They're talking about parse trees, same idea. Okay, so here is the token representation of this. So we saw a second ago, I'm going to sort of like do a little condensed format, like not write out the entire object, some sizzle shorthand notation. So I don't have to try to cram all those curly braces on the slide, but basically, it was Const identifier equals number and comment.
+
+[00:11:25]
+That was the important stuff, the information that's in the tokens. Now, if we discard the comment and then we're like, okay, let's consider everything but the comment, here is how that could look in a parse tree node. So a parse tree is a tree. The token's just a flat, array.
+
+[00:11:43]
+It's like a long sequence of them but the whole point of the parse tree is that you're now representing your code as an actual tree. There's nesting going on, and that nesting is going to be useful for us when we're trying to figure out what's multi line and what's not.
+
+[00:11:55]
+So here, we would say, rather than const and identifier being two separate tokens in the parse tree, we're going to choose to say we have a type of this parse tree node. And the type is this is a constant declaration or ConstDecl for short. Decl is a very common abbreviation that you'll see in compilers for short for declaration 'cause that's a long word.
+
+[00:12:13]
+And then we will have an ID field that basically says, this is the particular identifier that this constant declaration is named. Then we're gonna have a value for the constant declaration that's being basically what comes after the equals, and this is where the nesting begins. So at this point, we basically say everything after the equals is another parse tree node.
+
+[00:12:29]
+And so in our case, that's going to be a parser node that's a little bit simpler. It's just called a type number and the value of 5. You can imagine that you could get this nesting going arbitrarily long. If you wanted to you could very well have instead of a number here in like.
+
+[00:12:42]
+Actual JavaScript, you could have an object which has multiple fields in it, and then each of those fields has an array, and each of those arrays has another object. You could get the nesting really, really deep here. But the point is that no matter how deep the nesting gets, you do actually get to keep that structure in memory.
+
+[00:12:57]
+You do actually get to traverse this and manipulate it however you want, whereas the tokens are really not conducive to that kind of nesting. The tokens are just a flat array. And so if we want to do the type of analysis that we're doing with the multiline or not, it's much more convenient to have it in a tree form than to have it in the like.
+
+[00:13:16]
+I have a big flat array and if I get to a point and realize I've made a mistake, I have to know exactly where in the array to jump back to be able to do analysis, okay. So this is our parse tree node. And basically this is a good answer to the question of, like, how do we know back here that we wanted to do multi line mode?
+
+[00:13:33]
+So essentially, what you can do is, if you want to be keeping this metadata around, just like we did with the comments. You can just record that in the parse tree node, like as you're going along and seeing the tokens, you start off with is multi-line false by default.
+
+[00:13:46]
+And then as soon as you hit this trailing comma, you're like, well, I'm in the middle of this node. I'll just flip that to true and we're all set. And now that's just a very, very quick, easy operation to do. You don't need to do any backtracking at all.
+
+[00:13:57]
+And then later when you come through and traverse the parse tree, instead of traversing the tokens to do your formatting. Now you just have that right there on the node right when you encounter it. So essentially the pipeline that we built up to here, originally we had our source string and then we converted it to tokens.
+
+[00:14:13]
+Then we took our tokens and coverted that to a parse tree. So notice that when we made the parse tree, we just look at the tokens. We didn't need to go all the way back to the source string. We were able to just say like, well, I can translate this concert followed by this identifier.
+
+[00:14:27]
+Followed by this yadda, yadda directly into the parse tree node without having to go ask the source string for any info. And then finally, we can go from the parse tree to the output string and then when you've completed our formatting job. This is a theme that we're going to see throughout the workshop of you got your input and you turn that into an output.
+
+[00:14:44]
+And then you take that previous output and use that as the input to the next thing. And then that output turns into a different output, and so on and so forth. This thing happens to be called lexing or tokenization, or I've occasionally heard scanning. This is usually called parsing.
+
+[00:14:57]
+That's pretty much the common name for this and this is often called code gen, short for code generation. And again you'll find this in all sorts of different compilers. It's not only a theme in this course that we're going to be doing all these like translating from one intermediate representation to another.
+
+[00:15:12]
+This is also how modern compilers do it. Production grade compilers do it very, very common. Now let's just go indulge me in a small tangent. Let's say we built our formatter, and we've decided we're going to go a little bit rogue with our formatter. We're going to do something that formatters are not supposed to do.
+
+[00:15:28]
+We've decided to do it anyway. Our format is going to introduce syntax sugar. So we're basically saying, not only is this a formatter for JavaScript, but also, if you want x+++, not enough, we want x+++ support, so you can have three pluses in this formatter. Is it a formatter still?
+
+[00:15:44]
+Who knows, but we decided to do this. Let's indulge me and pretend we decided we want our formatter to allow you to write x+++ and it'll accept it. So here will be the tokens we would see if we were scanning along, we see, okay, there's the identifier x, there's PLUS there's PLUS and another PLUS.
+
+[00:16:02]
+Then we would translate that into a node in the parse tree. Now we could just make up a new parse tree node for this. We could say every time I see this combination of tokens, I'm going to make a new parse tree node that's called PlusPlusPlus. And it stores the identifier that's doing the plus, plus, plus on, and that's how it works.
+
+[00:16:19]
+We could do that. And at that point, we could say, well, I can take my parse tree and just do co generation on that parse tree to output string, just like I did before. And instead of just having my giant switch statement that's got, my const decals and whatnot, I just add one more case to it, saying okay.
+
+[00:16:35]
+If I see one of these PlusPlusPlus things, then I'm gonna put that in the output string. But of course, you can't put x+++ directly into the output string because that's not a thing in JavaScript and if you did that, you would have broken JavaScript. That's why it's syntax sugar.
+
+[00:16:48]
+What we can do is we can just say, well, no, I'm just I'm not going to put x+++ out whenever I see one of these nodes, I'm just going to emit this in my format. I'm going to just write out the output. JavaScript is going to x = x +2.
+
+[00:17:01]
+Now at this point, we're not formatter anymore. We are doing more than just formatting your source code. We are actually allowing new forms of syntax and then emitting something that's different from that, not just in formatting, but it actually just is something different. We've basically now turned into a transpiler.
+
+[00:17:16]
+Now here's the interesting thing, that's not a big change. Almost all of the work that we're doing here is exactly the same. We just added like one more case to the stage of going from tokens to parse tree. And then we added one case to going from parse tree to output string and suddenly we're a transpiler.
+
+[00:17:34]
+So this is why I wanted to start off with formatting. You might think that like making a transpiler is like a big, scary whoa, that's like a huge project. It's like not that much bigger than a format. Formatter is not that big of a project like you now know everything you know need to know to make syntax sugar in whatever language you know.
+
+[00:17:49]
+It's just that's it. You can make a formatter, and making a formatter isn't that much harder than just like doing the like lexing and parsing stuff. Then you can make a transpiler, as long as you're okay with only doing syntax sugar. And you might think, well, who would bother to do that?
+
+[00:18:03]
+Well, let me tell you about language called coffee script, which at one point was the 11th most popular language on Github at the peak of its popularity. Which was granted a very small single digit number of year window. But this was the kind of stuff that Coffeescript did.
+
+[00:18:16]
+It was basically like a language that compiled to Javascript without really changing the semantics. Mostly it just had different syntax and you can go look at the copy of source code, and you're gonna see this same kind of stuff. It really doesn't look a whole lot different than a formatter in a lot of ways.
+
+[00:18:31]
+Just doing some syntax, sure. Okay, so I mentioned that this is gonna be a theme in the course, and I wanna emphasize this again, like traversing the input and generating output is something that compilers love to do. Source string to tokens, tokens, parse tree, parse tree to output string, lexing, parsing code gen this is what we're doing right now.
+
+[00:18:51]
+And over the course of the workshop, we're going to add more and more steps in here, like we're going to get some name resolution in there. We're going to get some type checking in there, multiple different stages of analysis at the end of the day, that's pretty much what they're all doing is like.
+
+[00:19:02]
+Just take some source in Intermediate representation and create another one along the way, and at the end of the day, you get your output. Okay, so to summarize all the stuff we talked about in part one, we start off by talking about lexing, which is where you start off with your raw input source code, string.
+
+[00:19:17]
+And you output tokens, also known as tokenization or scanning. We talked about parsing, which is where you create your parse tree nodes or. Also known as abstract syntax tree nodes or AST nodes and this is where you're starting with the tokens that you got in the previous step rather than going to the source code.
+
+[00:19:31]
+You're disregarding the source code at this point, but you are still threading through that position so that when you give the error messages. You're still able to connect it all the way back to the original source code. And then we talked about formatting where your input is the parse tree node or as we saw, depending on your design, you may or may not have a need for the parseTreeNode information.
+
+[00:19:49]
+Maybe you can just do it with tokens. And then you're outputting the actual string.
+

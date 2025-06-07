@@ -1,0 +1,174 @@
+[00:00:00]
+>> Richard Feldman: Cool, all right, so let's talk about Inferring Constants. So this is the most basic type of inference we can do, but it's already gonna be something useful. So let's say we say const a = hi, and then const b = a, and const c = b. Nothing but constants, very straightforward, and I guess one string literal.
+
+[00:00:15]
+Very straightforward, but of course, it would be quite nice to be able to say, I would like to infer that c is a string, even though c is just referring to b, which is referring to a, and then a is the one that actually was a string. So in order to do this correctly, in order to be able to have our compiler understand that c's type is string, it needs to be able to sort of thread this through.
+
+[00:00:33]
+It needs to be able to understand that the implication of c being b, and b being a, and a being a string is that through the transitive property, c should also be a string. So it's easy enough for us as a human to just look at that and be like, yeah, obviously.
+
+[00:00:44]
+But this is a compiler, we need to actually teach it how to do this. So here's what we're gonna do. I'm gonna call what we're gonna use here a types database. Different people call this different things, probably the most correct name for this is a union find data structure.
+
+[00:00:58]
+Union find sounds like a verb, I always thought it was a really weird name for data structure, so I'm not gonna call it that in this course. I think types database is a much more helpful way to understand it, because basically, what we're making is a key value store.
+
+[00:01:10]
+The key is an ID or a type variable, I'm using those terms interchangeably, and then the value is the actual type of that variable. So that's what we're gonna call it. But if you ever hear about people talking about union find or there's various different terms that people use for this thing, like substitution table.
+
+[00:01:26]
+Then basically, at the end of the day, conceptually, I think a types database is the most useful way to think about it. Okay, so basically, what we're gonna do first is we're gonna say, okay, we got our types database and there's nothing in it right now. So the first thing we're gonna do is we're gonna go through and assign type variables to all of the interesting nodes in our parse tree.
+
+[00:01:45]
+Now, when I say interesting nodes, what I mean is we don't really care about the equals, that's not really a relevant part of this. When you have curly braces, that's relevant for scope, but it's not really relevant for types. For our purposes, the things that are relevant here are a, b, c.
+
+[00:01:58]
+So a is gonna get an ID of 0, that we're just gonna go through and assign it, and say, all right, 0, it's a null at first. So initially, we're gonna initialize all these in the database to just have null for their type because we don't know anything about them yet.
+
+[00:02:12]
+And I'm gonna go through and refine that. So basically, hi is going to get its own entry in the database. You might think, but who cares? Obviously, it's a string, we don't need to bother putting it in the database. But it actually is useful to have its own entry because quite a lot of the operations that we're doing are going to be done in terms of database IDs.
+
+[00:02:31]
+And so just having an id for this thing, even though we know it's going to end up being a string is useful. So we'll set it as null then immediately set it to a string later. So that's gonna be high. Then we have b, which is also gonna be null, const b, c is null, and we're all set.
+
+[00:02:45]
+Okay, so this is the initial population of our database. We're gonna sort of forget about c being special or sort of like our goal for now. At this point, we're just gonna focus on getting the database in the state that we want so that we can answer questions.
+
+[00:02:57]
+And then one of the questions that we might choose to ask is what is the type of c? All right, so for right now, everything is just null. All we've done is just gone through and just assigned these IDs to these things. I do wanna note that in the parse tree, it is actually useful to write down the ID that corresponds to this database.
+
+[00:03:15]
+So in our const deco right here, we would say, okay, the ID that goes with the identifier of a is gonna be 0. And then also the ID that goes with the expression is gonna be 1 and we would do that for all of these. Now the reason we wanna do this is that it is quite common that, especially if you're going to machine code or in our case to web assembly.
+
+[00:03:32]
+That once you get all the way through type checking and you get onto code generation, you actually need to know the types of things. And we'll see an example of where it becomes important that if you throw that information away and don't have it connected back to the parse tree.
+
+[00:03:45]
+It's very similar to the downside of not having your original source code positions connected except whereas that's a problem if you're trying to report errors and you can't connect them back to the source. In this case it's even more serious, which is that if you wanna actually run the program and you're doing ahead of time compilation.
+
+[00:04:00]
+Not having the type information at the final stage of code generation means that there's just some things you just cannot actually generate the code for, which is a much more important problem. Okay, so now we've assigned these type variables. The next thing we're gonna do is we're gonna assign some type relationships between these two.
+
+[00:04:15]
+So what do I mean by relationships? Well, we know that there's a relationship between this const a and the thing that it's assigned to, namely, that is essentially a symlink. It's like whatever the type is of the other side of this equal sign. I don't necessarily know what it is yet.
+
+[00:04:30]
+At this point, if I looked at it, I asked you right now, drop everything and tell me exactly what is it Id 1 in this database. It would be like null, I'm like, well, that's not helpful. But this is not about what is it at this exact moment when I'm doing the type checking?
+
+[00:04:41]
+The important part is that these two are related. So as we go through the type-checking process, we're gonna learn more about these other ids. We're gonna learn things through inference of looking at what's the shape of them. And also what are their relationships to other things, our understanding of the types of the program is sort of going to evolve.
+
+[00:04:58]
+And that's why I like to call this a database. It's just like a database in that it changes constantly as we're going through and doing these things. So the important thing that we wanna write down when we're changing this from null to something else is what I like to think of, again, this is my terminology.
+
+[00:05:10]
+This is not what you'll find in like compiler literature, but I like to call this a symlink. We're basically saying Id 0 is symlinked to Id 1. Which basically means that anytime we ask Id 0, hey, what's your value, it's gonna say, I don't know, go ask 1.
+
+[00:05:23]
+Whatever one's value is, that's what my value is, and that's how we're sorta making this link. Now the term link is definitely something you'll find in compiler literature, but symlink to me is, I don't know, a little bit more like [LAUGH] relatable. So these two are now basically connected.
+
+[00:05:35]
+We have said there's a relationship between a and hi, which is that anytime you ask what a is, or you ask what ID 0 is, the answer you're gonna get is, I don't know, go ask I did number 1. Okay, now moving on through our parse tree. So we've completed that part of our parse tree node.
+
+[00:05:51]
+Next up is this thing, and again, was null. This is the part where we say, okay, what type are you? You're a string literal. I bet you're a string. [LAUGH] Just write that down directly. There's no need for a relationship here or anything like that, some compilers will actually, again, because it's so common to have writing functions in terms of IDs, will actually have.
+
+[00:06:11]
+For example a set of hard-coded ids for string literals and number literals and stuff like that. It's like, yeah, they're all the same type, but I just want an ID so I can work in terms of IDs. And so in that scenario, you might see a SimLink off to some like hard coded one of those, or if you don't care about performance, which might be what we're doing in the exercises.
+
+[00:06:28]
+Then you might go a step further and say like, I'm gonna make a brand new one of these every single time I want to do this and like make the ID like SimLink to that. But that's just kind of, you would never do that in a production. It's just really wasteful.
+
+[00:06:40]
+But it is pretty common to have just l a hard coded list of okay, you got string for string literals and number for number literals, blah, blah, blah, blah. And they all have hardcoded Ids that I know about, and I can just sim link directly to those whenever I encounter one of those in my code, yeah.
+
+[00:06:52]
+Are those generally referred to as the primitives of your language? There's different names, I've had primitives, there's like, primary expressions, there's a couple of relate names to them. I do like primitives personally, but yeah, lot of noise can go with that. So moving on with our relationship. So next we're on to be here and now, an important thing to note here is that at this point, when we're saying, what is b sort of simlink to you?
+
+[00:07:18]
+We have a more direct answer than just saying like b assembling to like whoever's in this slot, because we actually know exactly what a's id is, it's 0. And we can know that using exactly the same strategy that we learned in the previous section using scopes. This naming resolution right here is pretty much the same algorithm that we went through previously, except now we're doing it in terms of types rather than in terms of, name declarations.
+
+[00:07:45]
+So you can imagine that as we're going along here, we could have a scope set, just like we did previously, and say that we're going to put a in the scope set, but it's not just gonna be a set. It's actually gonna be a map. And that map is gonna say, if I go ask you what's the value of a, I'm not just gonna say yes or no, a is in scope.
+
+[00:08:04]
+I'm actually gonna take it a step further and say, you know what the value of a is? It's 0 right here. A is associated with that ID of 0, which means that as we're traversing these parse tree nodes, when we see an a in the lookup position, so it's not a declaration, this is a lookup, we're saying like what is a?
+
+[00:08:19]
+I can answer that question. First of all, a was already defined. Remember how I said it's really convenient to already know that these are all going to be defined and I'd have to deal with them right here, that's exactly why. If we didn't have that naming step, then when we got here, we would have to be like, well, now we have to handle the possibility in the middle of type checking that this thing was not already declared.
+
+[00:08:39]
+But thankfully, in our compiler, we halt before that would have happened. So we know that this is going to work and we also know in this particular example that when I go and ask the scope, hey, what is the current value of a in the scope? It's gonna say, a, that's type ID 0.
+
+[00:08:53]
+So there's no need for a more special formal relationship here. I can just basically directly say look, b is just simply straight to 0. So even though this one is we're simply to the other thing, whatever's on the other side of me, it's well, I already have an ID for the thing on the other side of me.
+
+[00:09:07]
+So I'm just going to send link directly to that. Basically the same story with c. So when we get to c we're okay, what is c gonna be similar to? And c is, well, the other side of this is something that we also have in scope, namely b, so I'm just gonna symlink directly to that.
+
+[00:09:21]
+Okay, so now we have populated our database. We have assigned all the type relationships. We've said that zero, which is a back here, like const a, that is basically, hey, I don't know what my type is. Go ask 1, 1 is like, I'm a string. If you go ask const b what its type is, it's gonna say it's I'm some link to 0.
+
+[00:09:38]
+So that's a, we can sort of draw this out visually and say if we're gonna go back to our original goal here. Which is we wanna infer that c is a string, the way that we can do that is say, okay, well, first off, what is c's type ID.
+
+[00:09:50]
+And, okay, c is type ID 3. Well, that's right here in our database table. So we go ask our types database, what in fact is the current type of c? And it says, well, I'm whatever 2 is. So then we go and ask 2, okay, what are you?
+
+[00:10:05]
+And 2 says, I'm whatever 0 is. And we say, okay, what is 0? And it says, I'm whatever 1 is. Then we go to 1, and it says, I'm a string. So we did it. [LAUGH] That's the answer. [LAUGH] Several hops later, we have gone all the way from initially saying a equals high, b equals a, c equals b.
+
+[00:10:21]
+What is the type of c? To answering that question through our database with c as a string. Hooray, type inference on a very basic level. Okay, so to kind of like recap what we have done to get up to this point. So the first thing we did was we did our tokenization phase.
+
+[00:10:36]
+And that was where we started with a string and we're just like, cool, let me make some tokens. The tokens kind of look like this in memory representation. We have an object with like type as const, the value is null because there's no particular payload to this token, its position is zero, we're just writing that down for error messages.
+
+[00:10:51]
+Then we get another token that's like an identifier. Its value is a, position is 6, that's etc. Then we turn that stream of tokens into parse tree nodes which are nested. And so then we get things like this const declaration, which has the ID of a and then a value, the type of string and a value of hi.
+
+[00:11:07]
+And then now what we're doing is we're actually sort of annotating the parse tree nodes. We're expanding them, we're giving them a little bit more information by making these into typed parse tree nodes. And this is that initial step that I talked about, when we're going through and just handing out IDs to everyone, we just write down what is your type ID?
+
+[00:11:24]
+And at that stage, they were all null. So when we're going through the tree nodes and saying you get a typeId of zero, and you get a typeId of 1, etc, you Initially, that's not even useful information. It's like, yeah, your type id is 0, if I go look at the database it's null, how useful was that?
+
+[00:11:40]
+Well, the answer is it's quite useful if you are about to do is to go populate all those database tables, database rose by traversing the first three nodes and assigning relationships between them. Worth noting that you don't have to do this type ID assignment stage in type checking.
+
+[00:12:01]
+So I mentioned earlier that when you're finished with parsing and you're moving on to name resolution. You could do this canonicalization thing where there's some extra information you can put in there. In Rocks Compile, this is actually where we do this. So in the parse tree nodes, we don't have any type typeIds.
+
+[00:12:15]
+And then when we translate from parse tree nodes to canonical node, which do the string and turning and the name resolution. One of the other things we do during canonization is that we add these, we go through and assign type variables to everybody so that they can look them up later.
+
+[00:12:27]
+And so why do we actually need this? Right now we don't. Much like with the position that we saw earlier, I've mentioned that we write this down and it is useful in various scenarios, but none of the scenarios we've seen so far are actually making use of it.
+
+[00:12:44]
+We're just kind of writing it down and mentioning it, but not actually getting any value out of it. I would say this is in the same boat right now and that we're writing it down and I wanna note that we're writing it down. But we're not actually gonna make use of this until the very last section of the course, that's the part where we once again, will traverse these nodes, and then we're going to spit out WebAssembly.
+
+[00:13:01]
+And WebAssembly actually cares about what is the final concrete type of these things. And there are some things like string literals where we just know it's very obvious. But there's also some things where if we haven't already connected the type information back to the node, we see the node, and we're like, I don't know what to tell you why that suddenly you need to type, but I don't know what the type is and this is how we get that.
+
+[00:13:19]
+This way back at the very beginning of, [LAUGH] outside members. And then so from this type first three notes which had these ids connected to things they disable. We basically went through and assigned relationships until we ended up with this much more useful populated table. And the only way that we did this was just by traversing these parse tree nodes and just being like, okay, what are you?
+
+[00:13:39]
+You're a const echo, and here is your ID, and then here's the thing that you're assigned to, and here's the idea of that thing, and yada yada. And so if you were wondering what is the like? Literally, what does the code look like that actually does this? Basically you can implement this database as just an array in JavaScript.
+
+[00:13:57]
+That's totally acceptable and that's, in fact, what we're going to do in the exercises. So you literally can say when I'm coming along here, like DB bracket zero, I'm just initializing these slots in the array to null, and that's all the ceremony there is to it. So when I say types database, I mean kind of like an array.
+
+[00:14:12]
+We're not talking like PostgreSQL or anything like that. As far as representing the sim links versus concrete types, again, I'm trying to go for a pretty simple representation here. So what we'll see in the exercise is that I literally use the term symlink to talk about like, what is this?
+
+[00:14:26]
+Don't ask me, go ask ID number one. So that's just an object of what says symlink:1. And then if it's not a symlink, if it's a concrete type, then we actually use the term concrete and then say what its concrete type is. This primitive type is another word for that.
+
+[00:14:41]
+I use the term concrete basically to sort of contrast it with symlink. So symlink is sort of like, I don't know, go ask this thing. Concrete type is like, we know the answer, the answer is this, exactly this thing. It's a string for sure, it's a number for sure, it's a Boolean, etc.
+
+[00:14:56]
+And then, yeah, more and more symlinks there.
+

@@ -1,0 +1,87 @@
+[00:00:00]
+>> Richard Feldman: So I did say that I was gonna mention a little bit about generating polymorphic functions, so let's sort of talk through that real quick. So a Bool is 1 byte in memory and a Number is 8 bytes in memory. This is true in most languages. Actually, in WebAssembly, it's a little bit different.
+
+[00:00:13]
+For kind of some strange [LAUGH] design reasons, they don't support things as small as 1 byte. But in most programming languages, a Bool is 1 byte, and a Number is 8 bytes. This affects Array<Bool> and Array<Number>, like, for example, let's suppose I wanted to implement a function called push.
+
+[00:00:29]
+And I'm just using the TypeScript syntax for this to say this is a generic type parameter. Basically, it's like, give me an array, and that is an array of T, whatever T is, the T is a type variable. I'm not saying exactly what it is, I can push numbers, I can push strings, I can push booleans.
+
+[00:00:44]
+Then you, of course, need to give me the actual thing to push. Now, the problem with this is, knowing what we just learned about WebAssembly, where you have to be very, very specific about, this is the operation. It's 64-bit floating point integer. So this is exactly this, it's exactly this much memory, the array elements need to take up exactly this much space.
+
+[00:01:03]
+What do you do when you have a function that's polymorphic and yet you have potentially different arguments that are like, they just are different sizes? That's just a true thing about them in the world, how do you deal with that when you're asked to write machine code that is only dealing with one size?
+
+[00:01:20]
+So, I mean, I guess you could sort of, bottom line is basically like, yeah, push is supposed to add onto the end of the array. Tell me, WebAssembly programmer, how many bytes would you like me to add to the end of your array? And the answer can't just be T, that's not a number.
+
+[00:01:33]
+You gotta pick, is it 1 byte? Is 8 bytes? Is it 4 bytes? And the answer varies based on who's calling push. So, there are a couple of different ways to do this, but really they boil down to two that are more popular than really anything else. So the first one is hidden runtime data.
+
+[00:01:50]
+Sometimes people will call this dictionary parsing, although that also sometimes has to do with other forms of polymorphism, like ad hoc polymorphism, but it can be used for this too. Basically what this means is, we're gonna pay a runtime cost in the form of extra memory that goes along with some combination of the function itself.
+
+[00:02:08]
+That's being passed to the function, and/or follows the data structure around that just is like, hey, I made bytes big. And then the function's like, hey, when you get passed in, I need to see that little extra piece of metadata that you've got that says how many bytes you are.
+
+[00:02:20]
+So I know how many bytes I need to push onto the end of this array for you. So basically, if this works, whenever we call push with a different type for T, we also pass we being the compiler author. We don't make the programmer deal with this. We're just sort of like, yeah, when we're generating the WebAssembly byte code, or if we're compiling the JavaScript, when we join the JavaScript code, we're just gonna pass that information along.
+
+[00:02:42]
+There's just gonna be an extra argument that function, then you'd know about. As the user, you don't see that thing. What we can do when we're in the code generation step is we can just sneak things in. We can code generate whatever we want, it doesn't have to have anything to do with what you wrote.
+
+[00:02:56]
+And this is a very common technique, it's just like you just silently generate this extra thing and you pass it around from function to function. Not just to push, but to all the things that are leading up to the call chain to that, cuz they all need to be able to get it there.
+
+[00:03:09]
+Has some runtime memory cost, but at the end of the day this is not only a way to contain information like how many bytes T takes up, but also you can do lots of other things with this. There're plenty of nice language features where this is a perfectly reasonable way to implement them, including ad hoc polymorphism.
+
+[00:03:25]
+Like operator overloading, or being able to customize how equals works, or things like that. Now, the downside, of course, is that it's not only more memory usage, but also some more runtime logic. You have to decide at runtime, okay, I'm gonna go do this versus I'm gonna go do that.
+
+[00:03:40]
+Which leads us to approach number 2, which is monomorphization. So polymorphism, the poly meaning many, so you have multiple morphs, multiple different forms. Monomorphization is where you're like, okay, go from many forms down to one. And the idea here is, essentially, whenever we call push with a different type for T, we just create a specialized version of the function.
+
+[00:04:00]
+So this is kind of analogous to what we did at the type level when we were calling these functions. Remember we made our duplicated special type in our type database. And we just sort of filled it in with stuff that was specific to that by unifying it with, you're calling it with a number?
+
+[00:04:12]
+Great, we'll unify it with number, and then our special little version here is just gonna go unify with number, and that's fine. Monomorphization is basically taking exactly the same idea, except instead of doing it for your types, we're actually doing it for the code generation. So literally, like every single time you call push with a different type for T, we are generating a entirely different copy-pasted implementation of push that's exactly the same.
+
+[00:04:35]
+Except instead of 8 bytes, it says 1 byte or 4 bytes in all the different places where that comes up in that function. The rest of the function is exactly the same. So inside that function, T is no longer polymorphic, it is concrete, or another word for that is monomorphic.
+
+[00:04:50]
+So basically, if you look at one of these specialized functions that we generated, the copy-pasted and the substituted in the specific number for those things, there's no polymorphism left in there. So they don't need this extra runtime passing around thing because we've created a specialized one that's metamorphic.
+
+[00:05:08]
+Now, this does mean that you are doing a lot more function generation, you're gonna get maybe ten different versions of copy-pasted versions of the push function. But you don't have extra runtime data to pass around. Now, there is, on the one hand, some debate, and on the other hand also some consensus around which of these two approaches is sort of quote, unquote faster.
+
+[00:05:29]
+So all of the high performance languages, so you're talking your Rust and your C++, if they have polymorphism, they do it this way, they do the monomorphism thing. This does involve, your binaries will theoretically get bigger potentially because you're generating multiple instantiations of these functions. Binaries getting bigger also can have an implication on performance.
+
+[00:05:50]
+But the general consensus is that overall it's the net win and a pretty significant one. And actually the main reason for that is the way that this interacts with the optimizers. So if you're monomorphizing, you've got your specialized version that's for 8 bytes and your other one that's for 4 bytes or whatever else, those all get to get optimized separately.
+
+[00:06:08]
+And so, because getting to optimize different versions of a function separately can bring different benefits, especially if they're being optimized under different circumstances. Quite often compilers will just choose to make different specializations of functions anyway just so the optimizer can get their hands on different versions of them.
+
+[00:06:26]
+So the downside in practice, if you're comparing to a completely unoptimized version that's not doing any inling, that's a really significant downside. But it gets sort of murkier and the downside start to fade away a little bit if were you actually comparing it to somebody with the optimizer is doing a lot of inlining.
+
+[00:06:43]
+Generating bytecode, basically just same kind of thing as generating strings, except that it's bytes instead of strings. Concatenating bytes together instead of strings, magic numbers that are referenced via constants instead of constants that are referring to more familiar things. We do a little code touring, kind of looked at how that looks in practice.
+
+[00:07:00]
+And finally, we talked a little bit about generating polymorphic functions. Guess we're a little bit out of order, cuz we kind of already went and did the exercises. But on that note, we can go ahead and move on to the wrap up, unless there are any questions about co-generation.
+
+[00:07:20]
+
+>> Richard Feldman: Yes.
+>> Speaker 2: The monomorphism that you were mentioning earlier kind of as a way of handling polymorphism, as representation of polymorphism. Is that a similar mechanism behind things like dynamic dispatch? Or would we be doing that earlier in the pipeline?
+>> Richard Feldman: Dynamic dispatch and static dispatch. Well, so static dispatch would certainly happen earlier.
+
+[00:07:43]
+So static dispatch would be something that would happen back in the type checking. The static and static dispatch is short for statically typed kind of like. So it's all based on types and that would happen before this. So you could have static or dynamic dispatch and also monomorphization, or dictionary passing or something else.
+

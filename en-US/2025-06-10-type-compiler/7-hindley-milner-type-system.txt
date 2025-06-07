@@ -1,0 +1,88 @@
+[00:00:00]
+>> Richard Feldman: So this is going to be the beginning of our type checking adventure. There's gonna be multiple sections on type checking, parts three through six. And basically, this is gonna be the absolute bare bones, most basic, most straightforward kind of type checking you can do. You may have some questions as we go about, well, wait, what about this?
+
+[00:00:15]
+What about that? Don't worry, we're gonna get to those, but we're gonna start off with something really, really basic so that we can get really the foundational idea of what style of type checking we're doing and what the basic mechanism of it is. So this one's gonna be relatively short, but it's very important to understand this foundational concept.
+
+[00:00:33]
+So we're not gonna put any more stuff after it and just move on to the next part. Okay, so first we're gonna talk about type variables, or as we're gonna call them, type IDs, but typically, you see a compiler, they'll talk about as type variables, which will make more sense when we get to polymorphism.
+
+[00:00:48]
+Type relationships, and finally, path compression. All right, so, I mentioned in the beginning of the workshop that we are doing Hindley-Milner type inference, this is how you spell Hindley Miller. If you're ever wondering, this is named after two famous computer scientists, Hindley and Milner. Robin Milner is famous for all sorts of things, Hindley, I think, is mainly just famous for this algorithm.
+
+[00:01:08]
+There's also, you might see Damas-Hindley-Milner, or DMS for short, because Damas got involved later. But usually, the most common way that I hear people refer to this style of type checking is Hindley Milner. So why are we using it in this course? Well, first off, it's a real-world production like type inference system.
+
+[00:01:26]
+It's not just like a toy thing. This is used by production languages like Elm, Haskell, Rock, basically the typed functional programming languages tend to use Hindley- Milner type inference among languages that seal real-world production use. So it's not the most popular way to do it, but does have a lot of nice properties.
+
+[00:01:44]
+And in some cases, people will say, I wish that the language that I were using were using Hindley-Milner inference, because it does have some very nice properties, such as, it has a simple type system. Now, the word simple can mean a lot of different things to a lot of different people.
+
+[00:01:56]
+In this case, what I mean basically is that, you don't have subtyping to deal with, which means you don't have to worry about covariance, contravariance, or any of the other implications of subtyping. Now, subtyping can be quite nice for ergonomics, in some cases, it can be something where you kind of expect something to work, and then if you have a subtyping type checker or type system, it just works the way that you expect it to.
+
+[00:02:18]
+And the fact that Hindley-Milner is not a subtyping type system generally tends to mean that you might have some language features that you would find in other languages that you don't find the languages that have this. So for example, go interfaces would be an example this, that's a subtyping thing where you say, I'm defining this interface, and anybody who matches this interface can just instantly use this function.
+
+[00:02:39]
+Call this function without needing to change my types in any way or add any type variables or anything like that. There are ways you can be equally flexible, but in Hindley-Milner you usually end up incorporating a type variable to do that level of flexibility. Whereas if you have subtyping, you don't need to put a type variable or a type parameter in your type annotation.
+
+[00:02:56]
+So Hindley-Milner type inference, or at least a lot of languages that use Hindley-Milner tend to be sound meaning there, there is no concept in the language of a runtime tight mismatch. So an example of a runtime tight mismatch would be, you're coming along in your JavaScript code and you call a function, but it wasn't a function, it was a string for some reason.
+
+[00:03:16]
+And you get a tight mismatch at runtime that was like, I'm trying to call a string, you can't do that, you can't call strings, you can only call functions. And somehow you got a string here in this variable that you thought was a function, but actually at runtime, it wasn't.
+
+[00:03:28]
+So a sound type checker is one where, before the program runs, it tells you about every single instance of things like that. There is no such thing in this language as a runtime type mismatch, as we'll see when we get to code generation. There isn't even code that could report one, because there's just not a thing.
+
+[00:03:43]
+[LAUGH] So that's a very nice property of these languages, a lot of production type checkers today are not sound. Java is not sound, TypeScript is famously intentionally unsound. I think Java had some soundness holes that they found that were not intentional, I think having to do with reflection.
+
+[00:04:00]
+But basically, it is possible to write a Java program in a way where you get runtime type mismatches that the compiler didn't catch. TypeScript was intentionally unsound because they wanted to cover a very wide range of existing JavaScript code bases. Including some that are using things that essentially were either impossible or at least impractical to be able to catch type mismatches at compile time.
+
+[00:04:27]
+Hindley-Milner type inference is decidable, and what decidable means is that, it can figure out, it can infer all of the types for your program, all of them. You do not need to write type annotations. And in fact, in this workshop, just to emphasize this, I made type annotations essentially in afterthought.
+
+[00:04:42]
+So the very last thing at the very end of all the type checking sections that we do is we just kinda sneak type annotations in there and talk about how they work, and then that's it. So by the time we get to them, we've already made everything else work just using type inference with no annotations.
+
+[00:04:57]
+It's all sound, it's all decidable, and it all just works. It's also polymorphic, so that means that it can support generics. So we will get to things like you can say, I have an array of strings or I have an array of numbers, and that is like that type variable, that type parameter thing that, a lot of languages, again, going back to Go.
+
+[00:05:13]
+For a long time, Go didn't have generics, and this was like a famous Hello Blue, and then eventually, they added generics. And when they what they added were the form of generics known as parametric polymorphism, which is exactly the type of thing that we're doing here. And parametric polymorphism is basically, some people use it interchangeably with the term generics, although generics usually has a little bit more of an object-oriented connotation to it.
+
+[00:05:35]
+Parametric polymorphism is just like the most general, you got type parameters now, [LAUGH] and they're a thing. And that's what we're doing here, that's what all the functional languages that use Hindley-Milner Inference use, and it works great. Question?
+>> Speaker 2: Yeah, I was curious about the sound, I guess, type system.
+
+[00:05:55]
+Is there a performance penalty, either at runtime or maybe a memory, a penalty that is incurred by having a system like that?
+>> Richard Feldman: It's actually the opposite. There's a performance penalty incurred by having an unsound type system, at least if you wanna have an unsound type system, where when you get the types wrong, you got a crash at runtime.
+
+[00:06:16]
+If you're okay with having undefined behavior at runtime, then you can have an unsound type system like assembly language would be a good example of this. Where if you mix up your types in assembly language at runtime, you get, who knows? Could be anything. You're telling the CPU to add two things together that you thought were integers, but actually, it's adding two memory addresses of strings together.
+
+[00:06:35]
+Now the ones and zeros just, who knows what? And you're just gonna get all sorts of wild unpredictable behavior. It's much better to get a runtime type mismatch than that, [LAUGH] an actual error that stops your program or gives you a stack trace and stuff like that, but you have to pay for that.
+
+[00:06:49]
+So basically if you want to allow gracefully recoverable runtime type mismatches. Then that requires, essentially, every single thing that you are taking through your program needs to end up having some runtime metadata about, here's what my real type is. But if you don't have that requirement, and you're not otherwise wanting that for runtime type reflection or something like that, then you have the option of doing what Rust does and C++ does, at least by default.
+
+[00:07:15]
+And what Rock does, which is basically, you can say we have no overhead at runtime, we don't even keep the types around. We have no idea what the types are at runtime, because we know that we got them all right at compile time. So yeah, definitely at least potential performance benefit, unless you want, for other reasons to keep around the runtime type information.
+
+[00:07:32]
+
+>> Speaker 2: Thank you, and just quick follow up too, cuz I was thinking about in the context of TypeScript.
+>> Richard Feldman: Yeah.
+>> Speaker 2: We kind of provide that runtime type safety using type guards and stuff like that. So that's why I was kind of curious if there's a performance penalty in that case.
+
+[00:07:44]
+But it's different when you're-
+>> Richard Feldman: I see what you're saying, yeah, I mean, TypeScript, because it compiles to JavaScript, JavaScript's already keeping all that information around at runtime. You're paying for it no matter what, so they might as well use it [LAUGH].
+>> Speaker 2: Right, got it, that makes sense, thank you.
+
