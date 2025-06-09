@@ -1,0 +1,135 @@
+[00:00:00]
+>> Richard Feldman: One other question you might have is, well, hey, how come fstat doesn't just return the stack stat struct? Why do we have to pass it in like this, when it could have instead just said, well, now fstat is going to return the stat struct, just give me back, all those things.
+
+[00:00:15]
+Well, the short answer is that, if you were to return the stat struct, that means that you have to return all 144 bytes every single time you do that. So if the caller wants to return that, they now have to copy all 144 bytes again. So in other words, if I have my function that's read the files exact bytes or whatever, and I call that, I call fstat, fstat gives me back those 144 bytes.
+
+[00:00:37]
+I now have those 144 bytes, but the only way I can return them to whoever called me is I have to copy them again and return it back to them. And if another caller wants to do that, another 144, byte copy. In contrast, if you imagine something less expensive, if I'm just passing around the address, that's always eight bytes.
+
+[00:00:55]
+Sorry, if the thing that's gonna call fstat says, fstat just wants the address of where it's gonna write those bytes. Okay, I've got eight bytes, there's the address. Here you go, fstat. Now you've got what you need. And if I want to make that function get called by somebody else, that somebody else also just needs to give that function the eight bytes to give to fstat.
+
+[00:01:16]
+And if I want to do that again, again, just eight bytes to give to that function to give to fstat. So this is an example of how these design decisions are not just about ergonomics. It's not just about this one call in isolation involves copying eight bytes versus 144 bytes.
+
+[00:01:31]
+You also have to think about, well, let's suppose we had a whole chain of calls, and what am I sort of pricing them into, as far as how much memory they have to be copying around if I want to extract a helper function that just calls a chain of these things.
+
+[00:01:44]
+So in this case, it's not just about what's possible, but also about what is efficient, especially as your program gets bigger and you're having more functions calling from one place to another. Sorry, the more functions you have in a program, the more common it becomes to be passing things around based on their address, especially of things like structs, rather than the actual entire struct itself.
+
+[00:02:09]
+Even though that might be, at least in the short term, a little bit more ergonomic. So when you see larger C programs, it's very, very common to see tons and tons of functions where all they're doing is passing around memory addresses or really, really small things like integers or individual bytes or flags or things like that.
+
+[00:02:26]
+Seeing C code that passes an entire struct, either in the return value or as one of the arguments, is actually just a lot less common for this exact reason. They just don't want to pay for the copying it around, okay? Now you might also be asking, well, okay, fine, fair enough.
+
+[00:02:39]
+I understand why we're not returning the entire stat struct. So why don't we return a stat address? Why have to take this thing and then write the bytes into that? This is a little bit more of a can of worms than you might think. So when functions return, that is, when you run a function and it runs to completion and it either does an early return or it gets to the end of the body and just does a normal return.
+
+[00:03:02]
+All of the memory for the variable that functions just automatically gets freed. You don't have to say with the files, we have to do open and we have to remember to close at the end. There's no remembering to do clean up on a function, we never have to say, did you remember to free up all that memory and release it so that other people can use it.
+
+[00:03:19]
+It's like, no, no, that's not how functions work. They just automatically, sort of magically, have automatic memory management, not with the garbage collector, but just by virtue of how functions work. You call them, and then you don't have to ever think about all the variables you've allocated locally.
+
+[00:03:35]
+That memory just is gone as soon as the function itself is gone, which is good, because otherwise calling functions would leak memory. [LAUGH] Unless you explicitly freeze stuff. But this does mean that it's totally unsafe and also totally allowed, at least the C, to return addresses that are defined inside the function body.
+
+[00:03:52]
+So if you have an int or something like that in the middle of your function, you can return that int 'cause it's gonna copy the four bytes in the return value. But if you return the address to that int, well, now you're in dangerous territory, because if the caller after that function has finished and has returned, if the caller holds onto that address and says, I think I'll go see what's in that memory right now.
+
+[00:04:13]
+It might or might not be what it was the last time the function ran, and now we're gonna be back into this sort of dangerous really hard to debug. Really painful territory of that weird bug we saw in the last example, where when we took the line of code and moved it up to the top of the function, it caused the entire process to abort.
+
+[00:04:31]
+When you return the address to something in the middle of a function, basically you are returning an address to memory that might get totally overwritten the next time some other function calls. Because from the operating system's perspective and from the running program's perspective, that function exited that memory is fair game.
+
+[00:04:47]
+Anybody is free to write whatever they want into that memory. Anytime you call another function, it's free to stop all over it, and it's too late to do anything about it because the function has exited. So if you do this, you're basically just asking for trouble. So yeah, we could return a stat address.
+
+[00:05:04]
+But if we did that, we would basically be saying, cool, now we're returning an address to some memory that has been marked as free and considered fair game. And so as you're reading your stat struct, you might say, this all works very well. And you refactor your code a little bit to call another function and suddenly instead of getting the nice, correct stat values, you're getting total memory garbage, because that other function just stomped all over it.
+
+[00:05:28]
+Because as far as the program was concerned, that function had exited and that memory was fair game. You may recall that when we had this function to path that we wrote in the previous section, we took in this request, and we were cool. I'm gonna take in this request and then I'm going to return an address of the actual path and that path is going to be different.
+
+[00:05:48]
+And you may recall that it might've seemed a little bit strange that we were going to all this trouble to stomp all over that request memory. Well, one of the reasons that we did that is that, believe it or not, that's actually the safer option. [LAUGH] Because the caller actually is responsible for that request memory.
+
+[00:06:02]
+When you call this function, one thing we know for sure is that this memory right here that this address is pointing to, that memory must have already existed in the caller. We know that it's not going to disappear or get marked as safe to write over when this function exits because the caller had to provide this address.
+
+[00:06:21]
+It already had to be present for the caller. Which means that if we write over this memory, we stomp all over it like we did, that also means that, yeah, we did stomp all over it, but at least the caller knows that that memory is not being marked as free by the end of the function.
+
+[00:06:35]
+Whatever we do in the middle of this function is not going to affect sort of the lifetime as it's known of this thing that's being passed in. So that means that although, yes, we are sort of destroying this thing by writing over it, and yes, we do also have to be careful to make sure that there is actually room for the index.html.
+
+[00:06:51]
+Which in practice it always should be, but we do have to be careful in case we're dealing with a weird circumstance. At the end of the day, it is totally fine to return an address that is a subset of this address because we know that this memory is all good to go because the caller made sure of that.
+
+[00:07:06]
+Now granted, if the caller is allocating this in the middle of the caller's body, then the caller has to make sure on their end, not to accidentally return this path without, I don't know, copying it somewhere else or something like that. But, yeah, this is essentially why we did that in that way.
+
+[00:07:26]
+Cool, yeah, so this is an address into an arguments, memory, not into a local variables, memory. That's why that worked. Okay, now this is where we're gonna get into the heap. So functions can reserve long lived memory chunks using malloc there are other ways to do this. Malloc is actually a wrapper around mmap or virtual alloc on Windows, which we're not gonna get into.
+
+[00:07:45]
+But for all intents and purposes, malloc, which is how most people pronounce it, even though it's short for malloc, like memory allocate. This is a super common function that you will see used all the time. It is less performant than what we're using. What we've been using so far, it is not strictly necessary.
+
+[00:08:03]
+And in fact, the final version of this web server that we've got does not use malloc at all. One of the coolest pieces of advice I got about programming in C and I guess low level programming in general, is you don't always need to do this. In fact, in many cases, you don't need to do this at all.
+
+[00:08:19]
+And if you try to think carefully about ways to avoid doing malloc by instead doing tricks like what we did in the previous section, where we stopping over some memory that does need to be used. You can actually end up with programs that are believe it or not, less error-prone andin many cases and also run faster as a bonus.
+
+[00:08:35]
+But having said that, it's important to understand what malloc does. So we're gonna go through it even though it's not what we're gonna end up using In the final version of this and to sort of understand like what its trade-offs are. So basically when you call malloc, you can basically say, hey, I want to reserve a long-lived chunk of memory.
+
+[00:08:50]
+This is not gonna end when the function ends. This is just gonna be hanging out there and we're gonna make sure that that memory doesn't get touched, doesn't get stomped over when the function ends. And when you call malloc, it's gonna return Return and address that memory, which you can then continue using even after this function returns.
+
+[00:09:05]
+However, there's the downside. So by default, every time you call malloc, you have a memory leak. When you call malloc, it's saying, yeah, it's long lived. And when does that life end? When does that memory get freed and get returned back to be potentially used for other things?
+
+[00:09:18]
+It's when you implicitly go out of your way to call free on it, just like with file open and file close, every time you call malloc if you don't wanna leak memory, you have to call free on it. And this is where the trouble starts. If you call free at the wrong time, you can cause bugs.
+
+[00:09:35]
+This is the understatement of the century. Almost all memory safety errors. In practice that results in like critical safety errors, exploits and like heartbleed and all these things. Okay, heartbleed was like the if conditional thing, fair enough. But, [LAUGH] that was a rare case. Almost all of them are caused by one of two things, memory safety errors.
+
+[00:09:54]
+One is buffer overruns. So this is the type of stuff we saw all the way back in Hello World where you've got your reading into memory that you're not supposed to read into because of arithmetic errors or malicious arithmetic. And the other is literally using malloc and calling free at the wrong time.
+
+[00:10:09]
+And there are two flavors of this that can happen. One is called a use after free, which is basically where you malloc, you get back your address, you're using the address. Everything's great, you call free on the address. And then you forgot that you called free on the address and you try to reference it again later after you've called free.
+
+[00:10:25]
+So that's use after free. You're using the address after you would call free on it. At that point, you have exactly the same category of bugs as what we saw in the previous section where you're returning an address from a function. That address is to something that was from the middle of the function that wasn't created using malloc.
+
+[00:10:41]
+In other words, maybe it'll work fine if you get lucky and nobody has happened to use that memory that's been marked as free. If nothing has happened to overwrite that, it's all good. No problems, you won't see any symptoms. If you're not lucky, then it's gonna be a total disaster, because what you're gonna get when you read that memory is total memory garbage, just based on whatever happened to have been overwritten.
+
+[00:11:02]
+Whatever ones and zeros somebody else later on automatically got written into there. The second variety of use after free is called a double free. And a double free is where you accidentally call free twice on the same original address. This can be basically the same thing as used after free, but worse.
+
+[00:11:19]
+[LAUGH] So essentially, what happens on a double free is you're coming along like, hey, I'm done with this memory. Great, no problem. I call free on it, and I never use that variable ever again. I never try to read from it, but I do actually hold onto that address, and although I don't read from it, I do call free on it later again.
+
+[00:11:36]
+So that's a double free. I freed the same address twice. The problem with that is, if somebody in between the first free and the second free called malloc. It's entirely possible that Malik gave out that same address from earlier again and said, here you go, here's the address.
+
+[00:11:49]
+So when I call free a second time, the double free, I'm potentially freeing somebody else's allocation, [LAUGH] some other valid allocation. So this, when I say it's like potentially even worse than a use after free, The way that it can be worse is that the symptom might be somewhere totally like distant from the double free.
+
+[00:12:04]
+The second call to free itself is like totally harmless. And then all of a sudden this totally seemingly unrelated code is just like getting memory garbage. And you're like, what? What's going on here? Is there a use after free? And you look at how that allocation's used and you're like, no, I'm calling mallocing, right?
+
+[00:12:16]
+I'm never freeing it. I'm never using it. I don't understand what's going on. And the problem actually, is that some totally unrelated code was holding on to an address and freed it. Total nightmare. So if you can avoid using malloc and free, on the one hand, you might get a new set of problems, such as we saw earlier where like you're stomping all over memory and you have to be careful not to stomp too far.
+
+[00:12:35]
+But on the other hand, it means that you don't have to worry about these lifetime issues anymore. You don't have to get it exactly right. Call free exactly the right number of times you can just sort of avoid that whole category of problems.
+
