@@ -1,0 +1,1402 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:02.425
+&gt;&gt; Richard Feldman: Let's move on to
+the final step, generating web assembly.
+
+2
+00:00:02.425 --> 00:00:05.004
+So in this section we're gonna
+talk about a couple of things.
+
+3
+00:00:05.004 --> 00:00:08.458
+So first we're gonna talk about generating
+bytecode, and this is going to be sort of
+
+4
+00:00:08.458 --> 00:00:11.766
+a bookend to the middle section, which is
+gonna be a little bit more freeform than
+
+5
+00:00:11.766 --> 00:00:14.029
+these other sections have been,
+which is a code tour.
+
+6
+00:00:14.029 --> 00:00:17.661
+We're basically just going to look through
+and I'm just going to talk through a bunch
+
+7
+00:00:17.661 --> 00:00:20.898
+of stuff and feel free to ask questions
+about our WASM implementation here.
+
+8
+00:00:20.898 --> 00:00:24.256
+And then finally, we're gonna talk a
+little bit about the detail of generating
+
+9
+00:00:24.256 --> 00:00:25.370
+polymorphic functions.
+
+10
+00:00:25.370 --> 00:00:28.860
+I mentioned earlier there are some
+complications when it comes to this beyond
+
+11
+00:00:28.860 --> 00:00:30.050
+the type complications.
+
+12
+00:00:30.050 --> 00:00:33.453
+So we're gonna talk about those after
+the code tour because we're not actually,
+
+13
+00:00:33.453 --> 00:00:36.573
+because it's complicated,
+I've chosen not to implement that overall.
+
+14
+00:00:36.573 --> 00:00:39.705
+There's multiple ways to do it, but we've
+chosen not to do any of them in in this.
+
+15
+00:00:39.705 --> 00:00:42.920
+So basically, what we're gonna do is we're
+gonna talk a little bit upfront about,
+
+16
+00:00:42.920 --> 00:00:44.883
+sort of general concepts
+of generating byte code.
+
+17
+00:00:44.883 --> 00:00:48.098
+Then most of what we're gonna talk about
+right here is we're just gonna walk
+
+18
+00:00:48.098 --> 00:00:51.129
+through the code and talk through at
+a very high level what it's doing.
+
+19
+00:00:51.129 --> 00:00:52.822
+And then feel free to ask questions.
+
+20
+00:00:52.822 --> 00:00:55.503
+And then we're gonna get back and
+talk about polymorphic functions.
+
+21
+00:00:55.503 --> 00:00:58.368
+The main point of this course is
+all the stuff building up to this.
+
+22
+00:00:58.368 --> 00:01:01.888
+As we're gonna see in a second, once you
+get the basic idea of this, I think that's
+
+23
+00:01:01.888 --> 00:01:05.107
+the vast majority of the benefit,
+at least for the purposes of this course,
+
+24
+00:01:05.107 --> 00:01:07.649
+is just kind of understanding
+how does this actually work?
+
+25
+00:01:07.649 --> 00:01:09.917
+And you can get the idea pretty quickly,
+I think,
+
+26
+00:01:09.917 --> 00:01:11.701
+based on what we've already learned.
+
+27
+00:01:11.701 --> 00:01:14.698
+Okay, as we've talked about before,
+we have this recurring theme.
+
+28
+00:01:14.698 --> 00:01:18.541
+And this will be the last time the theme
+recurs, because this is the last section,
+
+29
+00:01:18.541 --> 00:01:20.673
+of traversing input and generating output.
+
+30
+00:01:20.673 --> 00:01:24.542
+So start off with source string, do some
+lexing, get out some tokens, take tokens,
+
+31
+00:01:24.542 --> 00:01:28.032
+parse them, we get a parse tree, do some
+naming on that, and then we get scope
+
+32
+00:01:28.032 --> 00:01:31.846
+involved, do some type inference on that,
+and then we get back our type database.
+
+33
+00:01:31.846 --> 00:01:35.761
+And now we are finally ready for the final
+stage, which is taking the parse tree and
+
+34
+00:01:35.761 --> 00:01:36.804
+Code Gen to a string.
+
+35
+00:01:36.804 --> 00:01:40.511
+Just kidding, that's not what we're
+doing now, that's what we already did.
+
+36
+00:01:40.511 --> 00:01:44.273
+What we already did when we did formatting
+was we basically ran through these steps.
+
+37
+00:01:44.273 --> 00:01:47.081
+And okay, granted, we didn't have
+naming and type inference there.
+
+38
+00:01:47.081 --> 00:01:49.005
+But we could, if we wanted to,
+choose to do those.
+
+39
+00:01:49.005 --> 00:01:51.867
+If you wanna do, you could have
+your format or be like, yeah,
+
+40
+00:01:51.867 --> 00:01:54.517
+tell me about naming errors and
+tell me about all the types.
+
+41
+00:01:54.517 --> 00:01:56.493
+It's not gonna use them,
+it doesn't need them.
+
+42
+00:01:56.493 --> 00:01:59.041
+Those are sort of optional as
+far as the format is concerned.
+
+43
+00:01:59.041 --> 00:01:59.970
+But fundamentally,
+
+44
+00:01:59.970 --> 00:02:02.969
+you could just do all these steps if
+you wanted to with the formatter.
+
+45
+00:02:02.969 --> 00:02:06.641
+And then, of course, if you wanted to take
+it an actual step further, then we would,
+
+46
+00:02:06.641 --> 00:02:10.264
+instead of generating a string at the end,
+because it's a formatter, we would keep
+
+47
+00:02:10.264 --> 00:02:13.958
+everything else the same, except that now
+we are generating WebAssembly bytecode.
+
+48
+00:02:13.958 --> 00:02:16.778
+And you might have noticed I
+did sneak something in here,
+
+49
+00:02:16.778 --> 00:02:20.208
+which was the formatter only cares
+about the parse tree as its input.
+
+50
+00:02:20.208 --> 00:02:24.391
+But if we're generating WebAssembly
+Bytecode, we actually do need to know that
+
+51
+00:02:24.391 --> 00:02:28.574
+type database, because finally, [LAUGH] it
+has come to pass that we do finally get
+
+52
+00:02:28.574 --> 00:02:31.957
+some value out of storing all of
+those IDs in our parse tree nodes,
+
+53
+00:02:31.957 --> 00:02:35.054
+way back in the day [LAUGH],
+when we were back at section two.
+
+54
+00:02:35.054 --> 00:02:36.572
+Now we finally get to use them.
+
+55
+00:02:36.572 --> 00:02:39.622
+So now the fact that we have those
+IDs in our parse tree nodes and
+
+56
+00:02:39.622 --> 00:02:43.611
+we have this fully populated Type DB means
+that not only do we know the structure of
+
+57
+00:02:43.611 --> 00:02:48.129
+the nodes, where's the conditionals, where
+are the functions defined, yada yada, but
+
+58
+00:02:48.129 --> 00:02:52.026
+also we know what the types of absolutely
+every single thing in our program is.
+
+59
+00:02:52.026 --> 00:02:53.507
+We know the type of everything.
+
+60
+00:02:53.507 --> 00:02:57.231
+There is nothing in our program where
+the type is a mystery to us at this point,
+
+61
+00:02:57.231 --> 00:02:59.774
+because we did complete type
+inference on all of it.
+
+62
+00:02:59.774 --> 00:03:02.933
+So now ready to generate some
+WebAssembly byte code and that's good,
+
+63
+00:03:02.933 --> 00:03:04.816
+because WebAssembly Bytecode is tight.
+
+64
+00:03:04.816 --> 00:03:07.942
+WebAssembly actually requires you
+to explicitly specify the types.
+
+65
+00:03:07.942 --> 00:03:11.521
+Some byte codes do not, but machine code
+also doesn't require that you specify, but
+
+66
+00:03:11.521 --> 00:03:14.850
+it does require that you know it because
+if you don't know it or you get it wrong,
+
+67
+00:03:14.850 --> 00:03:15.718
+bad things happen.
+
+68
+00:03:15.718 --> 00:03:19.133
+[LAUGH] So essentially, whether you're
+going to WebAssembly Bytecode or
+
+69
+00:03:19.133 --> 00:03:22.875
+machine code, you basically need to know
+your types at this point, or you need to
+
+70
+00:03:22.875 --> 00:03:26.289
+do something like the aforementioned
+other languages that will do some,
+
+71
+00:03:26.289 --> 00:03:30.227
+runtime extra work, where they will wrap
+up the type information around the thing.
+
+72
+00:03:30.227 --> 00:03:33.730
+So you'll have not only is this a string,
+but there's also a little piece of
+
+73
+00:03:33.730 --> 00:03:36.539
+information hanging off the side
+that says, I'm a string.
+
+74
+00:03:36.539 --> 00:03:40.301
+And so if you know where that little piece
+of extra information is consistently,
+
+75
+00:03:40.301 --> 00:03:41.683
+you can go ask at runtime, but
+
+76
+00:03:41.683 --> 00:03:45.358
+of course there's performance implications
+to that and all that good stuff.
+
+77
+00:03:45.358 --> 00:03:48.394
+So because we have all of our types,
+we don't need to do that at runtime.
+
+78
+00:03:48.394 --> 00:03:50.162
+We already know what all the types are and
+
+79
+00:03:50.162 --> 00:03:53.085
+we can just tell it to Webassembly
+directly and have it run faster.
+
+80
+00:03:53.085 --> 00:03:55.216
+Okay, now it is time for
+the WebAssembly code tour.
+
+81
+00:03:55.216 --> 00:03:59.119
+So basically what I'm gonna do is I'm just
+gonna sort of walk through our solution
+
+82
+00:03:59.119 --> 00:04:03.267
+here and if you take a peek ahead, I guess
+you're gonna peak, you could always cheat.
+
+83
+00:04:03.267 --> 00:04:07.214
+But looking at the exercise, we might end
+up going through the thing that is in
+
+84
+00:04:07.214 --> 00:04:11.240
+the exercise anyway, but we only have
+this one WebAssembly implementation.
+
+85
+00:04:11.240 --> 00:04:13.406
+So here we go,
+let's take a look through it.
+
+86
+00:04:13.406 --> 00:04:17.227
+So fundamentally, what WebAssembly is
+doing is to recap what we said at the very
+
+87
+00:04:17.227 --> 00:04:21.220
+beginning, what you end up with when you
+have code generated some web assemblies,
+
+88
+00:04:21.220 --> 00:04:23.058
+you end up with a whole bunch of bytes.
+
+89
+00:04:23.058 --> 00:04:24.471
+There's a bunch of ones and zeros.
+
+90
+00:04:24.471 --> 00:04:27.082
+If you try to read them as a human,
+you look at that and you go,
+
+91
+00:04:27.082 --> 00:04:28.376
+this is a bunch of gibberish.
+
+92
+00:04:28.376 --> 00:04:31.767
+I always see a string ther, I see a string
+there, okay, but then more gibberish,
+
+93
+00:04:31.767 --> 00:04:33.749
+I don't really know what
+to make of any of this.
+
+94
+00:04:33.749 --> 00:04:35.638
+This is not designed to be human readable,
+
+95
+00:04:35.638 --> 00:04:38.899
+what it's designed to be is to be
+streamed efficiently over the network.
+
+96
+00:04:38.899 --> 00:04:40.285
+That's really what its job is.
+
+97
+00:04:40.285 --> 00:04:43.578
+So it can be decoded over the network
+as it's coming in, and then translated
+
+98
+00:04:43.578 --> 00:04:46.886
+directly, or JITed, just in time,
+compiled directly into machine code.
+
+99
+00:04:46.886 --> 00:04:50.078
+So like I said, the reason that we're,
+the main reason that we're doing
+
+100
+00:04:50.078 --> 00:04:52.912
+this in WebAssembly rather than
+in machine code, is number one,
+
+101
+00:04:52.912 --> 00:04:56.157
+if we did it in machine code, then it'd
+have to have a different version for
+
+102
+00:04:56.157 --> 00:04:58.662
+everybody's different
+machine that you're running.
+
+103
+00:04:58.662 --> 00:05:03.482
+So I'd have to have a version of this for
+X8664 Intel machines, and another one for
+
+104
+00:05:03.482 --> 00:05:04.812
+64 bit ARM machines.
+
+105
+00:05:04.812 --> 00:05:08.870
+And the amount of work that would have to
+go into this section is a lot bigger, but
+
+106
+00:05:08.870 --> 00:05:11.051
+also just because WebAssembly honestly,
+
+107
+00:05:11.051 --> 00:05:13.978
+is a little bit simpler to
+understand than those things.
+
+108
+00:05:13.978 --> 00:05:18.300
+A lot of those architectures are very old,
+they have all the legacy stuff going on,
+
+109
+00:05:18.300 --> 00:05:20.709
+whereas WebAssembly is a lot more modern,
+and
+
+110
+00:05:20.709 --> 00:05:23.769
+the way it's organized is
+a little bit more streamlined.
+
+111
+00:05:23.769 --> 00:05:24.494
+Question, yeah?
+
+112
+00:05:24.494 --> 00:05:28.362
+So in this case, we'd be taking advantage
+of compiling to WebAssembly, because
+
+113
+00:05:28.362 --> 00:05:32.075
+the folks who did WebAssembly took care
+of the rest of it for us, is that right?
+
+114
+00:05:32.075 --> 00:05:35.438
+Well, I don't know if I would say it's
+that they took care of the rest of
+
+115
+00:05:35.438 --> 00:05:35.955
+it for us.
+
+116
+00:05:35.955 --> 00:05:40.707
+It's more just that for their particular
+goals, one of WebAssembly's goals is that
+
+117
+00:05:40.707 --> 00:05:45.393
+you could have this bytecode that anyone
+could compile to, much like JVM bytecode,
+
+118
+00:05:45.393 --> 00:05:48.033
+and then it can be translated
+efficiently to any
+
+119
+00:05:48.033 --> 00:05:50.811
+individual like actual
+hardware architecture.
+
+120
+00:05:50.811 --> 00:05:52.423
+So because they did that work,
+
+121
+00:05:52.423 --> 00:05:57.011
+they ended up with making different design
+decisions than the hardware designers did,
+
+122
+00:05:57.011 --> 00:06:00.118
+because they're just dealing
+withdifferent trade offs.
+
+123
+00:06:00.118 --> 00:06:04.377
+Really easy example of this is,
+we can go into this if you're curious, but
+
+124
+00:06:04.377 --> 00:06:07.556
+basically WebAssembly is
+designed as a stack machine,
+
+125
+00:06:07.556 --> 00:06:10.938
+which essentially means that
+the way that WebAssembly sort
+
+126
+00:06:10.938 --> 00:06:14.995
+of manages its own memory is pretty
+much one to one with the exact push and
+
+127
+00:06:14.995 --> 00:06:18.681
+pop the stack stuff that we were
+doing ourselves back in part 2.
+
+128
+00:06:18.681 --> 00:06:20.687
+And then, I guess again, in part three.
+
+129
+00:06:20.687 --> 00:06:23.456
+Whereas the hardware does
+not have that concept.
+
+130
+00:06:23.456 --> 00:06:27.843
+If you wanna stack, you have to manage
+that yourself in a much more complicated
+
+131
+00:06:27.843 --> 00:06:30.513
+way than what we or
+what WebAssembly are doing.
+
+132
+00:06:30.513 --> 00:06:31.763
+But since, of course,
+
+133
+00:06:31.763 --> 00:06:35.839
+we wanna have functions, it's pretty
+nice to be able to have access to that.
+
+134
+00:06:35.839 --> 00:06:39.203
+Anyway, so WebAssembly files
+are organized into sections.
+
+135
+00:06:39.203 --> 00:06:42.725
+So the first type is types,
+then functions, then memory, exports,
+
+136
+00:06:42.725 --> 00:06:43.510
+code and data.
+
+137
+00:06:43.510 --> 00:06:47.527
+These sections, as Chris mentioned,
+they come in streaming, right, so
+
+138
+00:06:47.527 --> 00:06:49.970
+the first section,
+right up front is types.
+
+139
+00:06:49.970 --> 00:06:54.632
+So when I say WebAssembly is a typed
+system, if you're streaming this over
+
+140
+00:06:54.632 --> 00:06:58.930
+the network, it's right up front,
+tell me what all your types are.
+
+141
+00:06:58.930 --> 00:07:02.402
+Basically, these are kind of type
+aliases where you're saying,
+
+142
+00:07:02.402 --> 00:07:05.509
+I want to give a name to a particular
+type or stuff like that.
+
+143
+00:07:05.509 --> 00:07:09.479
+That's the very first thing that comes
+across the wire, then your functions,
+
+144
+00:07:09.479 --> 00:07:12.037
+then some global memory,
+and then things export.
+
+145
+00:07:12.037 --> 00:07:15.301
+So WebAssembly can export things
+to JavaScript, the actual code.
+
+146
+00:07:15.301 --> 00:07:18.588
+So this is the bulk of what we're
+going to actually be looking at.
+
+147
+00:07:18.588 --> 00:07:22.308
+And then some actual data that read
+only memory that can go with that.
+
+148
+00:07:22.308 --> 00:07:25.603
+Worth noting that these all have
+numbers associated with them.
+
+149
+00:07:25.603 --> 00:07:29.794
+So this is a very, very common, recurring
+theme that we're gonna see here is just
+
+150
+00:07:29.794 --> 00:07:33.954
+that there are magic numbers all over
+the place, and they correspond to things.
+
+151
+00:07:33.954 --> 00:07:37.178
+And when we're emitting WebAssembly
+bytecode, we need to know
+
+152
+00:07:37.178 --> 00:07:40.713
+which magic numbers to emit in the right
+places in order to get to work.
+
+153
+00:07:40.713 --> 00:07:44.177
+So this is in some ways similar to
+the format that we did in the sense that
+
+154
+00:07:44.177 --> 00:07:46.998
+in the formatter,
+we were traversing our parse nodes and
+
+155
+00:07:46.998 --> 00:07:48.672
+then printing out some strings.
+
+156
+00:07:48.672 --> 00:07:49.766
+Same exact thing here.
+
+157
+00:07:49.766 --> 00:07:53.592
+We're traversing our parse nodes and
+we're printing out, well, not strings,
+
+158
+00:07:53.592 --> 00:07:54.875
+magic numbers basically.
+
+159
+00:07:54.875 --> 00:07:57.005
+That's the fundamental difference here.
+
+160
+00:07:57.005 --> 00:07:59.608
+So if you're not familiar
+with this notation,
+
+161
+00:07:59.608 --> 00:08:01.833
+this is hexadecimal integer notation.
+
+162
+00:08:01.833 --> 00:08:05.138
+It's pretty common when you see
+manuals for things like WebAssembly or
+
+163
+00:08:05.138 --> 00:08:05.806
+CPU manuals.
+
+164
+00:08:05.806 --> 00:08:07.481
+They use this hexadecimal notation.
+
+165
+00:08:07.481 --> 00:08:10.744
+If we were a more elaborate language and
+we had fancier types,
+
+166
+00:08:10.744 --> 00:08:12.331
+we would support more types.
+
+167
+00:08:12.331 --> 00:08:16.193
+But this is basically just a list of
+[LAUGH] here are all the WebAssembly types
+
+168
+00:08:16.193 --> 00:08:17.612
+that we use and care about.
+
+169
+00:08:17.612 --> 00:08:21.269
+So we care about i32 which don't worry
+about it, we're using it for Booleans,
+
+170
+00:08:21.269 --> 00:08:21.858
+that's it.
+
+171
+00:08:21.858 --> 00:08:24.396
+F64, that's basically a 64-bit
+floating point number.
+
+172
+00:08:24.396 --> 00:08:26.210
+That's the classic Javascript number so
+
+173
+00:08:26.210 --> 00:08:29.643
+this is going to correspond to our number
+type, these are both for functions.
+
+174
+00:08:29.643 --> 00:08:33.007
+This is for a reference to a function,
+when you're passing it around,
+
+175
+00:08:33.007 --> 00:08:35.314
+this is the actual function
+definition itself.
+
+176
+00:08:35.314 --> 00:08:40.760
+And then finally they have a special
+magic number for void, which is basically
+
+177
+00:08:40.760 --> 00:08:46.390
+when you empty block type or you don't
+have a function with n obody essentially.
+
+178
+00:08:46.390 --> 00:08:50.953
+These magic numbers, we can kind of
+see where these come up in here.
+
+179
+00:08:50.953 --> 00:08:53.363
+Yeah, sure, here's an example.
+
+180
+00:08:53.363 --> 00:08:55.514
+If we are encoding, what is this?
+
+181
+00:08:55.514 --> 00:08:57.183
+Yeah, right, parameters.
+
+182
+00:08:57.183 --> 00:09:00.133
+Right, so another detail,
+like I mentioned at the beginning,
+
+183
+00:09:00.133 --> 00:09:03.684
+we are working on a subset of Javascript
+here, not just in terms of types, but
+
+184
+00:09:03.684 --> 00:09:07.261
+also in terms of what co-generation
+capabilities we're supporting here.
+
+185
+00:09:07.261 --> 00:09:10.789
+So there are a lot of things that are a
+lot easier to type check than they are to
+
+186
+00:09:10.789 --> 00:09:12.816
+actually implement in pure WebAssembly.
+
+187
+00:09:12.816 --> 00:09:16.917
+And again, since this is for learning
+purposes, we didn't really go all the way
+
+188
+00:09:16.917 --> 00:09:19.705
+and implement our full type
+system as limited as it is.
+
+189
+00:09:19.705 --> 00:09:24.482
+But yes, I just decided we're just
+only gonna support F64 params, so
+
+190
+00:09:24.482 --> 00:09:26.846
+we should say number, that's it.
+
+191
+00:09:26.846 --> 00:09:31.060
+You can have any param type you
+want as long as it's a number.
+
+192
+00:09:31.060 --> 00:09:35.116
+So yeah, basically,
+this is how you tell WebAssembly,
+
+193
+00:09:35.116 --> 00:09:39.408
+I am going to make a new sort of
+type annotation for this function.
+
+194
+00:09:39.408 --> 00:09:43.375
+When you're saying,
+I want to specify this is a function type,
+
+195
+00:09:43.375 --> 00:09:48.157
+you do types.func, which was this
+magic number, 0x60 in hexadecimal.
+
+196
+00:09:48.157 --> 00:09:52.932
+And then when you wanna say, and by
+the way, this thing returns an F64 type,
+
+197
+00:09:52.932 --> 00:09:54.513
+that is this magic number.
+
+198
+00:09:54.513 --> 00:09:57.193
+So what's actually getting emitted here?
+
+199
+00:09:57.193 --> 00:09:58.649
+When we are printing this out,
+
+200
+00:09:58.649 --> 00:10:01.339
+this is basically the same
+thing that we're doing here.
+
+201
+00:10:01.339 --> 00:10:05.136
+When we say concatBytes, this is a string
+concat except instead of concatenating
+
+202
+00:10:05.136 --> 00:10:08.780
+strings together for the formatter,
+we were concatenating bytes together.
+
+203
+00:10:08.780 --> 00:10:12.962
+And instead of the strings that we're
+concatenating together being the familiar
+
+204
+00:10:12.962 --> 00:10:17.082
+syntax that we had in the input in the
+first place, instead we were concatenating
+
+205
+00:10:17.082 --> 00:10:21.098
+together are these magical number like
+bytes that just happen to go together.
+
+206
+00:10:21.098 --> 00:10:25.959
+So this thing right here, I mean, could
+just be essentially the same thing as,
+
+207
+00:10:25.959 --> 00:10:30.677
+I don't know, let's say we had some
+argument's a bad example, whatever,
+
+208
+00:10:30.677 --> 00:10:32.798
+some sort of lambda here, right?
+
+209
+00:10:32.798 --> 00:10:35.257
+I don't know, b+1, something like that.
+
+210
+00:10:35.257 --> 00:10:39.593
+That's what we do in the formatter is
+we're concantenating these together to
+
+211
+00:10:39.593 --> 00:10:40.775
+develop the string,
+
+212
+00:10:40.775 --> 00:10:45.455
+it's exact the same thing here except
+that we're concantenating together bytes.
+
+213
+00:10:45.455 --> 00:10:47.212
+And instead of familiar strings,
+
+214
+00:10:47.212 --> 00:10:50.008
+it's these sort of strange
+looking magical numbers.
+
+215
+00:10:50.008 --> 00:10:52.387
+And so
+there are some other differences here.
+
+216
+00:10:52.387 --> 00:10:54.924
+Obviously, I mentioned
+the stack machine before.
+
+217
+00:10:54.924 --> 00:10:58.618
+When you're compiling or
+transfiling to a human readable language,
+
+218
+00:10:58.618 --> 00:11:02.325
+you tend to get with that a lot of
+ergonomics that save you a lot of time.
+
+219
+00:11:02.325 --> 00:11:06.990
+So you may recall we talked through that
+syntax sugar example where it was like we
+
+220
+00:11:06.990 --> 00:11:12.020
+invented this plus, plus, plus operator,
+and then we de-sugared it to x = x + 2.
+
+221
+00:11:12.020 --> 00:11:16.375
+There's a lot of that type of thing going
+on in here where basically it's like,
+
+222
+00:11:16.375 --> 00:11:19.367
+okay, conceptually I want this to be,
+I don't know.
+
+223
+00:11:19.367 --> 00:11:23.546
+I want this to be something that, there's
+just a function for that in JavaScript,
+
+224
+00:11:23.546 --> 00:11:27.084
+and if I were compiling JavaScript,
+I would just call that function.
+
+225
+00:11:27.084 --> 00:11:29.143
+But WebAssembly doesn't have that, so
+
+226
+00:11:29.143 --> 00:11:31.997
+I have to actually implement
+that function by scratch.
+
+227
+00:11:31.997 --> 00:11:34.416
+It has to sort of give it the raw,
+de-sugared,
+
+228
+00:11:34.416 --> 00:11:38.057
+unfiltered version because I just
+don't have the convenience there.
+
+229
+00:11:38.057 --> 00:11:41.129
+That category of thing, I would
+mainly classify as an inconvenience.
+
+230
+00:11:41.129 --> 00:11:45.192
+It's just the same thing aswhen there's
+a library, you don't have access to, fine,
+
+231
+00:11:45.192 --> 00:11:46.298
+I gotta write it myself.
+
+232
+00:11:46.298 --> 00:11:49.952
+I would say, and then also, when it comes
+to concatenating these two together,
+
+233
+00:11:49.952 --> 00:11:53.413
+it's also just magic number constants
+instead of magic string constants.
+
+234
+00:11:53.413 --> 00:11:55.916
+The string constants are maybe
+a little more intuitive, but
+
+235
+00:11:55.916 --> 00:11:57.693
+fundamentally it's not that different.
+
+236
+00:11:57.693 --> 00:12:01.270
+Mainly the way that this,
+I would say, feels different to me,
+
+237
+00:12:01.270 --> 00:12:04.389
+is just when things need to
+be organized differently.
+
+238
+00:12:04.389 --> 00:12:08.531
+If we were putting together, I don't know,
+let's see what's, sure, okay, so
+
+239
+00:12:08.531 --> 00:12:10.024
+the import section, right?
+
+240
+00:12:10.024 --> 00:12:14.891
+So here's an example of something where
+WebAssembly has this concept of imports,
+
+241
+00:12:14.891 --> 00:12:19.835
+and basically, any kind of stuff that you
+want to import from the host environment.
+
+242
+00:12:19.835 --> 00:12:22.104
+In this example, we're using console.log.
+
+243
+00:12:22.104 --> 00:12:26.550
+You don't get to just say, I'm just
+gonna call console.log because that's on
+
+244
+00:12:26.550 --> 00:12:28.973
+the window object like
+you can in Javascript.
+
+245
+00:12:28.973 --> 00:12:33.182
+You actually have to declare upfront,
+hey, host language, Javascript,
+
+246
+00:12:33.182 --> 00:12:36.156
+here are all the things that
+I want to import from you.
+
+247
+00:12:36.156 --> 00:12:37.447
+I want to access from you.
+
+248
+00:12:37.447 --> 00:12:39.543
+And in order to give it
+a flat list of those,
+
+249
+00:12:39.543 --> 00:12:43.157
+that means that you need to have already
+prepared that list ahead of time,
+
+250
+00:12:43.157 --> 00:12:46.889
+which in turn means that you need to have
+traversed your entire parse tree and
+
+251
+00:12:46.889 --> 00:12:50.215
+found every single instance of
+whenever we're doing console log or
+
+252
+00:12:50.215 --> 00:12:53.703
+whatever it is in our language that
+we want to import from JavaScript.
+
+253
+00:12:53.703 --> 00:12:56.284
+All of that work has to be
+done in a separate pass, or
+
+254
+00:12:56.284 --> 00:12:59.945
+if we want to avoid a separate pass,
+we have to do that trick that we kind of
+
+255
+00:12:59.945 --> 00:13:02.482
+talked about way back in
+the formatting section.
+
+256
+00:13:02.482 --> 00:13:06.392
+Where, as we're going along, we sort of
+write down, yes, I just saw a console.ly,
+
+257
+00:13:06.392 --> 00:13:07.446
+let me write that down.
+
+258
+00:13:07.446 --> 00:13:10.146
+That's gonna be needed for
+the import section later.
+
+259
+00:13:10.146 --> 00:13:12.339
+And then when you actually
+get to this point,
+
+260
+00:13:12.339 --> 00:13:14.311
+you have to sort of gather it up and
+do it.
+
+261
+00:13:14.311 --> 00:13:17.967
+So these are the types of things that I
+would say feel like the biggest part of
+
+262
+00:13:17.967 --> 00:13:22.090
+doing code generation, not to a human
+readable language, but rather to bytecode,
+
+263
+00:13:22.090 --> 00:13:25.946
+is just they just have different rules
+about how they want things to be placed.
+
+264
+00:13:25.946 --> 00:13:29.734
+And sometimes that requires structural
+changes that you wouldn't otherwise
+
+265
+00:13:29.734 --> 00:13:33.402
+normally need to do, in addition to
+the inconveniences of helper functions
+
+266
+00:13:33.402 --> 00:13:35.924
+not being there and
+you have to write things out, and
+
+267
+00:13:35.924 --> 00:13:39.618
+the inconvenience of the magic numbers
+other than the familiar strengths.
+
+268
+00:13:39.618 --> 00:13:41.896
+But I mean,
+the good news is that fundamentally,
+
+269
+00:13:41.896 --> 00:13:44.715
+from a learning perspective,
+all of those things, I think,
+
+270
+00:13:44.715 --> 00:13:47.391
+are pretty close at hand,
+once you've done a formatter.
+
+271
+00:13:47.391 --> 00:13:49.338
+It's not that far of a leap, I would say.
+
+272
+00:13:49.338 --> 00:13:50.904
+It's really just okay, well,
+
+273
+00:13:50.904 --> 00:13:54.560
+you got to learn about that import
+section thing that we just talked about.
+
+274
+00:13:54.560 --> 00:13:57.841
+You got to learn about the whole,
+this is the Type section.
+
+275
+00:13:57.841 --> 00:14:00.445
+You got to have your your
+types in order for that.
+
+276
+00:14:00.445 --> 00:14:04.661
+Once you understand like the sort of list
+of things that you need to do differently
+
+277
+00:14:04.661 --> 00:14:09.249
+in the WebAssembly world, or in the x8664
+world, or in the LLVM world, all of these
+
+278
+00:14:09.249 --> 00:14:13.103
+things are in the category of what
+people tend to call compiler back ends.
+
+279
+00:14:13.103 --> 00:14:16.969
+So the compiler back end is basically
+the thing that's responsible for
+
+280
+00:14:16.969 --> 00:14:21.480
+the code generation piece and the compiler
+frontend is essentially the other stuff
+
+281
+00:14:21.480 --> 00:14:26.075
+that we're doing, the type checking,
+the analysis, the parsing, and all that.
+
+282
+00:14:26.075 --> 00:14:28.474
+So I guess being here at Frontend Masters,
+
+283
+00:14:28.474 --> 00:14:32.476
+it's only appropriate that we sort
+of relegated the backend portion of
+
+284
+00:14:32.476 --> 00:14:35.358
+the compiler to the very end
+[LAUGH] of the workshop.
+
+285
+00:14:35.358 --> 00:14:36.775
+Having said all that, so
+
+286
+00:14:36.775 --> 00:14:40.700
+this basically is essentially our
+whirlwind tour of this code base.
+
+287
+00:14:40.700 --> 00:14:43.916
+If you want, there's quite
+a lot here to get this to work.
+
+288
+00:14:43.916 --> 00:14:48.290
+But really, you can even get some bit
+shifts in there if you're into that kind
+
+289
+00:14:48.290 --> 00:14:51.064
+of thing,
+also something we did in the C course.
+
+290
+00:14:51.064 --> 00:14:56.037
+But basically, the whole purpose of all
+of this is just building up to being able
+
+291
+00:14:56.037 --> 00:15:01.158
+to actually run our Node.js tests, as we
+have been doing all these other things,
+
+292
+00:15:01.158 --> 00:15:04.228
+because Node.js does
+support wasm execution.
+

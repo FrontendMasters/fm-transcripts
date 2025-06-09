@@ -1,0 +1,1482 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:02.877
+Cool, all right, so
+let's talk about Inferring Constants.
+
+2
+00:00:02.877 --> 00:00:05.098
+So this is the most basic type
+of inference we can do, but
+
+3
+00:00:05.098 --> 00:00:06.816
+it's already gonna be something useful.
+
+4
+00:00:06.816 --> 00:00:12.726
+So let's say we say const a = hi, and
+then const b = a, and const c = b.
+
+5
+00:00:12.726 --> 00:00:14.813
+Nothing but constants,
+very straightforward, and
+
+6
+00:00:14.813 --> 00:00:15.934
+I guess one string literal.
+
+7
+00:00:15.934 --> 00:00:19.132
+Very straightforward, but of course,
+it would be quite nice to be able to say,
+
+8
+00:00:19.132 --> 00:00:22.184
+I would like to infer that c is a string,
+even though c is just referring to b,
+
+9
+00:00:22.184 --> 00:00:25.148
+which is referring to a, and then a is
+the one that actually was a string.
+
+10
+00:00:25.148 --> 00:00:29.278
+So in order to do this correctly, in order
+to be able to have our compiler understand
+
+11
+00:00:29.278 --> 00:00:33.066
+that c's type is string, it needs to
+be able to sort of thread this through.
+
+12
+00:00:33.066 --> 00:00:36.825
+It needs to be able to understand that the
+implication of c being b, and b being a,
+
+13
+00:00:36.825 --> 00:00:39.702
+and a being a string is that
+through the transitive property,
+
+14
+00:00:39.702 --> 00:00:40.946
+c should also be a string.
+
+15
+00:00:40.946 --> 00:00:43.936
+So it's easy enough for us as a human
+to just look at that and be like, yeah,
+
+16
+00:00:43.936 --> 00:00:44.461
+obviously.
+
+17
+00:00:44.461 --> 00:00:48.266
+But this is a compiler, we need to
+actually teach it how to do this.
+
+18
+00:00:48.266 --> 00:00:49.669
+So here's what we're gonna do.
+
+19
+00:00:49.669 --> 00:00:52.567
+I'm gonna call what we're gonna
+use here a types database.
+
+20
+00:00:52.567 --> 00:00:56.572
+Different people call this different
+things, probably the most correct name for
+
+21
+00:00:56.572 --> 00:00:58.381
+this is a union find data structure.
+
+22
+00:00:58.381 --> 00:01:01.005
+Union find sounds like a verb, I always
+thought it was a really weird name for
+
+23
+00:01:01.005 --> 00:01:03.182
+data structure, so
+I'm not gonna call it that in this course.
+
+24
+00:01:03.182 --> 00:01:06.776
+I think types database is a much
+more helpful way to understand it,
+
+25
+00:01:06.776 --> 00:01:10.126
+because basically,
+what we're making is a key value store.
+
+26
+00:01:10.126 --> 00:01:14.450
+The key is an ID or a type variable,
+I'm using those terms interchangeably, and
+
+27
+00:01:14.450 --> 00:01:17.196
+then the value is the actual
+type of that variable.
+
+28
+00:01:17.196 --> 00:01:18.880
+So that's what we're gonna call it.
+
+29
+00:01:18.880 --> 00:01:22.787
+But if you ever hear about people talking
+about union find or there's various
+
+30
+00:01:22.787 --> 00:01:26.652
+different terms that people use for
+this thing, like substitution table.
+
+31
+00:01:26.652 --> 00:01:29.478
+Then basically,
+at the end of the day, conceptually,
+
+32
+00:01:29.478 --> 00:01:32.740
+I think a types database is the most
+useful way to think about it.
+
+33
+00:01:32.740 --> 00:01:35.833
+Okay, so basically, what we're gonna
+do first is we're gonna say, okay,
+
+34
+00:01:35.833 --> 00:01:38.368
+we got our types database and
+there's nothing in it right now.
+
+35
+00:01:38.368 --> 00:01:41.624
+So the first thing we're gonna
+do is we're gonna go through and
+
+36
+00:01:41.624 --> 00:01:45.382
+assign type variables to all of
+the interesting nodes in our parse tree.
+
+37
+00:01:45.382 --> 00:01:48.762
+Now, when I say interesting nodes,
+what I mean is we don't really care about
+
+38
+00:01:48.762 --> 00:01:51.266
+the equals,
+that's not really a relevant part of this.
+
+39
+00:01:51.266 --> 00:01:53.606
+When you have curly braces,
+that's relevant for scope, but
+
+40
+00:01:53.606 --> 00:01:55.052
+it's not really relevant for types.
+
+41
+00:01:55.052 --> 00:01:58.907
+For our purposes, the things that
+are relevant here are a, b, c.
+
+42
+00:01:58.907 --> 00:02:03.471
+So a is gonna get an ID of 0, that we're
+just gonna go through and assign it, and
+
+43
+00:02:03.471 --> 00:02:06.080
+say, all right, 0, it's a null at first.
+
+44
+00:02:06.080 --> 00:02:09.478
+So initially, we're gonna initialize all
+these in the database to just have null
+
+45
+00:02:09.478 --> 00:02:12.103
+for their type because we don't
+know anything about them yet.
+
+46
+00:02:12.103 --> 00:02:15.054
+And I'm gonna go through and refine that.
+
+47
+00:02:15.054 --> 00:02:19.465
+So basically, hi is going to get
+its own entry in the database.
+
+48
+00:02:19.465 --> 00:02:21.192
+You might think, but who cares?
+
+49
+00:02:21.192 --> 00:02:24.767
+Obviously, it's a string, we don't need
+to bother putting it in the database.
+
+50
+00:02:24.767 --> 00:02:27.871
+But it actually is useful to have
+its own entry because quite a lot of
+
+51
+00:02:27.871 --> 00:02:31.544
+the operations that we're doing are going
+to be done in terms of database IDs.
+
+52
+00:02:31.544 --> 00:02:32.901
+And so just having an id for this thing,
+
+53
+00:02:32.901 --> 00:02:35.179
+even though we know it's going to
+end up being a string is useful.
+
+54
+00:02:35.179 --> 00:02:38.659
+So we'll set it as null then
+immediately set it to a string later.
+
+55
+00:02:38.659 --> 00:02:40.131
+So that's gonna be high.
+
+56
+00:02:40.131 --> 00:02:44.703
+Then we have b, which is also gonna
+be null, const b, c is null, and
+
+57
+00:02:44.703 --> 00:02:45.840
+we're all set.
+
+58
+00:02:45.840 --> 00:02:49.511
+Okay, so this is the initial
+population of our database.
+
+59
+00:02:49.511 --> 00:02:52.939
+We're gonna sort of forget about c being
+special or sort of like our goal for now.
+
+60
+00:02:52.939 --> 00:02:56.357
+At this point, we're just gonna focus on
+getting the database in the state that we
+
+61
+00:02:56.357 --> 00:02:57.953
+want so that we can answer questions.
+
+62
+00:02:57.953 --> 00:03:01.721
+And then one of the questions that
+we might choose to ask is what
+
+63
+00:03:01.721 --> 00:03:02.744
+is the type of c?
+
+64
+00:03:02.744 --> 00:03:04.330
+All right, so for right now,
+everything is just null.
+
+65
+00:03:04.330 --> 00:03:07.269
+All we've done is just gone through and
+just assigned these IDs to these things.
+
+66
+00:03:07.269 --> 00:03:09.931
+I do wanna note that in the parse tree,
+
+67
+00:03:09.931 --> 00:03:15.356
+it is actually useful to write down
+the ID that corresponds to this database.
+
+68
+00:03:15.356 --> 00:03:18.461
+So in our const deco right here,
+we would say, okay,
+
+69
+00:03:18.461 --> 00:03:21.647
+the ID that goes with
+the identifier of a is gonna be 0.
+
+70
+00:03:21.647 --> 00:03:25.253
+And then also the ID that goes with
+the expression is gonna be 1 and
+
+71
+00:03:25.253 --> 00:03:27.098
+we would do that for all of these.
+
+72
+00:03:27.098 --> 00:03:29.683
+Now the reason we wanna do this
+is that it is quite common that,
+
+73
+00:03:29.683 --> 00:03:32.829
+especially if you're going to machine
+code or in our case to web assembly.
+
+74
+00:03:32.829 --> 00:03:36.666
+That once you get all the way through type
+checking and you get onto code generation,
+
+75
+00:03:36.666 --> 00:03:38.787
+you actually need to
+know the types of things.
+
+76
+00:03:38.787 --> 00:03:42.292
+And we'll see an example of where it
+becomes important that if you throw that
+
+77
+00:03:42.292 --> 00:03:45.546
+information away and don't have it
+connected back to the parse tree.
+
+78
+00:03:45.546 --> 00:03:49.205
+It's very similar to the downside of not
+having your original source code positions
+
+79
+00:03:49.205 --> 00:03:52.760
+connected except whereas that's a problem
+if you're trying to report errors and
+
+80
+00:03:52.760 --> 00:03:54.686
+you can't connect them back to the source.
+
+81
+00:03:54.686 --> 00:03:57.708
+In this case it's even more serious,
+which is that if you wanna actually
+
+82
+00:03:57.708 --> 00:04:00.295
+run the program and
+you're doing ahead of time compilation.
+
+83
+00:04:00.295 --> 00:04:04.099
+Not having the type information at the
+final stage of code generation means that
+
+84
+00:04:04.099 --> 00:04:07.677
+there's just some things you just
+cannot actually generate the code for,
+
+85
+00:04:07.677 --> 00:04:09.628
+which is a much more important problem.
+
+86
+00:04:09.628 --> 00:04:12.318
+Okay, so
+now we've assigned these type variables.
+
+87
+00:04:12.318 --> 00:04:15.083
+The next thing we're gonna do is we're
+gonna assign some type relationships
+
+88
+00:04:15.083 --> 00:04:15.815
+between these two.
+
+89
+00:04:15.815 --> 00:04:17.265
+So what do I mean by relationships?
+
+90
+00:04:17.265 --> 00:04:20.817
+Well, we know that there's
+a relationship between this const a and
+
+91
+00:04:20.817 --> 00:04:24.826
+the thing that it's assigned to,
+namely, that is essentially a symlink.
+
+92
+00:04:24.826 --> 00:04:28.395
+It's like whatever the type is of
+the other side of this equal sign.
+
+93
+00:04:28.395 --> 00:04:30.126
+I don't necessarily know what it is yet.
+
+94
+00:04:30.126 --> 00:04:33.301
+At this point, if I looked at it,
+I asked you right now, drop everything and
+
+95
+00:04:33.301 --> 00:04:35.352
+tell me exactly what is
+it Id 1 in this database.
+
+96
+00:04:35.352 --> 00:04:37.897
+It would be like null, I'm like,
+well, that's not helpful.
+
+97
+00:04:37.897 --> 00:04:41.042
+But this is not about what is it at this
+exact moment when I'm doing the type
+
+98
+00:04:41.042 --> 00:04:41.568
+checking?
+
+99
+00:04:41.568 --> 00:04:44.088
+The important part is that
+these two are related.
+
+100
+00:04:44.088 --> 00:04:46.384
+So as we go through
+the type-checking process,
+
+101
+00:04:46.384 --> 00:04:48.629
+we're gonna learn more
+about these other ids.
+
+102
+00:04:48.629 --> 00:04:52.339
+We're gonna learn things through inference
+of looking at what's the shape of them.
+
+103
+00:04:52.339 --> 00:04:54.830
+And also what are their
+relationships to other things,
+
+104
+00:04:54.830 --> 00:04:58.071
+our understanding of the types of
+the program is sort of going to evolve.
+
+105
+00:04:58.071 --> 00:04:59.380
+And that's why I like to
+call this a database.
+
+106
+00:04:59.380 --> 00:05:02.380
+It's just like a database in that it
+changes constantly as we're going through
+
+107
+00:05:02.380 --> 00:05:03.331
+and doing these things.
+
+108
+00:05:03.331 --> 00:05:07.057
+So the important thing that we wanna write
+down when we're changing this from null to
+
+109
+00:05:07.057 --> 00:05:10.377
+something else is what I like to think of,
+again, this is my terminology.
+
+110
+00:05:10.377 --> 00:05:12.644
+This is not what you'll find in
+like compiler literature, but
+
+111
+00:05:12.644 --> 00:05:13.725
+I like to call this a symlink.
+
+112
+00:05:13.725 --> 00:05:18.277
+We're basically saying Id
+0 is symlinked to Id 1.
+
+113
+00:05:18.277 --> 00:05:21.686
+Which basically means that anytime
+we ask Id 0, hey, what's your value,
+
+114
+00:05:21.686 --> 00:05:23.671
+it's gonna say, I don't know, go ask 1.
+
+115
+00:05:23.671 --> 00:05:25.630
+Whatever one's value is,
+that's what my value is,
+
+116
+00:05:25.630 --> 00:05:27.377
+and that's how we're
+sorta making this link.
+
+117
+00:05:27.377 --> 00:05:31.006
+Now the term link is definitely something
+you'll find in compiler literature, but
+
+118
+00:05:31.006 --> 00:05:34.191
+symlink to me is, I don't know,
+a little bit more like [LAUGH] relatable.
+
+119
+00:05:34.191 --> 00:05:35.952
+So these two are now basically connected.
+
+120
+00:05:35.952 --> 00:05:38.897
+We have said there's
+a relationship between a and hi,
+
+121
+00:05:38.897 --> 00:05:42.289
+which is that anytime you ask what a is,
+or you ask what ID 0 is,
+
+122
+00:05:42.289 --> 00:05:46.143
+the answer you're gonna get is,
+I don't know, go ask I did number 1.
+
+123
+00:05:46.143 --> 00:05:48.201
+Okay, now moving on
+through our parse tree.
+
+124
+00:05:48.201 --> 00:05:51.094
+So we've completed that part
+of our parse tree node.
+
+125
+00:05:51.094 --> 00:05:53.689
+Next up is this thing,
+and again, was null.
+
+126
+00:05:53.689 --> 00:05:57.367
+This is the part where we say,
+okay, what type are you?
+
+127
+00:05:57.367 --> 00:05:58.479
+You're a string literal.
+
+128
+00:05:58.479 --> 00:05:59.670
+I bet you're a string.
+
+129
+00:05:59.670 --> 00:06:01.253
+[LAUGH] Just write that down directly.
+
+130
+00:06:01.253 --> 00:06:04.821
+There's no need for a relationship here or
+anything like that,
+
+131
+00:06:04.821 --> 00:06:07.994
+some compilers will actually,
+again, because it's so
+
+132
+00:06:07.994 --> 00:06:11.980
+common to have writing functions in
+terms of IDs, will actually have.
+
+133
+00:06:11.980 --> 00:06:15.964
+For example a set of hard-coded ids for
+string literals and number literals and
+
+134
+00:06:15.964 --> 00:06:16.868
+stuff like that.
+
+135
+00:06:16.868 --> 00:06:19.437
+It's like, yeah, they're all the same
+type, but I just want an ID so
+
+136
+00:06:19.437 --> 00:06:20.408
+I can work in terms of IDs.
+
+137
+00:06:20.408 --> 00:06:24.095
+And so in that scenario, you might see a
+SimLink off to some like hard coded one of
+
+138
+00:06:24.095 --> 00:06:26.407
+those, or
+if you don't care about performance,
+
+139
+00:06:26.407 --> 00:06:28.794
+which might be what we're
+doing in the exercises.
+
+140
+00:06:28.794 --> 00:06:32.086
+Then you might go a step further and say
+like, I'm gonna make a brand new one of
+
+141
+00:06:32.086 --> 00:06:35.548
+these every single time I want to do this
+and like make the ID like SimLink to that.
+
+142
+00:06:35.548 --> 00:06:37.921
+But that's just kind of,
+you would never do that in a production.
+
+143
+00:06:37.921 --> 00:06:40.480
+It's just really wasteful.
+
+144
+00:06:40.480 --> 00:06:43.453
+But it is pretty common to have just l
+a hard coded list of okay, you got string
+
+145
+00:06:43.453 --> 00:06:46.670
+for string literals and number for
+number literals, blah, blah, blah, blah.
+
+146
+00:06:46.670 --> 00:06:49.371
+And they all have hardcoded Ids that
+I know about, and I can just sim link
+
+147
+00:06:49.371 --> 00:06:52.039
+directly to those whenever I encounter
+one of those in my code, yeah.
+
+148
+00:06:52.039 --> 00:06:56.680
+Are those generally referred to as
+the primitives of your language?
+
+149
+00:06:56.680 --> 00:07:00.334
+There's different names,
+I've had primitives, there's like,
+
+150
+00:07:00.334 --> 00:07:03.871
+primary expressions,
+there's a couple of relate names to them.
+
+151
+00:07:03.871 --> 00:07:07.763
+I do like primitives personally, but
+yeah, lot of noise can go with that.
+
+152
+00:07:07.763 --> 00:07:09.616
+So moving on with our relationship.
+
+153
+00:07:09.616 --> 00:07:14.140
+So next we're on to be here and now,
+an important thing to note here is
+
+154
+00:07:14.140 --> 00:07:18.976
+that at this point, when we're saying,
+what is b sort of simlink to you?
+
+155
+00:07:18.976 --> 00:07:24.361
+We have a more direct answer than just
+saying like b assembling to like whoever's
+
+156
+00:07:24.361 --> 00:07:29.363
+in this slot, because we actually
+know exactly what a's id is, it's 0.
+
+157
+00:07:29.363 --> 00:07:33.342
+And we can know that using exactly
+the same strategy that we learned
+
+158
+00:07:33.342 --> 00:07:35.699
+in the previous section using scopes.
+
+159
+00:07:35.699 --> 00:07:39.529
+This naming resolution right here is
+pretty much the same algorithm that we
+
+160
+00:07:39.529 --> 00:07:43.844
+went through previously, except now we're
+doing it in terms of types rather than in
+
+161
+00:07:43.844 --> 00:07:45.508
+terms of, name declarations.
+
+162
+00:07:45.508 --> 00:07:49.715
+So you can imagine that as we're going
+along here, we could have a scope set,
+
+163
+00:07:49.715 --> 00:07:54.245
+just like we did previously, and say that
+we're going to put a in the scope set, but
+
+164
+00:07:54.245 --> 00:07:55.905
+it's not just gonna be a set.
+
+165
+00:07:55.905 --> 00:07:57.646
+It's actually gonna be a map.
+
+166
+00:07:57.646 --> 00:08:01.281
+And that map is gonna say,
+if I go ask you what's the value of a,
+
+167
+00:08:01.281 --> 00:08:04.039
+I'm not just gonna say yes or
+no, a is in scope.
+
+168
+00:08:04.039 --> 00:08:07.050
+I'm actually gonna take it a step further
+and say, you know what the value of a is?
+
+169
+00:08:07.050 --> 00:08:08.276
+It's 0 right here.
+
+170
+00:08:08.276 --> 00:08:12.590
+A is associated with that ID of 0, which
+means that as we're traversing these parse
+
+171
+00:08:12.590 --> 00:08:16.719
+tree nodes, when we see an a in the lookup
+position, so it's not a declaration,
+
+172
+00:08:16.719 --> 00:08:19.182
+this is a lookup,
+we're saying like what is a?
+
+173
+00:08:19.182 --> 00:08:20.438
+I can answer that question.
+
+174
+00:08:20.438 --> 00:08:22.271
+First of all, a was already defined.
+
+175
+00:08:22.271 --> 00:08:25.355
+Remember how I said it's really convenient
+to already know that these are all going
+
+176
+00:08:25.355 --> 00:08:28.282
+to be defined and I'd have to deal with
+them right here, that's exactly why.
+
+177
+00:08:28.282 --> 00:08:31.557
+If we didn't have that naming step,
+then when we got here,
+
+178
+00:08:31.557 --> 00:08:35.486
+we would have to be like, well,
+now we have to handle the possibility in
+
+179
+00:08:35.486 --> 00:08:39.367
+the middle of type checking that
+this thing was not already declared.
+
+180
+00:08:39.367 --> 00:08:42.671
+But thankfully, in our compiler,
+we halt before that would have happened.
+
+181
+00:08:42.671 --> 00:08:44.502
+So we know that this is going to work and
+
+182
+00:08:44.502 --> 00:08:48.225
+we also know in this particular example
+that when I go and ask the scope, hey,
+
+183
+00:08:48.225 --> 00:08:50.312
+what is the current
+value of a in the scope?
+
+184
+00:08:50.312 --> 00:08:53.106
+It's gonna say, a, that's type ID 0.
+
+185
+00:08:53.106 --> 00:08:57.197
+So there's no need for
+a more special formal relationship here.
+
+186
+00:08:57.197 --> 00:09:01.329
+I can just basically directly say look,
+b is just simply straight to 0.
+
+187
+00:09:01.329 --> 00:09:04.593
+So even though this one is we're simply to
+the other thing, whatever's on the other
+
+188
+00:09:04.593 --> 00:09:07.572
+side of me, it's well, I already have an
+ID for the thing on the other side of me.
+
+189
+00:09:07.572 --> 00:09:10.361
+So I'm just going to send
+link directly to that.
+
+190
+00:09:10.361 --> 00:09:11.814
+Basically the same story with c.
+
+191
+00:09:11.814 --> 00:09:15.413
+So when we get to c we're okay,
+what is c gonna be similar to?
+
+192
+00:09:15.413 --> 00:09:19.258
+And c is, well, the other side of this
+is something that we also have in scope,
+
+193
+00:09:19.258 --> 00:09:21.939
+namely b, so
+I'm just gonna symlink directly to that.
+
+194
+00:09:21.939 --> 00:09:24.595
+Okay, so
+now we have populated our database.
+
+195
+00:09:24.595 --> 00:09:26.497
+We have assigned all
+the type relationships.
+
+196
+00:09:26.497 --> 00:09:30.601
+We've said that zero, which is a back
+here, like const a, that is basically,
+
+197
+00:09:30.601 --> 00:09:32.460
+hey, I don't know what my type is.
+
+198
+00:09:32.460 --> 00:09:34.536
+Go ask 1, 1 is like, I'm a string.
+
+199
+00:09:34.536 --> 00:09:38.906
+If you go ask const b what its type is,
+it's gonna say it's I'm some link to 0.
+
+200
+00:09:38.906 --> 00:09:41.546
+So that's a,
+we can sort of draw this out visually and
+
+201
+00:09:41.546 --> 00:09:44.197
+say if we're gonna go back
+to our original goal here.
+
+202
+00:09:44.197 --> 00:09:46.373
+Which is we wanna infer
+that c is a string,
+
+203
+00:09:46.373 --> 00:09:50.621
+the way that we can do that is say, okay,
+well, first off, what is c's type ID.
+
+204
+00:09:50.621 --> 00:09:52.812
+And, okay, c is type ID 3.
+
+205
+00:09:52.812 --> 00:09:55.486
+Well, that's right here
+in our database table.
+
+206
+00:09:55.486 --> 00:10:00.447
+So we go ask our types database,
+what in fact is the current type of c?
+
+207
+00:10:00.447 --> 00:10:04.202
+And it says, well, I'm whatever 2 is.
+
+208
+00:10:04.202 --> 00:10:05.920
+So then we go and ask 2,
+okay, what are you?
+
+209
+00:10:05.920 --> 00:10:08.113
+And 2 says, I'm whatever 0 is.
+
+210
+00:10:08.113 --> 00:10:09.331
+And we say, okay, what is 0?
+
+211
+00:10:09.331 --> 00:10:10.609
+And it says, I'm whatever 1 is.
+
+212
+00:10:10.609 --> 00:10:12.806
+Then we go to 1, and
+it says, I'm a string.
+
+213
+00:10:12.806 --> 00:10:13.962
+So we did it.
+
+214
+00:10:13.962 --> 00:10:14.853
+[LAUGH] That's the answer.
+
+215
+00:10:14.853 --> 00:10:19.489
+[LAUGH] Several hops later, we have gone
+all the way from initially saying a equals
+
+216
+00:10:19.489 --> 00:10:21.274
+high, b equals a, c equals b.
+
+217
+00:10:21.274 --> 00:10:22.345
+What is the type of c?
+
+218
+00:10:22.345 --> 00:10:26.062
+To answering that question through
+our database with c as a string.
+
+219
+00:10:26.062 --> 00:10:29.085
+Hooray, type inference
+on a very basic level.
+
+220
+00:10:29.085 --> 00:10:33.542
+Okay, so to kind of like recap what
+we have done to get up to this point.
+
+221
+00:10:33.542 --> 00:10:36.415
+So the first thing we did was
+we did our tokenization phase.
+
+222
+00:10:36.415 --> 00:10:39.339
+And that was where we started with
+a string and we're just like, cool,
+
+223
+00:10:39.339 --> 00:10:40.380
+let me make some tokens.
+
+224
+00:10:40.380 --> 00:10:43.749
+The tokens kind of look like
+this in memory representation.
+
+225
+00:10:43.749 --> 00:10:45.489
+We have an object with like type as const,
+
+226
+00:10:45.489 --> 00:10:48.524
+the value is null because there's no
+particular payload to this token,
+
+227
+00:10:48.524 --> 00:10:51.627
+its position is zero, we're just
+writing that down for error messages.
+
+228
+00:10:51.627 --> 00:10:54.115
+Then we get another token
+that's like an identifier.
+
+229
+00:10:54.115 --> 00:10:56.507
+Its value is a, position is 6, that's etc.
+
+230
+00:10:56.507 --> 00:11:00.755
+Then we turn that stream of tokens into
+parse tree nodes which are nested.
+
+231
+00:11:00.755 --> 00:11:03.621
+And so then we get things
+like this const declaration,
+
+232
+00:11:03.621 --> 00:11:07.440
+which has the ID of a and then a value,
+the type of string and a value of hi.
+
+233
+00:11:07.440 --> 00:11:10.260
+And then now what we're doing
+is we're actually sort of
+
+234
+00:11:10.260 --> 00:11:12.007
+annotating the parse tree nodes.
+
+235
+00:11:12.007 --> 00:11:15.647
+We're expanding them, we're giving them
+a little bit more information by making
+
+236
+00:11:15.647 --> 00:11:17.208
+these into typed parse tree nodes.
+
+237
+00:11:17.208 --> 00:11:20.759
+And this is that initial step that I
+talked about, when we're going through and
+
+238
+00:11:20.759 --> 00:11:24.052
+just handing out IDs to everyone,
+we just write down what is your type ID?
+
+239
+00:11:24.052 --> 00:11:27.023
+And at that stage, they were all null.
+
+240
+00:11:27.023 --> 00:11:31.607
+So when we're going through the tree nodes
+and saying you get a typeId of zero, and
+
+241
+00:11:31.607 --> 00:11:36.334
+you get a typeId of 1, etc, you Initially,
+that's not even useful information.
+
+242
+00:11:36.334 --> 00:11:39.835
+It's like, yeah, your type id is 0,
+if I go look at the database it's null,
+
+243
+00:11:39.835 --> 00:11:40.745
+how useful was that?
+
+244
+00:11:40.745 --> 00:11:45.519
+Well, the answer is it's quite useful
+if you are about to do is to go
+
+245
+00:11:45.519 --> 00:11:50.298
+populate all those database tables,
+database rose by traversing
+
+246
+00:11:50.298 --> 00:11:55.094
+the first three nodes and
+assigning relationships between them.
+
+247
+00:11:55.094 --> 00:12:00.040
+Worth noting that you don't have to
+do this type ID assignment stage
+
+248
+00:12:00.040 --> 00:12:01.441
+in type checking.
+
+249
+00:12:01.441 --> 00:12:04.312
+So I mentioned earlier that when
+you're finished with parsing and
+
+250
+00:12:04.312 --> 00:12:06.011
+you're moving on to name resolution.
+
+251
+00:12:06.011 --> 00:12:08.812
+You could do this canonicalization thing
+where there's some extra information you
+
+252
+00:12:08.812 --> 00:12:09.410
+can put in there.
+
+253
+00:12:09.410 --> 00:12:11.401
+In Rocks Compile,
+this is actually where we do this.
+
+254
+00:12:11.401 --> 00:12:15.117
+So in the parse tree nodes,
+we don't have any type typeIds.
+
+255
+00:12:15.117 --> 00:12:17.967
+And then when we translate from
+parse tree nodes to canonical node,
+
+256
+00:12:17.967 --> 00:12:20.374
+which do the string and
+turning and the name resolution.
+
+257
+00:12:20.374 --> 00:12:23.531
+One of the other things we do during
+canonization is that we add these,
+
+258
+00:12:23.531 --> 00:12:25.993
+we go through and
+assign type variables to everybody so
+
+259
+00:12:25.993 --> 00:12:27.511
+that they can look them up later.
+
+260
+00:12:27.511 --> 00:12:29.722
+And so why do we actually need this?
+
+261
+00:12:29.722 --> 00:12:31.287
+Right now we don't.
+
+262
+00:12:31.287 --> 00:12:34.575
+Much like with the position
+that we saw earlier,
+
+263
+00:12:34.575 --> 00:12:39.867
+I've mentioned that we write this down and
+it is useful in various scenarios,
+
+264
+00:12:39.867 --> 00:12:44.862
+but none of the scenarios we've seen so
+far are actually making use of it.
+
+265
+00:12:44.862 --> 00:12:46.757
+We're just kind of writing it down and
+mentioning it, but
+
+266
+00:12:46.757 --> 00:12:48.118
+not actually getting any value out of it.
+
+267
+00:12:48.118 --> 00:12:50.655
+I would say this is in the same boat right
+now and that we're writing it down and
+
+268
+00:12:50.655 --> 00:12:52.036
+I wanna note that we're writing it down.
+
+269
+00:12:52.036 --> 00:12:55.392
+But we're not actually gonna make use
+of this until the very last section of
+
+270
+00:12:55.392 --> 00:12:59.119
+the course, that's the part where we once
+again, will traverse these nodes, and
+
+271
+00:12:59.119 --> 00:13:01.111
+then we're going to spit out WebAssembly.
+
+272
+00:13:01.111 --> 00:13:04.545
+And WebAssembly actually cares about
+what is the final concrete type
+
+273
+00:13:04.545 --> 00:13:05.441
+of these things.
+
+274
+00:13:05.441 --> 00:13:08.170
+And there are some things like string
+literals where we just know it's
+
+275
+00:13:08.170 --> 00:13:08.778
+very obvious.
+
+276
+00:13:08.778 --> 00:13:11.933
+But there's also some things where if
+we haven't already connected the type
+
+277
+00:13:11.933 --> 00:13:14.599
+information back to the node,
+we see the node, and we're like,
+
+278
+00:13:14.599 --> 00:13:17.362
+I don't know what to tell you why
+that suddenly you need to type, but
+
+279
+00:13:17.362 --> 00:13:19.672
+I don't know what the type is and
+this is how we get that.
+
+280
+00:13:19.672 --> 00:13:23.079
+This way back at the very beginning of,
+[LAUGH] outside members.
+
+281
+00:13:23.079 --> 00:13:27.878
+And then so from this type first three
+notes which had these ids connected to
+
+282
+00:13:27.878 --> 00:13:29.332
+things they disable.
+
+283
+00:13:29.332 --> 00:13:32.132
+We basically went through and
+assigned relationships until we
+
+284
+00:13:32.132 --> 00:13:34.520
+ended up with this much more
+useful populated table.
+
+285
+00:13:34.520 --> 00:13:37.450
+And the only way that we did this was just
+by traversing these parse tree nodes and
+
+286
+00:13:37.450 --> 00:13:39.155
+just being like, okay, what are you?
+
+287
+00:13:39.155 --> 00:13:43.415
+You're a const echo, and here is your ID,
+and then here's the thing that you're
+
+288
+00:13:43.415 --> 00:13:47.084
+assigned to, and here's the idea
+of that thing, and yada yada.
+
+289
+00:13:47.084 --> 00:13:49.472
+And so
+if you were wondering what is the like?
+
+290
+00:13:49.472 --> 00:13:52.965
+Literally, what does the code look
+like that actually does this?
+
+291
+00:13:52.965 --> 00:13:57.116
+Basically you can implement this
+database as just an array in JavaScript.
+
+292
+00:13:57.116 --> 00:13:58.710
+That's totally acceptable and
+that's, in fact,
+
+293
+00:13:58.710 --> 00:13:59.986
+what we're going to do in the exercises.
+
+294
+00:13:59.986 --> 00:14:03.959
+So you literally can say when I'm coming
+along here, like DB bracket zero,
+
+295
+00:14:03.959 --> 00:14:07.126
+I'm just initializing these
+slots in the array to null, and
+
+296
+00:14:07.126 --> 00:14:09.258
+that's all the ceremony there is to it.
+
+297
+00:14:09.258 --> 00:14:12.420
+So when I say types database,
+I mean kind of like an array.
+
+298
+00:14:12.420 --> 00:14:15.792
+We're not talking like PostgreSQL or
+anything like that.
+
+299
+00:14:15.792 --> 00:14:18.950
+As far as representing the sim
+links versus concrete types, again,
+
+300
+00:14:18.950 --> 00:14:21.682
+I'm trying to go for
+a pretty simple representation here.
+
+301
+00:14:21.682 --> 00:14:25.551
+So what we'll see in the exercise is that
+I literally use the term symlink to talk
+
+302
+00:14:25.551 --> 00:14:26.900
+about like, what is this?
+
+303
+00:14:26.900 --> 00:14:29.014
+Don't ask me, go ask ID number one.
+
+304
+00:14:29.014 --> 00:14:32.381
+So that's just an object
+of what says symlink:1.
+
+305
+00:14:32.381 --> 00:14:35.401
+And then if it's not a symlink,
+if it's a concrete type,
+
+306
+00:14:35.401 --> 00:14:39.423
+then we actually use the term concrete and
+then say what its concrete type is.
+
+307
+00:14:39.423 --> 00:14:41.752
+This primitive type is another word for
+that.
+
+308
+00:14:41.752 --> 00:14:44.961
+I use the term concrete basically to
+sort of contrast it with symlink.
+
+309
+00:14:44.961 --> 00:14:48.306
+So symlink is sort of like,
+I don't know, go ask this thing.
+
+310
+00:14:48.306 --> 00:14:52.510
+Concrete type is like, we know the answer,
+the answer is this, exactly this thing.
+
+311
+00:14:52.510 --> 00:14:56.878
+It's a string for sure, it's a number for
+sure, it's a Boolean, etc.
+
+312
+00:14:56.878 --> 00:14:59.793
+And then, yeah, more and
+more symlinks there.
+

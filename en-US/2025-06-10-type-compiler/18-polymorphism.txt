@@ -1,0 +1,164 @@
+[00:00:00]
+>> Richard Feldman: Okay, and that brings us to part 6, polymorphism.
+>> Speaker 2: So now we're gonna get into the most advanced forms of function related things.
+>> Richard Feldman: And part 7 is going to be WebAssembly code generation. So this part 6 is the culmination of our type checking journey. So at the end of this we will have gone as far as we're going to go with Hindley-Milner type inference.
+
+[00:00:23]
+And hopefully, it's been an enjoyable journey. Let's just start off by talking about polymorphic functions, and we'll talk about what that term means very specifically while we're at it. We'll talk about arrays, this is a very classic example of polymorphism, where you have an array that has a specific type associated with it.
+
+[00:00:39]
+So you could say, at the type level, this is an array of strings, or this is an array of numbers. And then finally, we're gonna talk about type annotations as promised earlier on. At the very end, after we've talked about all the other type system features we're just gonna throw type annotations in there at the end, just as a way of really emphasizing that, yes, you really can get complete full type inference.
+
+[00:00:55]
+And really type annotations are strictly an optional thing that we're just kind of attacking on at the end. In case you want to write annotations to annotate your source code for all the usual reasons that you might choose to do that, even though you don't have to. Okay, so let's start off by talking about polymorphic functions.
+
+[00:01:11]
+So previously, you may recall, that we had this increment function defined to be x return x + 1. We had this goal of having one successful unification here, where we're using inc(42) that should unify, because this is all about numbers, and 42 is a number, that should be fine.
+
+[00:01:26]
+This one needs to be a mismatch, because it's a string, which is a concrete type, that's not a number. So now we're going to do something that's a little bit fancier than that. So this here is the identity function, it's one of the most famous functions out there, it's just basically takes one argument and returns it [LAUGH].
+
+[00:01:41]
+It's very straightforward function, but has some surprisingly useful and also surprisingly interesting properties. So the identity function is interesting because the way that this works in terms of definition, first of all, ends up getting us to that case that we talked about earlier, where we actually are going to have a null ending up in the types table.
+
+[00:01:59]
+But also, this is a case where this actually should not end up with 1 success and 1 mismatch for this, this should be totally legit. We should just have 2 successes for these two types, even though they're totally different concrete types. And in fact, if we don't have 2 successes here, something has gone very, very wrong with our type checker because obviously, the identity function should always work when you call it with different types, that's kind of its whole thing.
+
+[00:02:21]
+Now, worth noting, this is a form of polymorphism. So polymorphism generally means that you have your program behaving differently depending on a type difference. In other words, this identity function is essentially doing two different things depending on what types we pass it. If I pass it a number, it's returning a number, if I pass it to get a string, it's returning a string.
+
+[00:02:41]
+Now, in the language like JavaScript, that distinction might sound kinda meaningless, it's, what do you mean it's doing something different based on the type? Those are just two different types, what's the big deal? When we get to WebAssembly code generation, we'll see that that actually is a relevant difference.
+
+[00:02:56]
+Because strings and numbers, if you're dealing with bytes in memory, those are different sizes in memory, they have a different number of bytes they take up in memory. And so, when you're implementing this at a really low-level, like we're gonna do in the next section. When you're, hey, this function returns 8 bytes, versus this function returns 12 bytes, those are different functions, you have to pick one.
+
+[00:03:16]
+[LAUGH] You can't just say this returns some bytes, I don't know, you have to pick an actual number. And so, from that perspective, this function has to be polymorphic because that's what type of low-level code generation we're doing. If we're doing an interpreter or something like that, we could sort of pass along some runtime type information and then do the polymorphism at runtime.
+
+[00:03:34]
+Which is why it maybe doesn't feel like it's polymorphic because a lot of languages just take care of that at runtime for you. So, as a user of the language, it doesn't feel as if I'm doing something different based on the types, but behind the scenes, the runtime interpreter is having to do something different.
+
+[00:03:50]
+Because fundamentally, if you have two different types of different sizes, the CPU really is only gonna accept [LAUGH] numbers and instructions that work with one or the other. Okay, so, let's bust out our trusty types table here and our little database, and basically say, okay, we're gonna assign 0 to the name here and 1 to the thing after the equals just like always.
+
+[00:04:09]
+We're gonna go through and assign 2 to the argument a, 3 to the return type. And then, once again, we're gonna recycle this and just say, okay, yeah, we could just make a thing and assign it to symlink, but we're just gonna say cut to the chase, a is just 2 in both cases.
+
+[00:04:22]
+Okay, here's our initial types database, everything's null. Basically, we're gonna start off building up some unifications here. So unify(0, 1) that's our classic, just like we're gonna symlink this thing to the thing that it's equal to unify(3, 2) is basically because we have a return here. So anywhere we have a return, we're basically saying, okay, that return type that is getting returned needs to be the return type of the function, those need to be unified.
+
+[00:04:47]
+And that's actually it for identity. So previously, when we had the return x + 1, we had a whole bunch more unifications to do here, because plus brought three of its own. We had a number literal. Identity function, really lightweight. It's basically just these two unifications, and that's it.
+
+[00:05:04]
+So let's see how these translate into the database. So okay, it's unify(0, 1), we have seen this many times, this is just a symlink connecting the two. And then unify(3, 2) again, just a symlink, and that's it. So we're done unifying this function, there is nothing more to unify, there are no more constraints to apply.
+
+[00:05:21]
+There are no more rules that this function has to follow, and yet we still have two glaring nulls sitting here [LAUGH] in our database for the first time. So, what implications does this have for calling the functions? Well, so this is what it's gonna look like in the actual, whether we do it in the side table, or whether we actually store it in there, we are going to end up with a function that has these variables in it.
+
+[00:05:45]
+So, I guess we end up with just one null in the database after we put that in there for 1 which is this whole thing, forget about that one. But yes, [LAUGH] the a is what's null here, because this thing has no constraints on it whatsoever, it's just, I am an argument, that's my constraint, [LAUGH] being an argument is not a type constraint.
+
+[00:06:02]
+Yeah, then also we'll do a path compression on this. So the path compression would basically say, okay, since 2 and 3 are connected, 3 is sub-linked to 2, then basically, we would follow that and say, okay, these two are just both 2. Okay, so, our goal is 2 successes for each of these.
+
+[00:06:18]
+So now let's get into the calling the functions part of this. All right, so to do this we're gonna need to once again expand our database table. So all the values are the same, but we've got a bunch more nulls in here. I'm gonna assign 0 to identity again because again, we're just doing the scope lookup here and saying, we're gonna reuse the 0 we already have.
+
+[00:06:35]
+We're gonna assign 4 to be the return type of this whole thing, and then 5 to be the argument, and same thing here, 6 to be what it all evaluates to, and then 7 to be the argument. Okay, next up, we're gonna unify(4, 2) because basically, we're saying, okay, 4 is the entire thing that this call to identity is going to resolve to.
+
+[00:06:54]
+And what a returns is, sorry, what the identity function returns is 2. So, right at this point, and I'm gonna give you a very small spoiler that the approach we're about to take is not going to work out. So if you're watching this and saying, hang on a sec, that doesn't look like it's gonna work out, you're right.
+
+[00:07:08]
+It's not gonna work out and then we're gonna learn what we're gonna do instead. But for right now, we're just gonna keep doing the thing we did in the previous section and then crash and we'll brick wall. So, unify(4, 2), basically just exactly like we did last time, great.
+
+[00:07:20]
+Then unify(5, 2), because okay, well, that's the argument coming in and it's a 2 over there as well, so far so good. So we've unified this with the return type just like we did last time and then this with the argument type. Great, and then of course, we need to unify 5 with a number because it's a number, they're all obviously.
+
+[00:07:35]
+So [LAUGH] we've all done a one character worth of space here [LAUGH]. Okay, so we'll just go ahead and process those. So 4 becomes the symlink to 2, 5 also becomes the symlink to 2, and then 5 also becomes the symlink to a Number, and already there was trouble brewing.
+
+[00:07:47]
+Because now we have our identity function, and somehow, our identity function now thinks it only takes numbers, which means it's no longer the identity function. And we're about to ran crash into the brick wall of implications of that as soon as we start trying to unify this next one here.
+
+[00:08:01]
+So, again, we're doing 6 and 2 because that's the return type here. So, this whole thing's return type should be whatever this is returning. Then 7 and 2, because the argument is also coming in there. And then finally, 7 and string, because, hey, that's a string literal. So 6 and 2, great symlink, 7 and 2, great symlink.
+
+[00:08:16]
+And then here's where trouble starts, we're unifying the number 7, which is symlink to 2 over here with a string and kaboom. Now we're trying to make this be both a number and a string at the same time, and we've got a tight mismatch that we shouldn't have it.
+
+[00:08:29]
+We were trying to aim for 2 successes and we ended up with 1 success and 1 type mismatch exactly as we did in the previous section when we actually wanted that. Okay, so what were we supposed to do different here? Cuz our goal was 2 successes and we did not achieve our goal.
+
+[00:08:43]
+So what do we need to do differently in order to make it so that this actually works the way the identity function is supposed to work from a types perspective? Okay, so let's sort of rewind the clock and go back when we had not expanded those extra database table entries at this point.
+
+[00:08:58]
+And we're just kinda looking at, okay, let's just take the identity function, we're calling it passing 42. How else can we do the unification constraints so that this ends up with a better outcome? Okay, so first off, we resolve that identity is id0, no problem, that part's the same, that part's the same.
+
+[00:09:14]
+So far, so good, everything is totally harmless at this point. The next thing we're gonna do is we're going to make a fresh function type just for this call. So you may recall at the end of the previous exercise, one of the things we did, which is a little bit of foreshadowing, was that we made a fresh ID.
+
+[00:09:30]
+In the middle of unification, we're just, hey, let's just add some new stuff to the database. That's the thing we can do. And one of the other things we can do is not only can we add rows to the database, but we can put constraints on those rows, we can populate them with new stuff.
+
+[00:09:44]
+And that's exactly what we're gonna do here. So what we're gonna do is we're just gonna make up a new function. And this new function is basically a carbon copy of the old function, except that we're giving it fresh IDs for everything that is unbound. So it's still got the same shape, it's still one argument, one return value.
+
+[00:09:58]
+And it's still got the same sort of connection here, where it's the argument and the return value are the same ID, it's just that we've given it a new ID. So rather than recycling the two, we're just sort of, we made a new one that looks and works like the old one, but it's sort of a twin.
+
+[00:10:12]
+They're totally independent, they're not connected, they're not symlinked. They just look identical, but they aren't identical. And the really critical thing here is that, now, if we start using this one in all the places that we were previously using this one. Now, we can go ahead and modify this one as much as we want, and it's not gonna go back and damage the original identity function.
+
+[00:10:31]
+It's not gonna go and turn this into a number because now we're just messing around with this copy that we made rather than the original. Now, this is a really important subtle distinction, because sometimes you wanna do this and sometimes you don't wanna do this. In the previous example, it was very important that we went back and affected the original, whereas in this case, we don't.
+
+[00:10:49]
+So, what's the difference? Well, the difference is, a is a polymorphic type. So previously, we were dealing with a function that was taking a number type, after we did type inference, we concluded, that thing was a number. Its type was hard-coded, it was a concrete number type. This thing, remember, never gets bound to anything, it's unbound, that's how we know it's a polymorphic type, also known as a type variable.
+
+[00:11:13]
+So in our system here, when you have this scenario where you have this thing and there's nothing associated with it, that is a type variable. Which is why in the literature, [LAUGH] they call these things type variables because when you initialize them, that's what they are. So I like to call them IDs cuz of the database metaphor.
+
+[00:11:29]
+But if you see someone talking about, this is a type variable, that can usually mean either the ID itself or just the sort of default situation that it's in when you've just made the number and you haven't actually associated anything with it yet, because it's, well, yeah, it's null, it's unbound, it's just a type variable.
+
+[00:11:45]
+It could end up being anything, it's polymorphic. And when you are calling these things, this is the scenario where you want to do this sort of cloning trick to make sure that you're not accidentally polluting the original thing and it stays polymorphic and remains a type variable. As far as figuring out when to do that, one way you could think of this, this would be a very inefficient way to implement it.
+
+[00:12:06]
+Is you could just say, well, every time we do a function call, we just clone it as much as we want. But then if the arguments are not polymorphic, then we just throw away the call. But of course, it kinda makes more sense to just sort of be, okay, well, let me look at what I'm actually passing here.
+
+[00:12:22]
+Before I do this unification, I can decide in the moment, on the fly, okay, am I dealing with a polymorphic variable? If so, I need to do this cloning, and otherwise, I don't. Okay, so, I've chosen a different color for these just to kind of emphasize that both of these are sort of for purposes of this call only.
+
+[00:12:39]
+The only reason we created these was just for this one call to identity. They're not gonna participate in any of the rest of the stuff we're doing. They're just narrowly scoped to, we did this so that we can type check this without affecting the identity function here. Okay, so now we unify(4, 7).
+
+[00:12:56]
+So 4 being the return type, and then the 7 being the equivalent of this two, except over here it's a 7 instead of a 2. Then unify(5, 7), okay? So far, so good. And then unify(5, N). So, exact same stuff that we did before, except the arguments of return type are now unifying with 6 and 7 rather than 2 and 3, like they were in the previous example.
+
+[00:13:18]
+So, so far, so good, we'll just go ahead and do those. So 4 unifies with 7, 5 unifies with 7, and then 5 unifies with Number, which results in the symlink causing 7 to end up being a Number. This is fine because we have this clone here and this clone thinks it's all about numbers.
+
+[00:13:35]
+But that's not a big deal when we come to the other one where we're passing it in with a string because it's gonna get its own clone, which we're gonna call 10 and 11 down here. So 8 is gonna be the strategy thing, 0 is the same as before, 9 is the argument.
+
+[00:13:48]
+And now when we go and unify these three in exactly the same way that we did the previous time, except that now we're unifying with 11 rather than with 2. Yeah, then we go through and just process these things, symlink, symlink, and this ends up being a string, and it's no problem.
+
+[00:14:02]
+We have these two clones that got totally unified and they didn't harm anything, there was no effect on identity. If we wanted to, we could call it a whole bunch more times like an array and pass in a function and a Boolean. And all these different things, since every single time we do them, they're gonna get their own fresh clone of this function that we're gonna unify against.
+
+[00:14:22]
+We're never gonna end up actually stomping on the original, we're only ever gonna be interacting with these copies. And so, we can do all the full type inference, we are still getting stuff out of this, figuring out, this thing is getting the same return type because that's what this does.
+
+[00:14:34]
+So we do get to see, this ends up being a Number, this ends up being a String, and these things are similar to one another. That's all very nice and useful, right? If we ask, what's the type of this whole expression? We can ask, 8 0, 8 is 11, 11 is string.
+
+[00:14:50]
+So it's serving a very useful purpose, but it's not serving the purpose that we don't want it to, namely, modifying the original. Because the original is polymorphic, and we do not want to modify that polymorphic function.
+

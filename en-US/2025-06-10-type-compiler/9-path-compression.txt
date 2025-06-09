@@ -1,0 +1,102 @@
+[00:00:00]
+>> Richard Feldman: Okay, so last thing I wanna talk about in this section is path compression. So you might have noticed that this is a pretty convoluted route that we took to answering the question of what is this type of C? It's a string. We had to go through quite a few hops in the database.
+
+[00:00:13]
+So we're asking it read in this row, go over there, go over here, go over there. The more and more, the longer and longer this chain gets, the more and more hops are talking about. And imagine if you have a, b, c, and then like, d, e, f, g, and that chain was really long, and unfortunately, by coincidence, you happen to be using g an awful lot in the code down below.
+
+[00:00:32]
+Well, every single time you're going and trying to do any kind of operation on that, whether it's just looking up and trying to do type inference, honestly, what is the value of g right now? That's the thing that, as we will see in the next section, happens a lot when you're doing more advanced forms and type inference.
+
+[00:00:46]
+You don't really wanna be doing all these hops every single time that really, really can slow down the compiler. So this is where path compression comes in. Now, I mentioned earlier on that the data structure that people call this is often called Union Find. The reason that they call it Union Find is because that's also the name of this path compression strategy.
+
+[00:01:04]
+It's a data structure that is designed to have this form of path compression done on it that we're about to talk about. So, path compression, very simple idea. It basically relies on a property of our type system, which we'll talk about in a sec, which basically says, okay, if I'm asking what is the type of 3?
+
+[00:01:21]
+I wanna go ask it, is it okay? Right here, it says, 0h, I need to go look at 2. Great, no problem. We go look at 2, and then 2 says go see 0, and I say, all right, all right, well, hang on a sec. If I had to go through a hop to go to 2 and 2 just pointed me to 0, fool me twice, shame on me.
+
+[00:01:37]
+I'm not gonna do that work again. I'm just gonna change my database value right now, while I'm in the middle of traversing my path and say from now on, I point straight to 0. I am not doing this middleman nonsense. Anytime you ask, what is value of 3?
+
+[00:01:50]
+I'm gonna go straight to 0. Now, this optimization relies on the type system property that we're not doing subtyping. If you're doing subtyping, this doesn't work. Because in subtyping, you can potentially have relationships where you're saying, yeah, I'm a subset of this and maybe I can change, or maybe that thing can change in the future as we learn more about the types.
+
+[00:02:11]
+But this is basically saying, in the Hindley Miller system, this is like saying there's no point to maintaining this link. This is just useless information. It is always going to be the case, the way that these relationships are done in this type inference system, that it's always safe to say, I can compress my path from two hops down to one.
+
+[00:02:28]
+As soon as I know that I'm going to hop to you and you're going to hop to 0, I will never get burned by just hopping directly to 0 and changing myself to always do that. So this is how Henley Milner is able to be a fast type inference algorithm, is by doing stuff like this.
+
+[00:02:42]
+We were talking about Chris Lattner earlier, and one of the things he said to me on the podcast, which I also was asked, what's the name of the podcast? It's Software Unscripted, if you wanna see the actual interview. One of the things he mentioned was that when they were doing Swift, they actually did use Henley Miller type inference with Swift.
+
+[00:02:58]
+But they also added a bunch of other features in part for like Objective C compatibility that did involve some like subtyping things, and they got some really bad performance characteristics. To make a long story short, they were not able to rely on this property because of some other design decisions they made in the type system.
+
+[00:03:16]
+So fortunately, for our purposes, and also Elvis's, and also Rock's, and also Haskell's, we are able to make this optimization and say yeah, we can compress this path out of this, and of course, we can keep doing it. So, as soon as you ask 0 what its type is, it's, I don't know, go ask number 1, and then 1 says, I'm a string.
+
+[00:03:31]
+So fine, fine point me straight to 1. I'm just gonna keep doing this until you get me to a concrete type, and then I'm gonna stop. So you can go all the way and say we're not even to keep one sim link, we're gonna go all the way to string and go straight to a concrete type.
+
+[00:03:46]
+The main reason not to do that is that you can get concrete types that are much bigger than string you can imagine, we talked about a hypothetical type that's like, I have an object type, and I have 16 fields, and 3 of those or more objects. And you one of those is an array, which has even more, you can have some pretty big type entries on this column of the database.
+
+[00:04:05]
+And so the nice thing about sort of compacting the path down to one hop is that it's never gonna get out of control. You're gonna have that most one hop, but you're also not paying the cost of or like being priced into copying a potentially very large type around every single time you finish doing this compression.
+
+[00:04:22]
+You could also, if you wanted to, it's your compiler. If you want, you could strike a middle ground where you say, well, we have a heuristic and types of a certain size, we will just do that so we don't even have one hop, or maybe string is one of those.
+
+[00:04:34]
+But I think most compilers will just kind of just do it down to one hop and be like, okay, we've solved the pathological problem. We're not gonna micro-optimize it down. If it's a string, then we go straight to concrete and remove that last hop. It's mainly about moving the pathological explosion that can happen if you don't do any path compression.
+
+[00:04:51]
+Okay, yeah, so the technique that allows us to do this is unification rather than subtyping, and the whole next section is gonna be about unification. So don't worry if you don't know what that term means, because we're gonna talk about it at length. Yes, concrete example of where this is useful.
+
+[00:05:07]
+So let's just walk through very briefly the example of editor tooling. Let's say I've got my very nice editor, and I literally want to know, what is the inferred type of c? This is not an academic learning question anymore. I'm like, I got my mouse over that c.
+
+[00:05:19]
+I don't have any type annotations. I would really like if my editor just displayed that is a string for me, because I wanna know. So now we know basically how that would work. We're only missing one ingredient here, which is just how do you find the source position of c?
+
+[00:05:32]
+And this is one other example of where it's really useful if in your parse tree nodes and whatnot, you've been writing down your source code positions, because now, the editor can say, hey, we're at offset, I'm gonna make up a number 56, right? That's what the index is of this.
+
+[00:05:45]
+Or maybe they give it to you in lines and columns, you can translate it back, it's fine, because we still have the source code. So we can translate that into a source code position, and then at that point, we can go through our list of tokens, be like, aha, this is the one that has that position.
+
+[00:05:57]
+I found it, great. So now we've got our token, and then parse tree node, because we would have converted from tokens to parse tree nodes already. So we go through our parse tree and then we're like, aha, here's the one that has that position. Good thing, we wrote it down.
+
+[00:06:09]
+So now that we know the parse tree node, we also connected the parse tree node to the types database by writing down the ID of the of the type in our parse tree node. So now we can just go to the parse tree node and be like, I found the parse tree node that's at this position.
+
+[00:06:21]
+That one is the one that corresponds to c. That thing's type ID is 3, great, no problem. Just go look that up in the database and now we have the answer, boom, c is a string. And that's how the editor can do that. So if you were writing a language server, for example, or any kind of editor extension that wanted to give this feature of hover to show me the inferred type, this is one way you could do that.
+
+[00:06:44]
+There's, again, a very deep rabbit hole of caching and different architectures you can do to affect performance of this. But the point is that this is a fully working absolutely, totally valid way to do this, that you can do to using the things we just learned. Okay, so previously we talked about this theme of traversing input, generating output, lexing, parsing, and then naming.
+
+[00:07:07]
+Now we are introducing a new step after naming, which is inference. Now you notice I also dropped off, previously we had a code gen, which was the formatting step. We are for the next several sections of this course, are gonna ignore code gen. And we're gonna get back to it with the very last section when we're gonna do not cod gen to formatting style to more JavaScript, but rather code gen to WebAssembly.
+
+[00:07:26]
+But between now and then, we're really just gonna be hanging out in the, okay, Leling, parsing, naming, and then type inference on top of that, and we're gonna get into more and more type inference scenarios. And let me tell you, the type inference is a very, very deep rabbit hole, very large iceberg.
+
+[00:07:40]
+We're gonna cover, I think, the most interesting and useful parts of it. But we could do a whole other workshop day just on edge cases and stuff that we're not choosing to implement just within a thing, let alone other type systems. So very, very deep rabbit hole there, but lots to learn.
+
+[00:07:55]
+Okay, to summarize everything we talked about in Part 3. We talked about type variables, which I'm choosing to call type IDs, but again, in the literature, you're gonna see them called type variables. So I do wanna call that out. And then also when we get to polymorphism, you'll understand why actually variables, maybe not the most beginner-friendly, but actually is a totally logical name for them.
+
+[00:08:12]
+Type relationships, so this is where we did the sim linking thing where we were saying we all these constants and the actual entry in the database table is not. I have this type that I've already figured out, but rather, I have whatever type that thing has. And maybe by the end of all this inference process, you'll be able to ask me what I am and I'll go ask them, and one thing will lead to another, and then I'll have a concrete answer for you.
+
+[00:08:33]
+And finally, path compression, which is the algorithm that allows us to do all this sort of bouncing around and hopping between different database entries, and yet keep the performance manageable by compressing the number of hops all the way up from however many it was down to one every time we were traversing one of these chains.
+
+[00:08:50]
+So you only ever have to traverse that big chain once and actually, since they're all doing path compression, in practice, they end up being pretty compact.
+

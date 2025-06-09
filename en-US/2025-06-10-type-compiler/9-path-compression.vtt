@@ -1,0 +1,885 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:00.521
+&gt;&gt; Richard Feldman: Okay, so
+
+2
+00:00:00.521 --> 00:00:04.179
+last thing I wanna talk about in
+this section is path compression.
+
+3
+00:00:04.179 --> 00:00:08.080
+So you might have noticed that this is
+a pretty convoluted route that we took to
+
+4
+00:00:08.080 --> 00:00:10.765
+answering the question of
+what is this type of C?
+
+5
+00:00:10.765 --> 00:00:11.508
+It's a string.
+
+6
+00:00:11.508 --> 00:00:13.606
+We had to go through quite
+a few hops in the database.
+
+7
+00:00:13.606 --> 00:00:17.148
+So we're asking it read in this row, go
+over there, go over here, go over there.
+
+8
+00:00:17.148 --> 00:00:20.318
+The more and more, the longer and
+longer this chain gets, the more and
+
+9
+00:00:20.318 --> 00:00:21.679
+more hops are talking about.
+
+10
+00:00:21.679 --> 00:00:24.667
+And imagine if you have a,
+b, c, and then like, d, e,
+
+11
+00:00:24.667 --> 00:00:28.868
+f, g, and that chain was really long,
+and unfortunately, by coincidence,
+
+12
+00:00:28.868 --> 00:00:32.010
+you happen to be using g an awful
+lot in the code down below.
+
+13
+00:00:32.010 --> 00:00:33.882
+Well, every single time you're going and
+
+14
+00:00:33.882 --> 00:00:37.210
+trying to do any kind of operation on
+that, whether it's just looking up and
+
+15
+00:00:37.210 --> 00:00:40.660
+trying to do type inference, honestly,
+what is the value of g right now?
+
+16
+00:00:40.660 --> 00:00:43.118
+That's the thing that,
+as we will see in the next section,
+
+17
+00:00:43.118 --> 00:00:46.182
+happens a lot when you're doing more
+advanced forms and type inference.
+
+18
+00:00:46.182 --> 00:00:49.086
+You don't really wanna be doing all these
+hops every single time that really,
+
+19
+00:00:49.086 --> 00:00:50.413
+really can slow down the compiler.
+
+20
+00:00:50.413 --> 00:00:52.720
+So this is where path
+compression comes in.
+
+21
+00:00:52.720 --> 00:00:57.089
+Now, I mentioned earlier on that the data
+structure that people call this is often
+
+22
+00:00:57.089 --> 00:00:58.180
+called Union Find.
+
+23
+00:00:58.180 --> 00:01:02.941
+The reason that they call it Union Find is
+because that's also the name of this path
+
+24
+00:01:02.941 --> 00:01:04.402
+compression strategy.
+
+25
+00:01:04.402 --> 00:01:08.232
+It's a data structure that is designed to
+have this form of path compression done on
+
+26
+00:01:08.232 --> 00:01:09.883
+it that we're about to talk about.
+
+27
+00:01:09.883 --> 00:01:12.764
+So, path compression, very simple idea.
+
+28
+00:01:12.764 --> 00:01:17.158
+It basically relies on a property of
+our type system, which we'll talk about
+
+29
+00:01:17.158 --> 00:01:21.564
+in a sec, which basically says, okay,
+if I'm asking what is the type of 3?
+
+30
+00:01:21.564 --> 00:01:23.145
+I wanna go ask it, is it okay?
+
+31
+00:01:23.145 --> 00:01:25.405
+Right here, it says, 0h,
+I need to go look at 2.
+
+32
+00:01:25.405 --> 00:01:26.253
+Great, no problem.
+
+33
+00:01:26.253 --> 00:01:30.543
+We go look at 2, and then 2 says go see 0,
+and I say, all right, all right,
+
+34
+00:01:30.543 --> 00:01:31.742
+well, hang on a sec.
+
+35
+00:01:31.742 --> 00:01:36.401
+If I had to go through a hop to go to 2
+and 2 just pointed me to 0, fool me twice,
+
+36
+00:01:36.401 --> 00:01:37.190
+shame on me.
+
+37
+00:01:37.190 --> 00:01:38.825
+I'm not gonna do that work again.
+
+38
+00:01:38.825 --> 00:01:42.390
+I'm just gonna change my database value
+right now, while I'm in the middle of
+
+39
+00:01:42.390 --> 00:01:45.270
+traversing my path and say from now on,
+I point straight to 0.
+
+40
+00:01:45.270 --> 00:01:47.829
+I am not doing this middleman nonsense.
+
+41
+00:01:47.829 --> 00:01:50.596
+Anytime you ask, what is value of 3?
+
+42
+00:01:50.596 --> 00:01:51.999
+I'm gonna go straight to 0.
+
+43
+00:01:51.999 --> 00:01:56.627
+Now, this optimization relies
+on the type system property that
+
+44
+00:01:56.627 --> 00:01:58.776
+we're not doing subtyping.
+
+45
+00:01:58.776 --> 00:02:00.555
+If you're doing subtyping,
+this doesn't work.
+
+46
+00:02:00.555 --> 00:02:04.922
+Because in subtyping, you can potentially
+have relationships where you're saying,
+
+47
+00:02:04.922 --> 00:02:07.459
+yeah, I'm a subset of this and
+maybe I can change,
+
+48
+00:02:07.459 --> 00:02:11.248
+or maybe that thing can change in the
+future as we learn more about the types.
+
+49
+00:02:11.248 --> 00:02:14.251
+But this is basically saying,
+in the Hindley Miller system,
+
+50
+00:02:14.251 --> 00:02:17.382
+this is like saying there's no
+point to maintaining this link.
+
+51
+00:02:17.382 --> 00:02:19.715
+This is just useless information.
+
+52
+00:02:19.715 --> 00:02:23.319
+It is always going to be the case, the way
+that these relationships are done in
+
+53
+00:02:23.319 --> 00:02:26.148
+this type inference system,
+that it's always safe to say,
+
+54
+00:02:26.148 --> 00:02:28.374
+I can compress my path
+from two hops down to one.
+
+55
+00:02:28.374 --> 00:02:32.404
+As soon as I know that I'm going to hop
+to you and you're going to hop to 0,
+
+56
+00:02:32.404 --> 00:02:35.459
+I will never get burned by
+just hopping directly to 0 and
+
+57
+00:02:35.459 --> 00:02:37.413
+changing myself to always do that.
+
+58
+00:02:37.413 --> 00:02:41.272
+So this is how Henley Milner is able
+to be a fast type inference algorithm,
+
+59
+00:02:41.272 --> 00:02:42.783
+is by doing stuff like this.
+
+60
+00:02:42.783 --> 00:02:46.217
+We were talking about Chris Lattner
+earlier, and one of the things he said to
+
+61
+00:02:46.217 --> 00:02:49.664
+me on the podcast, which I also was asked,
+what's the name of the podcast?
+
+62
+00:02:49.664 --> 00:02:53.036
+It's Software Unscripted,
+if you wanna see the actual interview.
+
+63
+00:02:53.036 --> 00:02:55.845
+One of the things he mentioned was
+that when they were doing Swift,
+
+64
+00:02:55.845 --> 00:02:58.565
+they actually did use Henley Miller
+type inference with Swift.
+
+65
+00:02:58.565 --> 00:03:01.694
+But they also added a bunch
+of other features in part for
+
+66
+00:03:01.694 --> 00:03:06.390
+like Objective C compatibility that did
+involve some like subtyping things, and
+
+67
+00:03:06.390 --> 00:03:09.674
+they got some really bad
+performance characteristics.
+
+68
+00:03:09.674 --> 00:03:13.797
+To make a long story short, they were not
+able to rely on this property because of
+
+69
+00:03:13.797 --> 00:03:16.832
+some other design decisions
+they made in the type system.
+
+70
+00:03:16.832 --> 00:03:20.001
+So fortunately, for our purposes, and
+also Elvis's, and also Rock's, and
+
+71
+00:03:20.001 --> 00:03:22.791
+also Haskell's, we are able to make
+this optimization and say yeah,
+
+72
+00:03:22.791 --> 00:03:25.796
+we can compress this path out of this,
+and of course, we can keep doing it.
+
+73
+00:03:25.796 --> 00:03:30.459
+So, as soon as you ask 0 what its type is,
+it's, I don't know, go ask number 1, and
+
+74
+00:03:30.459 --> 00:03:31.990
+then 1 says, I'm a string.
+
+75
+00:03:31.990 --> 00:03:34.661
+So fine, fine point me straight to 1.
+
+76
+00:03:34.661 --> 00:03:37.388
+I'm just gonna keep doing this until
+you get me to a concrete type, and
+
+77
+00:03:37.388 --> 00:03:38.278
+then I'm gonna stop.
+
+78
+00:03:38.278 --> 00:03:42.180
+So you can go all the way and
+say we're not even to keep one sim link,
+
+79
+00:03:42.180 --> 00:03:46.393
+we're gonna go all the way to string and
+go straight to a concrete type.
+
+80
+00:03:46.393 --> 00:03:50.047
+The main reason not to do that is that
+you can get concrete types that are much
+
+81
+00:03:50.047 --> 00:03:53.992
+bigger than string you can imagine,
+we talked about a hypothetical type that's
+
+82
+00:03:53.992 --> 00:03:58.190
+like, I have an object type, and I have 16
+fields, and 3 of those or more objects.
+
+83
+00:03:58.190 --> 00:04:01.404
+And you one of those is an array,
+which has even more,
+
+84
+00:04:01.404 --> 00:04:05.776
+you can have some pretty big type
+entries on this column of the database.
+
+85
+00:04:05.776 --> 00:04:08.899
+And so the nice thing about sort
+of compacting the path down to
+
+86
+00:04:08.899 --> 00:04:11.608
+one hop is that it's never
+gonna get out of control.
+
+87
+00:04:11.608 --> 00:04:15.784
+You're gonna have that most one hop, but
+you're also not paying the cost of or
+
+88
+00:04:15.784 --> 00:04:19.013
+like being priced into copying
+a potentially very large type
+
+89
+00:04:19.013 --> 00:04:22.327
+around every single time you
+finish doing this compression.
+
+90
+00:04:22.327 --> 00:04:24.813
+You could also, if you wanted to,
+it's your compiler.
+
+91
+00:04:24.813 --> 00:04:28.010
+If you want, you could strike
+a middle ground where you say, well,
+
+92
+00:04:28.010 --> 00:04:31.262
+we have a heuristic and types of
+a certain size, we will just do that so
+
+93
+00:04:31.262 --> 00:04:34.150
+we don't even have one hop, or
+maybe string is one of those.
+
+94
+00:04:34.150 --> 00:04:37.738
+But I think most compilers will just kind
+of just do it down to one hop and be like,
+
+95
+00:04:37.738 --> 00:04:40.003
+okay, we've solved
+the pathological problem.
+
+96
+00:04:40.003 --> 00:04:41.847
+We're not gonna micro-optimize it down.
+
+97
+00:04:41.847 --> 00:04:46.004
+If it's a string, then we go straight
+to concrete and remove that last hop.
+
+98
+00:04:46.004 --> 00:04:50.324
+It's mainly about moving the pathological
+explosion that can happen if you don't do
+
+99
+00:04:50.324 --> 00:04:51.531
+any path compression.
+
+100
+00:04:51.531 --> 00:04:56.487
+Okay, yeah, so the technique that allows
+us to do this is unification rather
+
+101
+00:04:56.487 --> 00:05:01.385
+than subtyping, and the whole next
+section is gonna be about unification.
+
+102
+00:05:01.385 --> 00:05:03.135
+So don't worry if you don't
+know what that term means,
+
+103
+00:05:03.135 --> 00:05:04.596
+because we're gonna talk
+about it at length.
+
+104
+00:05:04.596 --> 00:05:07.067
+Yes, concrete example of
+where this is useful.
+
+105
+00:05:07.067 --> 00:05:10.001
+So let's just walk through very
+briefly the example of editor tooling.
+
+106
+00:05:10.001 --> 00:05:13.550
+Let's say I've got my very nice editor,
+and I literally want to know,
+
+107
+00:05:13.550 --> 00:05:15.098
+what is the inferred type of c?
+
+108
+00:05:15.098 --> 00:05:17.387
+This is not an academic
+learning question anymore.
+
+109
+00:05:17.387 --> 00:05:19.451
+I'm like, I got my mouse over that c.
+
+110
+00:05:19.451 --> 00:05:20.828
+I don't have any type annotations.
+
+111
+00:05:20.828 --> 00:05:24.486
+I would really like if my editor just
+displayed that is a string for me,
+
+112
+00:05:24.486 --> 00:05:25.668
+because I wanna know.
+
+113
+00:05:25.668 --> 00:05:27.864
+So now we know basically
+how that would work.
+
+114
+00:05:27.864 --> 00:05:29.856
+We're only missing one ingredient here,
+
+115
+00:05:29.856 --> 00:05:32.359
+which is just how do you find
+the source position of c?
+
+116
+00:05:32.359 --> 00:05:35.330
+And this is one other example of
+where it's really useful if in your
+
+117
+00:05:35.330 --> 00:05:36.231
+parse tree nodes and
+
+118
+00:05:36.231 --> 00:05:39.841
+whatnot, you've been writing down your
+source code positions, because now,
+
+119
+00:05:39.841 --> 00:05:43.738
+the editor can say, hey, we're at offset,
+I'm gonna make up a number 56, right?
+
+120
+00:05:43.738 --> 00:05:45.717
+That's what the index is of this.
+
+121
+00:05:45.717 --> 00:05:48.947
+Or maybe they give it to you in lines and
+columns, you can translate it back,
+
+122
+00:05:48.947 --> 00:05:51.181
+it's fine,
+because we still have the source code.
+
+123
+00:05:51.181 --> 00:05:54.124
+So we can translate that into a source
+code position, and then at that point,
+
+124
+00:05:54.124 --> 00:05:56.114
+we can go through our list of tokens,
+be like, aha,
+
+125
+00:05:56.114 --> 00:05:57.640
+this is the one that has that position.
+
+126
+00:05:57.640 --> 00:05:58.434
+I found it, great.
+
+127
+00:05:58.434 --> 00:06:01.214
+So now we've got our token,
+and then parse tree node,
+
+128
+00:06:01.214 --> 00:06:04.977
+because we would have converted from
+tokens to parse tree nodes already.
+
+129
+00:06:04.977 --> 00:06:06.629
+So we go through our parse tree and
+then we're like, aha,
+
+130
+00:06:06.629 --> 00:06:07.792
+here's the one that has that position.
+
+131
+00:06:07.792 --> 00:06:09.046
+Good thing, we wrote it down.
+
+132
+00:06:09.046 --> 00:06:13.219
+So now that we know the parse tree node,
+we also connected the parse tree node to
+
+133
+00:06:13.219 --> 00:06:17.533
+the types database by writing down the ID
+of the of the type in our parse tree node.
+
+134
+00:06:17.533 --> 00:06:19.075
+So now we can just go to
+the parse tree node and
+
+135
+00:06:19.075 --> 00:06:21.473
+be like, I found the parse tree
+node that's at this position.
+
+136
+00:06:21.473 --> 00:06:24.969
+That one is the one that corresponds to c.
+
+137
+00:06:24.969 --> 00:06:28.528
+That thing's type ID is 3,
+great, no problem.
+
+138
+00:06:28.528 --> 00:06:31.958
+Just go look that up in the database and
+now we have the answer, boom,
+
+139
+00:06:31.958 --> 00:06:32.678
+c is a string.
+
+140
+00:06:32.678 --> 00:06:33.801
+And that's how the editor can do that.
+
+141
+00:06:33.801 --> 00:06:37.204
+So if you were writing a language server,
+for example, or
+
+142
+00:06:37.204 --> 00:06:41.789
+any kind of editor extension that wanted
+to give this feature of hover to show me
+
+143
+00:06:41.789 --> 00:06:44.923
+the inferred type,
+this is one way you could do that.
+
+144
+00:06:44.923 --> 00:06:48.655
+There's, again,
+a very deep rabbit hole of caching and
+
+145
+00:06:48.655 --> 00:06:53.109
+different architectures you can
+do to affect performance of this.
+
+146
+00:06:53.109 --> 00:06:56.380
+But the point is that this is
+a fully working absolutely,
+
+147
+00:06:56.380 --> 00:07:01.027
+totally valid way to do this, that you can
+do to using the things we just learned.
+
+148
+00:07:01.027 --> 00:07:04.723
+Okay, so previously we talked about
+this theme of traversing input,
+
+149
+00:07:04.723 --> 00:07:07.869
+generating output, lexing,
+parsing, and then naming.
+
+150
+00:07:07.869 --> 00:07:11.458
+Now we are introducing a new step
+after naming, which is inference.
+
+151
+00:07:11.458 --> 00:07:14.220
+Now you notice I also dropped off,
+previously we had a code gen,
+
+152
+00:07:14.220 --> 00:07:15.614
+which was the formatting step.
+
+153
+00:07:15.614 --> 00:07:19.290
+We are for the next several sections of
+this course, are gonna ignore code gen.
+
+154
+00:07:19.290 --> 00:07:22.425
+And we're gonna get back to it with
+the very last section when we're
+
+155
+00:07:22.425 --> 00:07:25.395
+gonna do not cod gen to formatting
+style to more JavaScript, but
+
+156
+00:07:25.395 --> 00:07:26.942
+rather code gen to WebAssembly.
+
+157
+00:07:26.942 --> 00:07:30.324
+But between now and then, we're really
+just gonna be hanging out in the, okay,
+
+158
+00:07:30.324 --> 00:07:33.358
+Leling, parsing, naming, and
+then type inference on top of that, and
+
+159
+00:07:33.358 --> 00:07:36.034
+we're gonna get into more and
+more type inference scenarios.
+
+160
+00:07:36.034 --> 00:07:39.101
+And let me tell you, the type inference
+is a very, very deep rabbit hole,
+
+161
+00:07:39.101 --> 00:07:40.006
+very large iceberg.
+
+162
+00:07:40.006 --> 00:07:43.383
+We're gonna cover, I think, the most
+interesting and useful parts of it.
+
+163
+00:07:43.383 --> 00:07:47.619
+But we could do a whole other workshop day
+just on edge cases and stuff that we're
+
+164
+00:07:47.619 --> 00:07:51.810
+not choosing to implement just within
+a thing, let alone other type systems.
+
+165
+00:07:51.810 --> 00:07:55.284
+So very, very deep rabbit hole there,
+but lots to learn.
+
+166
+00:07:55.284 --> 00:07:58.038
+Okay, to summarize everything
+we talked about in Part 3.
+
+167
+00:07:58.038 --> 00:08:01.118
+We talked about type variables, which I'm
+choosing to call type IDs, but again,
+
+168
+00:08:01.118 --> 00:08:03.640
+in the literature, you're gonna
+see them called type variables.
+
+169
+00:08:03.640 --> 00:08:04.819
+So I do wanna call that out.
+
+170
+00:08:04.819 --> 00:08:08.665
+And then also when we get to polymorphism,
+you'll understand why actually variables,
+
+171
+00:08:08.665 --> 00:08:10.615
+maybe not the most beginner-friendly, but
+
+172
+00:08:10.615 --> 00:08:12.579
+actually is a totally logical name for
+them.
+
+173
+00:08:12.579 --> 00:08:15.929
+Type relationships, so this is where we
+did the sim linking thing where we were
+
+174
+00:08:15.929 --> 00:08:19.353
+saying we all these constants and the
+actual entry in the database table is not.
+
+175
+00:08:19.353 --> 00:08:22.059
+I have this type that I've
+already figured out, but rather,
+
+176
+00:08:22.059 --> 00:08:23.681
+I have whatever type that thing has.
+
+177
+00:08:23.681 --> 00:08:26.244
+And maybe by the end of all
+this inference process,
+
+178
+00:08:26.244 --> 00:08:29.162
+you'll be able to ask me what I am and
+I'll go ask them, and
+
+179
+00:08:29.162 --> 00:08:33.113
+one thing will lead to another, and
+then I'll have a concrete answer for you.
+
+180
+00:08:33.113 --> 00:08:34.883
+And finally, path compression,
+
+181
+00:08:34.883 --> 00:08:38.850
+which is the algorithm that allows us to
+do all this sort of bouncing around and
+
+182
+00:08:38.850 --> 00:08:42.757
+hopping between different database
+entries, and yet keep the performance
+
+183
+00:08:42.757 --> 00:08:46.785
+manageable by compressing the number of
+hops all the way up from however many it
+
+184
+00:08:46.785 --> 00:08:50.170
+was down to one every time we were
+traversing one of these chains.
+
+185
+00:08:50.170 --> 00:08:53.897
+So you only ever have to traverse that big
+chain once and actually, since they're all
+
+186
+00:08:53.897 --> 00:08:57.186
+doing path compression, in practice,
+they end up being pretty compact.
+
