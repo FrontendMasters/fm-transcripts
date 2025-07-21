@@ -1,0 +1,75 @@
+[00:00:00]
+>> Josh Long: So we need to propagate our history. We need to present to it the transcript of our chat log on each request. Otherwise it's going to completely forget what we're talking about and why we're talking about it. It has no idea. Okay, so the way we do that is by advising this request with an advisor, okay?
+
+[00:00:18]
+So I'm gonna use a prompt chat memory advisor, okay? Okay, and I'll say memory=newConcurrentMap, oops, ConcurrentHashMap. Okay, so it's going to be a map of username to prompt chat memory advisor. Each user will get their own advisor, okay, it's multi tenant. And so how would that work? I'll say advisor.
+
+[00:00:47]
+Sorry, advisor and I'm going to look up the current advisor from the map. So this is a nice idiom here. If you haven't seen this in Java, I'm going to say this.memory.compute if absent passing in the username which is going to come in the path variable there, string user.
+
+[00:01:08]
+So if it's there, return it. If it's not, then create it. And I'll just create it brand new like that. I'm going to use a new in memory chat memory. Okay, so I'll say advisor. Voila. That actually returns the user's memory I'm using in memory here. There's a JDBC one as well.
+
+[00:01:30]
+Let me see what the contract is. Chat memory, I guess you have to add the extra jar in the class path. But there's a chat memory you can use as well. You can persist the state in a SQL database, for example, and you can also implement the contract yourself, you can see chat memory is a pretty straightforward.
+
+[00:01:48]
+We just have to implement these three methods. Void, add, list of messages, get a list of messages and clear. That's it. If you can implement that in terms of MongoDB or DynamoDB or whatever, then you can use that instead of this. Okay, so I've got that. Now let's just restart this thing, go back to the console here.
+
+[00:02:06]
+My name is Josh. Great. What's my name? Your name is Josh. Hey, nice, I knew we were meant to be, right, this model and me. Okay, so that's clearly working good. But still it's not. I mean I can ask it anything, right? I can ask it like to do math homework for me, right?
+
+[00:02:24]
+This is not its stated purpose. I don't want somebody just using this endpoint as a. And letting me ring up my chatgpt AI OpenAI Bill Right. I want this to be a focused, purpose built agent of adoption for my dogs, right? There's dogs that need to be adopted.
+
+[00:02:41]
+This thing can't be busy doing people's math homework or getting them to write code, right? Did you see, like there's some. A little while ago, you know, Amazon has this assistant inside the Amazon Amazon app or whatever, and somebody realized that if you like, ask it in a certain way, you can unset the prompt and get it to write code for you.
+
+[00:02:56]
+It's supposed to be helping you find products on the marketplace. You know, like, we don't want that, right? So what we wanted, and I'm sure they did what I'm about to show you, but it's just funny that that's a thing, right? What we want to do is give our model an overall system prompt.
+
+[00:03:13]
+A system prompt informs the overall tone and tenor. It informs what we're expecting it to do in the in frames, the thing we're expecting it to do, right? So that it gives us a response in terms of that system prompt. So I happen to have a system prompt over here, okay.
+
+[00:03:29]
+And I'm gonna cut it and then copy it to the clip, I'm sorry, you know what? That's wrong, dog, better. Okay, I'm gonna dog it to the clipboard there and paste it into my system prompt, okay, var system, okay? And out here I can configure, you can do this anywhere.
+
+[00:03:49]
+Actually, I could have done the system prompt actually here. Why not? Let's do it there. I could do the system prompt here. So right after the user or right before the user, it doesn't matter. Put it there. If you want, I'm going to specify a system prompt. Or you can specify a default system prompt that is available to all people who have a chat client.
+
+[00:04:09]
+You can make this a bean. By the way, like I said, it's not uncommon to have different models. So you can have five different chat clients, one chat client that's talking to the really fast model, one that's talking to the more fully featured one, etc. Okay. And so you can have bean definitions that are just chat clients.
+
+[00:04:24]
+Okay. So there's my system prompt. It says you are an AI powered assistant to help people adopt a dog from the adoption agency named Pooch palace, with locations in Antwerp, Seoul. I'm sorry, there you go. Minneapolis, Seoul, Singapore, Paris, Mumbai, New Delhi, Barcelona, San Francisco and London. Information about the dogs available will be presented below.
+
+[00:04:48]
+If there's no information, then return a polite response suggesting we don't have any dogs available. Yeah, so let's try. We're going to ask it to find Prancer. Remember, that's our dog. So do you have any neurotic dogs? Look, so it says, I'm sorry, I don't have specific information about neurotic dogs available at Pooch Palace.
+
+[00:05:15]
+If you're looking for a particular type of dog or have other preferences, please let me know and I'll do my best to assist you. Okay, well, at least it's talking about Pooch Palace. It's acting like it's an employee, you know, an assistant, somebody who can help you at our fictitious dog adoption agency called Pooch Palace.
+
+[00:05:31]
+But it still doesn't know about our dogs, you might be forgiven for thinking that you're talking to a real person who, for whatever reason, is unable to bring up the inventory of dogs in the shelter, right? So what we want to do is to give it access to that data.
+
+[00:05:48]
+Where does that data live? It lives in our database, right? So I don't want to give it access to all the data. I mean, let's be clear, right? Like in this case, it's a little bit of a silly thing, but I'm standing on principle here. So if I click on this hit, okay, go there, that, that, that.
+
+[00:06:04]
+Okay. It's only 18 records, okay? I mean, with the models that we have today, like you saw Gemini, Google's Gemini model, it supports a 2 million context window. So when I talk about a context, when I talk about that size, what that is, is it's a measure of the complexity of the request or the response.
+
+[00:06:25]
+It's both of them combined, right. Of the interaction with a model. Okay. It's called a context, and there are tokens. There's a token count that you spend each time you make a request. So the complexity of the request can stem not just from the input, but also from their output.
+
+[00:06:42]
+You could say, write the first 500 pages of War and Peace, right? It's only a one sentence request, but the response is going to be enormous. Or I could give it the text of War and Peace and say, find the uses of the word lake. I could give it a large body of requests and it'll give me one number back.
+
+[00:07:04]
+Find the frequency, right, it doesn't matter, they both count towards the complexity of the request, the token count of the request. So it's our job to reduce that token count. If you're using an on device model like Ollama, that's free, Right. You can run that in your local machine.
+
+[00:07:19]
+You don't have to pay anybody. But even running on your local machine or in your own data center, even though you're not paying somebody to host it, and even though it's more secure, maybe for your financial services use cases, you still have to pay to buy the machines and pay the electricity and all that.
+
+[00:07:34]
+There's a cost to it. So you're very strongly incentivized to reduce that cost by reducing the amount of tokens consumed. So, yes, Could I send all the data in my piddly little 18 row database here? Sure, but should I? No, of course not, right? We wanna send only the results that are germane to the request at hand.
+

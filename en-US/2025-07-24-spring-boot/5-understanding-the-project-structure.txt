@@ -1,0 +1,122 @@
+[00:00:00]
+>> Josh Long: This is important. Let's make sure we're all on the same page on this, okay? I went to Start Touch Spring IO, I chose here, I chose a bunch of different infrastructure pieces, databases, Redis MongoDB. You can inspect the project that gets created for you on Start Spring IO by going to the Explore button and you can see the files that get created and you can even see what Docker compose file was created for you.
+
+[00:00:26]
+So if you want an easy way to bootstrap your MongoDB Redis Neo 4J, Postgres, whatever, anything that spring supports, which is everything, basically, you can often find an easy config file for you there. Okay, so that's part one. What does that do at runtime when you create a new project?
+
+[00:00:42]
+Well, when I chose Docker Compose on Start Spring IO, it added this dependency spring boot Docker Compose that has the effect. Here's a brand new public static void main, never touched, never changed. I run this and you can see it's taking its sweet time to run the Docker image for me.
+
+[00:01:03]
+So the project that we just looked at, there's two distinct steps. One is you run Docker Compose up and then two, you run the program. By default, though, if you choose Docker Compose and Start Spring IO, Spring will do both things for you. It'll start up Docker for you, and then it'll start up the Java code, right?
+
+[00:01:24]
+It'll automatically detect the presence of compose.YAML in the root product, yes?
+>> Student: So just out of curiosity, is that going to be problematic when I go to deploy my enterprise app?
+>> Josh Long: No, because it only happens in development mode. Yeah, so when you package it up as a jar or as a native image, it doesn't include the code that does that, okay?
+
+[00:01:42]
+So that's a very good point. But what is the benefit of this? The benefit is that now if somebody took this particular project, not the one that we looked at in the intro, I wanted to keep those two things teased apart. If somebody wanted to take this code in a brand new git repository, Git clone run, just do maven Spring boot run.
+
+[00:01:58]
+As long as they've got Docker and a JRE, right, this will work. It'll have Postgres and it'll have the code. It comes with it, right? So what it's doing is it's actually shelling out. You can see it says Docker CLI, right? Behind the scenes, it's actually shelling out and running whatever's in the Docker Compose file here, which, in this case, is Postgres.
+
+[00:02:20]
+It's running that for me. And you can see that here. If I go to the Command line, Docker PS, there's Postgres. Now I'm going to stop the Java process. Okay, goodbye. Now, uh-oh, Docker's gone, right? It also shut down the container, which is. It's fine, I understand why it's doing that.
+
+[00:02:41]
+But also postgres doesn't really. It's not one of those. It's not serverless, right. You're supposed to keep that thing running for more than a second. So if ever you're making changes and you have to affect the restart, it'd be a shame to restart that every single time. So Spring Boot gives you some control over this.
+
+[00:02:56]
+Okay, you get Spring Docker Compose Lifecycle management, Start only. Okay, Start Only. So I start this now, and I do docker ps. It's fine. Stop it. By the way, that one started up Docker, right? This is a web Server and the Postgres support. So it took 1.7 seconds with Docker Compose.
+
+[00:03:23]
+If I go over here, Postgres is still running. It didn't stop it this time, right? Now I go back and I restart the program, okay? And that took 0.9 seconds. So 0.8 seconds saved by not having to manually shell out and do Docker compose up on your behalf.
+
+[00:03:42]
+And it's connected. Now that still is a lot slower than if you didn't have this on the class path at all, right? Like if I just comment that out as I've just done, now it's not in the class path at all, right? So that's 0.5 seconds. It's almost half a second just to start up, just to detect the presence of and then not do anything about Compose YAML.
+
+[00:04:09]
+So it's up to you. But I like to keep this in there, especially if you have a large team. This can help people standardize. They can know exactly how to start it and run it. If it's just you, maybe just comment this out and run it yourself, docker compose up.
+
+[00:04:21]
+Okay, now what else does Spring Boot do with the presence of this on the classpath? Well, in addition to starting or stopping the Docker image for you, every single time you restart the image, it also automatically connects you. So let's say I am using Spring Boot. What did I do on the build?
+
+[00:04:37]
+Did I choose a JDBC library? I don't have anything for JDBC. Let me just add here, and then this, and I'll choose Spring Boot Starter JDBC. Cmd + Shift + I, this is going to be low-level database connectivity stuff, okay? And the reason I care about that is because I want to demonstrate that I am connected.
+
+[00:04:55]
+So let me create an application runner. This is going to be a thing that runs when the application starts up, okay? Jdbc, Sorry, Application runners are just ways to run when the application starts up. It's a listener, a callback event. It's like onload for your enterprise application. So there's the database, db.SQL.
+
+[00:05:16]
+Select all from customer, right? Or even better yet, select one, okay? Query, integer, class, dot, single, whatever. And I can get the int value, right? So var count system out there, okay? So when the application starts up, it's going to inject this nice fluid DSL that I can use to talk to a SQL database.
+
+[00:05:43]
+I'm going to issue a query against my SQL database, get a response, turn it into an int value, and then print that out. So that's worked. And that only works because I'm connected to a database. So the question is how, how is this thing connected to a database?
+
+[00:05:57]
+I didn't specify the credential, right? You can see I've got compose YAML, the Docker image has a username and password and all that. But Spring Boot, how does Spring Boot know about that? How does Spring Boot establish a connection? Especially since these are not the default container credentials, right?
+
+[00:06:14]
+And the way that it does that is it's actually interacting with the Docker daemon behind the scenes. So if you have this Docker Compose support here, then you don't need to specify the normal credentials, right? Spring data source, secret username, my user and URL jdbc,postgres, localhost this is what you would have to do in your production environment.
+
+[00:06:39]
+Obviously you would never put that in production, right? That's your password. You'd put that in an environment variable or HashiCorp Vault or something more sensible than in source code. But my point is these three things are specified here. And if I didn't have Spring Boot's automatic starting up of Docker Compose and integration with Docker Compose, I.
+
+[00:06:57]
+I'd have to specify those credentials. That's fine, but just know that that's the cost. So as soon as I comment this out, suddenly I need to both start up Docker Compose by myself and specify this stuff, okay? So that git clone run life is easier when you have the Docker Compose support.
+
+[00:07:15]
+Now, Docker Compose is great. If you're like me some of the times, I'll start up my main method and then I'll iterate, right? I'll make changes. I'll start my main method, write some code, hit an endpoint, make sure it works. Some people, they're more sensible, more logical. They write the tests first.
+
+[00:07:33]
+In this case, they're not starting up their production code and then iterating that way. They're starting up the test code and cycling on that test driven development. For those people, we have test containers. So the Docker compose support gets run if you run the main method in your ide.
+
+[00:07:50]
+But there's also the test code in the source test Java folder. You can see I've got a public static void main entry point in the source test folder, okay, source test main. So it's public static void main as opposed to the actual public static void main in the root of my production code and source main Java.
+
+[00:08:11]
+Here's a test main method and it says do everything that you do in the production code, which is demo application main and extend what's possible by running the test containers config that Test containers config in turn is using this nice Java API called Test Containers. How many of you have heard of test containers?
+
+[00:08:33]
+It's a Java library that you can use to talk to the Docker daemon. And there's some programmatic, fluent DSLs that you can use to spin up a Postgres container, or Redis, or Neo4j, or whatever, right? They have strongly typed objects that you can use in Java to stand these up.
+
+[00:08:50]
+So here I'm saying run the postgres container when you create this object in Spring, it in turn results in postgres being created and run on your local docker behind the scenes. This is nice because now I can run this test Java code and it'll also run the test container support.
+
+[00:09:10]
+So do you need both Docker Compose and test containers? Usually not. It's up to you, right? I added both so you could see what would happen, right? You'll have one during your main code, you'll have the other one during your test code, and you can run the Docker Compose from test code as well.
+
+[00:09:24]
+So really, it's granularity of what you want. I could have a test that only needs Postgres. I only create the Postgres container. I have another test that only needs MongoDB. I only create that MongoDB. Whereas with Docker Compose, you got to put them all in there, right? It's not usually convenient to have a dozen different Docker Compose files with different permutations of your different collaborating infrastructure services.
+
+[00:09:46]
+Okay, all that to say git clone run, that's what we want here, okay? Docker compose, test containers. You'll see I rely on Docker Compose a lot because I want to. It's pretty straightforward if you don't know what to do. Docker compose up, run the program. You can see I'm running inside of DevTools here.
+
+[00:10:02]
+And why is that valuable? Well, because let's say I go ahead and create AddController, @ResponseBody, okay? @GetMapping, String helloWorld, okay? And I'm gonna just, actually, I've got the code running already. Localhost, what did I call it? Just forward slash? Okay, did I add DevTools retroactively? What am I running exactly?
+
+[00:10:34]
+This is this. Sorry, let me, cd demo.
+>> Josh Long: Okay, pom.xml.
+>> Josh Long: Okay, go here, localhost/helloworld. Now go back to the command line or to the code, rather add this. Go back over here. Refresh. What is going on? Did I not add devtools? I did not add DevTools. Okay, you have that in the intro.
+
+[00:11:21]
+I forgot to add it to this. So we go back over here. Got the web support dev tools. This is your friend. You wanna add DevTools to every project whenever you can, right? So let's see. Postgres, docker, compose, enter, UAO, demo zip. I got too many demo zips.
+
+[00:11:47]
+There we go. So DevTools now got the application. Create this simple controller. Okay, start that up. Okay, it's up and running. Localhost, hello.
+>> Student: Hi, you did-
+>> Josh Long: Thank you.
+>> Student: Just 'Hi'.
+>> Josh Long: There you go. Okay, so there's that, but that's not quite effusive or ebullient enough.
+
+[00:12:27]
+So I'll add a few of those and refresh, right? I go over here and I change the return type to be a map. So I can get it like a JSON structure. Go over here, map.of[message]. Put that in here and then refresh. So what happens is the JVM itself is very slow.
+
+[00:12:49]
+Spring Boot, super fast. So if you want to get your application cycled very quickly, keep the JVM warm and then throw away spring and just recreate it anew each time. That's what it's doing here. So you can see changes in your source code almost instantaneously for template files.
+
+[00:13:04]
+If you're doing server-side HTML templates and all that stuff, it's not cached, so it changes instantaneously, right? So you can move very, very quickly.
+

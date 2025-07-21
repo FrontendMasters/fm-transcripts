@@ -1,0 +1,162 @@
+[00:00:00]
+>> Josh Long: That's data. Hopefully you understand data is a thing. You can do it. It's the blood of every application you build, right. Without data, there's no point to everything else. But nonetheless, I think the next natural step after that will be building something on the web using HTTP or whatever we're going to talk about is some of that stuff.
+
+[00:00:22]
+Some of which you've already seen. You've already seen me use the REST client. You saw me build a simple controller earlier for HTTP endpoints. But I think there's so much more to it than just that stuff. So let's build a new service here, as always, going to my second favorite place on the Internet, start at springreo.
+
+[00:00:38]
+My first favorite place obviously is production. I love production. You should love production. You should go as early and often as possible. Bring the kids, bring the family. The weather's amazing. It's the happiest place on earth. It is better than Disneyland. But if you haven't been to production, obviously begin your journey here at start Spring IO.
+
+[00:00:52]
+And so what we're going to do is I'm going to build a new application. I use GraalVM, I'll use the web support, I use the, the GraphQL support. I'm going to use GRPC support, I'm going to use the web support. Already got that. Add that, I'm going to add thymeleaf, I guess maybe, I don't know if I have time.
+
+[00:01:10]
+We'll add hypermedia support. We'll add dev tools, obviously and we could add htmx. I'm not even sure what that addition does, but you could, I guess that's it. Is that everything? Got dev tools, got htmx, got the GRPC bits, got the web server. I got hypermedia. I'm not sure if we'll have time for that, but we'll try.
+
+[00:01:40]
+Okay, here we go, web. So public, static, void main. And the first thing we're going to do is going to build a simple HTTP client. Yeah and when we build this HTTP client, we have the old. The REST client, right. So you saw me create that earlier. So let's say I build a.
+
+[00:02:10]
+Let's go to a web service. We have a web service over here that we can use for some sample data. It is called JSON placeholder.typecode.com users, okay. Just a nonsense resting point on the Internet. Okay, so I'll take that. And that's going to be the first thing we're going to do.
+
+[00:02:32]
+We're going to Build a simple users client, and that's this. So we want to create a simple client. I'll build a, it's going to be a spring bean managed by spring, and it's going to talk to that REST endpoint. What data do we want to return back? That's the real question.
+
+[00:02:54]
+So we're going to have a few different bits. Actually, I'll copy and paste this because I've already done this mapping elsewhere. So here's the domain of the code. We've got a user. The user has an address which is a rich type. The address has a string, street street and then we have a GEO object, and the GEO has the Latin long, which is a rich type.
+
+[00:03:17]
+So I'm going to return a collection of users. Okay, users. And when somebody invokes this client, they'll get back this collection of users. So we'll say return. Now, of course, in order for me to do that, I need the REST client. The REST client. You've seen me use the JDBC client.
+
+[00:03:39]
+The REST client is just like that, except it's for. Well, guess what, it's for rest. Actually, it's just for HTTP is, I guess, the right thing to say. So I'm injecting the builder. I'll use that to create the bean. You could, and most people do actually centralize that you can create a configuration.
+
+[00:03:53]
+So you can say web configuration, whatever, some name like that. And then you could have a single bean of type REST client that you make available for the entire application context. But it's useful to have a. Actually what. Let's just do that. I'll do that. Like that. And that way when I create this bean, I can just inject the REST client directly instead of building it.
+
+[00:04:18]
+Okay, okay so what does this implementation look like? This is the hard way. I don't want to write. This is not the code that I would write most of the time. But at least you can see how it's going to work, right? So remember, the base URL for the REST client is right here.
+
+[00:04:32]
+So what we need to specify at this point is just the last mile, right? The users. Then we retrieve the data as the following type of data and that's it, right? Body of that list. What is this then? Retrieve body. Okay, wait, wait, wait. It's a collection of.
+
+[00:04:55]
+Okay, that's the other thing. So that's a great point. If this was a single user, I could return a user class, but it's not right. This is a collection clearly of users. This gets us to a fundamental limitation in Java's generics that you don't have in NET Land, which is we don't have reified generics, right?
+
+[00:05:18]
+Which means that the runtime, at runtime, when you have a list of string at runtime, there's no way using reflection to ask this instance variable what the generic parameter is, right? That doesn't exist. So array, list of string, come on, string, whatever, there. So that that instance variable has no generic parameter at runtime.
+
+[00:05:42]
+If I use Reflection, I will get just this. It looks like a list of objects. There's no generic type. This means that there's no such thing as list of user class. That doesn't exist. It's not possible. So we need some way to capture that shape. Because what we're going to do is we want to get the JSON data that comes back from this endpoint, and we need to tell this client to turn it into something that conforms to this Java object shape.
+
+[00:06:18]
+We got JSON coming back. We have a Java object, but the shape is a collection, a list of users. It's not just a user. And there's no way for me to pass in this. That doesn't work. So how can I, at runtime capture the idea of a collection of t?
+
+[00:06:34]
+Well, turns out there's a bit of a hack here, a bit of a gimmick, which is if you bake a generic parameter into the super type hierarchy, I know of a class that actually does get reified. So what do I mean by that? I can say user list extends arraylist of user.
+
+[00:06:54]
+Now, because I'm extending a concrete type, then this type does have a generic parameter. I can get that. It's a user, okay? And so if you understand that, then there's something called the parameterized type token pattern. And basically like what I just did here, I created a user list.
+
+[00:07:14]
+This also works if I say user users, new array list and then do that, I'm creating an anonymous inner class. See that? Isn't that hideous? So I'm creating an anonymous inner class, but because it's an anonymous, because I have this curly bracket. Curly bracket that's technically a subclass of arraylist that I'm defining one place and it's never used again, but that still works.
+
+[00:07:40]
+If I inspect this type at runtime via reflection, I can deduce that the generic parameter is of type user, okay? So there is a way to smuggle in from design time to runtime the generic parameter of a type. So we have that packaged up in a reusable Format called a parameterized type reference.
+
+[00:08:03]
+You can see it's a thing that you parameterize and then you have to create a subclass of it. Those curly brackets are doing a lot of work here. So you do private final. There you go. Get rid of all this. And now I'm going to ask it for this.
+
+[00:08:21]
+I'll say instead of just giving it a class literal, which I can totally do for single things, I'm going to give it a parameterized type reference. Now let's try this. I'm going to inject this client here, okay. There you go. When the program starts up, I'll inject the users client and call users and get all the data and then print it out.
+
+[00:08:49]
+There we go. See, it's worked. So now we have a nice type safe reference to all the JSON data we got. The GEO was mapped to the geo object there and not bad. But you have to understand that weird thing with parameterized type references to make that work.
+
+[00:09:05]
+In fact, this is not even as bad as it looks. You can actually do that. So it means you're only declaring the types once, which is still a little bit better. You can rerun that like this. Same thing. Okay, so that does work, but it's a little ugly.
+
+[00:09:19]
+So everybody clear on this? This is a weird thing. It's not spring, it's just Java itself. You have to do something like this. Every framework has something like this. But for the spring ecosystem, we support passing parameterized type references around where it makes sense when you want to get a generic thing whose parameter is typed.
+
+[00:09:37]
+Okay, so this is a low level client. I'm using an HTTP client to make a get request passing in the URL. I've already got a base URL. Right, that's up here. Right, I've defined this bean. It's got a base URL. I'm injecting that REST client here and I'm going to the base URL users and I'm getting the response back.
+
+[00:09:52]
+But this is a lot of work and if I had to do this for every single endpoint and every single service, then things would get out of hand pretty quickly. So there's actually a nicer way to do this. There's declarative interface based clients. Okay, so the way that works is you create an interface and I'm going to call this user's client or I'll call it declarative users client.
+
+[00:10:11]
+And here you annotate not with gitmapping, which is the component model that we'll look at in a minute for Exporting HTTP endpoints, but rather Git Exchange, which is the client side analog to that. So here I'll say collection of user users. So now I've got this interface. One of the things that's.
+
+[00:10:30]
+So remember Spring Framework 7 and Spring Boot 4 come out later this year. One of the things that I helped work on, and that has been a long time in coming, is to automate away the ceremony I'm about to show you. So you can literally do something like this with an annotation and that'll be enough.
+
+[00:10:47]
+But at the moment it's not the case. I'm going to show you some ceremony. Don't cry. It'll be fine in just a few months. So what I'm going to do is I'm going to create a declarative users client, okay. And I'll say return HTTP service proxy factory. Great.
+
+[00:11:07]
+With names. Create the Exchange adapter. So it'll be a REST client.adapter.create passing in the HTTP client build dot That I know. So normally if you had more than one of these things and you very well should, then you just extract that out into a bean, right? So httpservice proxy factory.
+
+[00:11:34]
+Right, like that. So that would be pretty reasonable. You'd have a my HTTP service proxy factory and then you could just reuse that. I would just inject this into this. Okay, and so now you can just say that or just call it there. Okay, whatever. So now as I add more.
+
+[00:11:58]
+So basically you do this ceremony once and then as you want to add more declarative interface based clients to the system and you can have multiple methods. I don't know if this one actually supports an id for example, but let's see. Let me try, okay. Path variable. I don't know if that works.
+
+[00:12:17]
+Let's try it. Does this work? Yes, it does. Okay, so that's a free implementation there. So let's just try that out. Here we go. Okay, there's that and then users, client, dot user. What did I call it? User surely. That's the simple one. I want the declarative one.
+
+[00:12:46]
+Okay. User, client, user. And the ID is one. I'll print it out, okay. System out, take 512, okay. So you can see there's the single user and here's everything else right from the endpoint, okay. So the burden, this is what you had to write to get that client, right.
+
+[00:13:20]
+But there is some machinery that you had to do that's this. Okay, now for any new services, you just define a new bean of this type and then create an interface. And it's pretty straightforward. You can move really quickly at this point. But you do need to have this.
+
+[00:13:37]
+And why would you want to have this? Well, because you have a question around your REST client. So behind the scenes there's a REST client. Spring's providing this REST client. It in turn can adapt like four different libraries that you can use for HTTP, actual low level HTTP libraries.
+
+[00:13:51]
+And by default I'm not even sure what it's using anymore, but it's probably using the JDK one. There's actually two different JDK options now in Java. Like if you want to use. There's the old URL connection from 30 years ago that can work, but it doesn't support like options or some things like that.
+
+[00:14:09]
+It's not great. It works on older JVMs that are like before Java 11. And then there's a simple JDK client I think it's called. And that one's also probably being. It's probably what's being used here. But my point is the REST client will dynamically adapt to whatever HTTP runtime it can find, not runtime library it can find on the class path.
+
+[00:14:27]
+And these REST clients, as you can see, I've configured it with a base URL. So if you want to have like the full URL, you don't. If you want to just reuse the same REST client for all of your client use cases, then don't do that. Right, you can just put the REST client URL here.
+
+[00:14:43]
+Git mapping. Sorry, exchange mapping. Is it request mapping? I think it's this. So let's see if that works. So should still work. It does not URI with unidentified scheme. So maybe not. Maybe I have to do it here. Yeah, that's probably true. That's ugly. I don't like that at all.
+
+[00:15:23]
+So let's see. Yeah, okay, so that works, but it's ugly, right? That's why I like to centralize it instead of having to restipulate it. You could do static final string, base URL and then that'll work too. But makes me want to take a shower. So you've got your choices, okay.
+
+[00:15:55]
+I would just put it in the REST client and then make sure I have the right one. Okay, which brings us to a great point. If I have two REST clients that spring this is the secured one or whatever, or this one has the base URL and spring has to answer the question of which one to inject, which one to give me.
+
+[00:16:13]
+If I define two beans of the same type, well, we get into a question of qualifiers. So yeah, it gets very complicated, doesn't it? So where's my use of it? It's up here. I'm injecting the REST client. You can see Intellij is saying, hey, cannot auto wire. There's more than one bean of type rest client in the context, okay?
+
+[00:16:31]
+So you need to qualify. So a couple options here. You can do map of string, this and basically in this case they're. I can get the bean by the name one by the name. So the name is secured rest client by default. That's this if I want to avoid magic strings, right, I can say secured rest client, right?
+
+[00:16:59]
+And then over here I can say name is that. And then it doesn't matter what you call this over here, right? It's completely relevant now and over here I can use that constant. That works as well. That's one option. The other option, instead of injecting all of them and then disambiguating, that way you can inject a single one and use a qualifier.
+
+[00:17:20]
+So like that and then rest client and then that. Okay, there you go. So that qualifier is saying find the bean that has this name, this match, okay? And this is very common for all of Spring. It has nothing to do with Spring specifically, just rest programming for all.
+
+[00:17:37]
+Any place where you have more than one of type foo and you want to find just a particular one, you can even go a step further. Remember, annotations in Spring are composable, so you can compose them. You can actually create a meta annotation like this. Copy and paste that.
+
+[00:17:51]
+And I can say, let's say I have qualifier, I'm going to add this, I'm going to call this secured. Whatever. Now I've got my own custom composable qualifier, my custom secured annotation. Now at the call site secured. Put that in there. At the call site I'm going to use secured on the REST client and at the definition I'll use ecured, so I no longer need that anymore.
+
+[00:18:27]
+Okay, so that should do as well. Did I use the REST plant somewhere else? I did in the first one. Yeah, here. Okay, well, clearly this one shouldn't be involved anymore. There you go. So you see, you can use qualifiers to cleanly disambiguate. You can even make them type safe by avoiding magic strings by creating your own meta annotations.
+
+[00:19:02]
+Okay, that's just do that. So you can have like, maybe you have one implementation that works with the iOS store and another one that does a Play Store. And you need integrations in the back and you want both available and you need different call sites to have different call flows.
+
+[00:19:14]
+Okay, so now I've got these declarative interface clients. I've got a manual rest client based client. Either way, I've got a client.
+

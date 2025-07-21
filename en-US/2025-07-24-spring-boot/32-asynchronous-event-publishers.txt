@@ -1,0 +1,84 @@
+[00:00:00]
+>> Josh Long: And so what I'm going to do is I'm going to use the spring Framework application event publisher, which we've looked at before, and we're going to publish an event. I'm going to publish an event from the adoption service to the dog tour module. So I'm going to create my first purposefully public type dog adoption event public.
+
+[00:00:20]
+And it's going to have the dog id. That's my first type that I've intentionally made public. I'm now going to go back over here to my dog tour, sorry, my service, and I'll say application event publisher, publish new dog adoption event. So now that that's public, that the event is public, I can go back to the dog tour and just turn it into a listener for that event, Right?
+
+[00:00:45]
+So event listener, dog adoption event. Now, of course, because that's public, these don't need to be anymore. These can be packaged private again, which is nice. So let's see. Actually, that should just run. Here we go. Okay, run that command five. There you go. Scheduling. And we can see scheduling for the dog adoption event, not the int that I had before.
+
+[00:01:09]
+So it's worked. I've got these two modules integrated with each other. They're talking to each other, but they're decoupled. One doesn't know about the other. They don't need to know about each other, except. Except they're kind of coupled, aren't they? Remember we talked about how you can publish events from one module to another?
+
+[00:01:25]
+Those events are published synchronously in the same thread. So if I go over here and I say thread sleep throws exception because thread sleep throws an exception. And then I run the same request. Notice that even though I'm calling the dog adoption service, it's not returning. There you go.
+
+[00:01:44]
+It took five seconds to get that response because another component in the system somewhere else that I have no idea about, did a thread sleep, right? Can you imagine how frustrating that would be to debug? I'm working on the adoption code and for some reason now, somewhere along the lines where there wasn't an issue.
+
+[00:02:00]
+Now there's a five second delay, somebody added something that took a long time and I have to wait for it. My SLA is in trouble. So this is not what you want when you want messaging. A lot of people think about asynchronous fire and forget and you can get that after a fashion, right?
+
+[00:02:13]
+It's pretty easy in spring to. By the way, a service is just a component. Remember, it's a meta annotation. So I'm using service because it makes it clear what it is. I could get asynchronicity. I could just make it at async like that. And what that does is it wraps the invocation in a thread and then launches the thread.
+
+[00:02:30]
+So I publish that message, returns immediately, then five seconds later you'll see it print out scheduling. Now it's invoking that method on a separate thread. But now I've got the risk of losing state, don't I? Because imagine if I got the adoption thing. I'm updating the database table that's happening in one transaction.
+
+[00:02:51]
+Publish the message, it goes to another module and it gets to the dog tour that runs for five seconds. And then before the five seconds lapses, somebody pulls the power out of the machine. Transaction lost. Right. I've got my system in an inconsistent state. Right, which we want to avoid.
+
+[00:03:09]
+So how do we get the best of both worlds? How can we have our asynchronous, you know, fire and forget cake and eat it too? Well, we can use the outbox pattern. Okay, so spring modulus to the rescue. Here we're going to use a application module listener. This pairs like fine wine with cheese with this property here.
+
+[00:03:28]
+Say, initialize the schema and moduleth. Republish outstanding events on restart. This is the important bit. Then go over here. I'm going to publish it again. It's instantaneous, it returns instantly. So it's still asynchronous. Wait for it to finish. Good. Now you go over here. Refresh the tables. We have this new table called event publication.
+
+[00:03:53]
+This event publication table has the id, has a listener id, has the event type, the serialized representation of the event, the publication date and the completion date. Let's try this again. Refresh. Notice that there's no completion date yet. I'm waiting, waiting, waiting. Refresh. There it is. That completion date only gets filled in once the event listener has been dispatched and completed successfully.
+
+[00:04:21]
+What happens if I don't complete something successfully? Publish. Stop the Java process, Refresh that. You'll see that there's null and there's no chance of it ever becoming non null until something happens. I'm going to restart the JVM now. You can see that missedmessage was asynchronously redelivered and reprocessed.
+
+[00:04:41]
+And so that happened on restart. So this is the outbox pattern. You use the outbox pattern to reconcile non transactional state against a transactional ledger. In this case a SQL table or whatever. I mean, there's A bunch of different integrations here. I think we have an integration from MongoDB and so on.
+
+[00:04:59]
+So let's imagine you're writing to Amazon S3, right? S3 is a nice API. It's up most of the time, sometimes it's not. Sometimes you have faulty networks, sometimes you have latency. Whatever, whatever that is, the write might fail. Okay? It's not unusual, it's just the nature of the cloud, any cloud.
+
+[00:05:15]
+And so I want to make sure it gets done. I write an item into a ledger saying, hey, you're supposed to put this file in S3. And then you keep trying until it's done and then you update the database saying, it's been done. Now I guarantee that it got finished.
+
+[00:05:29]
+That reconciliation is the important bit, like we were talking about earlier about saga patterns and things like that. So this outbox pattern is a great for one shot request. This is a great way to get that effect. Right now I'm using the republish Outstanding events on restart. You can do this yourself, though.
+
+[00:05:45]
+You can actually republish the events whenever you want. Right, so let's say I wrote some code here, application runner, right? You incomplete me, I'm going to inject the incomplete event publications, new application runner and we'll say event publications, Resubmit event publications. We are nothing if nothing graded names in the Java community.
+
+[00:06:11]
+Okay, so ep. Is it completed? Get the application event that triggered the thing, which would be in this case a dog adoption event, right? Get the completion date, get the identifier, get the event itself, right? This event identifier is going to be pretty interesting. You can do consistent hashing and do load balancing, Right?
+
+[00:06:31]
+You could use Spring Cloud's discovery client support, which we'll talk about in a minute here, and do kind of load balancing that way. You might want to also make sure, because this does bring. If you can resubmit whenever you want, right? Like let's say I just did that.
+
+[00:06:45]
+That means that all messages, all missed messages will get resubmitted when any JVM that has this code restarts. Right? Well, what happens if you have 10 instances of the same node of the same code? They all restart at the same time. You have version 1.0 and then you deploy 1.1.
+
+[00:07:04]
+Now they all start up and they all have this resubmit incomplete publications Right? Now you've got a problem. Now you're going to inadvertently publish or republish rather all the same messages 10 different times. So then you get into, okay, well, even in the world of the monolith, you still have synchronization issues because you have to worry about your sibling nodes, which are the trouble.
+
+[00:07:27]
+So there's some solutions for that. I just showed you Spring integration. Spring integration has this really convenient thing which is beyond the scope of what I'm going to show you here, but it's called a lock registry. So you can configure a JDBC lock registry, a Mongo lock registry.
+
+[00:07:41]
+There's a bunch of implementations and you can say lock registry.tryacquire mylock, and then you have a runnable that runs in here, a callback, basically. And whatever you do inside of this will only be run once per cluster, tight. Whichever node manages to acquire that lock will run this code and nobody else, right.
+
+[00:08:04]
+So you can enforce serialization and linearity as best as possible, in a way, in a distributed system., okay. And of course you have the. The last option, which is just write your code to be idempotent. I know it's cheeky, I know it's not nice to say that, but sometimes that's just the best of medicine, you know?
+
+[00:08:19]
+Make your code edempotent if you can. It's not always easy. Like, if you're going to charge people's credit cards, you want to make darn sure that this is just warning once, right? Okay, so now we've got our decoupled system. What happened here? It's. Why is this unhappy? Yeah, there we go.
+
+[00:08:40]
+Intellij was spazzing. Okay. So I published the event from one module to another. I've used a decoupling and event driven architecture to write the code to be more robust.
+

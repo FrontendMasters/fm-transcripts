@@ -1,0 +1,131 @@
+[00:00:00]
+>> Josh Long: So I've got my application here. This is a off. It's an authenticated application. But I've got just the one application, right? That's not how things work normally. Normally I've got more than one application. I don't want to like have to add all this stuff. It wasn't that bad.
+
+[00:00:13]
+To be fair, I added lines 90, so 73 to 96, so 23 lines of code or something like that with. With ample spacing and new lines and all that. But still, I don't want to have to duplicate this for every single API. I want to centralize all this logic and certainly what am I going to do with a backend REST API?
+
+[00:00:35]
+How are they going to authenticate if they're using passkeys, whatever? So what I want is some way to handle authentication and then use the fact of that authentication to then vend and validate tokens. This is what OAuth does, right? So what I want to do is I want to create a OAuth authorization server.
+
+[00:00:52]
+Okay, and so we're going to use Spring security to. And Spring Security's authorization server to create a spring authorization server. So here we go. Authorization server as.idc customer defaults. Defaults, okay. Do I have to restart this? Okay,
+>> Josh Long: I need to provide some configuration. So OAuth is an OAuth identity provider IDP.
+
+[00:01:25]
+It needs to know about what clients might connect to it. If you've ever gone to like developer.facebook.com or developer. What used to be called twitter.com or x.com or whatever, or developer LinkedIn, most of these pages, most of these sites have a developer dot there. You can register to build a new app or something, a client that will talk to that company's APIs, okay.
+
+[00:01:47]
+And that's OAuth behind the scenes. You're registering to build an OAuth client. So that will talk to these backend APIs that OAuth client. You need to specify things like where you want to redirect after the OAuth flow is done. Are you building a mobile phone or a web app?
+
+[00:02:02]
+Right, is it a desktop console thing or whatever so that you have to stipulate all this stuff up front. But these are all things that you specify when you register an OAuth client, okay? And then what that OAuth client will do is it'll you're gonna, it'll allow you to write a program that identifies itself as a client.
+
+[00:02:19]
+Some user will hit your app and then you acting as a client of like Facebook or LinkedIn or whatever will redirect them to a trusted, well known domain, which is facebook.com or GitHub.com or whatever. They'll authenticate GitHub.com with a padlock in the browser and all that. You know you're in the right place.
+
+[00:02:36]
+They'll redirect you back to the web app and there the web app will have a token that they can use on your behalf to then talk to LinkedIn's APIs. So at no point does this app have your username and password. Only LinkedIn or only GitHub or only Facebook has that.
+
+[00:02:52]
+Okay, so this is very important. They can't lock you out of your account. They can't do anything malicious. They don't have access to pseudo root mode in your account. They only have access to what you've specifically allocated them to do. That's called a grant, right? An oauth grant.
+
+[00:03:07]
+I give you permission to read from my Google Drive but not write, for example. So I need to specify those clients. There's a Java object and you can see that it's saying, hey, you don't have any registered client repositories here. You can configure an interface. You can implement this a number of different ways.
+
+[00:03:22]
+There's one with JDBC and in memory on the classpath and you can easily build one. It's not a., look, it's a very easy API to build. You can imagine doing it with Mongo or Dynamo or whatever. But I'm going to use the config file version of it. So I shall go over here to config and remember that AUTH YAML that I had earlier.
+
+[00:03:45]
+It's back. So we're going to use configuration here. I'm going to do something. Spring boot supports both properties and YAML. So I have to, unfortunately I have to refactor this to be YAML. Okay, so spring application name is. Come on, it's called Auth and SQL init. So it's a Spring SQL init mode is always.
+
+[00:04:21]
+Got that. And then finally the data source bits, right? So spring data source, URL, username password. Okay, so it'll be secret. My user, JDBC, PostgreSQL localhost my database. Okay, so now let's comment all that out. Good. Now we've got a valid YAML file. It's just the same thing as I had before.
+
+[00:04:53]
+What's new is I've also configured a client I've registered. You can register as many as you want. I've given the name OIDC Client because I'm great with names, right? So here's. Oops, what happened there? It's got a client ID of spring. It's got a not bcrypt. I'm just using a no op so it's easy to understand what password is.
+
+[00:05:10]
+It's a password that's been encoded with no encoding called Spring. And I'm asking for this client will have the ability, if it's authenticated, to do client secret basic authentication. And it does authorization code and refresh token flows. And when it's done it'll redirect back to a client. Okay, so what we're building here is an authentication and authorization service, an OAuth IDP.
+
+[00:05:34]
+You might have heard of other OAuth IDPs like Okta, they support OAuth Active Directory supports OAuth, right. Keycloak in the Java community supports OAuth, right. And this is. I'm going to change the port to run in port 9090. So my auth application will run in port 9090. Let's go to the code down here.
+
+[00:05:54]
+I'm going to comment out this controller. So now this is just a pure AUTH server. Start that up. So now we go back to the lab again and here we're going to build a service. And this service is a REST API. It's just a pure REST API that doesn't have a front end.
+
+[00:06:14]
+No user will hit this directly. They're going to hit something in front of this, but they're not going to hit this directly. This is a REST API, but we need to protect it. We need to make sure that requests that go to the service are validated, that tokens are validated.
+
+[00:06:30]
+So we've used Spring Security's resource server, okay. This is in the OAUTH spec. You have OAuth authorization servers, you have OAuth resource servers which are backend APIs and you have OAuth clients which are the things that intercept the. They're the user facing thing that initiates the request response dance to incept the token which you can then use to call the backend service.
+
+[00:06:52]
+So in order for this to work, it's going to run in port 8080. Remember the auth server is running on 9090. This is my backend API. It's going to run on 8080. And I'm going to let's. You know the simple controller that I had earlier, I'LL just do the same thing here.
+
+[00:07:08]
+Class hello, controller.
+>> Josh Long: Okay, hello, map. String string. Hello, principal. Okay, and then it's just going to be hello. Okay, good. Seems pretty straightforward. Right, I'm just going to start this up. The only thing this is going to need to do its work is the location of the Auth server where it can validate the tokens, which we know to be on localhost 9090.
+
+[00:07:43]
+So basically, requests are going to come into this service and if they don't have a token, the filter is going to reject the request and say, no, denied. And if they do have a token, we need to know if they're valid. So we're going to call the Auth server whenever the request comes in and the Auth server, that's called the issuer uri.
+
+[00:07:58]
+Okay, so that's good. But now we need something to. We need again, the service is not going to be visible to the open world, right? The outside of the world is not going to ever talk to that service directly. You don't even need to have a route to it, basically, right in the cloud.
+
+[00:08:13]
+But I do need something. The user is going to talk to something. They're going to go to acme.com or whatever, some website, and they're going to see your beautiful React app and angular code. And that React app is going to call your backend APIs and that's going to call the service behind the scenes, right?
+
+[00:08:29]
+So we need to build that front end. Well, remember what we just talked about, right? What's a really good way to centralize things like authentication and to make access to your JavaScript and your APIs easy? Spring Cloud gateway. Right, so go back to the lab again, okay? And here we're going to build a client, an OAuth client, and we're going to bring in the web support.
+
+[00:08:53]
+And that's it? No, that's not it. Just testing you. Okay. Gateway. Go back here, okay. Nope, no, don't do that. Get nervous every time I do that. Okay, here we go. UAO client, zip. So service properties, application properties. Service port is going to be 8081. Remember in the auth server.
+
+[00:09:29]
+In our application YAML we said that when a user has visited the Auth server and successfully authenticated, they're going to be redirected back to 8081loginoauth2 code spring. This is the name, that's this, right? That's the client. This is the URL set up by the OAuth client support on the OAuth client API that we're building right now.
+
+[00:09:56]
+So yeah, this is going to be a. Well, first of all, it's going to need to stipulate as what OAuth client. We want to behave or act or whatever. So I'll take some properties from this config file, paste them here. This is the mirror image of what we provided on the server side.
+
+[00:10:16]
+In the OAuth IDP, we're saying I want to act as a client called Spring. Here's my client ID and my client secret. And when I'm done, redirect me back to this endpoint. So I'm going to say I'm acting as a client, talk to that AUTH server to get the token one time redirected back.
+
+[00:10:32]
+Then here's what to do. Okay, so I'm, I'm acting as that. So now in the code, remember I want this to be a proxy. So we're going to use Spring Cloud Gateway server response gateway, and we're going to say return route.build.get. So for all requests that have no particular place to go, we're going to serve up some JavaScript on port whatever, 8020, I think.
+
+[00:11:07]
+Okay, but for requests that are bound to the API like that, we'll serve it up on port 8080, okay. Now, of course, remember what we saw before, we're going to have to do a before filter. So before filter functions to rewrite the path. So API just becomes this.
+
+[00:11:28]
+And then also we want to handle OAuth. We want to make sure that when somebody goes to the proxy on port 8081, that if there's no token, that we immediately reject the request. And then redirect them to the Auth server to authenticate, right? And that token, that filter is called a token relay.
+
+[00:11:45]
+So filter, token relay, filter functions, okay? And this is going to be aware of the fact that you've got Spring Security's client support there and it's going to incept the flow. So before we start this up, let's get this JavaScript going. Where did I put that? I think I trust me, I care for you too much to make you watch me code JavaScript live on stage.
+
+[00:12:06]
+So we're going to just do this like this. We'll say, security ui, here's my index HTML and. And you can see this HTML page is the ultimate in trivial, right? I've added a listener. I'm calling API and I'm getting the endpoint, right? The hello, the name. So that's the endpoint in the Service.
+
+[00:12:31]
+Where's my service here? What does it say? It's called name.
+>> Josh Long: And actually let me just return that. I'll say name.
+>> Josh Long: Okay, so I'm going to restart the service. So now here's my JavaScript. I'm going to start it by just running this little script run. All that's going to do is use Python and serve it.
+
+[00:12:52]
+You can use Node, you can use whatever, you can even use Java. But it's a little verbose in that case. Okay, so that's up and running, service is up and running. Here's the gateway. Let's start that up.
+>> Josh Long: So now if I go to 8081 incognito mode. Okay, 127.0.0.1:8081, I think it redirects me to the auth server and port 9090.
+
+[00:13:26]
+Now I log in, redirects me back, and there's my JavaScript page on the client. So the gateway proxied two things. It proxied forward slash API in the same host and port. I'm proxying API and that gives me the back end service, which is on port 8080. And it proxied the JavaScript which is in my.
+
+[00:13:51]
+You can imagine a CDN, but in this case it's being run from a static directory in my local file system because there's a security filter. There's a spring security filter here. I tried to access this JavaScript before I ever got a chance to render that page. Before those bytes ever got to me.
+
+[00:14:08]
+I was redirected to get a token. It redirected back to the gateway. The gateway established the session with a token in it. And now every request is in terms of this authenticated session. Easy, notice how nice and clean my code is. I don't have JWT tokens being banded around.
+
+[00:14:23]
+I don't have to worry about sending the header in the JavaScript code. I don't have to worry about cores either. This is actually a much more efficient way to build a system. Okay, any questions on all that? Or at least do you understand the concept? Like conceptually passwords terrible.
+
+[00:14:38]
+There's a lot of ways to avoid them, including one time tokens, pass keys, and of course OAuth. And OAuth lets you scale out all those approaches for your entire system, right? It's not just one app at a time now and this code for your full analysis and scrutiny is in the repository.
+
