@@ -1,0 +1,144 @@
+[00:00:00]
+>> Josh Long: Now we're going to build on this. We've got a toy of an application. It is an application, it's just a bit of a contrived one. That's fine. But let's imagine that now we're under the gun to get this thing to production, right? We need to get to production.
+
+[00:00:15]
+What does that look like? And at this point it's a matter of packaging and making it production worthy. So to that end, go to your pom xml, okay? And you wanna add a starter. And the starter is this one. Just add. Org Spring framework boot spring boot starter actuator Actuator in physics is a thing that takes a little bit of energy and turns it into a lot of energy.
+
+[00:00:46]
+So the actuators are observability module, right? One of the things that sets spring boot apart and one of the reasons it's become so popular is because even from day one it was designed in such a way that you could take it to production. It was not just cool looking code, it was actually code that would integrate with the rest of your infrastructure, with the rest of your operations and so on.
+
+[00:01:07]
+Or better, it would actually level up your operations because it would demand observability in a way that most applications don't by default. So once you've got actuator on the class path, we're going to do something you shouldn't do in production, but that we want to see. So add this property file, this property value, it's called management endpoints, web exposure, include equals * and then restart your application.
+
+[00:01:42]
+I'm gonna close the SQL files here, okay? I'm assuming we're all on the same page there. So let's just keep it down to these two. And notice that I haven't changed anything in the Java code. I've just added the starter for the actuator and I've added this one property file, one property value.
+
+[00:01:58]
+What that will let you do is go to localhost 8080Actuator. This is the spring boot actuator. Like I said, we've done a thing you won't want to do in production. We, we've told the actuator make everything visible. That's what this property is doing. This is for our demo.
+
+[00:02:13]
+Don't do this in production, okay? Don't do this last thing in production. By default, if you don't have this, you only see three actuator endpoints. The actuator endpoint is meant to surface information about the state of your application, the health, the well being of your application. So you can see things like this.
+
+[00:02:30]
+If you go to forward/actuator, it shows you all the different endpoints that are available. This is a hypermedia. So now we have a list of beans. You wanna know what Java objects have been configured by spring? Go to \slash beans, right? You can see their dependencies, their make, the classes that they live in, their scopes, et cetera.
+
+[00:02:46]
+Right, scopes means how many of them are there? Is it just one per application, is it one per request? Whatever. You can look at all the different cache implementations. So if you have the spring cache abstraction set up, you can see what caches you've configured. You've got your health endpoint and the health endpoint gives you a status code 200 if your service is healthy.
+
+[00:03:07]
+But let's say that you start up the program and the database connection pool can't connect to the data source. Well then this will reflect that the status is unhealthy and it'll show 500 error. Okay, so this is what you would feed to your load balancer. If you're using Kubernetes you could do probes enabled is true.
+
+[00:03:28]
+That'll enable Kubernetes liveness and readiness probes for you. So if I go back over here. Reload. There you go. Now I've got two different sub endpoints and I go to here liveness and it shows me this liveness and the readiness and these behave exactly as they're supposed to.
+
+[00:03:42]
+For Kubernetes you can show the details for the health endpoint, show details always. I'm going to do that. If you do that and then go back over here, you can see now we got what is valid, what's not valid, what's wrong with something. If any one of these subsystems, your disk space, your database, et cetera, returns false, then the overall aggregate status will be down and it'll give a 500 error.
+
+[00:04:07]
+You can contribute your own health indicators. In fact, just register a bean of type health indicator. So if you have some other network service that you need to be up in order for you to function, create a health indicator that pulls that service. It's literally interface is called health indicator.
+
+[00:04:23]
+It's a one-method lambda, you'll know what to do. It returns a boolean. Basically the health indicator is very, very good for guess what, determining the health of your system and you can contribute to it as much as you want. Yeah, look at that. Do we have valid SSL certs does the ping work?
+
+[00:04:38]
+Is the service live? Is a disk space good? Do we have too much or too little database? All this stuff is there for you and each project will add more and more of these. If you add MongoDB support, you'll get a health indicator from MongoDB on all these different projects.
+
+[00:04:54]
+Add relevant things there. Okay, back to the actuator at health we have info. Info is a tabula rasa, okay? It's empty info tells you whatever you want it to tell. So if I do a management info, default info env enabled is true, okay? Do that and then you do info.best-course-ever=frontend masters, right?
+
+[00:05:25]
+So I'm going to add that little property. It's arbitrary. This is obviously just me making something up, right? So I go over here, refresh and now I've got this custom attribute there called best course ever equals frontend masters, right? So I can now export that. So imagine you've got a service in production and you're trying to identify the service.
+
+[00:05:42]
+You don't know which one it is. Well, you can put information in here. You know one way to, you know one good way to identify a service by its git commit. You want to know who contributed. If you got an error in production, something's going wrong. Which build am I running?
+
+[00:05:55]
+You want to put the git information in there. You know how you do that? You go to your build back in maven land, right? And we preconfigure for you the git commit ID plugin. All you gotta do is opt into it. So I go down here, gonna copy and paste that.
+
+[00:06:13]
+And we're gonna go back to our build, pom.xml, and down here in the plugins section, paste that and just get rid of the version. You don't need the version. Now I'm going to stop the process since this is a change the dependencies. I've added something to the classpath.
+
+[00:06:28]
+I'm going to rebuild this. It's going to fail because I don't have a git repository. So I'm going to say git init git add git commit a m yolo and then do skip test package or clean package even to rebuild everything from scratch. What that's done is it's just added a git properties file to the code base.
+
+[00:06:52]
+See that file there? If I cat the file you can see it shows information about the git commit. The name, the tag, the date, all this kind of stuff that is relevant to my project and that's going to be compiled into. Like I said, it's going to be compiled into the code of the program.
+
+[00:07:08]
+So now if I restart the project having done nothing else besides add that, enable that plugin. Now, the info endpoint gives you the information about what version of the commit is running here. So imagine you make changes, you do git commit, git push. It goes to your CI environment, GitHub Actions, whatever you do a maven clean package.
+
+[00:07:26]
+Now, it automatically includes the current build revision in the info endpoint. Now you can go there and say, okay, this is Josh, he committed a bug, get blame and fire, that kind of thing. So this is very, very useful. Now you know what's going on, what else you've got conditions.
+
+[00:07:45]
+So you know that spring boot is doing a lot of things magically. It just starts up stuff for you on your behalf based on cues and clues that you give it, including property files, including the definition of certain beans, including the presence of certain classes on the class path.
+
+[00:08:00]
+We talked about conditional yesterday. Well, do you want to know what conditions are true and which ones are false? Which ones resulted in the coalesced final form of the application that you see before you click on conditions? This is a report of all the conditions that were evaluated.
+
+[00:08:14]
+Which ones are positive, that is to say they resulted in true, which ones are negative, and which ones are evaluated unconditionally. There's no test, it's always true, right? So let me see. Negative. There you go. Negative matches. Okay, so for example, because I don't have rabbitmq in the class path, I don't have RABBITT template and therefore the condition for on class condition in the Rabbit health contributor auto configuration class was false.
+
+[00:08:41]
+Okay, so go back here. Now we've got the config props. And this is for people who are reasonable and smart and don't want to waste time paying jetbrains for extra things that they may not need. If you want property files. Autocompletion. Right, My friend in the front, you know how we couldn't do auto completion for the properties?
+
+[00:09:02]
+There's a cheat code here that auto completion is based on this index that gets shown right here. Actuator config props. So these are the properties to which spring boot will respond given the types on the class path. So if I wanted to change something about the web server, right?
+
+[00:09:19]
+I could choose. Let's see, management.server.base.path, right? Management server. Sorry, prefixes. Management server base path. Management server. Inputs that base path, right, okay. Or if I wanted to change SSL, I could say spring.ssl.bundle.pem. Or spring.ssl.bundle.jks. Or spring.ssl.watch.file.quietperiod, okay? So you have all these properties that if you don't have the plugin that'll do the autocompletion, this shows you all the properties that are available to you anyway.
+
+[00:09:53]
+It's a menu, okay? And it shows you the values, if they're not masked off, okay? Okay, what else we got here? Env. I'm not going to click on this one. You can guess what this is. It's just your environment variables. Probably don't want to show that on stage.
+
+[00:10:09]
+That's why I'm saying do not leave this property open in production. Actually, I will show it. Let me see if it shows anything. Yeah, it masks off a lot of things actually, so it's okay. But still, I would definitely not. This is your property sources. This is the environment variable, the environment object I taught you about yesterday that has the keys and values in your environment, your system properties, your environment variables, your application properties, all that stuff, all the loggers.
+
+[00:10:32]
+Let's say you're trying to debug a nasty bug in production and you've got an error happening and you've got some debug at level fine or trace, you want to see that log output, but it's not set to debug that by default. You can hit this endpoint and while the program is running, update a log level granularity for a particular package.
+
+[00:10:53]
+So that's pretty good. What else do we have here? Heap dump. You want to get a heap dump to understand where the memory is and put it in a profiler, click on, you guessed it, actuator heap dump. And that'll download a heap dump that you can put in a profiler to understand a stack trace from production.
+
+[00:11:09]
+Thread dump. You wanna see what threads are waiting and what are idle and what are doing what. Just go to /threaddump. Okay, what else do we got here? Metrics, aha, this one's the important one. Metrics. Okay, so we have metrics. This, it gives you guess what. Metrics. These are things that show you the state of different parts of your application, including how many web sessions you've got, what your CPU usage is, how many connections you've got to the database, et cetera, how much disk space you've got free, how long it took for the applications to start versus get ready to be ready.
+
+[00:11:45]
+So now let's say I want to look at how Many requests there have been, I go to actuator metrics, httpserver requests, and it says, hey, you've had 12 requests total time across, all them aggregate was that the max time was this. And if you want to, you can also break it down by whether there was an exception, whether what method was used, what errors occurred and what endpoints there were.
+
+[00:12:07]
+Okay, now why is this useful? Well, because it pairs with another project that we built called Micrometer. Micrometer is the de facto way to do any kind of observability in the JVM space. It is a, as it says, vendor neutral application observability facade. You don't need Spring to use this, right?
+
+[00:12:24]
+It's the other way around. Spring needs this to be workable, but it's not the other way. So you can, and people do use Micrometer independent of Spring. So, for example, database libraries, they're not gonna import a whole frame. You know, if you're a driver, if you're providing a driver, you're not gonna import Spring.
+
+[00:12:39]
+That makes no sense. Spring will consume the database driver. But because this is just a core spi, like a logging library, people include Micrometer in their driver and they emit metrics that make sense for them, okay? Aha. SBOM software bill of materials, right? You can't deploy mystery meat applications to production these days, right?
+
+[00:12:59]
+There's actually government regulation in some areas where you need to be able to account for the mystery, like the provenance of the dependencies in that application. We see this all the time. This is a discussion around the Docker image area as well as in your application artifacts. So we have an SBOM support right now.
+
+[00:13:15]
+It's not enabled though. I need to enable it. And the way you do that is by going back to start spring IO, I'm going to add one dependency here, SBoM software build of material. So add that and it'll just give you a plugin that you can add to your build.
+
+[00:13:33]
+It's the same as the commit ID thing I showed you earlier. All you gotta do is add this to your build and then rebuild the project, right? I'm going to just paste that in. And that'll give me a cyclonedx maven build on material. So maven skip tests package.
+
+[00:13:53]
+I'm going to do nothing else. I'm just going to restart the project now, having added that thing to my build. Go back over here. You can see it says now I have an application, SBoM. So I go to actuator SBOM application and look at that. I have a full manifest of every dependency and their sha and where they come from and the creator of it, and so on, right?
+
+[00:14:16]
+So this is really good. If you want to do production, then this is what you need to do these days, right? This is very, very important. Your security team wants this, they just don't. They maybe didn't, maybe they haven't told you that yet, but they do. So this will show you the provenance of every dependency.
+
+[00:14:28]
+Very, very important. We learned a lot in the Java community from the left pad incident from 10 years ago, whatever it was. Ever since then it's been very, very important to be very clear about what nonsense you have in your build. Okay, what else do we have in here, friends?
+
+[00:14:45]
+We've got actuator info. We talked about that, we talked about conditions, we talked about heap dump metrics, scheduled tasks. Mappings. This is another one that's really useful. Do you want to know what endpoints are exposed? You've got controllers. Those controllers respond to certain HTTP URL predicates, right, like a request comes into /customers.
+
+[00:15:07]
+How do I know that that endpoint is exposed? Especially if I've got these routes strewn about my code base, as is pretty common when you have a lot of different controllers. Well, go to mappings. This will show you all the different HTTP endpoints and the component that handles them and the content types that they accept and produce and so on.
+
+[00:15:24]
+So for example, there's a delete endpoint for actuator caches. It is handled by this Java component right here. And the method is here, it's called handle and it takes us. This is the signature of the types that it expects, the request mapping conditions, etc., right? So that's the actuator.
+

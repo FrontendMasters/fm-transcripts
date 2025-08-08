@@ -1,0 +1,114 @@
+[00:00:00]
+>> Josh Long: All this time I haven't been using Spring. I mean, I use some types from Spring's packages, but I'm not using Spring as a framework for dependency injection. So let's talk about that. Let's look at our first Spring framework example here. Here I've rewritten that same code to use Spring to use dependency injection.
+
+[00:00:17]
+And what Spring wants is it wants to manage your objects in order to do the same magic trick I just told you about, where it swaps things out for you. In order for that to happen, you need to describe all the objects in the ecosystem and how they relate to each other.
+
+[00:00:29]
+So I've got a configuration class and I've got methods annotated with each one of these is one of the objects Spring will manage. So I've got the customer service, it's got proxies in there. I've got my data source. Technically embedded data source is a data source still, right?
+
+[00:00:44]
+The code still works. I've got my embedded database. I'm using H2 instead of SQLite. So I go back to my test now and you can see I'm just creating the application context in Spring. Spring has this concept of an application context. It is the thing that hosts your Bean configurations, your objects, which are the objects that Spring manages.
+
+[00:01:09]
+Here I'm saying create a new application context given this configuration class, and from there get a pointer to the customer service, get a pointer to the data source, call initialize, and then do the test just like before, right? And you can actually prove out. Here, you can actually see I'm doing even nicer.
+
+[00:01:29]
+This is a low level test that is just written using junit. Over here though, there's some actual integration in the testing hierarchy with Spring itself. And so you can actually tell Spring's test support to decorate a junit test and it'll automatically start up the application context for you.
+
+[00:01:45]
+And you can actually even then ask it to inject into the parameter list of the methods under test. You can inject beans from the application context. So I don't have to call application context getbean datasource class or getbean customer service class, etc. This is the same test. So let's run both of these if I can, CustomerServiceTest.
+
+[00:02:07]
+Can I run this? It's the same one, I gotta run the other one. Let's just try running this one. Run. Okay, then what about this one? Okay, so you get the idea. Same results, very, very fast using Spring. But it's also a little verbose. I think we can agree, right?
+
+[00:02:32]
+That's a little bit verbose. So what things can we do to remove some of the tedious reworking, right? We've got a lot of things that are being duplicatively declared. So one thing we can do is we can have Spring automatically discover things for us, right? And that's with component scanning.
+
+[00:02:46]
+So rather than having a. Rather than having all the beans described in this Java configuration class, the old one said add configuration. I can also tell Spring to scan the current classpath for objects that have these marker annotations on them. These marker annotations are @Component, so anything that has @Component on it will itself be picked up.
+
+[00:03:09]
+What that means is this configuration class is add component. If I say class foo and I say addcomponent, then Spring will automatically discover this type and manage it for you. You can create your own meta annotations as well. So I can call this @FrontendMasterService. Let's say I have that annotation.
+
+[00:03:33]
+So I'm going to do this. I'll create that. Put that there. Okay, and then now, because this has add component on it, Spring will pick it up as well. So I can go here and I can say my service, right? Spring will pick up this. It'll pick up this class and manage it for you just as well as it'll pick up this one using the Spring framework.
+
+[00:04:02]
+And the benefit is that now, on my business logic, because I have Component scan here, I don't need to define a bean method that returns. I don't need to construct the object for Spring. It'll just figure out how to do it based on whether there's no constructor or not, whether there is a constructor that takes no parameters, etc.
+
+[00:04:22]
+So that's a little bit better. Okay, that's using component scanning. Where's my readme? That's using component scanning. Life cycle is very important in Spring, right? So in Spring you have, you know, it manages your objects for you. And so if I look at my. This one, where's my production code?
+
+[00:04:42]
+If I look at lifecycle over here, there you go. You can see that Spring has this concept of a life cycle. So normally if you have a dependency, you can express a dependency as a parameter in the constructor or dependencies. Here I'm telling Spring I have a constructor.
+
+[00:04:59]
+I'm expecting a pointer to my JDBC client. It'll resolve that. It'll say, okay, I'm managing a bean of type JDBC client right here. I'll inject that pointer in the constructor here, and then I'll construct this customer service. But you can also do some validation after the object has been set up and is about to be put into production.
+
+[00:05:21]
+By implementing initializing Bean, this gives you a chance to do some final validation of the state of the object. There's also a corresponding interface called disposable bean, right, like that. And in that case, you would have a. What is the disposable bean? Did I already do it? I did.
+
+[00:05:45]
+It's called destroy, yeah, sorry. So you can do @Override public void destroy, right? And that comes from that disposable bean interface. If you add these, these are like your final chances to do validation of the state of the object before it gets put into use, and your final chance to clean up the state of the object before it gets put into use.
+
+[00:06:04]
+Okay. You don't have to use these interfaces, though there are annotations you can use as well. So post construct and pre destroy have the same effect. You annotate a method with these annotations and Spring will automatically know to call them right after the object has been constructed and right before it's been destroyed.
+
+[00:06:29]
+Now, so we have Spring, right? Spring has all your objects. It is the keeper of all these different objects. One of the things that's nice about Spring is that it can visit, it can transform it, it can inspect all the objects. It's the single place you can go to effect change across everything in the code base, right?
+
+[00:06:46]
+You can ask Spring to do that for you. One of the natural ways to do that are through two callback interfaces, one of which is called the bean post processor. How many of you have heard of bean post processors? This is a little, like I said, this is a little in the weeds.
+
+[00:07:01]
+And you're not going to need to know this right now. But just, if you wanna understand Spring, it helps to understand these two callbacks, okay? Okay, so here's a logging bean post processor. So imagine I've got a scheme where in my code base I might have objects that have this magical interface called loggable.
+
+[00:07:20]
+So if any object in my code base, any service in the system implements loggable, then I want to automatically turn them into a proxy that has that logging instrumentation on it. So I can register an object of type, logging of type, bean post processor. And the contract is I get a pointer to every single object in the Spring context, I'm able to inspect it.
+
+[00:07:40]
+And if it implements loggable, I transform it into a loggable proxy that we saw earlier that has that Telemetry that you can log out or send to Prometheus. Otherwise I just leave it alone. So I'm getting a chance to visit every single object in the code base. So if you wanna administer something, if you wanna deploy some new capability as an architect, you do this in your Spring application.
+
+[00:08:00]
+Register this bean one time, it'll in turn transform every other bean. Okay, so let's see that in action. I'm not sure if we have. Here we go, this one. Let's see. Debug. There you go. There you go. So you can see, I'm able to inspect and I'm able to discover that this is a customer service and it's loggable and so on.
+
+[00:08:34]
+So that all gets done in this bean post processor. There's another interface that runs even earlier. So the bean post processor gets run on all the objects before the context is started, before it's officially ready to start working for you. That other interface is called a bean factory postprocessor.
+
+[00:08:50]
+And that bean factory post processor is. Is the primordial soup. That's when Spring starts up. It looks at all the different objects that you've got in your system that you tell it about via annotations, via xml, via component scanning, via whatever, all these different channels by which you can tell Spring, hey, I want you to manage this object.
+
+[00:09:10]
+At that point, Spring has a bunch of bean definitions. These are metamodel objects that have information like the. The constructors, the properties, the scopes, et cetera, of each of these objects. And from there, Spring will validate that all these objects will wire up correctly, that the references to each other are valid, that they're not going to be, that it's not going to get down the line and start trying to instantiate all these different objects and have an error, because one of these objects doesn't exist.
+
+[00:09:38]
+This will all get validated, and then finally they will all be real objects. But before that happens, you have bean definitions. Like I said, these bean definitions are very important in the lifecycle of the object. So here I'm creating a bean factory post processor. I'm getting a pointer to something called the bean factory, which is the thing that underpins all of Spring, right?
+
+[00:10:00]
+Before you talk about application contexts, before you talk about Spring boot, you understand that there's a bean factor. That's the thing that contains your objects, it controls the lifecycle of your objects and so on. And you can actually inspect it, you can modify it, you can mutate it.
+
+[00:10:14]
+So here I'm saying, give me all the Beans that have this interface loggable, that have this type in their hierarchy somewhere, loggable. And it's gonna give me all the bean names. And I'm saying if this class and I'm saying give me the class, the type, this is the type here.
+
+[00:10:29]
+I'm saying if it has that type, then print out bean blah is a loggable and is also whatever, scope, and I can even see the scope. So in spring, scopes are how many objects, how many instances of them are there? By default? In spring, every object is created one time.
+
+[00:10:48]
+We call that singleton scope, right? So it's not per request. It's not per. It's just one time. You have one shared object, which can be. It's normally just fine. But imagine you are doing something where you're keeping a counter for every single web request that comes in. You've got one object, got multiple threads coming in.
+
+[00:11:06]
+What does that mean? You've got to make sure that that counter variable, that int counter is mutated in a thread safe way. You need to either use, synchronize or use an atomic integer or something like that. So you have thread safety issues you need to worry about in the weird cases.
+
+[00:11:24]
+In the normal cases, you're probably never going to hit this. But just be aware. Okay, so these interfaces, basically the way they work, you have bean factory post processor and bean post processor. They're just objects. You just register them in spring just like you did everything else. So here is my configuration.
+
+[00:11:43]
+You can see I registered a logging bean factory post processor along with my embedded database and my JDBC client, and I've also registered my logging bean post processor. The only thing that's different is that they both have the word static. Okay, because these things need to be registered and running much earlier on in the lifecycle of the program than these do.
+
+[00:12:06]
+Because in effect these are going to post process these. So they need to be spring needs to know about them much earlier on. So you make them static. Okay, good, let's see here. Readme now, finally, we just did a SpeedRun of Spring 101. I don't expect you're going to need to know all this stuff right now, but you wouldn't believe how many people look at spring boot, which is what I'm about to show you and don't understand that these underpinnings have been there for decades before, right?
+
+[00:12:40]
+And so if you want to understand spring boot, it helps to understand spring, which is what we just did. We're looking at core spring as a component model.
+

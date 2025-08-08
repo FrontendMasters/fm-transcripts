@@ -1,0 +1,177 @@
+[00:00:00]
+>> Josh Long: The very next thing I wanna talk to you about is Spring Batch. Now, Spring Batch is a, t's a framework to build and to solve ETL, batch processing kinds of things. One of the things that people don't really appreciate is that batch processing is still very much the bread and butter of most financial services organizations.
+
+[00:00:20]
+And look like I, do you remember that old T shirt that said be very nice to me, I'll replace you with a very small shell script. In my mind, it's always been very nice to me or I'll replace your COBOL and Cakes installation with a very small spring batch app, right?
+
+[00:00:36]
+Spring Batch is just a very nice way to solve these kinds of large amounts of sequential data processing tasks. And it's a framework that builds on top of, sorry, it builds on top of Spring framework, and that you can use from Spring Boot. And it is meant to deal with data.
+
+[00:00:52]
+It's meant to load, process and write data. It's ETL, that's the whole point, right? Extraction, transformation and loading, processing, writing, that kind of thing. So what we're gonna do is we're going to step back a little bit, and let's say that, I mean, this code is all still valid, but let's keep it a little simpler here, okay?
+
+[00:01:08]
+So I've commented out all that code. We're basically back to stock standard spring boot application, going to get rid of the schema there, and we're going to just comment that out. I'll go back to my build and keep it a little bit simpler, okay? Cmd + Shift + I.
+
+[00:01:29]
+I'm not adding anything, I'm just removing things, so you know that this is a separate, but it's orthogonal. You can use these things together, but I just don't see the need to, so we'll keep it simple, okay? Okay, so there's my Spring Boot application. It's now going to become a spring batch application, it's a batch processing.
+
+[00:01:44]
+And remember, batch processing is one of those things where you're usually typically dealing with a lot of data and there might be errors and there might be ingest involved and there might be issues. And these kinds of things are by definition things you find out only after hours and hours of running, right?
+
+[00:01:59]
+So there are things you want to have to be as bulletproof as possible. So Spring Batch ships with a number of features that are meant to support you in the 1% case, or the 0.01% case right there. It's easy and clean and elegant in the 99% case. But it's that when, when things go wrong, as an operator running this job, I want to be able to intervene.
+
+[00:02:20]
+I want to be able to correct it or to have fallbacks or whatever. And likewise, I also want to be able to do complex sort of processing on this data, okay? So I've deleted these two different tables here. I'm deleting all these tables. Goodbye to everything, force refactoring, good.
+
+[00:02:38]
+And I'm going to go back to my application properties. I'm keeping my Spring data source credentials and all that stuff. I'm going to keep the SQL init. I'm going to tell Spring Boot to run that. I'm going to create a new table here, a new file rather called schema.sql, create table if not exists dog ID serial primary key name text not null.
+
+[00:03:05]
+Owner text is null, and then description text not null. Okay, pretty straightforward, good. So let's go ahead and rest, and then, sorry, I'm going to tell Spring Batch also to initialize its own schema. Okay, so this is the thing that's interesting is that Spring Batch is meant to run over hours, minutes, days, hours, whatever.
+
+[00:03:37]
+It's meant to handle large amounts of data, right? And to make it easy to read data from different disparate data sources and write it out to different disparate data syncs. And because of that, we keep track of the state of a job in a SQL database. So, here we go.
+
+[00:03:56]
+I've just restarted the application, refreshed it. Now I go over here, you can see that there's now a bunch of tables here related to Spring Batch, okay? So we've got Spring Batch, job execution, Spring Batch, job instance, Spring Batch, step execution, etc. So these are all the state of a given job and its execution.
+
+[00:04:14]
+So the way it works is in spring batch, you create a job and then you can run that job as many times as you want. You define the job as just a regular bean using Spring's programming model, but then you can run as many instances of that job as you want, and those get stored here, Batch, job, instance.
+
+[00:04:30]
+And each job has 0 to n steps, right? So each step can do one bit of IO. Okay, so you might have one step that does, you know, it's not uncommon to have a batch job that has one step. But you can also have multiple steps in a sequence.
+
+[00:04:47]
+You can have conditional steps, you can have conditional logic saying, okay, based on the outcome of this, if this exited incorrectly, then don't bother with this. If it didn't, then do this, right? You can have conditional flows in your spring batch job. So let's create a spring batch job.
+
+[00:05:02]
+And what we're going to do is we're going to load data from a CSV file and then write it out to the SQL database. Pretty cliche, but it'll demonstrate the concepts, okay? So, I'm going to create a spring batch job CAD job. In order for me to build this, I need a job builder.
+
+[00:05:20]
+Get it? So, new jobBuilder. Sorry, I need a job repository, JobRepository. Good, job builder, passing in the name. So I'll call this job because, again, amazing with names. So I'm gonna pass in that repository. And that repository is the thing that's gonna talk to the SQL database for us.
+
+[00:05:42]
+Jobs, by default, they have parameters. Those parameters are used to create a key that if the parameters are the same, will stop the job from running again. That is to say, imagine you're doing a process that runs every night at midnight or whatever. You're doing some sort of analytics, you want to prepare a report, or worse, imagine you're doing some destructive thing that actually changes state somewhere.
+
+[00:06:07]
+You want to make sure that thing doesn't run more than once, okay? Or it doesn't run more than once per 24 hours or whatever. So you might have as the key for one of these jobs, the date, the year, month and day, whatever. And so if that key, if that job has already been run with that key, don't run it again.
+
+[00:06:25]
+And that's a job parameter. And you can have job parameters that contribute to the key or not. But the point is, by default there are no job parameters, which means that if you run the same job again and there's no keys, there's nothing to distinguish one run from another, it won't run, which is actually kind of confusing.
+
+[00:06:41]
+So, to make it easy to develop, I use the runid incrementer that contributes a parameter which is going to just increment. It'll be monotonically incrementing, okay? Now, first step. What's my first step? Well, I'm going to inject a step. This is dependency injection where I have a spring bean method that is injecting a pointer to the job repository that is configured for me automatically by Spring Batch.
+
+[00:07:07]
+And I'm going to inject a pointer to the other step that I want to use. I haven't defined the step, but I will, okay? So that's this. What's the issue here? It's the next start. There you go, okay? So now what about the step? Well, I'm gonna only have one step.
+
+[00:07:26]
+As I said, you can have as many as you want, okay? And I'll pass in the job repository again, new step builder, okay? Dot, and then you have a chunk. Now, remember, this is sequential data access, right? So if I have a million rows or a billion rows, then you don't wanna do something naive like select all, okay?
+
+[00:07:49]
+What you would rather do instead is chunk through it. Read a million rows at a time, or 100,000 or 10,000 or whatever. Some number that you can handle effectively. And that you can also afford to lose. The chunk boundary is the amount of data that wraps a transaction, right?
+
+[00:08:08]
+So when you read 1000 rows into memory, you then process it. If something goes wrong, Spring Batch will roll back the transaction along the last chunk size. So if your chunk size is 10,000, then it'll roll back and mark as incomplete that chunk of 10,000 rows. Even if, sorry, 9,999 of them process successfully, if it fails on the last one, you'll lose all 10,000.
+
+[00:08:31]
+It's the whole chunk size, right? So it's up to you to prescribe what the chunk size should be, but it should be some number that you can afford to lose and also that you can keep in memory at the same time, okay? So start small and scale up until you find a number that works.
+
+[00:08:46]
+So if you've got a billion rows, the idea here is that we're going to read 10 records at a time from a source, do some optional processing on it, and then write out to a sink all at once, at 10 at a time in a single transaction, right?
+
+[00:09:00]
+So you don't want to try and write a single transaction with a billion rows, so don't make the chunk size a billion, right? Make it something that's reasonable for your output data source, okay? Okay, and because that's a question of sort of your transactions, you have this platform transaction manager.
+
+[00:09:20]
+You have to give it a pointer to a thing managed by Spring called the Transaction Manager, okay? This is an abstraction that we have that you can use to talk to. There are implementations of this. This is a portable service abstraction. There are implementations of this interface for SQL, for Neo4J, for MongoDB, for JPA, for JTA, for distributed transactions, for Neo4J, for, I mean everything, everything that has transactions.
+
+[00:09:43]
+RabbitMQ, Kafka, there are implementations of this that you can find everywhere, right? And behind the scenes, when you are using Spring's Add Transactional support, let's say you have a service that has a method that returns whatever. If you put Add Transactional on that, Spring will automatically decorate that.
+
+[00:10:03]
+It's like an attribute, right? It'll automatically decorate that method in a transaction. It'll start a transaction beforehand and commit it after the method is run, right? And that's because somebody's configured a bean of transaction manager in the bean context, in the application context. And that, which kind of transaction manager you're using it's up to you, but by default, Spring Batch, Spring data JDBC, all that stuff.
+
+[00:10:24]
+I'll have a SQL data source transaction manager in auto configured for me. Okay, so the chunk is the amount of data I'm going to read and write in a single go. But what about the reading and the writing and what kind of data? Well, again, my goal is to read from a CSV file.
+
+[00:10:41]
+So I've got a domain object called dog, okay? And I'm going to read that from a CSV file and I'm going to write that out to a SQL database. So the chunk is going to read from a CSV file into the domain type called dog, and I'm going to write the DOG data to a CSV file.
+
+[00:10:59]
+So the input type and the output type are the same in this case. They don't have to be, though, because between a reader and a writer, you can put a processor. The processor might transform the thing. You might affect a change. What if you're terrible and it's like the night before Christmas and you want to like, raise the price of all the toys or something, right?
+
+[00:11:18]
+If you're a terrible person, you can raise the price 10%. You read all the data from the catalog, multiply the price times 1.1 and then write the thing out, right? You can do that in a batch. That's actually something you could probably also do in a SQL database.
+
+[00:11:32]
+But the point is you can do it in batch, okay? So read, okay? ItemReader, ItemReader, okay? And the ItemReader is gonna be an ItemReader of type Dog, so ItemReader, Dog. Okay, we'll come back to this in a second. This won't work to do. And then we need the itemWriter.
+
+[00:12:00]
+So itemWriter of type dog, great, okay? And same thing down here, so itemWriter. Okay, so now we say reader is equal to reader, and writer is writer, okay? The contract for these item readers and item writers is very simple. You can create your own, no problem. So here's the itemReader contract, right?
+
+[00:12:29]
+Your job is to return a T, which is a generic type there when asked. So we have item readers, rather, for flat files, for in memory, for JBDC, for JMS, for Kafka, for LDIF, which is like image metadata. Sorry, that's directory metadata? Yeah, directory metadata. You've got MongoDB, cursor reading, you've got paging, you've got redis, you've got whatever.
+
+[00:12:55]
+I mean, stacks for XML documents, you've got all sorts of stuff in here, but you can also easily create your own, right? So item readers are just, they read one thing at a time. The itemWriter writes a chunk, right? So your job is to write one chunk's worth of data.
+
+[00:13:12]
+Well, if the number that we specified is 10, then this chunk size will be 10. This is actually a list you can foreach over it. There's 10 items. So at most you'll be asked to write 10 items, okay? So I'm gonna use the batteries included, right? I'm going to use the ones that come in Spring Batch.
+
+[00:13:30]
+So I'll use the, rather not the new, the flat file item reader to read a flat file, okay? And what flat file? Well, it's gonna be a CSV file that I have on my desktop here, dogs.csv resource. Sorry, not there, file. How do I get rid of that?
+
+[00:13:57]
+Hide this. There we go. And put the resource here, good. So it'll be this flat file, okay? That flat file is a CSV file. So let's go take a look at that over here, Desktop/talk/dogs/dogs.csv, sorry, talk.csv, there you go. You can see I've got a bunch of dogs there that I need to load into memory or load into the program.
+
+[00:14:22]
+And it's got a header row, right? So I'm going to take the header and I want to tell this thing that it's, so let's see, delimited names, here's the row, the column names rather. And I'm going to tell it to skip the first line, lines to skip is one.
+
+[00:14:42]
+I'm going to tell it to map the CSV data to a Java object. Kind of like that row mapper that you saw earlier, except here it's gonna be a fieldSetMapper, right? So my job is to take the data from the csv and fieldSet.readInt(id), fieldSet.readString("name"), and then, okay, so name, what is it?
+
+[00:15:12]
+Owner and then description, okay? And of course this can be a lambda, much nicer. Okay, oops, new dog. Okay, goody. So there's that right, flat file item reader that's going to read the data. If everything's gone to plan, then I should see it all printed out here, right?
+
+[00:15:43]
+Okay, let's just see if that works so far, nope. I need to give it a name. Remember, it's going to store this stuff in a database. So for things where you need durable state, you have to provide a name. So okay, looks like it worked. So there's the, you can see I've got two different chunks.
+
+[00:16:05]
+There's only 18 records, I think. So, here's the first chunk and here's the slightly smaller second chunk because there's not quite 20 records, it's one chunk of 10, which is the max, and then 8, which is the balance, the modulus. Okay, so it's clearly able to read the data, right?
+
+[00:16:24]
+By the time we get to the itemWriter, I clearly have a collection of dogs from the CSV data. But now I want to write this to a SQL database. Remember, I've got this nice SQL table over here. No dogs, empty, okay? So our job now is to write this out.
+
+[00:16:39]
+And I'm not gonna instead of having my own item writer, I'll just use the JDBC batch itemWriter builder for data of type dog.build, okay? In order for this to work, obviously I'm going to need to inject the data source, so data source.. And I'll need to provide the SQL command or incantation or whatever.
+
+[00:17:02]
+So insert into dogs, id, name, description, owner. Do I have that? Yeah, I do. Okay, values, and then I don't know why it keeps insisting on putting that in, but, 1, 2, 3, 4, okay? Okay, so there's that. And then I'm going to assert the updates. Sure, I'm gonna do a prepared setter, so new ItemPreparedSetter.
+
+[00:17:29]
+And the idea here is I've got an item, I've got a single row. My job is to set the prepared statement parameters to update, to write into that thing. And it's going to accumulate 10 of these at a time and then commit the transaction with all 10 at the same time.
+
+[00:17:42]
+It won't do one at a time, right? So item, sorry, prepared statement, set, int the first one is the ID fine. Set string, sorry, string. Okay, item.name, item.description, item.owner. And that'll be 1, 2, 3, 4, goody. Okay, inject that. I think that'll work, let's try it. I don't know, only one way to find out, and not quite table dogs does not exist, sure.
+
+[00:18:24]
+Okay, so now there we go. There's our 18 records. So it's actually, you know, we've successfully ETL that data. And while this is a little overkill for just that one little row. What just happened there? It's a little overkill for just that one little row. What we've got there is we've got the job it has one step and the step has a reader and a writer, and that's it, right?
+
+[00:18:56]
+Where things get really interesting is when you start building up multiple steps. So you can have another step and another, and these things can actually be conditional. You can have steps that only execute if some previous statement was true. The other thing that's interesting is that the steps themselves, there's things you can do in terms of, let's see, is it here?
+
+[00:19:22]
+I forget how, but you can do things in the same JVM. You can have these steps execute in concurrence. You can also use, they call it partitioned steps and remote chunking. And basically there's two different schemes there where Spring Batch can in turn send the work to another node to process the work elsewhere concurrently.
+
+[00:19:43]
+So basically there's two different ways to do this. One is I have, let's say I have RabbitMQ or Kafka, right? I send from the leader node, I can send via these either remote chunking or partitioned processing. I can send the rows to read in a source data set to another node and it'll be responsible for seeking and then processing those rows.
+
+[00:20:10]
+And it'll respond back to the leader node saying, hey, I'm done, okay? That's one kind of processing. The other is you can send not just the range, as we just discussed, you can send the actual data in Kafka to another node. You can say, okay, I've read these 10 records into RAM on the source node on this other node, please process them and then send me back the confirmation that you're done.
+
+[00:20:36]
+The effect is that you have the ability to distribute the work across a cluster. You can have 100 different nodes processing work in concurrence, right? So even though I'm doing it in a sort of linear fashion here, spring batch scales up and out, and that's one of the things I like about it.
+

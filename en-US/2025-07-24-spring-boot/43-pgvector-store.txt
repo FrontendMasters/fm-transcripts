@@ -1,0 +1,78 @@
+[00:00:00]
+>> Josh Long: So what I wanna do is sub select the data. I want to get a sub selection of the data that's available. Remember I went to start spring IO over here and I chose PGvector. And if I had chosen Docker compose, you would see this Docker compose YAML.
+
+[00:00:15]
+It gives me this docker image called pgvector. That's postgres plus one little extension called vector. It's an extra type that has been added to postgres. If you have a stock standard postgres, you probably already have it installed. Maybe you don't, you can do it. It's not hard, right?
+
+[00:00:29]
+You can just get your operator to install it for you, your db, dba, they can do it. It's easy, or you can do it. It's not a big deal. Most postgres that are hosted already have it, for example. So the vector type is very useful. And the reason is because we can use it like a vector store.
+
+[00:00:47]
+Vector stores are databases that are optimized for semantic similarity search, okay? The idea is that you give them some data, be it some strings or images or audio or whatever, they turn it into an embedding, which is just to say they turn into a bunch of numbers, right?
+
+[00:01:03]
+This is where the complexity cost comes in, right? That process of turning data into embeddings is very expensive. How can you do that? Well, you can turn and create an embedding on your local machine. If you're using OpenAI, they actually have a rest endpoint. You can send some data to them.
+
+[00:01:19]
+It'll give you the bytes, it'll give you a matrix array of numbers, basically, and then you store that in the database. So that's the embedding of the data. And then given that, you can do cosine similarity math to find the similar data. Now do you have to do any of that?
+
+[00:01:34]
+No, of course not. It's all provided for you by the box. But my point is vector storage and embeddings and all that, it's not that big a deal. In fact, we even have a simple vector store provided out of the box in Spring AI. It's just in memory.
+
+[00:01:48]
+It's not. Do not use this in production. I think we even say don't use this in production, simple imitation. Yeah, it's basically, it's not production worthy, but you could run this, you don't have to use PGvector or anything, you could just run it in memory and the code is 300 lines of code.
+
+[00:02:06]
+307. I stand corrected. And like I said, most of the interesting stuff is here. Cosine similarity, just matrix multiplication, things like that. This is why GPUs are such all the rage these last few years, right? Is because this kind of stuff is really beneficially done on GPUs. Okay, so we're going to use PGvector, that's an implementation of the spring AI vector store interface.
+
+[00:02:29]
+So PGvector store, there's this, right? And yeah, it in turn is going to use. I also happen to love this one as well. It in turn is going to use the vector type behind the scenes. So how is that data gonna get there? Well, I'm going to initialize it.
+
+[00:02:44]
+I'll go here, say PGvector, initialize schema. Now that that's done, something needs to write the data that's in our SQL database into the vector store. So when the application starts up here, I'm going to do it just once, not per request. When the application starts up, I'll inject the vector store and I'll inject the dog repository, which we don't have yet.
+
+[00:03:04]
+I'll recreate it here in a second. Okay, so interface dog repository, extends list of CRUD repository. And we want this dog int id string description owner. Did I bring in spring data jdbc? See, I told you. I do this all the time, it's telling somebody else right here.
+
+[00:03:33]
+I forget the same thing. Spring boot starter data jdbc. Huzzah. Okay, okay, and there, and there, good, so there's a repository. Now, when the application starts up, I'm gonna read the data from the repository, okay? Nope, I'm gonna read it from the repository repo.find, for each dog in the SQL database, I'm gonna write it out to my vector store, okay?
+
+[00:03:59]
+And I'm going to write it out as a document, and I'm gonna use a spring AI document, and I'm gonna put arbitrary text in there. It's really up to you what you want to put in there, as long as you're consistent. Right? So I'll put that in there.
+
+[00:04:10]
+I'll say dog.id, dog.name, dog.description, okay, I say vector store, add list of document. Now this is a document about dogs, and so I shall call it a document. Okay, here we go. Good. Now I need to tell my AI model about this client as well. So I'll configure yet another advisor.
+
+[00:04:38]
+And for this I need to bring in the Spring AI Advisor module. This is not on the spring either, spring AI Advisor Vector store. Add that in and I'll say, new question, answer advisor, passing in the vector store. So that's a default advisor that will apply to all requests.
+
+[00:04:58]
+With this advisor, it's going to pre process the request that we send to the model by looking at the text of the model and then going to the vector store and saying, hey, do you have anything that might match this query? It's going to look at the text in this embedding and say, okay, I've got something that has one of the keywords in there.
+
+[00:05:13]
+And here it is. Hopefully that, that'll be our terrible, terrible, terrible dog, Prancer. Let's go ahead and restart. Prancer. Okay, so this takes a little while. Remember I'm talking to OpenAI for each one of these requests. So the program is not even started yet, right? By the way, I'm using PGvector.
+
+[00:05:31]
+I should say if you're not using Postgres, you probably still have access to a vector store. There are many purpose built ones. There's Milvus, there's Pinecone, there's weaviate, there's. Sure. These are all purpose built vector stores that you can find out in the wild. There are whole companies around just doing vector storage, but there's a million different plug ins or extensions for existing data stores that you've probably got in your organization, like Neo4j, like Mariadb, like Oracle, like Redis, like Azure, AI, like Apache, Cassandra, Chroma is a purpose built one.
+
+[00:06:00]
+Elasticsearch, MongoDB, PGVector, typesense, Azure, Cosmos, DB, et cetera, et cetera, et cetera. Okay, is that done? Yeah. That took 11 seconds, right? That, that was me calling the OpenAI endpoint many different times. So I'm going to comment that out so that we don't run that again, because there's no need.
+
+[00:06:16]
+And the result of that will be this new table we have here called Vectorstore. It's got the content and we've got these embeddings of the data. So now we go over here. Do you have any neurotic dogs? Yes, we do have a neurotic dog available for adoption. Me, Prancer, yeah.
+
+[00:06:37]
+Yes. Described as a demonic neurotic dog that is not fond of people or other animals and has a particular dislike for children. If you're interested in learning more about Prancer, feel free to ask. Boy, am I? This is our dog. This is the one. I can feel it.
+
+[00:06:53]
+By the way, this whole time I've been getting strings back here. This is the content. It's a string variable. You can also get entities, right? Like if I wanted a strongly typed object, let's say I did this record dog adoption, suggestion id, string name, string description. If I'm just doing a one shot request and I know that the response can be made to comply with that, well I can return that instead.
+
+[00:07:24]
+So let's try that. So now, do you have any neurotic dogs? There you go. We have Prancer, whose ID is 45, his name is Prancer and he's described as a demonic neurotic man hating animal, hating children, hitting dogs like gremlins. So it conformed the data that we got back, it said, yeah, it's Prancer.
+
+[00:07:52]
+And then it said, you want me to give you the response in terms of this Java object, A strongly typed job object. Great, I shall do that. It layered it on top and then we made it. So that works for you. Okay, isn't that nice? So now you have a foundation on which to build an abstraction.
+
+[00:08:06]
+This is a strongly typed thing you can pass around your code base, not just some freeform text that you have to parse to get a response, okay?
+
