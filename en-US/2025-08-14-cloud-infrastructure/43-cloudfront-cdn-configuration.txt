@@ -1,0 +1,102 @@
+[00:00:00]
+>> Erik Reinert: So the next thing I'm going to do is I'm going to create a distribution. So we just said that we are creating a private load balancer, right? So if we go back to our diagram really quickly here, we now have the resources for the ECS cluster itself, and now we're kind of working outwards this way.
+
+[00:00:22]
+So if you kind of think about like the ways that we've worked, we effectively started in the middle, then in phase two, we moved over to the right, and now we're moving all the way over to the left. We just added all the load balancer parameter or all the load balancer resources.
+
+[00:00:40]
+And now what we're going to do is we're going to add the cloud front resources or the distribution. What's nice about this is that this is a private load balancer. It's completely secured, it's not accessible to anybody. But what we can do is we can put an entire global CDN in front of our load balancer and then that CDN communicate directly to our load balancer without any concerns for connection or anything like that.
+
+[00:01:09]
+But we get the added benefit of now getting a CDN out of the box, meaning that every request will be fulfilled over the cdn, it'll be routed through their internal network and then to our load balancer. Nine times out of ten, that will be faster than you not using a CDN for your requests.
+
+[00:01:31]
+If you think about it for a second, yesterday when we loaded up the application, what did it have? It had a loading page or it had a landing page. It had buttons, it had style sheets, it had HTML, all that stuff. Well, because this is a multipurpose cluster, we want a way of delivering all of that stuff to the user as efficiently as possible.
+
+[00:01:53]
+If we used a public load balancer and just stopped there, we'd have to figure out how to lower that latency and do that caching and all that other stuff that a natural CDN would do, right? So what we do instead is we say, okay, well we know we need some way for the CDN to communicate to our cluster.
+
+[00:02:12]
+Let's put a private load balancer in between the two and then let's make everything publicly route through the CDN and then privately use their internal network, which is high speed, way faster than your Internet connection, and route it to the load balancer. So in this case, what would end up happen is if you were in, I don't know, England or France or something like that, and then you made a request to your domain, you would first get routed to The CDN in France, right, that would then hit that node and then at that point your request performance is no longer impacted by your Internet speed because the only thing you needed to connect to was the CDN in France.
+
+[00:03:03]
+You didn't have to go all the way back to the us. However, what is going to happen is that CDN is going to get that request and if it doesn't have it cached, Amazon will now take your request and using their internal network again, which is like 100 gigabit, way faster, they'll ship that request all the way through the network to your load balancer, which then they will, then you'll be able to get it on your load balancer, that'll get forwarded to your service and then you can fulfill the request.
+
+[00:03:36]
+So it's a good thing, even though you have an API to still have a CDN in front of it. CDNs are good for caching things and static assets and all that stuff. But again, you will never be able to compete with the network performance of a massive scale cloud provider like Amazon.
+
+[00:03:56]
+So just even putting your API behind it and then saying at least have a connection point closer to the user will mean that that routing to you will be faster as well. And so yeah, that's why we're putting a CDN in front of it or a cloudfront distribution in front of it is because we're getting benefits pretty much as much as we can to locality.
+
+[00:04:19]
+Cool. So in here, all of this is actually possible because of a change Amazon made not too long ago, before this course. Like I would say like maybe a year or two ago. This wasn't possible, by the way. Back in the day, Amazon's cloudfront would only talk to other public things, meaning it could not connect to private resources and whatnot.
+
+[00:04:46]
+And then Amazon introduced something called VPC Origins. And the idea behind a VPC origin is it's something that exists inside of your VPC that you want to connect to Cloudfront. It could be a bucket, it could be a load balancer, it could be whatever you want. But the goal here is to take that private thing and connect it privately to the distribution so that the only thing that is public is the distribution itself.
+
+[00:05:17]
+And so at the very, very top, we create our VPC origin. We say origin protocol policy, HTTP only. Can anyone guess why we're saying that the Origin protocol policy is HTTP only? Now the origin, just to be clear, is the load balancer. The load balancer we just created.
+
+[00:05:39]
+We created something on the load balancer with a specific Value. In this case, what we are doing is we are getting a SSL public request that Cloudfront's taken care of, right? But once we get behind the cdn, we don't need SSL anymore, right? Because we've been encrypted by the SSL request publicly.
+
+[00:06:06]
+So behind the cdn we can just make a normal HTTP request and pass it privately down to the load balancer. That is how we get around the load balancer needing an SSL certificate. We let Cloudfront create the certificate for us on the Cloudfront domain. They manage all that themselves.
+
+[00:06:26]
+And then the moment the CDN gets the request and it gets behind the cdn, we're now in safe zone, we're now private again, the load balancer is private, so we don't have to worry about something else connecting to it. And then it can just be HTTP only. So if you hate SSL, [LAUGH] which I do, this makes it a lot easier to.
+
+[00:06:48]
+This makes it a lot easier to hide services behind a CDN and not have to worry about encryption and all that kind of stuff. It's really nice. It gives you the ability to have a distribution out of the box and you're just basically plugging in a load balancer to it.
+
+[00:07:07]
+Once you have that VPC origin, you can then create your actual Cloudfront distribution. Now, Cloudfront itself is its own beast of pricing and modeling and blah, blah, blah and all this stuff. So I will say you could spend a lot of money on Cloudfront if you don't know what you're doing.
+
+[00:07:26]
+Cloudfront provisions globally by default in 100 countries or whatever, some nonsense. And if you don't set it to not do that, it will do that and you will have to pay for it. So setting like the price class, stuff like that is really important to make sure that you're not going for the Ferrari level of network throughput and when you don't need it.
+
+[00:07:49]
+But price class is a setting that we have. We also have origin. This is where we tell the distribution where our load balancer is. And so you can see here that the domain name for the origin is the DNS name of the load balancer. We're telling it that the origin ID in this case is cluster var name or cluster.dev or cluster staging or.
+
+[00:08:15]
+And then we're telling it that the VPC origin config the ID is the VPC origin that we just created. And then now we have just bound our load balancer to our Cloudfront distribution. So now we can actually communicate through the CDN to the load balancer. Because it's a cdn, we have caching features, right?
+
+[00:08:37]
+So we have the ability to say like, okay, in general, what methods are allowed to actually go over the CDN CDNs? Sometimes you don't need every request and you don't want to allow every request. Like, again, if it's just a static website with no HTTP calls or anything like that, then you probably don't need to make sure that the CDN supports put, post, patch, delete, right?
+
+[00:09:00]
+Like, you won't need any of those. So you can easily disable those if you want. But in our case, because we're using an actual like, we're putting an API behind it, we want to make sure that we can support all of these other methods. And so we have put pass, patch and delete in there as well.
+
+[00:09:19]
+However, you'll notice that we only cache git and head response types. Why is that? Why do we only cache git and head methods? The other ones actually change data. Exactly, yeah, the other ones will actually change data and or they'll have different data in their requests. We don't want to necessarily cache that.
+
+[00:09:43]
+We want to make sure that every time we want to get new data for put, post, patch or delete, we don't cache any of that. We only cache get and head to make sure that those two are the only ones that aren't changing effectively. But that does mean, again, going back to the benefit of using a cdn, that does mean that all of those CSS files, all those JPEG images, all that stuff.
+
+[00:10:08]
+Yeah, that'll get cached. That'll get cached directly on the edge. And what's really nice is going back to like the whole, you know, we're in France, we want to look at our website. It will go to the VP or it'll go to the distribution in France. It'll hit the node.
+
+[00:10:24]
+Well, what's cool is that it will have that cache stuff there. So you'll immediately download that and then the only thing it has to wait for is the request to your API service. So your site should load instantaneously almost. And then you may have just a little bit of like a loader window or something for the actual API request, but it's still like, it's fast.
+
+[00:10:47]
+You know what I mean? You still get that performance out of it. Redirect to HTTPs, this basically just says, hey, we don't want to use on the front end of the distribution, we don't want to use HTTP at all. So make sure. That everything gets redirected to HTTPs.
+
+[00:11:04]
+We want to forward values. So forwarding values means that once we go through the load balancer, what are we keeping? Are we keeping the query string parameter? Are we keeping forward cookies? Right, all that kind of stuff. Here's GEO restrictions. So for example, if you wanted to say, well, I only want a provision in the United States and Germany and blah blah blah, and blah blah blah, you could set up GEO restrictions, which in all honesty, normally when you create a cdn you will eventually do that [LAUGH].
+
+[00:11:36]
+You are in the global space now, which means that there are a lot of people who will mess with you. And in all honesty, there are definitely a few countries that we, even at my job have had to be like, we don't even service data, we don't service any kind of product to them.
+
+[00:11:53]
+So just block it because at the end of the day it makes it easier to prevent attacks, you know, things like that. And I think as a business, as a business, right. Not as like an open source project or anything else, it does kind of make sense to block countries you just don't do business in, you know, unless you want for some reason to let them still be able to come in or whatever.
+
+[00:12:17]
+You know, unless you have a specific reason, you know, it's fine. You know, it may frustrate some people but you know, it's a lot easier than trying to filter out like these attacks and where they're coming from and stuff like that. So you can do that here basically.
+
+[00:12:35]
+And then the viewer certificate, this just basically means like on the front end side or on the, in front of the distribution, where are we getting our SSL certificate? Since we're not going to be using a custom domain, we're just going to use the Cloudfront default certificate. And again, this is what's nice about Cloudfront that we don't get with load balancers is we at least get a certificate out of the box.
+
+[00:12:59]
+We don't have to create SSL or worry about it or really anything like that.
+

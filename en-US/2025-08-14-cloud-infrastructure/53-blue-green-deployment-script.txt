@@ -1,0 +1,81 @@
+[00:00:00]
+>> Erik Reinert: So after we deploy our production environment or before it, it doesn't really matter. I'm going to show you the one piece of bash foo that you get out of this project, which is our deploy SH file. Now, this is the easiest way I thought to do it, mostly because this is also just how I would have done it at work.
+
+[00:00:20]
+I would have just created a script and ran a script. But I'm going to go over the script for you really quickly. So early when we first started the phase, we talked about how we added to the gitignore to terraform ignores and then it overrides .txt. Well, the reason why we do that is because we can pass container overrides to the running container in ECS when we want to change what command it runs or whatever.
+
+[00:00:50]
+And so what we do is we quickly generate an overrides.txt file which contains JSON of what we want this one time container to run. So we target the service container, which is the one we created. But then we say that we want to override the command with goose dir migrations up.
+
+[00:01:11]
+Now, the migrations directory is in that container image and so is the goose container or is the goose binary. So technically, if I then say, okay, in the CLI AWS ECS run task, I tell it the cluster I want it to run that task on. I tell it the Launch type is EC2 because I want it to run on my instances.
+
+[00:01:34]
+Then I provide it that overrides and then the task definition, which is my service. Then I will get a task arn of that container that gets fired in that moment. Now, what's cool about that? And again, this is where if you understand and you know how to work around Amazon, there's a lot of really cool tools that they've made to make it easier for you to do what you want to do.
+
+[00:01:59]
+If you've ever used kubernetes before, you've probably used the kubernetes apply and wait feature. Well, what I can do is I can run a task and get its value or its arn using a little bit of bash. So pipe it into JQ and then get the task arn from the response.
+
+[00:02:17]
+And then I set that as a variable. I set that as a variable because then I say, hey, echo, give me that task arn so I know where it is in CI. So if I run it in CI and then it fails, I can go find that task arn inside of ecs, check to see logs what may have happened.
+
+[00:02:35]
+But then I can also tell the CI to wait for it to finish. If you have long running migrations, this would not work. It would just immediately run it and then do the deployment and there's still a database migration in the way. So we want the database migration to do its thing and then we want it to basically finish and then give us a successful exit code as well.
+
+[00:03:01]
+Again, this is just like command line that we're running that we're gluing together with some bash to get actually a really nice reliable deployment system. In this case, after we wait for it to stop, we make a quick describe on the task and we say, hey, what was the exit code?
+
+[00:03:22]
+How did it exit? And if it exited with a zero, then we're successful and if it doesn't, then we throw an error in the pipeline. So we literally have weighted migrations in the pipelines without having to connect to Amazon's infrastructure directly. But it still does the exact same thing of starting a container somewhere, waiting for those migrations to finish, make sure that they were successful, and then either continue or fail the pipeline.
+
+[00:03:51]
+I always really like this. This is one thing I will say that is really nice about ECS is like you can do cool stuff like this and again, it's not a ton of work to get to achieve this. So after we know that the migrations are completed, we get the task completed successfully with exit code zero, then we go ahead and remove that file because we no longer need it.
+
+[00:04:14]
+We just update the ECS service. You remember how I showed you the forces new deployment button in the top right hand corner? This is the CLI way of doing it. That's it. Once we actually have updated the task or ran the migration, we just want to make sure the task restarts with the new container image.
+
+[00:04:33]
+That's exactly what the Force new deployment does. Force new deployment goes out, checks for the latest version of staging, and then pulls that in and then runs it. Then what we do is we wait for that service to become stable again. Not only are we waiting for databases to complete in CI, we're actually waiting for services to become green.
+
+[00:04:53]
+Now, ECS does use blue green out of the box, which means that if you deploy a service to ECS and it's failing, it will not roll over to that new service, it'll stay at the old service. You don't have to worry about that. What's really happening here is this.
+
+[00:05:10]
+I don't know, what is it? 53 lines of code? Yeah, this 53 lines of code is literally the glue between all of your changes and your Deployments to ECS, where it goes out, runs the migration, waits make sure it was successful, goes out, runs an update service, waits make sure it was successful.
+
+[00:05:31]
+Then what's everything is successful and everything is green. Then the pipeline or the job finishes and we're good to go. That's basically the script again. If you're curious about it, be sure to check out the repo. But that's a quick explanation of everything that it does. Now that I've got that, I need to actually add this to my deployment job.
+
+[00:05:55]
+This is the last little bits of what we need to do left. I'm going to go to build and deploy. I'm going to open up that build and deploy YAML file. We're going to go back to our other workflow, not the terraform one. I'm just going to paste in the updated version of the deploy job.
+
+[00:06:11]
+I'm just going to delete the old version. There we go. Now, I thought about putting this inside of the make file, but it's really running make commands down at the bottom. If we look at our make file, I should have. I need to add one more thing. We need to add a new entry to our makefile.
+
+[00:06:37]
+So really quickly, I'm going to go to stage three, I'm going to go to our makefile and then you'll see that there we go. We have deploy right there. Now, the reason why I'm wrapping, you might look at that and be like, why are you just wrapping deploy in the make deploy with deployment?
+
+[00:06:58]
+Well, because we already tell the makes file what account ID it is, which default region it is, which ECR domain it is. So might as well make it a little easier. We are going to have to pass some environment variables because this is about targeting specific services and deploying specific services.
+
+[00:07:15]
+So we don't really have a static value that we would just keep here forever. This is more meant to be dynamic all the time, but if I pass it through the make file, at least I can get the benefits of the existing account ID and all that other stuff.
+
+[00:07:32]
+While that's running, we'll go to up paste in deploy and we'll save that like that. Now that we have that, you'll see that we're doing a little bit of work, but not really a ton. The first thing we're doing is we're doing the build image poll. That's what we were doing last time.
+
+[00:07:53]
+We're pulling in the SHA that we want to promote and deploy. Then what we do is we make a little run step that just does a little bit of scripting. The first thing it does is it says, okay, by default my build tag is staging. Again, I've showed you guys how IF statements works and how you can reference variables inside of GitHub Actions, know which branch you're on, or things like that.
+
+[00:08:16]
+So we're going to use that to our advantage. What we're going to do is we're going to say, but if the GitHub ref, this is an environment variable that comes from the GitHub pipelines. If this ref is set to refs head prod, then set the build tag to prod.
+
+[00:08:31]
+That's it again. You can see now how all these scripts are gluing together and being able to become a fully built system. Once we do that, we set the ECS cluster name, which again is also the build tag because it's the environment, so we could just use that value again.
+
+[00:08:49]
+Then when we say ECSS service name, the service name is obviously the cluster name plus service, which is now we've constructed our ECSS service name. I always recommend giving yourself a little bit of debug output. So if you are curious in what the pipeline ran or anything like that, you can easily just do that.
+
+[00:09:11]
+But then at the bottom here it runs build image promote. Right, because we want to promote that image to that environment and then we do the deployment to deploy that image that we just promoted.
+

@@ -1,0 +1,105 @@
+[00:00:00]
+>> Erik Reinert: Now we've got our main.tf, and this is really where the meat of the service deployment is. We have a really cool standardization that we've created that you may have noticed by now that I'm using over and over again, which is I'm using parameter store as a database.
+
+[00:00:24]
+I'm using parameter store as a way of generating thing in automation or in other places. And I'm just saying, put it here, let me access it later, right? Just like in App Runner, we want a way of storing parameters for services and making sure that they're securely stored, that we can easily edit them in the future.
+
+[00:00:45]
+We don't wanna have to edit them through Terraform, we just wanna edit them in the actual UI and then redeploy the service if we want, right? One of the things each service gets is a set of parameters for all of the secrets that you give it. And you'll understand this more in a second.
+
+[00:01:03]
+But think about the App Runner that we deployed, how it has a Google client id, Google client secret postgres URL. In this situation, what we do is we tell the service we want a secret for that environment variable. We want a secret for this environment variable. We want a secret for this environment variable.
+
+[00:01:31]
+And what it does is it goes out and it creates parameters with basically the word example in it or something like placeholder, right? Then now that it's created, you go in and you add your values. And now you can manage the resource without having to manage the value in the resource.
+
+[00:01:51]
+And so, that's exactly what we're doing here. We're saying, okay, well, I still want the UI to be the thing that's the source of truth, not Terraform. And so what we're gonna do is we're gonna say, okay, I need a secret for this, I need a secret for this, I need a secret for this.
+
+[00:02:05]
+Go ahead and provision those for me and then I'll go in later, update them and redeploy the service. So this is just like how I like using it. Some people would say, just put it in Terraform state and manage it with Terraform. But again, for starters, you don't have time to manage Terraform.
+
+[00:02:23]
+Maybe you just wanna move really fast, sometimes the UI is nice, right? Sometimes it's really nice to just go click real quick deploy done out the door, right? Other times it's nice to use Terraform. But when you use Terraform, you have to always use it pretty much. And so, I like this approach better.
+
+[00:02:38]
+Also, if you have development teams, this makes it a little easier for them. They don't have to copy code and push pipelines and stuff. They have a more direct window. And then you can create policies that let certain people do certain things, read versus write, like all that kind of stuff.
+
+[00:02:53]
+So basically out of the box secrets in the service module itself. We get a log_group per service. So this again is the permission side where we say, okay, let's create a log_group where all of our logs will go. So whenever we get a log with a service, it will automatically get shipped to CloudWatch and then we can review it.
+
+[00:03:12]
+Here's our execution IAM role that we created, here's our policy. You'll see that we attach some, again, some of those pre existing policies that we talked about before. This just makes life easier. Things like being able to read only from the registry, basically allowing us to pull images.
+
+[00:03:31]
+What's nice about this is when you start using ECR very heavily, having to give access to clusters and resources is incredibly annoying. And so this role becomes very handy because now you just attach it to the nodes or attach it to the service and bam, you're done. Now it can pull everything from ECR.
+
+[00:03:52]
+You have complete authentication. You don't have to worry about if. No, is it gonna be able to pull this image or not? No, it's fine. We gave it the read only role, it can pull any image. We also add the container for service. So this is just a ECS, my God, the naming, ECS role.
+
+[00:04:12]
+This will make it so that there's container service specific things that it'll allow. We have the main task role and then finally, [LAUGH] finally we get to the task definition and stuff we might recognize a little bit. So again, you'll notice that there is in fact a execution role.
+
+[00:04:28]
+There is a task role. So it does take two separate roles, which is why we had to define things twice and all of that. The family name, this is just something arbitrary, related to whatever you want to namespace this, for example, we call it just the full name of the service.
+
+[00:04:48]
+You could name it the application itself, you could name it the organization. It's totally up to you, but it's just an arbitrary name. It doesn't have to be anything specific. Then we get into the container definition. And as I said earlier, you can write JSON, but you have to write it really weirdly.
+
+[00:05:05]
+May I introduce the JSON encode function? [LAUGH] What we're doing here is we are actually writing pure JSON, but we're doing it with HCL. And so I'm using it to first write in HCL and then use the JSON decode function to turn it into and parse it to JSON once it evaluates it.
+
+[00:05:27]
+And so in this configuration we can see how many CPUs we want if it's essential. Essential means that it just runs all the time versus a one time process. The image where we're actually pulling the image from memory name. If we have port mappings, what's the port, right?
+
+[00:05:46]
+So if we define port in the service, remember var means that it's a module value. So that means we can change and add ports. So if we add a port, map that container port for us environment variables. Remember I told you that we can configure this service and then create secrets for it as well.
+
+[00:06:04]
+So here are the secrets. And then, we actually have our logging set up as well. And so you could see that we tell it that the options are the awslog-group, which is the group that we created in cloudwatch the region. This is why we needed the region, so that we can tell it where that log group is.
+
+[00:06:22]
+And then a stream prefix which is just really for the logs themselves. And that's the task definition. A couple of things to take away about task definitions are they are the actual configuration of your service. So the way ECS really kind of works underneath the hood is it has these documents that represents your configurations, kind of like instance templates.
+
+[00:06:44]
+Remember how earlier we had launch templates? Sorry, for our instance, this is a launch template for a task in a container. So these are not the containers themselves. Meaning that if we just created this, we would get nothing. This means that, yeah, this is just the configuration of that service.
+
+[00:07:04]
+What we're gonna do is we're going to launch a service with this task definition. And that's when we're actually going to get a container. I just want you to understand that this is a config more than it is running an actual service. We'll get to that in a minute.
+
+[00:07:22]
+And Miguel, that's actually where the third role comes into play. So the first two were for the task definition. The third one is for the service to launch that task definition, and so yeah, we create a service role. We attach a EC2 container service role, which is a different one related to services.
+
+[00:07:43]
+We set up a target group. So going back to the whole, how does a load balancer know when there's traffic or not and how to drain it and whatnot. This is exactly that connector to the load balancer. The target group basically gets assigned to the load balancer saying, hey, this target group has a port with this, it has a deregistration, or basically, how long it should wait before it completely takes it out of the load balancer.
+
+[00:08:11]
+And then, what VPC is it attached to? And then we create a listener that that target group binds with. And so the listener then says, okay, well, we want to forward all traffic to the target group, which we created, right? And then we wanna attach it to port 80 listener, that we have in the load balancer, right?
+
+[00:08:37]
+So this makes it so that we can listen on port 80 in the load balancer and then route to port 5000 or whatever else that we want, right? And so, yeah, once we have the target group, as well as the listener rule in place, we are now ready to actually start that service.
+
+[00:08:52]
+And again, just to give that traffic flow as one more example, what that means is that when the load balancer gets your request, it's first gonna hit the main listener that we created in the cluster, and then that listener on 80 will forward it to the listener rule.
+
+[00:09:12]
+If the listener rule matches, it could be a host header, it could be a path, right? So, for example, in the future, if you wanna make it so that you have more services over specific routes, that would be the listener rule that it adds for that service, right?
+
+[00:09:30]
+So in this case, we're just gonna do slash, meaning it's gonna do everything. And so what will happen is the listener rule will say, yeah, yeah, I have something for slash. And then the listener rule will tell it to forward that traffic to the target group, which is the service itself.
+
+[00:09:44]
+And that's this last one right here. So the aws_ecs_service resource takes the cluster value, takes the desired count as well, right? So right now we're setting it to one. We do have auto scaling, so we don't really have to worry about this value. We can just set it to one.
+
+[00:10:01]
+However, this is also what it will scale down to, right? So if you want five or seven by default or whatever, you can set that to. Your IAM role, your actual service IAM role, your task definition. Again, the thing that we described earlier, your capacity_provider_strategy. So this basically says, which capacity providers do you want it to go into?
+
+[00:10:23]
+Now, what's really cool about this is if you're in a scenario where you're like, okay, I want spot instances and I want on demand, and I want 75% spot and 25% on demand, then you can set up these provider strategies to where you can do that. You can say okay, base 1 capacity provider spot 75% and then you can add another one of these and then you can say base 2 capacity provider something else weight 25%, right?
+
+[00:10:48]
+And then it will balance the cluster out or balance the services out to make sure that you have that much of a support spread across them as well. Then we set up the load_balancer. So we actually just say the container_name, the container_port and then that target_group arn. And now we've actually bound everything together, right?
+
+[00:11:06]
+So we created the task definition, right? We created the target rule from the load balancer. So load balancer's over here, task definition on ECS is over here. And then we join them together with the service, right? So the service is the joiner of all of these things together to actually start the container.
+

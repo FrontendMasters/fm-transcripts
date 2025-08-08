@@ -1,0 +1,60 @@
+[00:00:00]
+>> Erik Reinert: Okay, while this is running in the background, the next thing we wanna do is we wanna add some kind of tests. I don't wanna just build something, I'd actually like to test something, right? And so the only thing we can truly test right now, because the application doesn't have tests itself, are the migrations.
+
+[00:00:20]
+So let's at least be sure that our migrations are written right and work, right? So what we're gonna do is we're gonna actually add a whole new job and we're gonna call it test. Now test, if you look closely, needs build. That means that test will never run unless build is successful, right?
+
+[00:00:38]
+But that's what we want. The reason why we want that is because we wanna use the same image again, right? So we also can't run that image until it's been built, right? So we say, okay, build runs on Ubuntu latest, just like it did before. There you go.
+
+[00:00:52]
+You can see my push was successful now, right, so I've successfully pushed my SHA up to the cloud. That specific SHA version, right, now I wanna run it. So what we do is we say, hey, well, because I'm on a brand new runner, I first wanna pull it, right?
+
+[00:01:07]
+So again, the reason why we have that make file is to make these commands easier to use. So sure enough, there you go, there's our make build image poll. So we make sure it has access, we give it the access credentials for that command, right? The next thing we do, look, we, we do makeup, right, literally the exact same commands that we run locally.
+
+[00:01:27]
+We can run in CI and then we run build image migrate, right? So this will use the build image and it'll run a migration inside of it, right? And then, because we can add these environment variables per command or per step, we add hard coded GOOSE_DBSTRING as well as goose driver.
+
+[00:01:49]
+The reason why this is hard coded is because this is meant to be local migrations. It's meant to run locally in Docker and all that stuff. You could put it in a config value if you wanted to, but the reality of it is you're probably never gonna change it, right?
+
+[00:02:03]
+It's just test credentials. It doesn't really matter too much. You can either leave it here or you can do whatever you want. But the last thing is make down, right? The reason why we have if always is in the off chance that the pipeline doesn't work for some reason, or we have a failure.
+
+[00:02:20]
+At least we always make sure that the containers get stopped at the end of the job, right? Very simple, very simple job. What makes this really possible, to be 100% clear with you, and why a lot of people probably don't run migrations in their pipelines versus us doing it is because we made it easy to run [LAUGH].
+
+[00:02:39]
+Right, we made it easy to run. We put all the most complex commands and everything in the makefile, right? So it's like if it's easy to run, then we can easily run it anywhere. So just to throw that out there that you might be like, well, we don't run migrations.
+
+[00:02:54]
+That might be why it might be really hard to run migrations, but it doesn't mean that you still shouldn't test them, right? So what we're gonna do now is we're gonna add that and then I'm going to add a commit that says setup, test, job and I'm going to push this up.
+
+[00:03:14]
+And now we're going to go to our pipeline again. So now if I go here and remember, every time I add a new job to my pipelines, that's going to be run every time I do a new push, right? One thing to note as well about this is you'll notice that we have to rebuild the image from scratch every single time, right?
+
+[00:03:39]
+There's ways of getting around that. I didn't include that because honestly, I want you guys to play. I want you guys to take this play, improve it, because I'm gonna be real, there's tons of improvements that can be made even off of this, right? I'm only really showing you how to get it out the door and how to get to that optimization stage.
+
+[00:03:58]
+In this case, what I would recommend, for example, is you could make it so that before this starts, you always pull latest, right? You'll have some build cache of some sort. You may not have all the build cache, but you may have a lot of the stuff that again, depending on your changes.
+
+[00:04:15]
+Like we talked about before, if you only changed a template and you didn't change the binary itself, then that won't also run in CI, right? So that caching becomes portable now too, to where you can benefit from it in multiple places. So yeah, I would say if you just threw in a Docker image poll latest, you'd probably make this pipeline go 30%, 60% faster just because the cache is there.
+
+[00:04:42]
+But again, I wanted to do this to show you and be able to explain and you can see the value of that would be as well, right? You could literally save money by just adding a single command. Cool, so our build step worked and was successful. And if I go to the Summary, you can see, there it is.
+
+[00:05:06]
+My build step is successful. Now I'm gonna click on Test. And now, we have test running, and so there you go, it ran my image pull, right? It got the SHA that it expected and now it's actually bringing up the environment and it failed, okay. So the reason why this failed is because I know exactly what it is.
+
+[00:05:35]
+The problem is that when we do docker compose up, we expose the ports via proxying, but when we run the containers directly, we actually run them on host. So the local hosts are not the same, they're two separate local hosts. So what it's trying to do is it's trying to connect to the local host on the host, but it's not there.
+
+[00:05:59]
+It's trying to go through a proxy that's not working and so it's failing. Basically, it's trying to go through itself and dying. I really wanna use host, so I'm just gonna use what works. Yeah, I'm just gonna use network_mode: host. I was going to try and do it a different way, but I think for now I'm just gonna use the network_mode: host.
+
+[00:06:21]
+That seems to be the problem here. So just gonna do that and push that up, and this should work for both.
+

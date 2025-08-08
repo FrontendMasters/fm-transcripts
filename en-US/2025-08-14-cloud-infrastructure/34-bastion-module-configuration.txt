@@ -1,0 +1,125 @@
+[00:00:00]
+>> Erik Reinert: We've got one more file that we need to do, and this is our Bastion TF file. So in this file we're actually doing some pretty cool stuff. And again, I'm just really trying to show you guys how flexible, how customized, and how much you can automate with Terraform.
+
+[00:00:17]
+So at the very bottom, we'll start with the very bottom, actually, this is our module to create an EC2 instance. You're going to notice that I use modules a lot of I use them a lot because I just don't want to have to find and look up. Because think about it like this.
+
+[00:00:33]
+If you use a module, you also don't have to look up Terraform resources because they're all in the module. Modules save time, even from a development standpoint, because all I have to worry about are the options that I want to provide to it. I don't have to think about, okay, what's the AMI Data lookup file or Data Resource, and then what's the EC2 create instance resource?
+
+[00:00:55]
+How do I glue those two together? Like, the module just takes care of all of that for you, so I do recommend using modules and Terraform as much as you can. You'll move very, very fast. And like I said, even the 200, 300 resources we'll be creating, we're only really probably creating like 50 things.
+
+[00:01:12]
+And then everything else is in the module and underneath it. So in this case, I'm using a module called EC2 instance, and it allows me to create an EC2 instance, right? So I'm telling it that the module's name is Bastion. I'm telling it that I want to associate an IP address.
+
+[00:01:30]
+Why? Because this is a Bastion node. I want to be able to connect to that node publicly. I'm giving it a very, very small instance size, right? Because this is just a jump box. I don't need tons of resources here. I just want to be able to connect to it and then connect to other things from it, right?
+
+[00:01:47]
+However, one thing that's really interesting is the AWS key pair or the key name on that next line. So I don't want to manage SSH keys. That sucks. That is annoying. This environment has this SSH key. This environment has this SSH key. Blah, blah, blah, blah, blah, so forth and so on, right?
+
+[00:02:10]
+Like, I would much rather make it so that it just generates me SSH keys and then maybe like stores them in ssm and then like as a developer, I can just go grab that key at SSM and then connect to it. That's a better experience for me. And so, that's what we're doing above, creating the instance with Terraform.
+
+[00:02:30]
+Like I said, you can use tons of providers and tons of modules. One of the things I'm doing is at the very top, I'm telling Terraform to literally just generate me a TLS private key. That's it. So you can even have Terraform generate you values, passwords, secrets, whatever, so that you can then use those values in specific things you're trying to do.
+
+[00:02:54]
+So in this case I'm using a TLS private key, RSA 4096. Then out of this resource will come a private key and a public key. Now that I have a private key and a public key, I can attach those to my bastion instance and then also have the private key to connect to it.
+
+[00:03:13]
+What happens is then I tell Amazon, hey, I want you to take this public key that I just created and created AWS key pair out of that. And then when I create my bastion instance, I want you to use that key name as the key for the instance.
+
+[00:03:30]
+So now I don't have to worry about managing keys at all. Whenever I create an environment, an SSM parameter gets created with the private and public keys inside of it. So now developers can know that if they need to access the SSA or the bastion key, I don't even have to give it to them, I just give them permission to view the key in ssm.
+
+[00:03:50]
+There you go. Now you go get it yourself. That's the motto DevOps should have you go get it yourself. Because that's truly DevOps in my mind is self serve. Let them be able to empower themselves to do it. In this case, we wrote automation in a way where we're solving the future problem of people trying to connect to the bastion node or get access to it, right?
+
+[00:04:13]
+I'm basically just saying, you know what, put this in Amazon, making sure that people can access it, and then they'll be able to connect to it when they need to. We enable monitoring as well, we put it in one of the public subnets because it's a public IP address or a public service.
+
+[00:04:31]
+And then the last thing we do here is we provide the VPC Security Group IDs. Now what you're going to notice is that I give this two security groups, I give it a bastion security group and I give it a private security group. Why do I give it both?
+
+[00:04:48]
+Based off of what I've told you earlier and how security groups work, why did I give it bastion and why did I give it public? Can anyone guess?
+>> Speaker 2: It has to connect to both of them.
+>> Erik Reinert: Exactly, yeah. So the bastion security group handles the ingress filtering only, meaning which public IP addresses can connect to it.
+
+[00:05:13]
+But if I just put the bastion one on there, I would not be allowed to connect to anything in the private subnet. The reason for that is because we are using access through the composition of security groups, meaning that if I put the private security group, which allows anything with the private security group access to it, then I have just given Bastion, the bastion node, access to the entire private subnet.
+
+[00:05:46]
+The way that we're composing these security groups, the only real takeaway I want you to have is we don't have to write additional terraform that says, okay, this bastion node, poke a hole into the security group and now you have access. It's literally just if it has the security group, that's all you need, right?
+
+[00:06:07]
+So this is why we reuse those module security groups, because we just attach them to the resources and now those resources have access. So if we combine the ability to have public IP addresses connect to this node with the ability for it to be on the private security group, then we've now bridged where they can come in.
+
+[00:06:29]
+We can manage those rules separately, but because it's on the private subnet group than anything else on that private subnet group the bastion node will have access to. Now what's also nice about this is if it's on the private security group, and then we allow the private security group to access something, everything on that security group now just got access to it.
+
+[00:06:49]
+So this is also like future-proof in the sense that if I tell the private security group, okay, now I want you to access the intra subnets, then the bastion service also has access to the interest subnets now, right? Because we have this composability. So this is how I like to shape traffic on Amazon.
+
+[00:07:09]
+When I started out, I thought of it way more literally of like, here's IPs, here's IPs gotta poke holes. Da, da, da. But now that I use it more, more and more I do this, which is just like security group to security group. If you're in this security group, you get access to everything, create more security groups if you want more granularity.
+
+[00:07:29]
+And so, yeah, yeah,
+>> Speaker 3: so maybe just taking a step back on the, I guess where this is coming from is online, whatever that is. Six towards the bottom.
+>> Erik Reinert: Yeah, sorry, this one right here?
+>> Speaker 3: Yeah. So like you're grabbing the first subnet there. This bastion is Going to be set up on a per environment basis, right?
+
+[00:07:53]
+
+>> Erik Reinert: Yep.
+>> Speaker 3: One for each environment.
+>> Erik Reinert: Yep.
+>> Speaker 3: So then is our address space also per environment or do we have one address space for all the environments?
+>> Erik Reinert: I see, so you're saying, like, is there a conflict there?
+>> Speaker 3: Yeah. Or like I'm just trying to understand, I guess, better how like, is did l have all the dev resources all gonna be in the same.
+
+[00:08:18]
+
+>> Erik Reinert: Yeah, all the dev resources would be in the same vpc, the same subnets and all that stuff?
+>> Speaker 3: Well, like, and I guess, would they be on the same security group as the prod stuff too, then?
+>> Erik Reinert: No.
+>> Speaker 3: So then there is like per environment, there is different address space.
+
+[00:08:38]
+
+>> Erik Reinert: So yes and no, this is where it gets like, kind of confusing.
+>> Speaker 3: If we don't have to go down that route.
+>> Erik Reinert: No, it's totally fine, it's a great question. You found a potential problem for us in the future if we didn't plan for it correctly.
+
+[00:08:58]
+So again, the environment contains everything that an environment needs, which is including a network, right? Database, blah, blah, blah, blah, blah, blah, right? So that must mean that when I create a new environment, I get a new network, right? Well, those two networks do not communicate with each other at all.
+
+[00:09:17]
+From an Amazon perspective, they are completely separate VPCs, or Virtual Private clouds. Meaning that if I wanted to connect to prod from dev, I literally could not do that. There's no connectivity whatsoever in the Amazon world, VPCs are the isolators there, right? However, because they are so isolated and so virtualized, it does mean that I could create a staging network with 10.0.0.16.
+
+[00:09:49]
+But I could also create a prod network with 10.0.0 dot 16. Now, if I do that, and then in the future I go, well, no, I actually want those two networks to communicate with each other. It won't work because I just provisioned two networks with the exact same address spaces and eventually there will be a collision and they will not work together.
+
+[00:10:10]
+So what would be an optimization to this? We're not doing that because we have the bastion node per environment. So all we have to do is hop on another bastion node and now we're in that environment and we don't want prod and staging to communicate. So that isolation is fine as well.
+
+[00:10:26]
+But if in the future that was a problem.
+>> Speaker 3: Like maybe what a good example would be like, we want to refresh stage with prod data.
+>> Erik Reinert: Sure, that's a great example. That's literally what I do at my job. Yeah. And in that case, if you wanted to do that, what you would do is you would go even further with the CIDR configuration.
+
+[00:10:48]
+So what you would do is you would say, you do something like this, you'd say staging is 10, 00016 but then prod is. Let's see if it'll autocomplete it for me. 10.0 like 100.0.0/16. Now, as long as the last address in 10.0.0.16 does not collide or overlap with the first address in the PROD subnet or in the PROD network, then you can put those two networks together.
+
+[00:11:32]
+And then, you could communicate from staging to prod if you wanted to. But if you do plan to do that, where you want to have like a VPC over here and a VPC over there, you do have to take into consideration that overlap and making sure that that doesn't happen.
+
+[00:11:48]
+Otherwise Amazon, it'll just break stuff. That's a great question. And again when we talk about scale, that's if you were going to glue two networks together, which is common, you would hit the. Yeah, you'd. Absolutely. Let's put it this way, if I didn't tell you that, you'd be mad at me because it would be very diffic because at that point you're screwed.
+
+[00:12:09]
+At that point you have to create a new network with the non conflicting space, move everything to that new network and then glue those two networks together. So it's actually very important that you're cognizant of that. Otherwise yeah, it's going to be a massive foothold in the future for you.
+

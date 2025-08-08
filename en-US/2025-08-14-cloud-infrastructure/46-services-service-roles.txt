@@ -1,0 +1,89 @@
+[00:00:00]
+>> Erik Reinert: So let's go ahead and let's create our next module which is our service module. So if I do service as a directory, I'm now going to have cluster, database, environment, network, service. And again, what's kind of cool is as you could see how these all kind of stack, right?
+
+[00:00:16]
+So we have environment at the very top, then inside of environment we have cluster, database, network, service, right? And then at the very, very top level we have environments that we use which have clusters networks inside of them. So we're going to go into our service again. If you want to know where I am in the path, you can just look at my terminal at the top and it'll show you.
+
+[00:00:39]
+So I'm in the terraform module service directory and I'm going to create some files. So the first file I'm going to create is a data TF file. So you should see there it is, there's my data TF file. And inside of this I'm going to copy paste all of the stuff we need for data and I'm going to go through it really quickly.
+
+[00:00:57]
+As I said before, we need to give permissions to things to be able to do things. And up until now there really hasn't been much that things we are provisioning need to do. And what I mean by that is a network is just a network. It's not like the network goes out and talks to other networks and all that kind of stuff.
+
+[00:01:17]
+It's just a network. It doesn't do anything besides be there. Same thing with a database. A database doesn't talk to s3 and any of that. So we don't have to worry about that. But when you're talking about the compute plane, specifically compute being like anything that processes something, you'll normally have to give it policies.
+
+[00:01:37]
+And so you will start seeing more policies and permissions in more like actionable services like lambdas or ECS or again anything logically that can do something can act. You need to normally give it permissions to act. In this case we're creating an assume role for that service so that the service can do what it needs.
+
+[00:02:02]
+Now earlier, we created roles for nodes, right? You might be asking yourself the question why are we having node roles and then service roles? The main point of that is the separation between the two, right? The node may need permissions to mount a volume for the cluster, right?
+
+[00:02:25]
+Or do other cluster related operations, but that doesn't mean that the service running on top of it should be able to do those operations, right? And so what we do is we say, okay, well the node can do things specific to the infrastructure side, but the service focuses on roles related to the service side.
+
+[00:02:45]
+So if the service needs to connect to sqs, we don't want to give that to the or, I'm sorry, yeah, if the service needs to connect to sqs, we don't want to give that to the node. There's no need. The node has no connection to sqs or need to communicate with it.
+
+[00:02:58]
+So the node wouldn't need that permission. So we keep those separate. If you were doing a VPA, VPS equivalent, right, in that case you don't get that separation. So the node would act as both because everything's running directly on the host, there's no container there. So we have a service role that we're creating and in that service role we're really just telling it that it can do three things.
+
+[00:03:25]
+It can get parameters. Remember all the way back in App Runner when we had to copy and paste the arns in and stuff. Yeah, that's gone. That's a way easier and nicer way of doing it. And yeah, we can just reuse the parameters that we have in a different part of the module as code.
+
+[00:03:45]
+And so in this case what we're doing is we are iterating over a for loop and we're saying, hey, get the SSM parameter arn and make it so that this can actually request those values. The other thing is log stream and put log events. Basically this is all related to CloudWatch.
+
+[00:04:05]
+We want to be able to see what's coming out of the containers just like we did in App Runner. And so this is a little bit more fancy. You're getting like a nice little log group with a seven day retention period and inside of it you get the access to permit or you're giving the service the ability to push the logs to it.
+
+[00:04:28]
+Okay, cool. So then we just create a task assume role and a service assume role. There is a little bit of a confusing thing. I don't want to go super deep down the rabbit hole because it's just like Amazon specific stuff stuff. But there's like an execution role and then I think there's a task role or basically there's two different types of roles that ECS uses.
+
+[00:04:51]
+The main gist of the difference is one is used to start the container and the things that are needed to start that container and the permissions around it and the other is used for the requests actually inside of the container so again, for example, if a container needs ECR access in order to pull, then that would be an execution role.
+
+[00:05:20]
+But if I don't want the internal container to be able to pull an image, then I want to put that on the execution role, not on the service role. So there's even another layer of separation there. Again, you don't need to go too deep into it. You just need to know if the service role is really the one that is giving us the ability to get parameters and all that stuff.
+
+[00:05:43]
+But just a little bit of background into how annoying ECs can be.
+>> Speaker 2: I guess, why are you assuming that role twice? I mean, that third one that you have to assume ECS task, you also have it at the top, I think. What's the difference between those two?
+
+[00:06:02]
+The task assume role and the execution role.
+>> Erik Reinert: So, okay, if we see here the execution assume role, I mean, they all do the same thing technically. They all do the exact same thing, right? AssumeRole ecs. Sorry, no, this is for ECS tasks. Yeah, so that would be the difference there.
+
+[00:06:24]
+And this is also ECS tasks. Yeah, so I guess that's the difference is just the domains that the identifiers are referencing. Yeah, now it does mean though, that every service on ecs needs a task and an execution role. So that's why we're creating two of them. The third one, the service role, may be another thing that I'm doing, or it may be being used for another resource.
+
+[00:06:57]
+So I would just pay attention to the task assume role and then the execution assume role. Those are the two that we're talking about that a service actually uses. So
+>> Speaker 3: I'm a little confused. Like, if we're creating these, why are they data?
+>> Erik Reinert: Okay, good question. So a resource normally means a logically created thing, something that actually exists and has state of existence, right?
+
+[00:07:26]
+But this goes back to the whole like pulumi versus terraform thing even. Right. In a normal code base, you could just be const value JSON, blah blah, blah, blah blah, right? And then write out your JSON. You can't do that in terraform easily, right? And so especially with writing, you remember how you might notice that in these dados data brackets, they don't have the statement name.
+
+[00:07:53]
+And the ones that are in Amazon are much larger. Basically, these are helpful data resources, basically that will take this code and then turn it into JSON for you, and it'll kind of like fluff it out into what it actually should be. Or expand it out to what it should be.
+
+[00:08:12]
+So all we have to do is be like statement, principles, identifiers, types, and then it will translate that to. Hold on, I can actually show you. So if we go to IAM really quickly, go to Policies. Do I have an assume role in here? No, actually, hold on.
+
+[00:08:33]
+That would be this. So let's do, do I have, yeah, I do, cool. Yeah. So you see how this one has like version statement, right. And the structure is a bit different. Basically, the terraform provider provides an interface that will make it. So you only have to write this and then it will translate it to this.
+
+[00:08:59]
+Yeah.
+>> Speaker 3: So it's kind of like a hacky type thing almost-
+>> Erik Reinert: Exactly.
+>> Speaker 3: Terraform.
+>> Erik Reinert: Yeah, because you can do it without it. Like if you really wanted to, you could write this as like as that literally in terraform. But it's a lot of extra lines you're writing over and over and then you have to remember how to capitalize and when to capitalize.
+
+[00:09:18]
+So there's a lot of errors that could happen here. I think they also validate them as well. So I think it's got a bit more data validation too. But yeah, you don't have to use them. They're there to be helpful. But they do they literally translate this into that right there?
+
+[00:09:37]
+Yeah. Cool. Okay, awesome. So that's our data file. Let's go ahead and save that.
+

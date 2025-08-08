@@ -1,0 +1,66 @@
+[00:00:00]
+>> Erik Reinert: Okay, so then we go into the auto scaling group. And the auto scaling group is pretty straightforward as well. It's solving the problems of desired capacity, meaning how many instances do we want right now, our min size, our max size, right? How many instances do we wanna scale to and stop at?
+
+[00:00:17]
+In this case, we want to stop at 5, which means that we have auto scaling and it'll work, which is fantastic, but we won't actually go to, you know, beyond five instances. So this is kind of helpful when you want to, like, save money. You want to make sure that if you scale all the way to the maximum, you're not going to 1000 instances or something like that.
+
+[00:00:36]
+You can at least limit it. Min size is nice. If, say, for example, you want more than one instance, you say, okay, I want 3 min, 5 max, make sure you have high availability, all that kinda stuff. Name_prefix, you'll notice that I have var.name each.key. So in this case, going back to the whole passing the name parameter thing, this would be staging, spot staging, on-demand staging, whatever, right?
+
+[00:01:05]
+But we're combining these two together to make the actual name of the autoscaling group. We add our launch_template, we tell it that we always wanna use the latest version of the launch template. Instance_refresh is kinda nice. This will just make sure that your instances properly get rolled. So for example, if you have 100 instances and you don't wanna just take them all down at once, you can tell it, like, hey, I wanna make sure that at least half of my instances are available so it'll roll like the first 50.
+
+[00:01:36]
+Make sure that all those roll successfully before moving to the next 50, whatever. So that percentage is important to make sure that you don't ever completely go down, right? Lose all of your instances or anything like that. We then add a couple of tags. So we just tell it that we want to add the Amazon ECS managed tag.
+
+[00:01:57]
+This is something specific to Amazon E. This is something that they recommend you do for their clustering. And then we just give it a name so that we know that the instance is the name of the cluster. And then we have an autoscaling_policy. Now, I thought about this a little bit because we are making one significant change.
+
+[00:02:21]
+If we move from App Runner to ecs, how we scale is going to change, what that means is at least out of the box. The easy solution, which is what we're going for right now, the easy solution, what that means is that it will only track CPU utilization, whereas in App Runner we got request concurrency scaling in App Runner.
+
+[00:02:53]
+We got a little bit more of a tunable scalable metric if we're serving HTTP requests. Because then we could say, well, it's not necessarily that I want the CPU to go to 75 or 80%. It's more that I wanna scale off of 1,000 requests a second or 10,000 requests a second, because that's what I know this service can process reliably, right?
+
+[00:03:19]
+Because we're doing a CPU tracking target, it means that we are now moving to a model of just hammer this thing as hard as you possibly can until I need another thing for you to hammer as hard as you possibly can. I think this is better. I know that request count is important, but I think in this case you want to worry more about just the resources you're paying for versus the idle processes that are on them.
+
+[00:03:56]
+And what I mean by that is if you're paying for an EC2 instance that's like four cores and eight gigs of RAM and you're scaling out only when you use two out of those four cores, then you're paying for two cores that you're not using ever. But when you're managing infrastructure like this, you kind of want to look at these as like resource pools that you're utilizing to your maximum as much as possible.
+
+[00:04:24]
+So I would make the slight argument that you should really be developing applications that scale their requests as performantly as possible. So your real issue is CPU utilization and not saying, well, it doesn't. You know, I know it was written in Go, but it can only take 100 requests per second because of how we've coded it.
+
+[00:04:46]
+It's like, well, then we're spending a ton of money on resources that we are never going to use. Because now I have to create a new instance for every 100 requests versus being able to take 10,000 requests on a single instance. So, yeah, and I'll be honest with you, I deal with this.
+
+[00:05:04]
+This is something I deal with quite often. There was a scenario not too, well, I would say a while ago, where we discovered, [LAUGH] we discovered that we were provisioning 2 core 4 gigabyte instances, right? And we were provisioning six, six DaemonSets on them. Now normally you'd be like, well, you know, that's not that big a deal.
+
+[00:05:27]
+A DaemonSets probably 0.25 of a core, right? But when you provision six of them, [LAUGH] that's the equivalent of almost a core and a half, right? And what we didn't realize was, as we were Provisioning so small of instances that we were provisioning like 75% Daemonset and then only like 25% of space was available for our service that we wanted to run.
+
+[00:05:57]
+So we were basically paying for daemon sets more than we were paying for running our service. What that meant was we had to provision bigger instances or we had to get rid of daemon sets that were on those instances. That's what I mean by having the ability to really optimize off of what you're paying for.
+
+[00:06:16]
+In this case, when you're at this level, you're really just paying for CPU and memory. And so if you can get it to a point to where you don't care about how many requests per second are going to the application, you can just simply say the application needs to be scaled.
+
+[00:06:34]
+When the compute gets to this level, then that resource management becomes very easy. Then you just go, okay, 75% of cores are being used. Great, give me a new instance.75 on that one too. Great, give me a new instance. And you just keep doing that, just keep doing that until it gets bigger and bigger and bigger.
+
+[00:06:50]
+And then eventually it'll like accordion, and then it'll go back down, right? And that's the real approach I think you should take. So I did keep with the CPU utilization. I do think that the request count going back to the App Runner comparison can also be a little scheme Y.
+
+[00:07:09]
+The reason why I say that is because if you're scaling at a value that's far, far too low for what your application can actually handle, then you are over provisioning quite a bit. Say, for example, your application can actually take 10,000 requests on app Runner, but then you tell it to scale every hundred.
+
+[00:07:31]
+Now you're paying for tons of instances, but you have more potential there. That request per second metric, it doesn't always mean it's the best metric to use in this case. Then the last couple things we have here are the capacity provider and the capacity providers. The easiest way to describe these are these are just attaching the clusters to, or I'm sorry, the instances to the clusters.
+
+[00:07:58]
+So the auto scaling groups are basically the providers and then the ECS instance or the ECS cluster is our cluster. And so we use these two resources to bind the auto scaling groups and capacity providers to the specific clusters that we want, because you can create capacity providers and then you can assign them to clusters.
+
+[00:08:19]
+And so that's really all we're doing here at the bottom.
+

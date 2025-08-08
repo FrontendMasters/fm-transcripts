@@ -1,0 +1,81 @@
+[00:00:00]
+>> Erik Reinert: All right, so now that we've done that, we're going to do Terraform Init again. We're going to do a plan. There we go. We've got 19 resources to add. And it's funny because earlier we created a virtual network with 63 resources and IT felt really simple, [LAUGH] you can tell how annoying even 19 resources are.
+
+[00:00:34]
+Modules are helpful. Use modules. If you can use modules, they will save you a lot of time. So, okay, now that we've got the plan, let's go ahead and use the apply. And now we are working on creating our cluster, the spot instances.
+>> Student: They can shut down just anytime.
+
+[00:01:00]
+So you have to be able to deal with that.
+>> Erik Reinert: Yeah, that's why we're putting them in auto scaling groups though. So an auto scaling group underneath the hood basically says I want this many instances and if any of them disappear I will refill it. And if I want to, I want to also scale this auto scaling group to this many instances.
+
+[00:01:20]
+And then if we lose one of those, I want to replace that one too. So if we're at 5 and then 1 of our spots gets taken and we go down to 4, the auto scaling group will know, well, we have to be at 5. So let me bring it back to 5.
+
+[00:01:35]
+The goal there is to make it so that your high availability is good enough to where you don't have to worry about having any outages or requests failing or anything like that for it. So really what you would do is you would have an auto scaling group with stuff, six or seven versions of the same container running it, and then you would send traffic to all of those instances and then the moment you lost one of those instances, you would stop traffic going to that instance, which a load balancer does basically.
+
+[00:02:10]
+And then once that new instance comes in, it allows traffic to start going to that instance. So for us, the mechanisms that are doing that are the auto scaling group and the load balancer. They work together to know when requests are failing to take an instance out and when requests are successful to keep the instance in.
+
+[00:02:30]
+And it does everything underneath the hood.
+>> Student: Do they give you any guaranteed minimum time on a spot instance? I guess maybe.
+>> Erik Reinert: No [LAUGH]. No, they really don't. No, and the reason why I say that is just because we were provisioning like 32 core 196 gigabyte RAM instances which are just huge and we'd only get for like 15 minutes at a time on spot.
+
+[00:02:59]
+it was ridiculously short. And I was like, okay, well Nevermind, some are just better than others. If you get a two core 4 gigabit RAM instance, you'll probably keep that for a while because they've got hundreds upon thousands of them and they all kind of keep in like a very stable market.
+
+[00:03:17]
+But if you got like really big instances and the market fluctuates a lot, if they can sell that instance for a bigger value, they're going to take it and they're going to go sell it. That's really why they take the instance, is because they want to, they found a better buyer for what you're paying for and so they can make more money off of the instance they just gave you.
+
+[00:03:35]
+Well, while this is running, one thing we can check really quickly is we could start looking at some of our cluster stuff. So if I go to ecs. Awesome. So there's a couple of really good signs here. So here's our ECS cluster right here. I'm inside of the ECS console.
+
+[00:03:55]
+You'll see that I have two other ones, but you'll see that I have my third one here staging. You'll see that I have zero services, I have no tasks running, but I do have one EC2 instance. So that means that the EC2 instance in my auto scaling group started it, got that value in the template that we provided it and it knew that it should connect to my staging cluster.
+
+[00:04:17]
+We also have container insights. So you can see here that I actually have more advanced metrics and stuff like that. If I click on staging itself, I can actually start looking at the cluster. So again you'll see that I have no services currently, no tasks either. But if I click on infrastructure, you can see, hey, there's my staging spot capacity provider.
+
+[00:04:36]
+There's my active container instance. If I scroll all the way to the right here, you can see that I have 2048 units of compute available and I have 3083, 3883 megabytes of RAM available as well. So like I have a running cluster now. I have a running cluster with an instance attached to it, ready to take services when we're ready to start scheduling those services.
+
+[00:05:04]
+
+>> Student: We still don't have the code deployed, right?
+>> Erik Reinert: Not yet, no. Well, so technically we do, but it's on App Runner, right? So during this whole time, if you were at your company, you would absolutely be leaving that stuff on App Runner, right? Let the devs keep going through that process and all of that.
+
+[00:05:22]
+And then once all of this was deployed, then you would move everything over to ecs. Awesome, so we got provisioned. Now, again, we just created a cluster and a distribution. But as I said before, we've taken a look at the staging cluster. We can see that we do have infrastructure, we have our capacity provider as well as even an instance right here.
+
+[00:05:48]
+We can see we're completely wired up and ready to go in the sense of running containers. And then if I go to distribution, I can go to Cloudfront and then if I go in here, again, disregard all my other stuff, but the one that's actually not labeled, if I click on that one, this is the one that we just created for our cluster.
+
+[00:06:07]
+And so you can see we got a domain name. And what's kind of neat, if we want to see if it's actually propagating properly, I can do this. Now, remember it in the load balancer, we said that if nothing else could be handled, I should get a 404.
+
+[00:06:24]
+So technically, if I make a request to this CDN and I get a 404, that means that's the response from the load balancer. So I'm gonna hit Enter, hey, 404 not found. So even though I don't have an application running yet, we still have complete connectivity from the CDN to the load balancer internally.
+
+[00:06:47]
+And that's the default response for it. So that's awesome. That means that, yeah, we're fully ready to start provisioning a service. So if I just pull up the directory in my code base really quickly, that module directory, what's neat is that the module directory is really even describing our infrastructure for us.
+
+[00:07:07]
+If there's anything I've really grown to appreciate in infrastructure management, it really is good organization, dude. You're managing stuff at the end of the day, whether it be virtual stuff or physical stuff or whatever. And it really is nice when it's organized well. It's easy to understand, it's approachable.
+
+[00:07:29]
+I've been on so many different jobs where things weren't organized well or they didn't take the time to think of anybody else using it but them. And yeah, being able to go into this module directory and just see cluster, database, environment, network, this is possible not just in this workshop, it's very possible in a real world scenario.
+
+[00:07:52]
+You just have to be conscious of what you're trying to logically separate and really describing it in as simple terms as possible. Again, we have a cluster, we have a database, we have an environment, we have a network. We're not saying ECS cluster, we're not saying RDS database, instance.
+
+[00:08:13]
+We're just speaking in general terms. And the idea is that, okay, so what happens in the future if we want our databases to be Aurora instead of RDS? We could make it so that this database module takes a variable that is Aurora as an option or postgres or.
+
+[00:08:32]
+I'm sorry, or is RDS instance as an option, right? And now people can use the exact same module and have more functionality and more things to do with it. So, yeah, I think speaking in general terms also makes it so that it's more direct to solving the problem and makes it so that it's more approachable where you're not speaking so much in the cloud resources terms, you're speaking more in.
+
+[00:08:57]
+Just like, this is what a database means to us, this is what a cluster means to us, right? When new people come on, that's what you say to them. You say, okay, well, if we say the word cluster, you think ECS cluster, right? And then everyone kind of is working together in a really common language.
+

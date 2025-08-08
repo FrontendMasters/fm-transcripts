@@ -1,0 +1,117 @@
+[00:00:00]
+>> Erik Reinert: Okay, so now what we're gonna do is we're gonna save this up and once again we're gonna do Terraform Init. We'll do Terraform Plan. Now the last two that we did. Cluster and Service, were not modules. I used individual resources for each one of those inside of that module.
+
+[00:00:29]
+So, you know, if I'm honest, like I can do that because I've written a lot of Terraform and I've worked. On a lot of Amazon resources. But again, I'm just gonna push this home one more time. If you wanna be productive. And you don't feel confident in doing a lot of the stuff or defining the things a lot of the ways that I just did, if you can find a module that can do it for you, like, you know, you could still get the benefit of doing those things.
+
+[00:00:55]
+It's just, just you might have to find some open source project or something that can help you do it. And again, I even do that with. VPCs and Kubernetes and all the other stuff. So, it's just after doing it for so long, I hate having to slog through all those resources.
+
+[00:01:12]
+To be honest, it is annoying because you go to other cloud providers, the resources really aren't as bad. It's partially Amazon. Amazon is so granular that you feel that weight after a while you're, my God, dude, it's an attachment as well. Come on. Why isn't it just attach itself?
+
+[00:01:30]
+It's incredibly frustrating. But all cloud providers are different as well. You go to gcp, you'll have a bit of a different experience than you would with Amazon and you might like or hate that more or less. Okay, cool. So we did our plan. Let's do our apply. That happened way faster than I expected it to.
+
+[00:01:56]
+Staging service. Okay, that's right. Yeah. So one thing that we changed convention wise was we changed the placement of where resources are because now we can. Localize them to environments and clusters and stuff like that. So, we're not just saying FEM. Now what I can do is I can actually add some organization so I can do like staging.
+
+[00:02:18]
+Then look at that. Now I get everything that's in staging in a nice format that I can read. You can see here my bastion private key, my cluster private key, database password, all that stuff up here. Then you'll see down here I've got my service bastion, cluster and database for.
+
+[00:02:37]
+All of the resources. Then you can see down here all. My service level stuff. So Client id client secret goose database string, postgres, URL. It's nice. Now you have a much larger scale on the whole environment. And then if I wanted to see prod, I would just do prod and cool.
+
+[00:02:57]
+Now I can see all prod stuff and go through that as well. So that's another reason why I like parameter stores is that you can filter and jump around like that and you could do that in Secrets Manager. But It's just not as proficient. Really quickly, let's go ahead and just go to ECS and let's just see.
+
+[00:03:15]
+What'S going on with the service. It got deployed pretty quickly, so let's go ahead and go here and see what's going on. Hey, we got a service. Awesome staging services there. We also see zero out of one tasks running. Well, we knew it might not be working, so let's see what's going on here.
+
+[00:03:31]
+But we're gonna click on the actual service itself and we'll see one failed tag. Okay, so again, we kind of knew that was gonna be happening. But we're seeing configuration here. We're seeing task definition, we're seeing a lot of stuff. So we got a good sign that. We at least provisioned some stuff.
+
+[00:03:47]
+Right, so we're seeing in here, we're seeing stopped task, failed to start. And then we're kind of seeing containers start over and over. So one thing to note about ECS is it will be in a perpetual. Loop for as long as you let it be. It will eventually kind of back off for 5 minutes or 10 minutes or something like that.
+
+[00:04:08]
+Then it'll try doing it again. It does have eventual fail off, but it will eventually kick back in if I just leave this here. We should start seeing more and more. Containers just keep trying to go and go. That's why I said it's okay in my mind to let a container fail.
+
+[00:04:23]
+It's not that big a deal. It's just starting something and stopping it on the host. But you don't want this going for months. Let's go ahead and go to logs really quickly. We're not seeing anything in logs, so that's interesting. So, I'm gonna do some quick troubleshooting mainly because I did clean up my environment.
+
+[00:04:44]
+So I'm curious to see if maybe I deleted something. So, what I'm gonna do is I'm gonna go to the container itself. There we go. And sure enough, look at this manifest Unknown REQUESTED IMAGE NOT FOUND So it's trying to pull FEM FD service staging. Interesting. We talked about environments and promoting and all that stuff.
+
+[00:05:10]
+Once we created an environment for staging, we no longer needed latest. We don't want to use latest. We want to make sure that staging gets this. So what I need to do now is I need to quickly make sure that I create a build for staging. So, what I'm gonna do really fast is I'm just gonna do my docker login, right, and I'm just gonna quickly build an image for staging.
+
+[00:05:32]
+So we'll do make build image because remember, we always build the SHA first. That's my mistake. We always build the SHA first and then we promote it to the environment that we're trying to promote to. So in this case, instead of promoting it to latest, we're going to promote it to staging.
+
+[00:05:50]
+So while this is running, there is another thing we need to do though. So I want to go back to. System Manager or SSM really quickly and. I want to fill in the parameters that are currently set as example. So remember, by default when we create a secret from scratch, we just get.
+
+[00:06:09]
+A secret that says example. So if I go to service Goose DB string, I shouldn't be worried about clicking that because it says example. So, what we need to do is this is kind of the manual part. We need to go get the values from our either previous environments or from our new database or whatever and populate those values really quickly off screen.
+
+[00:06:33]
+I did actually delete my Google client key and client id. So, I'm gonna quickly generate that and then I'm gonna fill in these values. This is what happens when you start building stuff. You can do two things at once. While I'm doing that, I'm also gonna do make build tag, build image promote, right?
+
+[00:06:54]
+And this will make sure that this gets pushed off to staging. Now that I've built that image and pushed it, I should be able to go to. I'm going to open up ECR or ECS in another tab staging tasks and. We should at least be able to see it have started, even though it.
+
+[00:07:15]
+Might not have actually been successful. Now what's interesting is, is you'll see that it's red before and now it's yellow. So maybe something else has gone on. So, let's go ahead and click on that Task, essential container in Task exited. Okay, so it actually ran and we got a task.
+
+[00:07:33]
+Now again, remember we're doing this to kind of show you how to debug in this scenario. Okay, so it actually failed, but it did run So I wonder if I can look at logs. Okay, cool. Sure enough. Awesome, I'm actually seeing logs now, right, and I could see.
+
+[00:07:52]
+Okay, I'm example in connection info. Okay, that makes sense. I didn't potentially set up the connection info properly. So that means again, I need to set up the values in Systems Manager for what I'm doing. What I'm going to do is, like I said, I'm going to grab the client id.
+
+[00:08:10]
+Let me just copy this link, paste and then copy this link. Let me just do these off screen really quickly. Sorry, but this is essentially what you'll need to do as well. When you run the automation, you'll need to make sure that you update these values, otherwise it will also be in a dead loop.
+
+[00:08:31]
+Now, I'm not going to actually use the Supabase URL. To be clear, I'm not gonna use the Supabase URL. What I wanna use is, I wanna use my RDS URL, right? Because we have a completely new instance now. So what I wanna do is I. Wanna go to Aurora and Amazon, I wanna go to DB instances, I wanna click on staging, and I wanna grab this endpoint and I wanna replace that endpoint and let me get this and at least replace the password.
+
+[00:08:56]
+So it's like password, there we go. What I wanna do is if we open, I open it up in an editor and kind of like break it down. What I want to do is I want to replace this, which is my username, I want to replace this, which is my password, right?
+
+[00:09:14]
+And then what I want to do as well is I want to replace this, which is my host name, right? So this is really how this postgres. Connection URL breaks down. And so, to get this completely populated, what I first need to do is, is grab this and paste in the host name.
+
+[00:09:34]
+So we'll do that. There we go. I got my host name, now I need my user. So then what I'm gonna do is I'm gonna go to configuration, I'm gonna scroll down and we'll see that the master username is staging, right, because it's a staging environment. So then what I'm gonna do is I'm gonna go to username and I'm gonna type in staging.
+
+[00:09:52]
+Now the last thing I'm going to. Do is I'm going to get my password. But remember, my password isn't here, my. Password is in ssm. So what I'm gonna do is I'm go to ssm, I'm gonna go to Parameter store. I'm gonna go to staging. And then there's my database password right here.
+
+[00:10:16]
+I'm gonna grab this value. I'm not gonna show it, so I'm gonna show that value to myself off screen. Then I'm gonna paste that into the last part of the connection string, which is the password right here. I'm going to grab this, copy this. Go over here. Paste this in, and.
+
+[00:10:36]
+This goes into both the goose DB string or the goose DB string as well as the postgres URL. So, you wanna update the same value in both. But then what I'm going to do is I'm going to open up ECS again. Oops, I did not. Well, whatever. So, we're gonna go to staging.
+
+[00:10:59]
+Staging service. We see some failed. So let's see. Let's see what's going on. So, before it was kind of restarting every few seconds and whatever, but now you can kind of tell. It's kind of been like, bro, I've been trying for the last five minutes and nothing's happened.
+
+[00:11:16]
+So, we're gonna wait. If you get caught in a scenario where it's effectively like, I'm not gonna do anything, you can do what's called force a deployment. And this is also what you would. Do if you made a configuration change and you wanted it to actually roll that change out.
+
+[00:11:31]
+Up in the top right hand corner. Here, you'll see the Update service button. You just click this dropdown and then. You just click Force new deployment. And then once you click that to. Make sure that it did in fact. Do that, you can go to the deployments tab, you can scroll down just a little bit, and then you'll see that there is a service deployment in progress.
+
+[00:11:49]
+If I refresh this, you'll see that the previous one then gets stopped and a new one gets created, hopefully. Now if we go to tasks. My gosh and then refresh. There you go. Now we can see that it's activating and it might actually even be running. Yeah, see, now we're actually running.
+
+[00:12:09]
+Now it's waiting to. Waiting for the process to get a health check. Hey, look at that. Now we're online. Awesome. So again, we deployed it broken, but we deployed it with everything it needed. The developer expectation here was just go in and update the secrets. It's not that difficult.
+
+[00:12:30]
+And then potentially go in and force a deployment or wait until CI runs the next deploy, which will then run. Roll out the service, it'll be green. And we're all good to go. So, yeah, I have a running service now, which is pretty cool. So, out of curiosity, I'm just gonna do this real fast.
+
+[00:12:48]
+I'm going to close this out. I'm going to do this and then I'm going to do HTTPs body again. PG Relation, user doesn't work. Okay, so we know this, but hey, we're online. We're just broken, right?
+

@@ -1,0 +1,575 @@
+WEBVTT
+
+1
+00:00:00.325 --> 00:00:04.288
+&gt;&gt; Erik Reinert: While that's running,
+we're going to take care of the last thing
+
+2
+00:00:04.288 --> 00:00:09.120
+that we were going to do today anyways
+that is setting up the deployment process.
+
+3
+00:00:10.400 --> 00:00:17.840
+Now we said right now we want to
+manage the deployment of the image.
+
+4
+00:00:17.840 --> 00:00:19.160
+We already know that we can do that.
+
+5
+00:00:19.160 --> 00:00:20.960
+We can build the image and push it in CI.
+
+6
+00:00:20.960 --> 00:00:22.560
+That's pretty straightforward.
+
+7
+00:00:22.560 --> 00:00:26.080
+But we also want to make sure
+that we can migrate the database.
+
+8
+00:00:27.120 --> 00:00:34.240
+Now I want to migrate
+my Supabase database.
+
+9
+00:00:34.240 --> 00:00:37.610
+That's the goal is to make GitHub
+actions connect to Supabase and
+
+10
+00:00:37.610 --> 00:00:40.160
+then run the migrations against it.
+
+11
+00:00:40.160 --> 00:00:44.931
+So what we want to do is we want to set
+up a job that really does the two things
+
+12
+00:00:44.931 --> 00:00:45.880
+that we said.
+
+13
+00:00:45.880 --> 00:00:50.009
+We want to set up a job that will build
+our image and promote it for us so
+
+14
+00:00:50.009 --> 00:00:54.720
+that we trigger a deployment, but we also
+want to do a job that will connect out
+
+15
+00:00:54.720 --> 00:00:58.000
+to Supabase and
+run the the migrations for us as well.
+
+16
+00:01:00.160 --> 00:01:00.990
+To do that,
+
+17
+00:01:00.990 --> 00:01:06.800
+what we're going to do is we're going to
+add another job in our GitHub Actions.
+
+18
+00:01:06.800 --> 00:01:10.771
+We're going to call this one Deploy.
+
+19
+00:01:10.771 --> 00:01:15.040
+Now, you'll notice that there's a little
+bit more going on with this one.
+
+20
+00:01:15.040 --> 00:01:17.360
+I'll explain it super quickly.
+
+21
+00:01:17.360 --> 00:01:21.970
+The first thing you'll notice is actually
+a brand new key called concurrency.
+
+22
+00:01:21.970 --> 00:01:27.203
+This is a GitHub Action specific feature
+that's really nice where it will make
+
+23
+00:01:27.203 --> 00:01:32.690
+sure that only one deployment happens at
+a given time in the repo, no matter what.
+
+24
+00:01:33.810 --> 00:01:38.411
+For example, if two merges get made
+to master main at the same time,
+
+25
+00:01:38.411 --> 00:01:43.821
+this one will run first and the other one
+will wait until that one is successful or
+
+26
+00:01:43.821 --> 00:01:47.570
+that one will stop until it fails or
+whatever.
+
+27
+00:01:47.570 --> 00:01:51.385
+But this is a really nice way to make sure
+that you don't have multiple deployments
+
+28
+00:01:51.385 --> 00:01:54.910
+running and overlapping each other and
+things like that.
+
+29
+00:01:54.910 --> 00:01:59.170
+The next thing is, because this is so
+credential heavy and so
+
+30
+00:01:59.170 --> 00:02:00.842
+credential specific,
+
+31
+00:02:00.842 --> 00:02:06.190
+we're just sharing all the environment
+variables for all the job here.
+
+32
+00:02:06.190 --> 00:02:08.150
+I'm not adding it to just the one step.
+
+33
+00:02:08.150 --> 00:02:10.030
+I'm doing it for pretty much everything.
+
+34
+00:02:12.670 --> 00:02:16.848
+Then you'll see that we have our normal
+things underneath it like needs and
+
+35
+00:02:16.848 --> 00:02:17.550
+runs on.
+
+36
+00:02:17.550 --> 00:02:22.187
+But you'll notice that I have something
+commented out here called if so right
+
+37
+00:02:22.187 --> 00:02:27.130
+now it's commented out, but in the future
+this would be uncommented by default.
+
+38
+00:02:27.130 --> 00:02:32.364
+Can anyone tell me why?
+
+39
+00:02:32.364 --> 00:02:35.625
+But it only does it whenever
+you push the main, exactly.
+
+40
+00:02:35.625 --> 00:02:37.530
+Yeah, so this is our deploy step, right?
+
+41
+00:02:37.530 --> 00:02:41.118
+We only want this to run
+on the main branch, and
+
+42
+00:02:41.118 --> 00:02:46.086
+so we're using the if key here,
+telling GitHub Actions, hey,
+
+43
+00:02:46.086 --> 00:02:51.440
+we only want you to run if it's
+the main branch effectively, right?
+
+44
+00:02:51.440 --> 00:02:55.911
+The next thing we want to do really
+quickly, and it's actually nice that I've
+
+45
+00:02:55.911 --> 00:02:59.499
+already got this set up,
+is we want to go to GitHub actions, and
+
+46
+00:02:59.499 --> 00:03:04.740
+we want to add the other secrets and
+variables that are needed to run the job.
+
+47
+00:03:04.740 --> 00:03:09.038
+We know that we need our goose
+DB string and our goose driver,
+
+48
+00:03:09.038 --> 00:03:11.415
+so let's go ahead and add those.
+
+49
+00:03:11.415 --> 00:03:16.141
+So the same exact value, if we go to ssm,
+
+50
+00:03:16.141 --> 00:03:22.268
+I'll do this with you because
+I got to update it too.
+
+51
+00:03:22.268 --> 00:03:28.086
+Parameter store fem fd service and
+
+52
+00:03:28.086 --> 00:03:34.705
+then postgres, this is my postgres URL
+
+53
+00:03:34.705 --> 00:03:39.730
+that I want so I can copy this.
+
+54
+00:03:39.730 --> 00:03:44.565
+Let me just grab this really quick,
+
+55
+00:03:44.565 --> 00:03:51.260
+grab this, and
+then I'm just going to paste.
+
+56
+00:03:51.260 --> 00:03:57.740
+I'm going to create a new value called
+goose DB string, save that value in.
+
+57
+00:04:01.020 --> 00:04:06.131
+This is another reason why it's
+helpful to not be behind a network or
+
+58
+00:04:06.131 --> 00:04:10.616
+anything like that as well,
+because we don't have to solve
+
+59
+00:04:10.616 --> 00:04:15.640
+the problem of how does the runner
+access the RDS instance?
+
+60
+00:04:15.640 --> 00:04:19.609
+Which is the common thing whenever you
+do your own self hosted database Here
+
+61
+00:04:19.609 --> 00:04:22.200
+we don't have to really
+worry about that at all.
+
+62
+00:04:23.560 --> 00:04:26.120
+It will go ahead and
+take care of it for us.
+
+63
+00:04:26.120 --> 00:04:30.845
+Now what we want to do is we want to
+
+64
+00:04:30.845 --> 00:04:36.456
+commit our new, our new job, right?
+
+65
+00:04:36.456 --> 00:04:41.515
+So I'm going to do commit,
+and we'll say setup,
+
+66
+00:04:41.515 --> 00:04:46.020
+deploy job nice, and we'll push this up.
+
+67
+00:04:46.020 --> 00:04:49.820
+Now again, normally this would
+not run on this branch, but
+
+68
+00:04:49.820 --> 00:04:55.460
+because I commented out the, you know,
+I commented out the if statement, it will.
+
+69
+00:04:55.460 --> 00:04:58.922
+So if you've ever, you know, or
+if you're in the future, you're like, man,
+
+70
+00:04:58.922 --> 00:05:00.020
+I need to debug this step.
+
+71
+00:05:01.320 --> 00:05:04.760
+Just use that, just comment that out,
+let it run on your job.
+
+72
+00:05:04.760 --> 00:05:06.080
+Debug, debug, debug.
+
+73
+00:05:06.080 --> 00:05:10.120
+Once it's working, remove the comment and
+you should be good to go.
+
+74
+00:05:10.120 --> 00:05:14.234
+So the goal now should be that it's
+going to build the image, push it up,
+
+75
+00:05:14.234 --> 00:05:18.888
+it's going to go to the test job, pull
+that image down, build it, or I'm sorry,
+
+76
+00:05:18.888 --> 00:05:23.676
+not build it, run the test, the migrations
+against it, then it's going to use that
+
+77
+00:05:23.676 --> 00:05:28.240
+exact same image again in the deploy
+step to run those migrations as well.
+
+78
+00:05:28.240 --> 00:05:32.419
+Now what's really dope about
+that is now we are testing our
+
+79
+00:05:32.419 --> 00:05:35.120
+migrations in the pipeline.
+
+80
+00:05:35.120 --> 00:05:39.840
+Then we're also using the pipeline
+to run those exact same migrations
+
+81
+00:05:39.840 --> 00:05:44.079
+against our Database,
+that's really the closed again.
+
+82
+00:05:44.079 --> 00:05:45.840
+We're wrapping up this phase.
+
+83
+00:05:45.840 --> 00:05:50.910
+That's the first closed loop that we
+just made where now we have a database.
+
+84
+00:05:50.910 --> 00:05:55.809
+It's managed by migrations, we know that
+we should be always making only working
+
+85
+00:05:55.809 --> 00:05:59.435
+changes to the database, and
+we're testing that, right?
+
+86
+00:05:59.435 --> 00:06:02.940
+The second closed loop will
+be the promotion process.
+
+87
+00:06:02.940 --> 00:06:07.636
+We said earlier that you guys would
+have to do the manual part of building
+
+88
+00:06:07.636 --> 00:06:10.939
+locally and
+pushing to trigger that deployment.
+
+89
+00:06:10.939 --> 00:06:14.940
+Well, we don't wanna do that anymore,
+we just want it to be merge and walk away.
+
+90
+00:06:14.940 --> 00:06:16.583
+And so now when we merge and
+
+91
+00:06:16.583 --> 00:06:21.260
+walk away, we also get the benefit
+of that promotion happening.
+
+92
+00:06:21.260 --> 00:06:24.780
+We still get to build every time we
+make a change, but now the build and
+
+93
+00:06:24.780 --> 00:06:28.849
+the push are separate from each other and
+the promotion to where now it's like,
+
+94
+00:06:28.849 --> 00:06:32.975
+okay, well, we only promote on main, but
+we get to still build in every branch,
+
+95
+00:06:32.975 --> 00:06:36.710
+we get to test in every branch, and
+we know that everything's working.
+
+96
+00:06:37.750 --> 00:06:40.446
+So there's our job, it's running.
+
+97
+00:06:40.446 --> 00:06:41.545
+Big money, big money, big money.
+
+98
+00:06:41.545 --> 00:06:43.359
+Yeah, let's hope, right?
+
+99
+00:06:43.359 --> 00:06:43.859
+Yeah.
+
+100
+00:06:52.230 --> 00:06:55.040
+Hey, we worked.
+
+101
+00:06:55.040 --> 00:06:58.626
+All right, so basically,
+we pulled our image,
+
+102
+00:06:58.626 --> 00:07:03.520
+we pulled that tagged version of it,
+we then ran our migration.
+
+103
+00:07:03.520 --> 00:07:07.840
+So we didn't actually promote our
+image until the migrations ran.
+
+104
+00:07:07.840 --> 00:07:09.097
+That's another thing to note.
+
+105
+00:07:09.097 --> 00:07:13.505
+We didn't trigger the update
+until the migration actually
+
+106
+00:07:13.505 --> 00:07:17.208
+happened because if
+the migration didn't work,
+
+107
+00:07:17.208 --> 00:07:21.520
+then we wouldn't want to
+deploy the service, right?
+
+108
+00:07:21.520 --> 00:07:23.440
+So we make sure the migrations run first.
+
+109
+00:07:23.440 --> 00:07:26.580
+It connects out to Supabase,
+actually runs the migrations, and
+
+110
+00:07:26.580 --> 00:07:29.160
+then the last thing it does
+is it promotes that image.
+
+111
+00:07:29.160 --> 00:07:32.362
+And so you can see here,
+here's our tag, here's latest, and
+
+112
+00:07:32.362 --> 00:07:33.640
+then I should be able to.
+
+113
+00:07:33.640 --> 00:07:40.879
+Now if I go in here,
+
+114
+00:07:40.879 --> 00:07:45.859
+App runner.
+
+115
+00:07:45.859 --> 00:07:46.640
+All right, cool.
+
+116
+00:07:48.450 --> 00:07:49.410
+Then there you go.
+
+117
+00:07:49.410 --> 00:07:52.210
+You can see I actually already
+have my deployment in process.
+
+118
+00:07:52.210 --> 00:07:55.090
+If I scroll down here,
+you can see that it's.
+
+119
+00:07:55.090 --> 00:07:59.833
+Well, I don't know why it's rollbacking,
+but it's starting my deployment and
+
+120
+00:07:59.833 --> 00:08:02.115
+taking care of my deployment process.
+
+121
+00:08:02.115 --> 00:08:05.126
+So now, this will go through,
+it'll make sure that it's successful, and
+
+122
+00:08:05.126 --> 00:08:06.596
+then there you go, I just deployed.
+
+123
+00:08:06.596 --> 00:08:14.290
+So now, we have a complete end to end
+CI CD that's running in our pipeline.
+

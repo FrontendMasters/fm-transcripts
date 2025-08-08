@@ -1,0 +1,84 @@
+[00:00:00]
+>> Erik Reinert: Okay, cool. So we've got that the next file we want to create is security group tf. So again, we took care of the calculation of our subnets and we made or we reused a base module for creating like our networking environment. However, it doesn't necessarily mean that it's going to solve all of our problems for it.
+
+[00:00:23]
+It's just us, it's just going to take care of that lower level networking part at some point. The module can only go so far before you have to start solving your own things. Like, okay, I want these security rules of my preference, not any other person's security rules or whatever.
+
+[00:00:39]
+In this case you can actually use a module with other normal resources or other modules as well. That's exactly what I'm doing here. I'm using more modules to now create security groups on top of that network. So I've created the network and I know that it's all set up basically out of the box, but now I want to make it so I can give SSH access to my bastion box or I want to make it so that the private network will be able to only communicate with the database network.
+
+[00:01:11]
+Like other kind of more custom preferences that I have. So in this file, what we're doing is we're doing just that. This is our first security group where we are telling it, hey, I want to name it var name Bastion. What's nice about this is remember it's all separated into environments, which means we will get out of the box a bastion node in every environment.
+
+[00:01:39]
+Again, it's just another reason why this environment organization is really powerful. Because it means that, okay, if I was looking at EC2 and I wanted to look at the dev bastion, I would just see dev bastion. Okay, cool. Probably prod-bastion, okay, cool. Now I know which ones I'm trying to connect to.
+
+[00:01:56]
+We tell it what ingress with CIDR blocks that we want to connect to. And so I'm doing a little bit of terraform logic here to basically say, hey, for each bastion ingress value inside of the array, give it the CIDR block and then allow it over SSH tcp.
+
+[00:02:18]
+And because I'm using a module to do this, this module itself is also going to create multiple internal resources that has just made it easier to customize because when you don't use a module like this, you actually need two resources, you need the security group and then you have to add rules to that security group with another resource.
+
+[00:02:39]
+So it's just more cumbersome, more work. I can do everything in one place with this module directly. So we do the same thing for our database security group where we basically say, hey, if anything is on the database network, allow it to access itself. So by default, only databases on the database network can communicate with other databases right now.
+
+[00:03:00]
+And then we do the same thing for elasticache, we create a private subnet as well. Basically what you're noticing here is that I'm creating security groups for each network. Like I'm just laying out the plane or each subnet space, right? So I'm saying like, okay, here's the security group for database, here's the security group for the private subnets.
+
+[00:03:22]
+And I'm just like slowly separating all of my traffic and filtering based off of just those. So I'm not trying to focus on say, okay, only this RDS instance can just talk to this RDS instance. I don't think that's a really great way of making networking in Amazon.
+
+[00:03:39]
+A big reason for that is because it's one to one, right? And so if you make a change, if something happens, if you make a firewall change, you could accidentally break something without meaning to. So what I like to do is I like to have higher level security groups that everything shares.
+
+[00:03:56]
+So today when we create stuff, everything's going to get provisioned with the private security group. That's it, I'm done. I don't have to think about filtering or anything else. I know that everything on the private security group will be accessible via the private security group. It's internal, so I don't have to worry about it being online either, right?
+
+[00:04:14]
+And it just makes networking a lot simpler. So if you want to go deep down into like the rabbit hole of like, I'm going to create a security group just for this database and then just for this database and then I'm going to make it so that I add a rule here and add a rule there.
+
+[00:04:27]
+Well, that's like four operations that you're going to have to figure out how to do, right? Whereas instead I can just create a security group and then wherever else I provision things, whenever I go to use a security group, I can just look this one up and say we're just going to use the private one.
+
+[00:04:42]
+Then again, because ingress with self, meaning that, hey, anything in the private security group can access across every protocol and across everything effectively. There's no blocking whatsoever. If you're in the private security group, you get access to everything. And this is like, again, this is like where I like to start, but we do want to poke some holes and so what we're doing is again, instead of poking a hole from one instance to another, what we're saying is that, hey, we want to allow the private subnet to access the database subnet.
+
+[00:05:19]
+And so we say, okay, 5432, poke a hole from one security group to another. This is another thing that's really nice about constructing policies and security policies in Amazon. Have you noticed that I haven't defined a CIDR or IP address at all here? That's because I'm just using abstracted security rules and I'm gluing those together.
+
+[00:05:41]
+I'm just saying, hey, if you're in this security group, you're good to go. It doesn't matter what your IP address is, it doesn't matter what space you're in, but if you don't have that security group, you will not be able to access this cluster, yeah. So when we're talking about security groups, is that just a higher level concept on the built in firewall in AWS?
+
+[00:06:04]
+It's literally iptables basically, yeah, it's literal firewalling. Yeah, so when we create our subnets and we like put something on the network in those subnets, by default they can all communicate with each other. Like that's just how Amazon works out of the box is that every everything in the 10.0.0.0 16 address space.
+
+[00:06:29]
+If you're in that address space, you can communicate with anything inside of it. So we want some isolation there, right? But we've already separated our stuff by subnet. So I don't really want to go lower than that cuz it's five things versus 90 things. So in this case what we're doing is we're saying, okay, we're, well, I have a database subnet, I have elasticache subnet, intra or private and public.
+
+[00:06:53]
+Let's create security groups for those subnets and then let's make it so that every resource gets attached to those security groups and then we'll do all of our filtering through the security groups, right? And so then it just naturally gets inherited. You don't have to worry about IP addresses or anything like that.
+
+[00:07:12]
+But you're still traffic shaping in a way where you know, okay, private can only talk to database or database only lets private talk to it, right, and stuff like that. Yeah, it's a little higher level, but it is, yeah, it's like, it's like, it's like you said it's like network filtering on top of the network that we created, yeah.
+
+[00:07:34]
+And so, yeah, in this case, what we're doing is we're allowing, you'll see the referenced security group id, that's the private network that we want to allow in. And then the security group ID is the address or the net or, sorry, the security group that we want to update.
+
+[00:07:50]
+So in this case, we're saying, hey, database security group, when it's the private security group, allow it just over 5,432. So we did make a hole, but we made just like a tiny little hole for that entire address space, which means we didn't do all, all here. I could have just said, all right, well, allow everything from the database network to the.
+
+[00:08:10]
+But it's like, well, I know it's only going to be used over 5,432 and I know it's only going to be used for databases. So let's be somewhat granular there. But let's not make it too complex to where it's going to be a pain in the. Don't make it so that it's a random port.
+
+[00:08:25]
+You know what I mean? Don't let your databases provision on anything but 5432. You'll be good. That's the standardization we're putting in place with our traffic. So if somebody created a database and they put it on 5433 and they come to you and they're like, why is my database isn't working?
+
+[00:08:43]
+It's your fault. It's like, well, what address did you put it on? 5457. Why just use the default one? That's the one that works out of the box. We do the exact same thing with Redis as well. So we say, okay, elasticache, we want you to be able to connect to the.
+
+[00:09:01]
+I'm sorry, we want the private subnet to be able to connect to Elasticache for Redis. Redis default is 6379. That should never change. So as long as you use the default port and you're connecting from the private subnets to the elasticache subnets, you have allowed traffic. You can do that.
+
+[00:09:22]
+So again, we're putting some security in place, but we're not getting massively granular with it to the point where we're trying to do it with every resource and stuff like that.
+
