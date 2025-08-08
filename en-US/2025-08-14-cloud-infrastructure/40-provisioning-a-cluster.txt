@@ -1,0 +1,90 @@
+[00:00:00]
+>> Erik Reinert: Okay, so now here's the fun part. Here is the main TF file. So I'm going to go through this one rather quickly because there's a lot in here. But I want to show you the complexity of something that does not have a module wrapped around it and how annoying it can actually be sometimes to do complex things with Amazon.
+
+[00:00:20]
+So this ECS cluster I purposely did not use a module with is. It is a little verbose. But the main reason why I didn't use a module with it is because I don't really like any modules that exist out there right now. For ecs, my goal is to really just create a cluster, create instances and get containers on top of it.
+
+[00:00:42]
+But there's a lot of other things you can do with ECS too, and it was just too much cruft for me. So the first thing we create is an ECS cluster itself. Now when we say an ECS cluster, there's really nothing that gets created. It's kind of just like an entry in a database, because an ECS cluster is really all of the instances that are attached to the cluster.
+
+[00:01:05]
+So the work here really isn't creating the cluster, it's making sure that all of the instances have the roles and policies that they need and can connect to the cluster and authenticate the right way and all that stuff. So when we talk about the ECS cluster, the. That's actually the only resource you need.
+
+[00:01:22]
+That's it. You just do that, you give it a name and then you're done. There's a small. There's a couple of settings that you can do here. Like, you'll see I have container insights enabled. This will be helpful when we wanna look really deeply into a service's metrics and things like that.
+
+[00:01:38]
+But outside of that, it's just that one definition. Then we start jumping into the auto-scaling group, which is really the beef of a ECS cluster. And so the first thing we have is a role, right? So we create a role for the cluster and then what we do is.
+
+[00:01:57]
+You remember how in the UI yesterday, I told you guys to like, look through that list of all the predefined roles and stuff? Well, you can also use them in your automation. So that's what's really, really nice. Again, going back to that whole, like, Amazon knows that there's a lot of, like, things you have to get around to get something created, so they've created helpful things to kind of like just say, well, if you just use this, this will solve this.
+
+[00:02:21]
+Problem and you'll be pretty much good to go for most general cases. And so that's what I'm doing here. And if you read the role name, it says Amazon EC2 container service for EC2 role. Basically all that means is, is that the container service works on top of EC2 instances, which is exactly what we want.
+
+[00:02:40]
+We're going to be creating EC2 instances. We then create an instance profile. So with users we use roles, with instances, we use instance profiles. That's how we make sure that an instance can have permission for anything inside of that instance to connect to S3, connect to SQS, publish, queue messages, whatever.
+
+[00:03:07]
+We give it an instance profile and then we attach that role to the instance profile. And that does mean that whatever that role can do, that user or that automation will be able to do on top of that EC2 instance. And so it is really nice to use these, because if you want to make it so a certain set of instances can just work with this stuff, but then they can't communicate with this other stuff or whatever, then you can make sure that there's really good role isolation and stuff there.
+
+[00:03:38]
+Another thing to note is again, we're dealing with instances, so you will see the private key thing pop up again. But you'll notice again that we're generating this for a separate purpose. We generated a bastion SSH key. This time I'm generating a cluster SSH key, which would mean that I would want to take this SSH key, put it on the bastion node, so that people connecting to the bastion node could then jump into EC2 instances inside of the cluster to debug if needed.
+
+[00:04:09]
+And that's exactly what you would do if you wanted to debug an instance. You would first go to the bastion node SSH in, and then that node would have the key pair to the instances. You would get the IP address of the cluster node. You want to work with SSH with that key or with the cluster key, and then bam, you're inside of that instance now.
+
+[00:04:30]
+So again, bastion's not like the most seamless experience, but it will get you to where you need to be and it will allow you to debug things if you need. So that's also why we store the cluster key inside of ssm. So if developers need access to it, or we need access to it, we can get it.
+
+[00:04:46]
+And another thing to note, remember in this data file here, I looked up a Amazon specific entry. Well, I can do the exact same thing with my own things. So if down the road I wanted to precede instances with this key or whatever, then I could just easily look this key up in my parameter store and then use it inside of other automation in other places.
+
+[00:05:09]
+So parameter store is really nice. That's all I'm trying to say, and that's why I like it. So then we create a launch template. A launch template works with an auto scaling group. The easiest way to describe what a launch template does is it is the parameters that defines the instances that the autoscaler will be provisioning.
+
+[00:05:29]
+It can only take one instance settings at a time, meaning you can't have multiple launch templates. For an auto scaling group, you can really only have one, but you can have multiple versions of a launch template. So if you make a change to it, or if you want to revert back to a previous set of changes, you can easily do that.
+
+[00:05:49]
+But if you look at it, it's pretty much the same thing as an instance configuration. You tell it the AMI or the image ID that you want. In this case, you'll notice that we're using the parameter from our data lookup. We also have an instance type. There's a little bit of extra work going on here, which is you'll notice that there's a for each.
+
+[00:06:10]
+Can anyone guess what I'm doing here? So you're basically looping through all of the providers and then out of that you generate like a new dictionary template or object and then you basically repurpose that into the code. Exactly, yeah. So I have a variable that I'm passing to this cluster called capacity providers.
+
+[00:06:32]
+Remember we said var dot means that that had to have been a variable from outside coming into the module. And so what that means is that our ECS clusters are configurable on the instance level. And to go a little bit further, what that means is that if I wanted to make it so that I could change the disk size for all of the cluster instances, I could do that.
+
+[00:06:59]
+If I wanted to change the key name for specific instances, I could do that. It just means that I'm iterating and creating multiple launch templates with that foreach value. So when we say for each on a resource, it just simply means that we are looping over it and then we're creating a bunch of resources based off of it.
+
+[00:07:23]
+So yeah, we would have, by the time we ran this, we would have multiple launch templates depending on the capacity, provider or configurations that we give it. But we'll look at that more in a minute once you see it. I think once you see it from the other side, it'll make sense.
+
+[00:07:38]
+So another thing down here at the bottom, we're still in the instance section. But you had asked earlier, how does the user data get into the instance? There it is right there. So we use user data, we import it as a file, and then these are variables here that are expected in the template and then they get replaced.
+
+[00:07:57]
+So again, cluster name is the cluster name right here. Right, Cool. Another thing to kind of note is, like I said or like Miguel said, this is supposed to be a loop, right? And so in this case it says each value market type spot. And what that's saying is, is that, hey, if this, if this specific configuration has a market type of spot, then add that market type to the instance profile.
+
+[00:08:33]
+Meaning basically turn on spot instances if we want to. That's why these capacity groups are. Is that what they're called? Capacity? No, sorry, capacity providers. That's why these capacity providers are configurable. Because sometimes you might want spot instances in your ECS cluster, sometimes you may want on demand, sometimes you may want instances of this size versus that size.
+
+[00:09:01]
+And that's one of the things we have set here. I can set the instance type or the size, depending on what capacity provider, and then I can assign containers to those capacity providers. So I can say like, all these containers run on the spot capacity provider, all of these containers run on the on demand capacity provider and things like that.
+
+[00:09:24]
+So you get a little bit of that kubernetes feel of workflow, scheduling, placement and whatnot. But that's about as far as it goes. To be fair, it's not as complex as kubernetes. What's the reason you have the base64 encode your template files? That's just a cloud init thing.
+
+[00:09:44]
+They want it as a base 64 so that it can be easily transferred over a request or something like that. So you base64 encode it just so that you can then decode it and get the full exact script and then encode it and just have a large file base 64 encoder.
+
+[00:10:07]
+So really quickly, for example, if I was to go in here and be like /bin/bash, set EU pipe, fail and then be like echo "hello world" W-R-L-D like this, then that'd be hard to make as a parameter in this, it's expecting just a string value. It'd be especially hard to transmit that over a network request of some sort.
+
+[00:10:41]
+And so what we do is we just encode it into this value and then that value is what actually gets translated here so that the network request can be successful. And then what happens is when Cloud Init gets this value, it then goes and says, all right, well, I want to decode.
+
+[00:11:05]
+And when we do decode, we get our script. So it's just a way of encoding the data so that it's easy to transmit the data and then re encode it or decode it later so that you can actually run the scripts and stuff. Yeah, because scripts are normally like multiline strings and all that kind of stuff.
+

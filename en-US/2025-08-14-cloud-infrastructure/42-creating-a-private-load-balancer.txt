@@ -1,0 +1,51 @@
+[00:00:00]
+>> Erik Reinert: I had actually just finished going through the main.tf file, which was really everything related to the cluster itself. So now we're going to create a couple of other files that are related to things that kind of help the cluster, right? Right now, if I just provisioned this based off of what we have in here, I would really just create a bunch of compute nodes, right?
+
+[00:00:21]
+I don't have any ingress or load balancer or anything like that. So that's what we wanna add next. Normally when you have a cluster of any part, that's a big step away from again, something like App Runner, which would be more focused on just here's your container, run it, right?
+
+[00:00:40]
+When you have a cluster, you're kind of legoing together this car almost that you're gonna drive all of your deployments out with. And so in this scenario, we need headlights, we need a frame, we need doors. So that's what a lot of these other components are like. The load balancer is what lets customers or requests into the cluster, right?
+
+[00:01:03]
+You just don't get that out of the box, that's an option you can add later. So now what we're gonna do is we're gonna create a file called load_balancer.tf and this is where all of our load balancer settings are gonna go, or all of our load balancer configurations are gonna go.
+
+[00:01:23]
+As I said before, man, when you take the ownership of managing infrastructure at scale, I really do think that it's coming completely home now to you guys in the sense of what scale looks like versus what start-up looks like, right? We are concerning ourselves with so many more problems and things to manage in the scale world that it's a lot to take on.
+
+[00:01:51]
+And for example, with the load balancer even we don't just create a load balancer, we create a security group to make it so that things can appropriately access the load balancer and firewall rules and all this stuff because we are managing it ourselves. And so we create a load balancer security group.
+
+[00:02:10]
+We tell it that, hey, pretty much anything can access 80 on this load balancer. There is a small tweak I could make here if we really wanted to, which is I could, you'll see that this is the first time I'm adding a rule that's focused entirely on a IP address or CIDR range.
+
+[00:02:31]
+Like up until now we've just saying security_group_access, security_group_access. But this time I'm saying 0.0.0 and 0.0.0, right? I could if I wanted to pass in the private security group and say like, okay, the private security group can access the load balancer, for example, but maybe the database security group can't.
+
+[00:02:53]
+In this scenario, technically, even though I'm in an internal network, meaning that this load balancer will be private, it will not have a public address. It will mean that anything inside of my private network will be able to access it on 80. So if I didn't want that, I would tell this security_group_ingres_rule to accept from the security_group, not from the IP address, right?
+
+[00:03:23]
+But because it's all private and I don't really care about adding and passing down another variable. Like we said, we have to add variable entries, pass it down, all that stuff. I was just like, eh, we'll just do 80. It's not that big of a deal. So then after we have our security_group_ingress and egress rule, we then have our load balancer itself and so we can add a couple of things like your idle_timeout.
+
+[00:03:46]
+So basically I'm saying a request can stay open up to 300 seconds before we cancel it, right? I'm telling it that it's an internal load balancer, right? Internal, true. That means again that it will not be provisioned in public subnets and it will also not be given a public IP address either.
+
+[00:04:07]
+So this is a truly internal private load balancer, load_balancer_type, application, preserve_host_header, false. And then subnets are the subnets that we provide it via the var in the module itself, security_groups, right? In this case, what we're doing is we're telling the load_balancer, hey, you have the access to your main load balancer security_group, but if we wanna add any other ones to it, we can.
+
+[00:04:34]
+So if we wanna add here, if we want to add the security group, the private security group, we could, and then they would be able to connect to each other through the private security groups, kind of making this one not even needed anymore to be honest. Or this ingress rule not even needed anymore to be honest, but anyways.
+
+[00:04:55]
+So again with load balancers, even on Amazon, it's not just like, here's a load balancer, you're done. You have to create listeners and target groups and all of this other stuff to finally get that request to that load balancer. After we create the load balancer, we create what's called a listener, meaning that the load balancer, by itself doesn't actually listen at all.
+
+[00:05:18]
+We need to tell it what port we want it to listen on, what protocol we want it to use, what's the default response. And so that's what we're doing here. After we create the load balancer we're actually telling Amazon, hey, now create a listener on that load balancer.
+
+[00:05:34]
+The listener port is port 80. It's an HTTP protocol and if the listener doesn't know how to respond to the request then by default give it a 404 not found, right? And so this will make it so that by default if somebody tries accessing this load balancer they now can access it over port 80 and if the request doesn't get fulfilled properly it will go to a 404 not found response and that's the load balancer.
+
+[00:06:03]
+Again, I hope you understand why modules can be so powerful [LAUGH]. There's just so much less you have to write when you're not using the resources directly.
+

@@ -1,0 +1,114 @@
+[00:00:00]
+>> Erik Reinert: So one of the things that's nice about the Docker CLI is there's a lot of really cool things you can do with it. For example, one of the things you can do is you can give it, like, formatting against log output that you want. So if I wanted to see how big my images were in general, I could run that command and you'll see here that.
+
+[00:00:16]
+Wow, the latest image is 400 megabytes, right? That's kind of a big image. Can anyone tell me why this is such a big image?
+>> Speaker 2: It's got a lot of packages you don't use.
+>> Erik Reinert: Yep, if we look at the Docker file, though, what is one thing in particular that might make this big by default?
+
+[00:00:38]
+
+>> Speaker 2: The public image.
+>> Erik Reinert: The public image, exactly, yeah. We're using a language image, right? So, we're using a Golang image. Means that Golang is gonna be installed in it. All the tools for Golang, blah, blah, blah, blah, blah. That's just going to make it heavier by default.
+
+[00:00:51]
+Right? So what would be better to use? Can anyone guess what might be a better image to use? And I will note, it's already in the tag. It's just not the appropriate one.
+>> Speaker 2: Base Alpine.
+>> Erik Reinert: Base Alpine, yeah, exactly. So what's kind of neat is Golang and all these other images out there use base images, right?
+
+[00:01:12]
+So, you'll notice that my Golang image has 12 or 1.24.2 dash Alpine, right? That means that underneath the Golang image, there's an Alpine image. So realistically, I should be able to build everything in the Golang image and then just move those outputs to a much smaller image. And that's exactly what we want to do.
+
+[00:01:35]
+That's the next step of what we want to do. So the first thing we're going to do is we're going to update the Docker file by including what we're missing, which is our Goose installer. Like I said, we want to run Goose in the container, right? So we need to actually add it to the container.
+
+[00:01:53]
+And then the next thing we're going to do is we're going to update this copy down here to be a little bit more granular, right? We don't need to necessarily copy, like static, which has a whole bunch of files in it, and main Js and templates. And, you know, we don't have to copy all of that at once.
+
+[00:02:10]
+What we really want to do is just say, okay, copy all of our go code. Just the go code. That's all we really care about for this, right? So, we're saying main go and then we're gonna do dot. This will make it so that when I copy, I'm only going to copy the main go and then I'm going to build off of that.
+
+[00:02:26]
+Now what's cool about this is now if I make template changes or anything like that, I won't have to like, if I make a JavaScript change, I shouldn't have to rebuild my go code, right? And so, this makes it even faster because now I don't have to worry about those changes impacting my build times and performance and stuff like that.
+
+[00:02:47]
+Now the next thing we're gonna do is we're gonna add what you are saying, which is the rest of the big changes. So underneath this line here under the main, we're gonna do two things. We're actually gonna delete the existing lines underneath it and then I'm going to add a whole new what is called stage.
+
+[00:03:08]
+So in a Docker file, you can do the normal kind of traditional thing, which is you can create one stage which does everything. And that's what this is right here. But if you wanna make it so it builds multiple images or tries multiple things, you can do them in what are called stages.
+
+[00:03:29]
+The first thing we'll do is at the very top we're going to say as build. Because now we're making this a stage. This isn't the final output, it's just a stage that we're going to use. Then if we go down to the bottom, you'll see that I can add the rest of my second stage.
+
+[00:03:47]
+You'll see that I have another from here underneath my first stage, meaning that I'm creating a whole new stage. Then I'm doing a couple of things, like setting an environment variable to set the version of Dockerize that I want to download. Don't worry, I'll show you what Dockerize is in a second.
+
+[00:04:05]
+I install it, right? I then go into my. I go into app again. You'll notice up here we go into app, but down here we go into app as well. Can anyone guess why? Why do I have to go into app twice?
+>> Speaker 2: It's a separate image.
+>> Erik Reinert: Yeah, it's a brand new image.
+
+[00:04:21]
+It's an entirely new stage. So we have to. Anything that you did in the previous stage that you want to make sure is replicated, you may have to re. Add to get back to that state, right? So we go into app and then what we do is we say, hey, I don't want you to copy from my source code like down here.
+
+[00:04:38]
+I want you to actually copy from the build stage. What's cool about this is now when we built our Go application up here, I can now use it down here. And you'll notice that it is in app or app main. That's because I'm downloading the the path from a previous build stage or the output from a binary in the previous build stage into this build stage.
+
+[00:05:05]
+
+>> Speaker 2: You still need the Golang image first because you need the GO compiler to build those.
+>> Erik Reinert: Exactly. Yeah, exactly. Yeah, we need to compile it with Go, but we don't want to actually keep that for our production image. We just want to make sure that we basically we want to build it in a little environment and then take those two binaries and go, okay, let's put you into this nice clean and simple environment.
+
+[00:05:28]
+And so that's what we're doing. We copy the main build and then we also copy Goose. Now the reason why we copy Goose is because Goose has to be compiled and installed with Go as well. There's no other real easy way to use Goose, unfortunately. So we use the Go image to not just compile our application, but we actually use it to compile and install Goose, which we then copy that binary into our final image.
+
+[00:05:54]
+Right, then we add our migrations, our static directory, our templates, we add our expose 8080 and then we set up our command as before. Right, so now what I'm gonna do really fast is just double check, make sure we are all good. I think we are cool. Okay, I'm going to save this.
+
+[00:06:17]
+Then what I'm going to do really quickly is I'm going to go back to the make file because I need to make a small change and it's right in the Build Image section. Basically right now, if I was to build this. Let's just do it. Make Build Image.
+
+[00:06:38]
+You'll notice that these are building simultaneously. Stage 2 and Stage 1 are basically building right on top of each other. So you'll see that right now the build stage is currently installing GOs. Then we're waiting because we've already completed the stages that we could in the second stage.
+
+[00:06:56]
+This is how BuildX and Docker works with stages. It will do as much as it can in one of the stages before it hits a dependency of another stage, and then it'll just wait. The downside to this though, is because I didn't tell it which stage I want it to specifically build for this image, it's going to take both stages, compile it into one image, and it's going to be even bigger.
+
+[00:07:22]
+That's because I didn't tell it separate the images. I just told it I want two build stages and I want you to glue those together. Now if I do image, let's see, where's format? Yeah, now you'll see it's actually, no, this one's 90 megabits. But actually, it did it exactly the way that I wanted it to, nevermind.
+
+[00:07:50]
+I guess maybe that's, that's kind of what we wanted, but it still didn't give us the exact image that we wanted because again, we built them together, basically. So what I want to do is I want to go to the make file and I want to build these separately just to be sure.
+
+[00:08:07]
+So what I'm going to do is I'm going to delete this and then I'm just going to say, hey, do both. So first use BuildX to target the build stage and focus on just doing that first, and then take the cache from that stage and rerun the actual build itself.
+
+[00:08:34]
+What happens is this gets built into an entirely separate image so that no cache or anything like that is stor stored in the image that we want to actually deploy. Then the second build command will make sure that we still use the cache from that previously built image, so we don't have to repeat anything.
+
+[00:08:54]
+But then it'll make sure that it only builds and uses the latest stage. Now if I do make build image, you see that they run in sequence and then if I do format, yeah, you'll still see that it was separated, but you'll also see. Yeah, there you go.
+
+[00:09:12]
+You'll see that my build image is actually 1.59 gigs, right? So that's how much cache I could have potentially pushed up if I hadn't made sure that those two images were explicitly separate, right? Another thing that's really nice about this though is that if you want to have build cache, then you just build it as a separate image, push it up to the cloud, and now others can use that build cache if you want to as well, right?
+
+[00:09:38]
+So having these as two separate images in general just works nice because it means that there's flexibility with like where this exists and where this exists, but they are completely separate. And so, yeah, now we've created two images. We've created our build image, which is again 1.59 gigs, and then our final image, which is 90 megabytes, which is obviously a lot smaller than the 381 megabytes that we had before.
+
+[00:10:03]
+
+>> Speaker 2: What all is getting cached?
+>> Erik Reinert: When we say cache in the Docker sense, we mean every layer that took to build that image. If I go ahead and I open up the Docker file really quickly, if I don't make a single change to the image and then I push that image up and then I tell another dev, hey, if you want to use my build cache, you just pull down my image, right?
+
+[00:10:30]
+Then they'll get the entire build cache. They'll get everything. But if they say, for example, they made a change in migrations or static or templates, then they would get all of the stuff before that. Does that make sense? So, if they made a change in here and they didn't, they changed like.
+
+[00:10:54]
+Well, basically they didn't change anything, but anything outside of the Go files, then this would never get built and they would have this 1.5 gigabyte image always available and ready to them if they needed. This also makes pipelines go faster. So if you build a build image and then you want to make it so that you don't have to rebuild that image, but you want to use it in CI because it has all of your tools in it.
+
+[00:11:21]
+Think about it like that. If you're running CI and you need to install all the tools we just did, you'd probably create steps to install this, install this, install that, install that. Where I work, we don't do that. Where I work, we use the build image to run all of the stuff.
+
+[00:11:37]
+So we build the image, we push it up to the registry, and then when we run a CI job, we just pull that image down and we run everything through the image so that our tooling is portable. So that's another valuable way of pushing it up, caching it, pulling it down, running all the things, you need to push it back up, sort of force and so on.
+

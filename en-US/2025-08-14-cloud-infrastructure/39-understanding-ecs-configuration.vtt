@@ -1,0 +1,688 @@
+WEBVTT
+
+1
+00:00:00.240 --> 00:00:04.130
+&gt;&gt; Erik Reinert: Okay, cool,
+so we created a database and
+
+2
+00:00:04.130 --> 00:00:07.360
+we created a network that it uses.
+
+3
+00:00:09.440 --> 00:00:13.789
+If we go back really quickly to the chart,
+
+4
+00:00:13.789 --> 00:00:18.512
+right, so
+far we have created the blue box and
+
+5
+00:00:18.512 --> 00:00:22.880
+then technically you can't see the vpc.
+
+6
+00:00:22.880 --> 00:00:27.840
+But think of the VPC as like the big blue
+square around it, around everything.
+
+7
+00:00:27.840 --> 00:00:32.640
+Everything basically sits in this
+VPC besides, really, cloudfront.
+
+8
+00:00:32.640 --> 00:00:39.120
+But now what we want to do is we want to
+provision ECS, the load balancer as well.
+
+9
+00:00:39.120 --> 00:00:43.712
+And what we're gonna do is we're
+gonna make a small opinionation and
+
+10
+00:00:43.712 --> 00:00:47.196
+we're gonna say whenever
+we created a ECS cluster,
+
+11
+00:00:47.196 --> 00:00:51.629
+we wanna attach a load balancer to it so
+that we always know that if we
+
+12
+00:00:51.629 --> 00:00:56.260
+can wanna take traffic into this cluster,
+we can, right?
+
+13
+00:00:56.260 --> 00:01:00.155
+So we're going to make sure that we don't
+just create an ECS cluster inside of our
+
+14
+00:01:00.155 --> 00:01:04.052
+cluster module, but we're also going to
+make sure we might add some other things
+
+15
+00:01:04.052 --> 00:01:07.700
+to make it so that that cluster is like
+fully retrofitted with what we need.
+
+16
+00:01:09.940 --> 00:01:15.540
+Okay, so I'm going to go into my module.
+
+17
+00:01:15.540 --> 00:01:19.940
+So I'm going to create a directory called
+cluster inside of my main root module.
+
+18
+00:01:19.940 --> 00:01:22.010
+So again, module cluster.
+
+19
+00:01:22.010 --> 00:01:24.890
+And then I'm going to create a file or
+a couple of files.
+
+20
+00:01:24.890 --> 00:01:30.090
+My first file is going
+to be user data tpl.
+
+21
+00:01:31.850 --> 00:01:36.890
+And I will explain this really quickly
+to you guys because there are pros and
+
+22
+00:01:36.890 --> 00:01:38.650
+cons to this.
+
+23
+00:01:38.650 --> 00:01:42.490
+So we are creating an ECS cluster, right?
+
+24
+00:01:42.490 --> 00:01:43.650
+And out of the box.
+
+25
+00:01:43.650 --> 00:01:47.290
+We're not creating an ECS cluster with
+like Fargate or anything like that.
+
+26
+00:01:47.290 --> 00:01:49.754
+We're doing it a little old school,
+
+27
+00:01:49.754 --> 00:01:53.820
+we're creating an ECS cluster
+with Amazon EC2 instances.
+
+28
+00:01:55.180 --> 00:01:58.780
+We still are taking
+the whole VMS approach, but
+
+29
+00:01:58.780 --> 00:02:03.020
+we want to create VMS that run
+containers on top of them.
+
+30
+00:02:04.860 --> 00:02:09.587
+Amazon, because we're using EC2,
+requires us to do
+
+31
+00:02:09.587 --> 00:02:14.540
+a bit of setup to get the cluster
+to work the way it should.
+
+32
+00:02:15.670 --> 00:02:18.695
+And one of the main kind of annoyances,
+but
+
+33
+00:02:18.695 --> 00:02:24.327
+like something that you need to do when
+you're creating EC2 clusters with EC or
+
+34
+00:02:24.327 --> 00:02:29.119
+I'm sorry, ECS clusters with
+EC2 instances, they're naming,
+
+35
+00:02:29.119 --> 00:02:33.405
+you have to provision each instance
+with a small piece of data
+
+36
+00:02:33.405 --> 00:02:39.110
+inside of it that tells it the cluster
+that it's running inside of.
+
+37
+00:02:39.110 --> 00:02:42.790
+If you've ever, how many of you guys
+have heard of cloud init before?
+
+38
+00:02:42.790 --> 00:02:44.230
+Like user data cloud in it.
+
+39
+00:02:44.230 --> 00:02:51.334
+Okay, so when we first got the cloud,
+when the cloud first hit the scene,
+
+40
+00:02:51.334 --> 00:02:56.491
+one of the questions a lot
+of people asked was, well,
+
+41
+00:02:56.491 --> 00:03:01.208
+how do I automate installing packages,
+right?
+
+42
+00:03:01.208 --> 00:03:05.407
+Like, I'm tired of creating instances and
+having to SSH into them and
+
+43
+00:03:05.407 --> 00:03:08.230
+set them up and all that stuff.
+
+44
+00:03:08.230 --> 00:03:10.524
+And so after a little while,
+
+45
+00:03:10.524 --> 00:03:16.300
+we found a solution that eventually
+got created called Cloud init.
+
+46
+00:03:16.300 --> 00:03:20.437
+And the idea behind Cloud Init is
+you can give it, like, scripts and
+
+47
+00:03:20.437 --> 00:03:25.020
+other things like that that will run
+the moment the instance comes online.
+
+48
+00:03:26.220 --> 00:03:30.108
+This makes it so that I can kind of
+precede an instance with a script,
+
+49
+00:03:30.108 --> 00:03:34.203
+and then that script will start,
+it'll run, and then it'll make it so
+
+50
+00:03:34.203 --> 00:03:39.370
+that the instance maybe configures
+itself or installs binaries or whatever.
+
+51
+00:03:39.370 --> 00:03:44.170
+That's what this user data TPL file is.
+
+52
+00:03:44.170 --> 00:03:52.170
+Every single instance inside of my cluster
+will create a file in the path, etc.
+
+53
+00:03:52.170 --> 00:03:54.490
+ECS config.
+
+54
+00:03:54.490 --> 00:03:57.690
+Its contents will simply be this.
+
+55
+00:03:57.690 --> 00:03:59.650
+Now, what does this look like to you guys?
+
+56
+00:03:59.650 --> 00:04:02.998
+Just out of curiosity,
+we've seen this before.
+
+57
+00:04:02.998 --> 00:04:03.813
+An ENV.
+
+58
+00:04:03.813 --> 00:04:06.030
+Yeah, it's an ENV file, yeah.
+
+59
+00:04:06.030 --> 00:04:11.791
+So basically, to get the instances
+to join the appropriate cluster,
+
+60
+00:04:11.791 --> 00:04:15.302
+we have to seed in an ENV
+file onto the host so
+
+61
+00:04:15.302 --> 00:04:20.867
+that when the program starts or
+the service starts on the instance,
+
+62
+00:04:20.867 --> 00:04:25.310
+it'll go, the ECS cluster is cluster name.
+
+63
+00:04:25.310 --> 00:04:28.213
+Let me join, right, so
+
+64
+00:04:28.213 --> 00:04:33.304
+this is [LAUGH] compare
+this to App Runner.
+
+65
+00:04:33.304 --> 00:04:39.453
+Right, again, what I have learned
+especially if you're speaking to somebody
+
+66
+00:04:39.453 --> 00:04:45.600
+in business, it will, [LAUGH] as the Tim
+Robinson joke that we've been making,
+
+67
+00:04:45.600 --> 00:04:50.120
+it'll make them wanna hit you,
+cuz it's just annoying.
+
+68
+00:04:50.120 --> 00:04:51.480
+It doesn't make sense.
+
+69
+00:04:51.480 --> 00:04:53.320
+Just make my cluster run.
+
+70
+00:04:53.320 --> 00:04:54.020
+Right.
+
+71
+00:04:54.020 --> 00:04:56.340
+Where does it get its cluster name?
+
+72
+00:04:56.340 --> 00:05:00.260
+Right, exactly, yeah, so
+this is actually a template file.
+
+73
+00:05:00.260 --> 00:05:05.700
+And so Terraform will load this file and
+inject the name from the terraform code.
+
+74
+00:05:05.700 --> 00:05:10.288
+But yeah, that's basically what we're
+doing is we're creating a template file
+
+75
+00:05:10.288 --> 00:05:14.012
+that Terraform will load,
+change any variables inside of it, and
+
+76
+00:05:14.012 --> 00:05:17.140
+then add that to the instance
+when it's created.
+
+77
+00:05:17.140 --> 00:05:21.241
+So I know I went on a little bit of a rant
+there, but again, the main reason why I do
+
+78
+00:05:21.241 --> 00:05:25.223
+that or why I did that was I just wanted
+you to understand what this file does and
+
+79
+00:05:25.223 --> 00:05:26.400
+its importance.
+
+80
+00:05:26.400 --> 00:05:27.360
+It is very important.
+
+81
+00:05:27.360 --> 00:05:30.640
+If this doesn't exist,
+none of the nodes will join the cluster.
+
+82
+00:05:30.640 --> 00:05:34.456
+But it is also kind of annoying
+because you have to create this,
+
+83
+00:05:34.456 --> 00:05:38.080
+Amazon doesn't really create this for you.
+
+84
+00:05:38.080 --> 00:05:44.080
+Which again, goes to show you
+that not even Amazon's perfect.
+
+85
+00:05:44.080 --> 00:05:47.061
+Sometimes it takes a little bit of work
+just to even get what you're trying
+
+86
+00:05:47.061 --> 00:05:47.600
+to achieve.
+
+87
+00:05:48.650 --> 00:05:51.410
+Okay, so the next thing I want
+to do is create a data file.
+
+88
+00:05:51.410 --> 00:05:56.345
+So I'm going to create a data TF file and
+then inside of that
+
+89
+00:05:56.345 --> 00:06:01.090
+I'm going to actually create
+a couple of data entries.
+
+90
+00:06:01.090 --> 00:06:05.290
+So the first data entry I'm going
+to create is a policy document.
+
+91
+00:06:05.290 --> 00:06:08.272
+So if you remember,
+when we created App Runner,
+
+92
+00:06:08.272 --> 00:06:11.450
+we created this assume role policy, right?
+
+93
+00:06:11.450 --> 00:06:15.910
+Well, that is that work
+being moved to Terraform.
+
+94
+00:06:15.910 --> 00:06:18.630
+So now I don't have to do
+that in the UI anymore.
+
+95
+00:06:18.630 --> 00:06:22.790
+Now I can just tell the Terraform
+to create an assume role policy.
+
+96
+00:06:22.790 --> 00:06:26.293
+And the idea is that I'm creating one for
+
+97
+00:06:26.293 --> 00:06:31.973
+the role to work with EC2 or
+work with EC2 instances basically.
+
+98
+00:06:31.973 --> 00:06:35.328
+The next thing we're doing,
+this is actually kinda neat, and
+
+99
+00:06:35.328 --> 00:06:37.750
+another cool feature of Amazon.
+
+100
+00:06:37.750 --> 00:06:42.258
+Amazon does provide a lot of really nice,
+helpful developer features and tools,
+
+101
+00:06:42.258 --> 00:06:45.420
+especially for automation and
+stuff like that.
+
+102
+00:06:45.420 --> 00:06:50.460
+And one of the things that they did was
+is they made a public parameter store.
+
+103
+00:06:50.460 --> 00:06:53.635
+And in this public parameter
+store are values and
+
+104
+00:06:53.635 --> 00:06:58.380
+references that you may need for
+provisioning things in Amazon.
+
+105
+00:06:58.380 --> 00:07:02.700
+And the main takeaway here is
+that Amazon is still a growing.
+
+106
+00:07:02.700 --> 00:07:04.875
+I don't want to call it a startup,
+
+107
+00:07:04.875 --> 00:07:08.780
+but it still has that feel pretty
+heavily because you have to.
+
+108
+00:07:08.780 --> 00:07:12.034
+It's kinda like a hobby set,
+you have to glue pieces together and
+
+109
+00:07:12.034 --> 00:07:13.950
+then you finally get your toy.
+
+110
+00:07:13.950 --> 00:07:14.590
+Right.
+
+111
+00:07:14.590 --> 00:07:17.550
+But it's not like a seamless experience.
+
+112
+00:07:17.550 --> 00:07:20.547
+You know, a lot of these
+services that are higher level,
+
+113
+00:07:20.547 --> 00:07:23.430
+like you saw how easy it was
+to create an EC2 instance.
+
+114
+00:07:23.430 --> 00:07:26.030
+It's just like one resource done, Right.
+
+115
+00:07:26.030 --> 00:07:30.724
+But when you talk about something like
+ecs, which takes multiple instances into
+
+116
+00:07:30.724 --> 00:07:33.967
+a cluster and then like makes
+Docker on them and then like
+
+117
+00:07:33.967 --> 00:07:38.470
+runs a container on top of that, there's
+a lot of gluing that goes into this.
+
+118
+00:07:38.470 --> 00:07:44.238
+And so Amazon has made it so that you can
+kind of find those pieces really easily
+
+119
+00:07:44.238 --> 00:07:50.890
+and glue together what you're trying
+to glue as reproducibly as possible.
+
+120
+00:07:50.890 --> 00:07:55.685
+And so what I'm doing here
+is I'm actually looking up
+
+121
+00:07:55.685 --> 00:07:59.737
+a parameter in Amazon's
+parameter store for
+
+122
+00:07:59.737 --> 00:08:04.490
+the AMI or the instance image for
+all of the images.
+
+123
+00:08:04.490 --> 00:08:07.137
+Because that is a hard thing to find and
+
+124
+00:08:07.137 --> 00:08:11.290
+it is very annoying to find if
+you don't know what an AMI is.
+
+125
+00:08:11.290 --> 00:08:15.622
+That is the actual instance image
+image that will be provisioned with
+
+126
+00:08:15.622 --> 00:08:16.600
+the instance.
+
+127
+00:08:16.600 --> 00:08:22.219
+So like Ubuntu, Debian, whatever,
+right, this is a Amazon Linux
+
+128
+00:08:22.219 --> 00:08:27.454
+image that's specifically
+designed to work with ECS, yeah.
+
+129
+00:08:27.454 --> 00:08:29.482
+Can you make your own amis?
+
+130
+00:08:29.482 --> 00:08:30.951
+Yep.
+Like load.
+
+131
+00:08:30.951 --> 00:08:36.328
+Absolutely, yeah, and for
+my personal stuff, I do that, actually.
+
+132
+00:08:36.328 --> 00:08:38.828
+I didn't think I'd actually
+end up shouting this out, but
+
+133
+00:08:38.828 --> 00:08:40.459
+it's appropriate time too.
+
+134
+00:08:40.459 --> 00:08:44.786
+I actually use Nix, which is
+a package Manager, to build AMIs and
+
+135
+00:08:44.786 --> 00:08:48.720
+install all of the binaries and
+everything I need on it, and
+
+136
+00:08:48.720 --> 00:08:53.779
+then it bakes that image and then creates
+it, and then I can use it in Amazon.
+
+137
+00:08:53.779 --> 00:08:56.616
+So, yeah, if you've ever heard of Packer,
+
+138
+00:08:56.616 --> 00:09:00.724
+Packer is another tool that makes it so
+that you can create AMIs and
+
+139
+00:09:00.724 --> 00:09:05.299
+then push them to Amazon and then use
+them with your instances and stuff.
+
+140
+00:09:05.299 --> 00:09:06.859
+So, yeah, you totally can.
+
+141
+00:09:06.859 --> 00:09:11.545
+This is just like, nice because it'll have
+a lot of the tools and everything already
+
+142
+00:09:11.545 --> 00:09:16.040
+needed to run ECS in it, so I don't have
+to worry about setting up this instance.
+
+143
+00:09:16.040 --> 00:09:19.880
+I just drop that little file into
+place and then everything else works.
+
+144
+00:09:19.880 --> 00:09:22.800
+So again, if you're just curious about it.
+
+145
+00:09:22.800 --> 00:09:24.853
+And I included the link here too, so
+
+146
+00:09:24.853 --> 00:09:28.760
+you can see all the other parameters
+that they provide and whatnot.
+

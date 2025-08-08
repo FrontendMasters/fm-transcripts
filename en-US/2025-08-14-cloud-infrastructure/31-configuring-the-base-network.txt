@@ -1,0 +1,103 @@
+[00:00:00]
+>> Erik Reinert: So now, what I'm going to do is I'm going to make another module called Network. Now we are going into the networking part of the Terraform. What we're going to do is we're going to go into the network directory and we're going to create Our1stMain TF in that directory.
+
+[00:00:17]
+I'm going to copy it from my notes and I'm going to paste in two resources and then I'm going to explain to you what they do. Okay, so I have a main TF file and I have two modules actually inside of this file. Now what is one thing that might stand out really quickly about this is that I am using purely modules here.
+
+[00:00:41]
+So I'm not using any kind of bare resources directly. I'm immediately relying on somebody or some other community that has built networks on Amazon and I'm using their module to create my own network. That's the takeaway I want you to have here, which is I didn't want to have to create a production ready, highly scalable network and I don't want you to either.
+
+[00:01:06]
+You can let others handle those complex and complicated problems for you. That's the beauty of open source. What I ended up doing was using one of those modules from one of the modules I showed you earlier. So if you remember when I went to the registry, I showed you the Terraform VPC module.
+
+[00:01:26]
+Well, we're actually using that module. This is a live example of us using effectively again a community driven project to be able to create all of our networking in Amazon. However, what is equally annoying about creating Networking, figuring out CIDRs and network address spaces. How many of you can actually calculate CIDRs and know all of that stuff in your head?
+
+[00:01:56]
+I can't either. I knew it at one point when I was much younger and I had a much better memory. But the reality of it is also when you create these networks, you have to figure out how much address space per subnet you want, how many IP addresses you want to be able to provision in those spaces.
+
+[00:02:15]
+It's just a pain, it really is just a pain, there are nice modules out there that don't even do resources. They can do things like help calculate things and all that kind of stuff. Hashicorp provides a module which will actually create networks for you based off of a base CIDR block and then the subnets and their availability zones and stuff like that.
+
+[00:02:42]
+Basically what I'm doing, and I'll go into a little bit more detail in it, is I'm using first a open source module to Calculate all of the CIDR addresses for my subnets. This is also per availability zone. So this is actually a really complex and annoying operation. But I'm letting Terraform do this for me so that if I give it a different CIDR, maybe I do 192 in one cluster, but then I do like 10.0 in another cluster.
+
+[00:03:15]
+I don't have to worry about it in the sense that I still know I'll get the same 65,000 IP addresses address spaces. But it will know how to either take a 192 versus a 10 and then calculate that for me. So it makes it a lot easier to set up these networks because all I really have to think about is do I want it 10.0, do I want it 192, do I want it 172?
+
+[00:03:39]
+And then tell it the Availability zones that I effectively want it to be in and then it will calculate the rest for me. Once we have all of our subnets and all of our CIDR blocks, the next thing we do is we create the actual VPC itself. Now this module going back to the whole 200 and something resources that we'll be creating today, it's not as bad as it seems because this one module will probably create 50 resources.
+
+[00:04:11]
+That's the beauty of these modules is they really do take care of the grunt work of setting up all the low level stuff that's really annoying that you don't want to have to do. And it does take care of a lot of again, that tedious creation of multiple resources and whatnot.
+
+[00:04:29]
+All I have to do is tell it which Availability zones I want it to be in. What's the CIDR address? Everybody knows what a CIDR is, by the way, what I mean by the term cidr? No? Okay, all right. A CIDR address, just super, super fast is the actual network address space that you want to own.
+
+[00:04:54]
+So for example, if I did 10.0.0.0 16, then that means that I will have is it 65,000 IP addresses or whatever. But really what it means is that anything in 10.0.00 I think, or is it yeah, zero to, I don't remember the exact 10 dot like 100 I think is what it is.
+
+[00:05:25]
+0.0.0 is all available to me. It could go beyond that. But the only thing I want you to take away here is that this translates into telling how much addresses you can have from here to here. That's what a CIDR does. What I can do is once I have this address, I can calculate and say, okay, I want the database network to be 10.50.0.0 and then I want the containers to be on 7.5.0.0.
+
+[00:05:59]
+But it allows me to say there's a base network that I want everything to be in this huge space. And then I can take that and say, okay, now I want this much space to go here, I want this much space to go there. And that's what that module does.
+
+[00:06:14]
+The module basically does all of that calculating for me. There is one thing that I don't have here yet, which I'll go ahead and add now just so that you can see it. So we're going to do, we're going to create a locals TF file and then inside of this file we're going to add what are called octets.
+
+[00:06:39]
+Again, if you don't know networking, you don't understand CIDR classifications or any of that stuff, then seeing these five numbers may really confuse you onto how you calculate things. But effectively what these numbers mean is how many addresses I want in each address space. So if I go again, I'm not trying to go super deep into networking, but to give an understanding here, basically these two files combined do the following.
+
+[00:07:11]
+The first is we tell or we define how many addresses we want in each address space using the octet for that value. So I think six, I think six is basically like 1,024 addresses. And then, I think 5 is like 256 or something like that, and I think three is like 10, right?
+
+[00:07:36]
+So as you go lower you get less addresses, whereas if you go higher, you get more addresses, right? And so what I'm doing is I'm purposely saying, well or no, it's the opposite, I think. Yeah, it's the opposite, yeah, sorry. So database will have like 100 addresses because it's a higher value.
+
+[00:07:55]
+But then when we go lower, private. Private will have like 20,000 addresses available to it. And the reason why we do that is because I'm not going to provision 20,000 databases, right? So why allocate so much space to that subnet? I don't need to, right? I'd rather have more space in other places.
+
+[00:08:13]
+And so I can say, okay, database, you get 100 IPs. Elasticache, you get 100 IPs. Intra, you get maybe more. Because that's like a private, complete, isolated space. But then private, we know we're going to use private all the time. Private is pretty much where everything's going to exist.
+
+[00:08:31]
+So let's give that again, 10,000, 20,000 IP addresses or whatever somebody smarter than me can remember or look at these numbers and immediately know what they actually calculate to. But that's the easiest, that's the only takeaway I want you to take away from this, is that these are octets and the lower the value, the more IP addresses and the higher the value, the less IP addresses.
+
+[00:08:53]
+We take those octets and we use this module here to off of the CIDR that we provide it calculate per Availability zone for each subnet, those spaces. So down here, when you look at the VPC module, you'll see that I have database subnets, I have elasticache subnets, I have interest subnets, I have private subnets, I have public subnets, I have all of these subnets.
+
+[00:09:21]
+That's why we're using this module up here. Because if you look closely, you'll see that for AZ in Availability zones, module subnets, network CIDR blocks. Get the CIDR block for the Availability zone, that subnet and that Availability zone. Yeah,
+>> Speaker 2: it's dividing your address space into subnets. Is that just a custom best practice?
+
+[00:09:51]
+
+>> Erik Reinert: So I think why they do this here is because, for starters, they expect you to use Amazon for multiple things, so they're trying to support multiple solutions and I think simultaneously they're just trying to create good standards and practices. Most applications have a database space, most applications have a private network versus a public network.
+
+[00:10:16]
+You don't have to use all of these, you don't have to use any of these if you don't really want to. But I normally just use these because I end up pretty much using all of them anyways.
+>> Speaker 3: I suppose it's a way to manage permissions between things too.
+
+[00:10:29]
+
+>> Erik Reinert: Absolutely, yeah, yeah. So you can say like, I want a security group in the database network that does only allow from the private network and then blocks everything from the public network or the public subnets. Yeah, absolutely, yeah. So it's just, there's no rhyme or reason really to it, except for it's just looking at how others have provisioned stuff and going they're probably going to have databases.
+
+[00:10:52]
+If they're running rds, they probably want their own database subnets for databases, like you said, to then isolate and protect where they need. Yeah, absolutely. But yeah, again, you don't have to feel like you have to do this. The reason why I'm doing it is because we are in the plan for the future phase, so why not make sure we've got more than enough address space for everything that we're trying to do, right?
+
+[00:11:18]
+And one of the ones that I actually really like out of this is the intra one. Can anyone guess what the intra one does? I actually said it earlier, but can anyone guess what the intra network does? If you remember, we don't really use it as much anymore, but we used to have Internets and then intranets, right?
+
+[00:11:40]
+An intranet is a network that's completely isolated from everything, there's no network connectivity, it's completely managed by you. And so, you get an intranet or an intra set of subnets with this module as well, that is, what's the word I'm looking for? When it's completely offline, there's no connectivity to the Internet or anything outside of it at all.
+
+[00:12:09]
+Black boxed, is that what it's called? I forget the word somebody in chat will be. Yeah, it's isolated, basically. Thank you, Whisper. Yeah, so for example, if you needed subnets that did not connect to the Internet at all to run specific workloads, then you would put them in the intra network and then you could guarantee that nothing can connect to those workloads and they're completely separated.
+
+[00:12:32]
+So I do like that they add that just in case of the like. For example, you could actually put your databases in the intra network if you really wanted to, right? If you're like, I don't want my databases connected at all to the Internet or some other services, you just put them in the intra network and now they are 100% isolated.
+
+[00:12:50]
+So yeah, you get kind of nice standards and stuff like that out of these modules that you would have to think of yourself basically.
+

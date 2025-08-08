@@ -1,0 +1,75 @@
+[00:00:00]
+>> Erik Reinert: Okay, cool, so we created a database and we created a network that it uses. If we go back really quickly to the chart, right, so far we have created the blue box and then technically you can't see the vpc. But think of the VPC as like the big blue square around it, around everything.
+
+[00:00:27]
+Everything basically sits in this VPC besides, really, cloudfront. But now what we want to do is we want to provision ECS, the load balancer as well. And what we're gonna do is we're gonna make a small opinionation and we're gonna say whenever we created a ECS cluster, we wanna attach a load balancer to it so that we always know that if we can wanna take traffic into this cluster, we can, right?
+
+[00:00:56]
+So we're going to make sure that we don't just create an ECS cluster inside of our cluster module, but we're also going to make sure we might add some other things to make it so that that cluster is like fully retrofitted with what we need. Okay, so I'm going to go into my module.
+
+[00:01:15]
+So I'm going to create a directory called cluster inside of my main root module. So again, module cluster. And then I'm going to create a file or a couple of files. My first file is going to be user data tpl. And I will explain this really quickly to you guys because there are pros and cons to this.
+
+[00:01:38]
+So we are creating an ECS cluster, right? And out of the box. We're not creating an ECS cluster with like Fargate or anything like that. We're doing it a little old school, we're creating an ECS cluster with Amazon EC2 instances. We still are taking the whole VMS approach, but we want to create VMS that run containers on top of them.
+
+[00:02:04]
+Amazon, because we're using EC2, requires us to do a bit of setup to get the cluster to work the way it should. And one of the main kind of annoyances, but like something that you need to do when you're creating EC2 clusters with EC or I'm sorry, ECS clusters with EC2 instances, they're naming, you have to provision each instance with a small piece of data inside of it that tells it the cluster that it's running inside of.
+
+[00:02:39]
+If you've ever, how many of you guys have heard of cloud init before? Like user data cloud in it. Okay, so when we first got the cloud, when the cloud first hit the scene, one of the questions a lot of people asked was, well, how do I automate installing packages, right?
+
+[00:03:01]
+Like, I'm tired of creating instances and having to SSH into them and set them up and all that stuff. And so after a little while, we found a solution that eventually got created called Cloud init. And the idea behind Cloud Init is you can give it, like, scripts and other things like that that will run the moment the instance comes online.
+
+[00:03:26]
+This makes it so that I can kind of precede an instance with a script, and then that script will start, it'll run, and then it'll make it so that the instance maybe configures itself or installs binaries or whatever. That's what this user data TPL file is. Every single instance inside of my cluster will create a file in the path, etc.
+
+[00:03:52]
+ECS config. Its contents will simply be this. Now, what does this look like to you guys? Just out of curiosity, we've seen this before. An ENV. Yeah, it's an ENV file, yeah. So basically, to get the instances to join the appropriate cluster, we have to seed in an ENV file onto the host so that when the program starts or the service starts on the instance, it'll go, the ECS cluster is cluster name.
+
+[00:04:25]
+Let me join, right, so this is [LAUGH] compare this to App Runner. Right, again, what I have learned especially if you're speaking to somebody in business, it will, [LAUGH] as the Tim Robinson joke that we've been making, it'll make them wanna hit you, cuz it's just annoying. It doesn't make sense.
+
+[00:04:51]
+Just make my cluster run. Right. Where does it get its cluster name? Right, exactly, yeah, so this is actually a template file. And so Terraform will load this file and inject the name from the terraform code. But yeah, that's basically what we're doing is we're creating a template file that Terraform will load, change any variables inside of it, and then add that to the instance when it's created.
+
+[00:05:17]
+So I know I went on a little bit of a rant there, but again, the main reason why I do that or why I did that was I just wanted you to understand what this file does and its importance. It is very important. If this doesn't exist, none of the nodes will join the cluster.
+
+[00:05:30]
+But it is also kind of annoying because you have to create this, Amazon doesn't really create this for you. Which again, goes to show you that not even Amazon's perfect. Sometimes it takes a little bit of work just to even get what you're trying to achieve. Okay, so the next thing I want to do is create a data file.
+
+[00:05:51]
+So I'm going to create a data TF file and then inside of that I'm going to actually create a couple of data entries. So the first data entry I'm going to create is a policy document. So if you remember, when we created App Runner, we created this assume role policy, right?
+
+[00:06:11]
+Well, that is that work being moved to Terraform. So now I don't have to do that in the UI anymore. Now I can just tell the Terraform to create an assume role policy. And the idea is that I'm creating one for the role to work with EC2 or work with EC2 instances basically.
+
+[00:06:31]
+The next thing we're doing, this is actually kinda neat, and another cool feature of Amazon. Amazon does provide a lot of really nice, helpful developer features and tools, especially for automation and stuff like that. And one of the things that they did was is they made a public parameter store.
+
+[00:06:50]
+And in this public parameter store are values and references that you may need for provisioning things in Amazon. And the main takeaway here is that Amazon is still a growing. I don't want to call it a startup, but it still has that feel pretty heavily because you have to.
+
+[00:07:08]
+It's kinda like a hobby set, you have to glue pieces together and then you finally get your toy. Right. But it's not like a seamless experience. You know, a lot of these services that are higher level, like you saw how easy it was to create an EC2 instance.
+
+[00:07:23]
+It's just like one resource done, Right. But when you talk about something like ecs, which takes multiple instances into a cluster and then like makes Docker on them and then like runs a container on top of that, there's a lot of gluing that goes into this. And so Amazon has made it so that you can kind of find those pieces really easily and glue together what you're trying to glue as reproducibly as possible.
+
+[00:07:50]
+And so what I'm doing here is I'm actually looking up a parameter in Amazon's parameter store for the AMI or the instance image for all of the images. Because that is a hard thing to find and it is very annoying to find if you don't know what an AMI is.
+
+[00:08:11]
+That is the actual instance image image that will be provisioned with the instance. So like Ubuntu, Debian, whatever, right, this is a Amazon Linux image that's specifically designed to work with ECS, yeah. Can you make your own amis? Yep. Like load. Absolutely, yeah, and for my personal stuff, I do that, actually.
+
+[00:08:36]
+I didn't think I'd actually end up shouting this out, but it's appropriate time too. I actually use Nix, which is a package Manager, to build AMIs and install all of the binaries and everything I need on it, and then it bakes that image and then creates it, and then I can use it in Amazon.
+
+[00:08:53]
+So, yeah, if you've ever heard of Packer, Packer is another tool that makes it so that you can create AMIs and then push them to Amazon and then use them with your instances and stuff. So, yeah, you totally can. This is just like, nice because it'll have a lot of the tools and everything already needed to run ECS in it, so I don't have to worry about setting up this instance.
+
+[00:09:16]
+I just drop that little file into place and then everything else works. So again, if you're just curious about it. And I included the link here too, so you can see all the other parameters that they provide and whatnot.
+

@@ -1,0 +1,706 @@
+WEBVTT
+
+1
+00:00:00.320 --> 00:00:03.522
+&gt;&gt; Erik Reinert: So after we deploy our
+production environment or before it,
+
+2
+00:00:03.522 --> 00:00:05.680
+it doesn't really matter.
+
+3
+00:00:05.680 --> 00:00:11.007
+I'm going to show you the one piece of
+bash foo that you get out of this project,
+
+4
+00:00:11.007 --> 00:00:12.960
+which is our deploy SH file.
+
+5
+00:00:14.560 --> 00:00:17.242
+Now, this is the easiest
+way I thought to do it,
+
+6
+00:00:17.242 --> 00:00:20.880
+mostly because this is also just
+how I would have done it at work.
+
+7
+00:00:20.880 --> 00:00:23.520
+I would have just created a script and
+ran a script.
+
+8
+00:00:23.520 --> 00:00:26.240
+But I'm going to go over the script for
+you really quickly.
+
+9
+00:00:27.360 --> 00:00:32.234
+So early when we first started the phase,
+we talked about how we added
+
+10
+00:00:32.234 --> 00:00:37.840
+to the gitignore to terraform ignores and
+then it overrides .txt.
+
+11
+00:00:37.840 --> 00:00:43.016
+Well, the reason why we do that is
+because we can pass container overrides
+
+12
+00:00:43.016 --> 00:00:48.275
+to the running container in ECS when we
+want to change what command it runs or
+
+13
+00:00:48.275 --> 00:00:50.000
+whatever.
+
+14
+00:00:50.000 --> 00:00:55.381
+And so what we do is we quickly
+generate an overrides.txt file
+
+15
+00:00:55.381 --> 00:01:01.740
+which contains JSON of what we want
+this one time container to run.
+
+16
+00:01:01.740 --> 00:01:05.900
+So we target the service container,
+which is the one we created.
+
+17
+00:01:05.900 --> 00:01:11.500
+But then we say that we want to override
+the command with goose dir migrations up.
+
+18
+00:01:11.500 --> 00:01:15.160
+Now, the migrations directory is
+in that container image and so
+
+19
+00:01:15.160 --> 00:01:18.300
+is the goose container or
+is the goose binary.
+
+20
+00:01:18.300 --> 00:01:24.542
+So technically, if I then say,
+okay, in the CLI AWS ECS run task,
+
+21
+00:01:24.542 --> 00:01:29.370
+I tell it the cluster I want
+it to run that task on.
+
+22
+00:01:29.370 --> 00:01:34.410
+I tell it the Launch type is EC2 because
+I want it to run on my instances.
+
+23
+00:01:34.410 --> 00:01:39.450
+Then I provide it that overrides and then
+the task definition, which is my service.
+
+24
+00:01:39.450 --> 00:01:47.290
+Then I will get a task arn of that
+container that gets fired in that moment.
+
+25
+00:01:47.290 --> 00:01:48.730
+Now, what's cool about that?
+
+26
+00:01:48.730 --> 00:01:53.293
+And again, this is where if you understand
+and you know how to work around Amazon,
+
+27
+00:01:53.293 --> 00:01:57.396
+there's a lot of really cool tools that
+they've made to make it easier for
+
+28
+00:01:57.396 --> 00:01:59.320
+you to do what you want to do.
+
+29
+00:01:59.320 --> 00:02:01.227
+If you've ever used kubernetes before,
+
+30
+00:02:01.227 --> 00:02:04.600
+you've probably used the kubernetes
+apply and wait feature.
+
+31
+00:02:04.600 --> 00:02:09.572
+Well, what I can do is I can
+run a task and get its value or
+
+32
+00:02:09.572 --> 00:02:12.720
+its arn using a little bit of bash.
+
+33
+00:02:12.720 --> 00:02:17.480
+So pipe it into JQ and
+then get the task arn from the response.
+
+34
+00:02:17.480 --> 00:02:19.160
+And then I set that as a variable.
+
+35
+00:02:20.690 --> 00:02:25.345
+I set that as a variable because then I
+say, hey, echo, give me that task arn so
+
+36
+00:02:25.345 --> 00:02:27.250
+I know where it is in CI.
+
+37
+00:02:27.250 --> 00:02:32.254
+So if I run it in CI and then it fails,
+I can go find that task arn inside of ecs,
+
+38
+00:02:32.254 --> 00:02:35.330
+check to see logs what may have happened.
+
+39
+00:02:35.330 --> 00:02:39.730
+But then I can also tell the CI
+to wait for it to finish.
+
+40
+00:02:41.650 --> 00:02:44.650
+If you have long running migrations,
+this would not work.
+
+41
+00:02:44.650 --> 00:02:47.527
+It would just immediately run it and
+then do the deployment and
+
+42
+00:02:47.527 --> 00:02:50.360
+there's still a database
+migration in the way.
+
+43
+00:02:50.360 --> 00:02:54.953
+So we want the database migration to
+do its thing and then we want it to
+
+44
+00:02:54.953 --> 00:02:59.400
+basically finish and then give us
+a successful exit code as well.
+
+45
+00:03:01.240 --> 00:03:05.971
+Again, this is just like command line
+that we're running that we're gluing
+
+46
+00:03:05.971 --> 00:03:11.080
+together with some bash to get actually
+a really nice reliable deployment system.
+
+47
+00:03:12.600 --> 00:03:15.931
+In this case,
+after we wait for it to stop,
+
+48
+00:03:15.931 --> 00:03:22.350
+we make a quick describe on the task and
+we say, hey, what was the exit code?
+
+49
+00:03:22.350 --> 00:03:23.630
+How did it exit?
+
+50
+00:03:23.630 --> 00:03:28.510
+And if it exited with a zero,
+then we're successful and if it doesn't,
+
+51
+00:03:28.510 --> 00:03:31.390
+then we throw an error in the pipeline.
+
+52
+00:03:31.390 --> 00:03:36.415
+So we literally have weighted
+migrations in the pipelines without
+
+53
+00:03:36.415 --> 00:03:41.390
+having to connect to Amazon's
+infrastructure directly.
+
+54
+00:03:41.390 --> 00:03:44.972
+But it still does the exact same thing
+of starting a container somewhere,
+
+55
+00:03:44.972 --> 00:03:49.017
+waiting for those migrations to finish,
+make sure that they were successful, and
+
+56
+00:03:49.017 --> 00:03:51.910
+then either continue or fail the pipeline.
+
+57
+00:03:51.910 --> 00:03:53.190
+I always really like this.
+
+58
+00:03:53.190 --> 00:03:57.716
+This is one thing I will say that is
+really nice about ECS is like you can do
+
+59
+00:03:57.716 --> 00:04:03.430
+cool stuff like this and again, it's not
+a ton of work to get to achieve this.
+
+60
+00:04:03.430 --> 00:04:06.378
+So after we know that
+the migrations are completed,
+
+61
+00:04:06.378 --> 00:04:09.795
+we get the task completed
+successfully with exit code zero,
+
+62
+00:04:09.795 --> 00:04:14.040
+then we go ahead and remove that
+file because we no longer need it.
+
+63
+00:04:14.040 --> 00:04:16.200
+We just update the ECS service.
+
+64
+00:04:16.200 --> 00:04:18.942
+You remember how I showed you
+the forces new deployment button in
+
+65
+00:04:18.942 --> 00:04:20.520
+the top right hand corner?
+
+66
+00:04:20.520 --> 00:04:22.600
+This is the CLI way of doing it.
+
+67
+00:04:22.600 --> 00:04:23.240
+That's it.
+
+68
+00:04:24.680 --> 00:04:28.571
+Once we actually have updated the task or
+ran the migration,
+
+69
+00:04:28.571 --> 00:04:33.640
+we just want to make sure the task
+restarts with the new container image.
+
+70
+00:04:33.640 --> 00:04:35.960
+That's exactly what the Force
+new deployment does.
+
+71
+00:04:35.960 --> 00:04:40.532
+Force new deployment goes out, checks for
+the latest version of staging, and
+
+72
+00:04:40.532 --> 00:04:42.860
+then pulls that in and then runs it.
+
+73
+00:04:42.860 --> 00:04:46.660
+Then what we do is we wait for
+that service to become stable again.
+
+74
+00:04:46.660 --> 00:04:49.997
+Not only are we waiting for
+databases to complete in CI,
+
+75
+00:04:49.997 --> 00:04:53.739
+we're actually waiting for
+services to become green.
+
+76
+00:04:53.739 --> 00:04:56.517
+Now, ECS does use blue
+green out of the box,
+
+77
+00:04:56.517 --> 00:05:00.651
+which means that if you deploy
+a service to ECS and it's failing,
+
+78
+00:05:00.651 --> 00:05:05.890
+it will not roll over to that new service,
+it'll stay at the old service.
+
+79
+00:05:05.890 --> 00:05:07.490
+You don't have to worry about that.
+
+80
+00:05:07.490 --> 00:05:10.530
+What's really happening here is this.
+
+81
+00:05:10.530 --> 00:05:11.730
+I don't know, what is it?
+
+82
+00:05:11.730 --> 00:05:13.090
+53 lines of code?
+
+83
+00:05:13.090 --> 00:05:18.858
+Yeah, this 53 lines of code is literally
+the glue between all of your changes and
+
+84
+00:05:18.858 --> 00:05:23.539
+your Deployments to ECS,
+where it goes out, runs the migration,
+
+85
+00:05:23.539 --> 00:05:26.799
+waits make sure it was successful,
+goes out,
+
+86
+00:05:26.799 --> 00:05:31.250
+runs an update service,
+waits make sure it was successful.
+
+87
+00:05:31.250 --> 00:05:34.410
+Then what's everything is successful and
+everything is green.
+
+88
+00:05:34.410 --> 00:05:38.330
+Then the pipeline or
+the job finishes and we're good to go.
+
+89
+00:05:39.530 --> 00:05:42.250
+That's basically the script again.
+
+90
+00:05:42.250 --> 00:05:46.010
+If you're curious about it,
+be sure to check out the repo.
+
+91
+00:05:46.010 --> 00:05:49.370
+But that's a quick explanation
+of everything that it does.
+
+92
+00:05:49.370 --> 00:05:55.210
+Now that I've got that, I need to
+actually add this to my deployment job.
+
+93
+00:05:55.210 --> 00:05:59.450
+This is the last little bits
+of what we need to do left.
+
+94
+00:05:59.450 --> 00:06:01.130
+I'm going to go to build and deploy.
+
+95
+00:06:01.130 --> 00:06:03.910
+I'm going to open up that build and
+deploy YAML file.
+
+96
+00:06:03.910 --> 00:06:07.590
+We're going to go back to our other
+workflow, not the terraform one.
+
+97
+00:06:07.590 --> 00:06:11.230
+I'm just going to paste in the updated
+version of the deploy job.
+
+98
+00:06:11.230 --> 00:06:13.590
+I'm just going to delete the old version.
+
+99
+00:06:13.590 --> 00:06:14.630
+There we go.
+
+100
+00:06:14.630 --> 00:06:19.464
+Now, I thought about putting
+this inside of the make file,
+
+101
+00:06:19.464 --> 00:06:24.310
+but it's really running make
+commands down at the bottom.
+
+102
+00:06:25.670 --> 00:06:29.830
+If we look at our make file,
+I should have.
+
+103
+00:06:29.830 --> 00:06:31.190
+I need to add one more thing.
+
+104
+00:06:34.890 --> 00:06:37.210
+We need to add a new
+entry to our makefile.
+
+105
+00:06:37.210 --> 00:06:41.686
+So really quickly,
+I'm going to go to stage three,
+
+106
+00:06:41.686 --> 00:06:47.610
+I'm going to go to our makefile and
+then you'll see that there we go.
+
+107
+00:06:47.610 --> 00:06:49.770
+We have deploy right there.
+
+108
+00:06:49.770 --> 00:06:54.310
+Now, the reason why I'm wrapping,
+you might look at that and be like,
+
+109
+00:06:54.310 --> 00:06:58.780
+why are you just wrapping deploy in
+the make deploy with deployment?
+
+110
+00:06:58.780 --> 00:07:02.584
+Well, because we already tell
+the makes file what account ID it is,
+
+111
+00:07:02.584 --> 00:07:05.540
+which default region it is,
+which ECR domain it is.
+
+112
+00:07:05.540 --> 00:07:08.300
+So might as well make it a little easier.
+
+113
+00:07:08.300 --> 00:07:11.705
+We are going to have to pass some
+environment variables because this is
+
+114
+00:07:11.705 --> 00:07:15.820
+about targeting specific services and
+deploying specific services.
+
+115
+00:07:15.820 --> 00:07:19.740
+So we don't really have a static value
+that we would just keep here forever.
+
+116
+00:07:19.740 --> 00:07:23.061
+This is more meant to be
+dynamic all the time, but
+
+117
+00:07:23.061 --> 00:07:27.435
+if I pass it through the make file,
+at least I can get the benefits
+
+118
+00:07:27.435 --> 00:07:31.000
+of the existing account ID and
+all that other stuff.
+
+119
+00:07:32.040 --> 00:07:38.102
+While that's running,
+we'll go to up paste in deploy and
+
+120
+00:07:38.102 --> 00:07:41.080
+we'll save that like that.
+
+121
+00:07:43.080 --> 00:07:47.420
+Now that we have that, you'll see that
+we're doing a little bit of work,
+
+122
+00:07:47.420 --> 00:07:48.680
+but not really a ton.
+
+123
+00:07:48.680 --> 00:07:51.360
+The first thing we're doing is
+we're doing the build image poll.
+
+124
+00:07:51.360 --> 00:07:53.680
+That's what we were doing last time.
+
+125
+00:07:53.680 --> 00:07:57.200
+We're pulling in the SHA that
+we want to promote and deploy.
+
+126
+00:07:57.200 --> 00:08:01.635
+Then what we do is we make a little run
+step that just does a little bit of
+
+127
+00:08:01.635 --> 00:08:02.640
+scripting.
+
+128
+00:08:02.640 --> 00:08:07.280
+The first thing it does is it says, okay,
+by default my build tag is staging.
+
+129
+00:08:08.560 --> 00:08:11.285
+Again, I've showed you guys
+how IF statements works and
+
+130
+00:08:11.285 --> 00:08:14.125
+how you can reference variables
+inside of GitHub Actions,
+
+131
+00:08:14.125 --> 00:08:16.880
+know which branch you're on,
+or things like that.
+
+132
+00:08:16.880 --> 00:08:18.520
+So we're going to use
+that to our advantage.
+
+133
+00:08:18.520 --> 00:08:22.064
+What we're going to do is we're
+going to say, but if the GitHub ref,
+
+134
+00:08:22.064 --> 00:08:26.230
+this is an environment variable that
+comes from the GitHub pipelines.
+
+135
+00:08:26.230 --> 00:08:31.910
+If this ref is set to refs head prod,
+then set the build tag to prod.
+
+136
+00:08:31.910 --> 00:08:33.750
+That's it again.
+
+137
+00:08:33.750 --> 00:08:37.418
+You can see now how all these
+scripts are gluing together and
+
+138
+00:08:37.418 --> 00:08:40.070
+being able to become a fully built system.
+
+139
+00:08:41.430 --> 00:08:45.437
+Once we do that, we set the ECS cluster
+name, which again is also the build tag
+
+140
+00:08:45.437 --> 00:08:49.950
+because it's the environment, so
+we could just use that value again.
+
+141
+00:08:49.950 --> 00:08:54.733
+Then when we say ECSS service name, the
+service name is obviously the cluster name
+
+142
+00:08:54.733 --> 00:08:59.390
+plus service, which is now we've
+constructed our ECSS service name.
+
+143
+00:08:59.390 --> 00:09:02.190
+I always recommend giving yourself
+a little bit of debug output.
+
+144
+00:09:02.190 --> 00:09:06.192
+So if you are curious in
+what the pipeline ran or
+
+145
+00:09:06.192 --> 00:09:11.230
+anything like that,
+you can easily just do that.
+
+146
+00:09:11.230 --> 00:09:15.000
+But then at the bottom here
+it runs build image promote.
+
+147
+00:09:15.000 --> 00:09:18.915
+Right, because we want to promote
+that image to that environment and
+
+148
+00:09:18.915 --> 00:09:22.840
+then we do the deployment to deploy
+that image that we just promoted.
+

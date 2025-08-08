@@ -1,0 +1,143 @@
+[00:00:00]
+>> Erik Reinert: So now what we want to do is we actually want to start laying the foundation work for our infrastructure and our automation, and we're going to focus this entirely. And what I think you should do when you're building Terraform is entirely on the problems that you're trying to solve, right?
+
+[00:00:15]
+So don't think about like, I need a bucket. And then don't think of it too technically, think of it in the plainest terms that you can like, I want this module to solve this problem. And the first problem that we kind of want to solve is not networking or databases or anything like that, even though those are problems that we want to solve.
+
+[00:00:38]
+The first problem we really want to solve is figuring out how to describe our environments, right? And the reason for that is because I want to create, I want to just go into Terraform, copy an environment module, paste it, change the name of that environment, and now I get everything.
+
+[00:00:55]
+I get ecs, I get cdn, I get load balancer, I get everything, right? So that's the composability that I want. So before I start thinking about VPs or VPCs and all of this other stuff, I want to kind of think of how they're going to be organized together so that I don't have to copy tons of things individually.
+
+[00:01:14]
+I can have like a huge module that's my entire environment, and then I can just be like, okay, device, staging, prod. And then everything gets created underneath that to do that. And again, this will make a little bit more sense once we get into it a little bit more.
+
+[00:01:30]
+What I'm going to do is I'm going to create a directory inside of Terraform called Module. Then inside of Module, I'm going to create a directory called environment. What we are going to do is we are going to separate all of our main problems that we are trying to solve into modules.
+
+[00:01:51]
+The first module that we are going to create is what's called an environment module. Now this doesn't mean that this module will be directly doing one thing. It means that it's really just about grouping all of the other problems that we're trying to solve together, like networking, like again, database, whatever else.
+
+[00:02:13]
+So inside of this directory I'm going to go into it. So I'm going to go into module, environment, and inside of this directory I'm going to create some new files. So the first thing I'm going to do is I'm going to create a main TF file. Main TF file is kind of just like an arbitrary or standard way of making like an entry point to all of your automation.
+
+[00:02:35]
+You don't have to call it main TF to be clear, as long as any Terraform files exist in the directory, then Terraform will see them, but you'll more than likely see like a main TF or like all of the main stuff exists and then other files that are relative to that main tf.
+
+[00:02:52]
+However, we're not going to add anything to this main TF yet because we have no other resources, right? So this is technically like an empty environment. But there are a couple of other things we know that this environment needs in order to work. So one of the first things we're going to do is we're going to create a data TF file, and in that file I'm going to put in two data lookups.
+
+[00:03:17]
+Terraform doesn't just create resources, it also allows you to look up resources in the provider that you're using. So for example, if something already exists in aws, you don't necessarily have to create it if you don't want to. And I actually do this a lot in my enterprise course that I did.
+
+[00:03:41]
+I talk a lot about separation of concerns where you would have a network terraform repo, and then you would have a database terraform repo, and then you'd have all these other repos that are completely separate, they don't share the same code bases, but they all work together and build on top of each other.
+
+[00:03:59]
+The reason for that and why we do that is because it allows us to separate the life cycle of changes. I can update databases entirely on their own. I don't have to worry about touching network or running anything related to network, or even planning against network, because that's its own completely separate module and its own completely separate repo.
+
+[00:04:19]
+And so what we do is we say, okay, we run the network repo first, then we run the database repo, then we run the ECS repo, and you keep blocking these repos together to where they become this stack that everything's running on, but each repo is separated. So if I just want to change one unit in that stack and it's provisioned like 50 databases, then I can just change the databases and I don't have to worry about impacting anything else.
+
+[00:04:46]
+And so that's where data lookups can be really nice. Because then you can say like, okay, in the database automation we expect the network to exist. Cool. Well, if the network exists, then I can do a data lookup to find the VPC id and now I can create Databases in that vpc even though they're not in the same repo per se.
+
+[00:05:08]
+So data lookups are really nice for that. We're not going to be doing that. We are just going to be creating a mono repo of Terraform today. That's just because it's easy. I've had many arguments about which approach is better. I would say the easiest approach is the one that fits your team the best.
+
+[00:05:24]
+Because if you have tons of repos, that is a lot more work. You have to go around to a lot more places, click a lot more buttons and it can be annoying versus just like having everything in one place. Cool. Okay, so we've got data. The next thing we want to create is a variables TF file.
+
+[00:05:42]
+So again you can see here I have a data file, I have a main file and I have a variables file. I'm going to edit this file and I'm going to paste in two variables. So remember, at the root of our module we created a locals file with a bastion ingress.
+
+[00:05:58]
+However, now in the environment module we're making it so that the bastion ingress is a variable. Why are we doing that? Why am I not just hard coding the value into the environment?
+>> Speaker 2: Because you're gonna have an amount of bastion hosts for n environments.
+>> Erik Reinert: Yep, yep, and what I wanna do with that is I wanna make it so that if it's dev, only these people can have access to it.
+
+[00:06:28]
+And if it's prod, then only these people can have access to it. So even though an environment is really a collection of other modules, I can still give it parameters that are environment specific. So if I wanted to, if I wanted to say like, okay, I only want these people to be able to access the dev bastion so devs can go in and connect to nodes if they need to develop stuff.
+
+[00:06:51]
+But in production, I don't want anybody to be able to do that, or I want specific people to be able to do that. If it's a variable and it's set at the environment level in that environment module, then it's just a little value I have to tweak. Then it's really easy to manage.
+
+[00:07:05]
+This is why the environment module exists, is to have a high level set of configuration that then bleeds down into all of your other components. So that if you want to tweak just one thing for that environment, you can easily do that again. Legos, if you like Legos, you're definitely going to enjoy Terraform, that's for sure.
+
+[00:07:24]
+The name is also very explanatory, right, dev staging, prod. If you wanna have a random name, like, I don't know, maybe you need a demo environment, right? Other things like that, the composability here. Think about it if somebody came up to you and said, hey, I need an entirely new environment of our deployment or of our infrastructure today, how easy would it be at your jobs to do that?
+
+[00:07:48]
+
+>> Speaker 3: Use Terraform, so pretty easy.
+>> Erik Reinert: Okay, yes, there you go. Yeah, if you're using Terraform, it is, it is pretty easy. But if you're not, it's just like, my gosh, so, yeah, when you're here and you're doing it, again, going back to think about phase one and phase two, you're not thinking in this world of like, okay, well, now I can have a little bit of more nice things and have a little bit more customization and stuff like that.
+
+[00:08:13]
+This is that kind of future proofing of like, well, we don't know what the name of the environment might be, so let's make it anything so that we can have anything. Okay, cool.
+>> Speaker 3: And I have gotten that type of request before.
+>> Erik Reinert: Yeah. Yeah.
+>> Speaker 3: From like a C suite.
+
+[00:08:29]
+
+>> Erik Reinert: Yes.
+>> Speaker 3: Hey, we need to-
+>> Erik Reinert: Yeah.
+>> Speaker 3: Show something to a client or a customer or whatever. Can you make us a separate environment?
+>> Erik Reinert: Yep, it's very common. That's why it's good to have composability around your environments, because you will get it. I get. I've gotten it before too.
+
+[00:08:47]
+And again, thankfully we used Terraform, but, you know, ours is still a little bit more daunting. But yeah, I mean, yeah, it's gonna happen, [LAUGH] it's gonna happen. So being prepared for it is very powerful. Especially when you could say, yeah, and they're like, okay, cool. You know,
+
+[00:09:06]
+
+>> Speaker 3: well, even like, you know, you'll. Let's say you have dev, Stage and prod. Right. But maybe the company is trying to figure out a way to save money or something. It's like, if you guys really don't need a stage environment.
+>> Erik Reinert: Yeah.
+>> Speaker 3: Let's get rid of all of our stage environments on the apps and services that we don't need.
+
+[00:09:27]
+
+>> Erik Reinert: Yep.
+>> Speaker 3: Stage environments. It's so much easier just to destroy those stage environments with Terraform than doing it manually. So.
+>> Erik Reinert: Yep. And you can decide if you want to as well, making them more ephemeral. You know, maybe have environments per PR versus like, environments all the time.
+
+[00:09:44]
+Right. You have that composability now because it's all in that definition it's very, very powerful. The next thing we want to do is we actually want to go back to our root module. Because at this point we've defined our environment module, we set up variables, we know we want some data, but we don't have any resources or other modules to put in it yet.
+
+[00:10:10]
+But if I did, right now, if I just did Terraform Plan, just for fun, it really wouldn't do anything because I haven't added any resources or anything like that. But it also means that it doesn't know my modules there. That's because I haven't used it in my root level yet.
+
+[00:10:31]
+Now what I want to do is I want to create a main TF file at the root of the project at the root where back end locals and all that other stuff is. Then in here. I'm actually going to set up our staging environment. What I'm going to do is I'm going to say in my main TF file, I'm going to define a module, I'm going to call it Staging.
+
+[00:11:02]
+I'm gonna tell it that the source of this module is my environment, right? I'm going to pass it the variables bastion, ingress and name, and that's all I need to create an environment. That's it. Let me just reopen it with color. There you go. So this is all like this, and I wanna be clear.
+
+[00:11:28]
+Another big benefit of using Terraform is to solve hard problems with easy solutions, right? If I can as a developer, just come in here and go, okay, Prod demo dev. Think about that. Think about underneath the hood. We're talking about five different ECS clusters, five different CDN distributions, five different.
+
+[00:11:52]
+All of that stuff out of the box for free, right? This is the power of IAC, when you organize it well and you focus on what problem you're trying to solve, not just like, I want an S3 bucket, yeah.
+>> Speaker 4: IAC.
+>> Erik Reinert: Infrastructure is code, yeah, sorry if you've never heard of the term before, IAC equals infrastructure as code, yeah.
+
+[00:12:14]
+Cool. Okay, so now if I do a Terraform plan, I should get an error. Yeah, there you go. So whenever you add a module to Terraform, Terraform has to first initialize that module. I don't know why, but what's ironic is that if I do Terraform init, you'll see that it initializes my staging module.
+
+[00:12:41]
+But what you actually end up with is effectively a reference to the directory in the Terraform configuration. You'll see here that Terraform underneath the hood adds my module with the key the path to it and then the directory effectively that it's in. So this is something that's required every time you create it or add a module.
+
+[00:13:08]
+This is not required for resources. So you don't have to do Terraform in it every time you add a resource. But if you add a module with this specific module key, you have to do Terraform Init otherwise it'll just fail. It'll say hey, you haven't initialized first, please, please initialize.
+
+[00:13:23]
+So whenever you're using modules, just remember to do Terraform init before plan, otherwise it will error out and be be mad at you. Cool. Okay. And again, I can do plan one more time now that I've done init and we should get no resources. But you will see that now we're actually starting to see some of that data, those data lookups.
+
+[00:13:45]
+So you can see here it first went out and got the region that I'm using and they've got the caller identity as well. So that basically I can know in my automation what region we're provisioning in and then like what's my account ID and all that kinda stuff, right?
+
+[00:13:59]
+So that just helps with everything else that we are about to write.
+

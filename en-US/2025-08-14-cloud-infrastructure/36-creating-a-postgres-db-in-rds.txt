@@ -1,0 +1,117 @@
+[00:00:00]
+>> Erik Reinert: So we have an environment and we have a network, right? So the next thing we need to do is we need to solve the next logical problem, right? If we remember our graph or our chart, we had a database in there. So why don't we go ahead and add that next?
+
+[00:00:18]
+So I'm going to say new directory and I'm going to call it database. And now I have a database directory or module that I'm ready to set up. Then inside of that, we'll do a main TF file as well. Again, this is a pretty common pattern of create a module, create a main TF file.
+
+[00:00:37]
+Create a module, create a main TF file. Now, I'm creating the main TF file for our terraform module. As before, this is a situation where I have some data or some parameter that I need to create. Because before I create my resource, in this case, it's a password.
+
+[00:00:58]
+And so we already have this convention of like, well, I know that if I create my SSH keys, I can put those in SSM and developers can get access to them. Why not do the same thing for the database password as well? And so that's exactly what we end up doing here.
+
+[00:01:12]
+We create a random string, we take that value and we store it in SSM as a parameter called database password. Then underneath that, we create our actual database itself. This is really where you would modify pretty much any specific database instance setting. Again, I am using a module terraform RDS or the Amazon provider has direct resources for managing databases, but there's multiple ones to do it.
+
+[00:01:47]
+RDS instance or a group, and then a subnet group and a bunch of other things. Again, I'm using a module here simply to solve that problem and make it easier for me to create this database. And again, what's nice is that this module kind of makes those parameters more towards what problems I'm trying to solve, which is why I like those.
+
+[00:02:09]
+If you think about it, when you use raw terraform resources, you are solving options that the cloud provider is giving you. You might not know what like a volume parameter is or some other weird things, right? But they're abstracting it into a module, into a way where it just says, like, do you want a volume or not?
+
+[00:02:28]
+You know what I mean? It makes it easier to understand. And so again, that's just another reason, especially with more complex things like rds, RDS can be very confusing. Again, you normally hire somebody to manage your database and they would absolutely know a lot of the parameters or things like that that would go into creating it.
+
+[00:02:52]
+In this case, we're creating a very simple database. We're creating a 50 gigabyte storage volume for it. We're not creating a option group, we're not creating a parameter group, we're not creating a subnet group, we're not creating a monitoring role. So we're kind of going very bare bones with this.
+
+[00:03:10]
+We're giving it an existing subnet group, which is our network that we've already created. Remember we created a database subnet and so we're actually telling the module, well, no, you can use the VPC name as the subnet group because the VPC name is the environment network name. We are setting the engine to postgres.
+
+[00:03:34]
+We're using 17.2. So again, going back to that whole how do you know your devs locally are using the same version as your database in the cloud? More than likely you would make this be the standard de facto or default. And then everything would follow this version. We wouldn't reverse it to where this follows devs.
+
+[00:03:56]
+We would make it so that this is the standard and all devs follow what's in production. So in this case we would make sure that everything was up to date. It was 17.2 IAM database authentication enabled. So this is kind of a newer thing, but this basically makes it so that you can use AWS's IAM security practices to connect to a database.
+
+[00:04:18]
+Instead of just doing like postgres user and postgres password, it actually can set up identities in the database directly with IAM roles and stuff and users. And so you, you can actually before, when we created an IM user, right, you could actually use that to connect to the database and that would integrate with the database directly.
+
+[00:04:40]
+We're not gonna use that for now, cause we don't need it. We also are telling it our max allocated storage. So this is actually a database. And this is really one of the nice things about this is one of the things that's really nice about RDS is that it has scale, right?
+
+[00:04:57]
+So if you're in a scenario where you're like, well, I only want 50, but I don't want my database to freeze up when we hit 50 because I don't want my production environment to go down. You can tell it, all right, I want to do a max allocated of 100, so it will allocate out at least double of its normal size.
+
+[00:05:14]
+So you don't have to worry about that. And then you can put like alerting and logging and monitoring around it. So if it hits the 75 area you go, okay, crap, we might need to increase the max allocated more or figure out why you're consuming so much data storage.
+
+[00:05:32]
+By default, Amazon creates parameter groups and option groups. They are pretty much what they say they are. They are the literal options that you provide to postgres from like the configuration file and the same thing for parameters. So again, if you're really, really proficient with postgres to the point where you know all the, you know, parameters required for the database that you need, then you would create your own parameter group and or option group.
+
+[00:06:04]
+In this case, we don't need it. Amazon provides defaults for each. And so that's what we're using. We're using basically the default parameter group postgres17 and the default option group postgres17 as well. I'll be fair, this is all pretty standard. It's tweaked and tuned to run on their infrastructure as well.
+
+[00:06:28]
+It's always worked for me. I haven't really needed to jump too deep into either of those. The password we are setting is that random string password result. So we're actually able to inject it not just into the SSM parameter above, but we can even use it in multiple locations.
+
+[00:06:46]
+Again, that's another nice thing about HCL is it is programmable, it is a language and so you can do the same normal reuse values and all that kind of stuff with it as well. This one's a big one. Publicly accessible. False. We are migrating for the complete purpose of making this offline and behind a VPC or behind a network firewall.
+
+[00:07:10]
+And so in this case we're telling it no, we do not want you to be public accessible. This is why the bastion host can be very helpful if you need somebody to be able to directly access the database. You know for a fact that they won't be able to do that unless they go through the process you want them to.
+
+[00:07:26]
+Which again would be like, you know, jumping on the bastion host, maybe having the credentials there that they need so that they can, you know, connect to the database. And maybe those credentials are read only. You don't have to worry as much about them breaking anything. Skip final snapshot.
+
+[00:07:43]
+So this is just a more of a redundancy. If you delete this database, it can keep you a final snapshot after it's deleted, and it'll take that snapshot before it gets deleted so that it has a final snapshot of your data. This is up to you. I don't normally keep this because I will also potentially do other kinds of data backups or other things like that.
+
+[00:08:08]
+So in this case it's up to you. If you want to enable it, it just means that when you delete the database, there's going to be a snapshot saved of it username. So the username is actually pretty straightforward. It's just the name that we provide the module and then any dashes are replaced with underscores.
+
+[00:08:29]
+And that's just a postgres kind of standard. Normally when you create usernames in postgres they have underscores with them. In this case it's going to be based off of the environment. There's a pretty big reason for that. If you recall, we're creating environments and we're putting a database inside of it.
+
+[00:08:49]
+That means that this is a shared database is really all I'm trying to say. This is an environment database. That means that multiple services will connect to this database. You'll create multiple, multiple databases inside of the instance. But the reason why we're doing this is because we want to save money.
+
+[00:09:09]
+We could provision a database per service if we wanted to and have more of a microservice approach. But this is also, like we're balancing between saving money and also scaling out. A lot of RDS instances just become a lot more money. So I don't necessarily recommend it in non production environments.
+
+[00:09:31]
+So at my company we have a shared database per environment that we then can control access to and everything. And then in production we scale out to where every service has its own database. But in my mind it's just a better cost-effective way of handling for if you don't need to have a isolated database per service, but if you wanted to, you could last thing VPC Security Group IDs.
+
+[00:10:01]
+So as we said before, we are traffic shaping by security group, right? And so in this case we would provide it the security groups that it should be attached to for access. We gave in the network module, if you remember, we created a security group called DB and then we allowed the private network access to it.
+
+[00:10:22]
+So in this case the only security group that we need to give it is the database security group because we don't really care about it needing to access anything else. And we don't want to necessarily give it the entire private security group. We just want to make it so private can access it.
+
+[00:10:40]
+That's it. That's why we're making it use its database security group and then just Making a firewall rule from private to database allows access. So only need one security group there. Cool. Okay, so that is the instance or the main RDS module. There's just a couple of other things we're gonna use.
+
+[00:11:00]
+The first one is going to be the variables or variables. Again, we are picking variables that make it so that this is dynamic. Right? So if I take this module and I use it somewhere else, I should be able to use it pretty easily. Right. And so the biggest things that we really care about in this module as a variable are the name, the security groups that it's connecting or that it's using to connect with the subnets that it's using to connect to, and then the VPC name that it's going to be provisioned in.
+
+[00:11:35]
+What's again nice about this is this should mean that even if I use this in a completely other project, this module completely somewhere else, it shouldn't have opinions to the point where I can't just easily do that without, without a couple of options. And so these are like a good example of that where if I wanted to use this module in a completely separate project, in a completely separate whatever, I should be able to without too much trouble.
+
+[00:12:01]
+Cool. Okay, so database is actually really straightforward. It's just those two files and then we go back into our environment directory and we add a new module. So again, before I was in the database directory, database main variables. Now I'm going out, I'm going into the environment directory and then I'm going to the main file in there.
+
+[00:12:23]
+So when you're composing modules, there is definitely a lot of hopping around. Like, okay, I'm gonna go into this module, do this, and I'm gonna go over here and do this, and I'm gonna import this module from here. So yeah, I just want to note that we will be hopping around a bit and if you ever feel like you're lost or anything like that, you can use the.
+
+[00:12:41]
+Whenever I'm in here, you can use the path at the top to see where I am, or you can just ask. Feel free to ask as well. I'm going to go to the environment main TF and now what I've done is I've added a module for my database.
+
+[00:12:59]
+This is starting to look like an actual environment. Now what's nice or what I like about it at least is that when you get to this layer, when you're at the environment module, it's pretty easy to read. Like, it's actually not that difficult. Okay, I get a network, I get a database.
+
+[00:13:17]
+These are the settings for the network, right? These are the settings for the database. It's not as granular as the modules underneath it. So that makes it a lot easier. Again, when you're in those scenarios of like, can we just get a whole new environment? Yeah, actually, you can, because it's a lot easier to configure because we've abstracted away all of those challenges and those problems, right?
+
+[00:13:41]
+And so, yeah, now as an organization, we don't just have an environment, but we have an easy way to create databases, right? We have an easy way to create networks. So the more that we invest into this, the more it should pay off and help us, you know.
+
