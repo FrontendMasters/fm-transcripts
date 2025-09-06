@@ -1,0 +1,83 @@
+[00:00:00]
+>> Brian Holt: So, as you can see here, this get a little bit more complicated. You start exchanging session IDs and all that kind of stuff. The nice thing here is the SDK kind of handles all this for you, which is great. Another problem with SSEs is that it was really hard to horizontally scale them.
+
+[00:00:16]
+If you have lots of users using your MCP, like spin up multiple servers running the same MCP server, this handles this a bit better. Where you have sessions that work in a very normal web server kind of way. And if you drop a connection, it's very easy to go back and resume later.
+
+[00:00:36]
+So yeah, the topography of the handshake is a bit more complicated. But again, usually you're not writing this, normally your framework is handling this for you. Key here is you have a UUID as a session, like some unique identifier, and the client refers to that in the HTTP header.
+
+[00:00:55]
+That's basically it. So, you can see here the code ends up being really similar.
+>> Brian Holt: We're gonna talk about this. I don't think I'm gonna have you necessarily rewrite this because again, it's not really that interesting. We're just gonna be exposing this all over Express. In fact, we'll copy this and we'll put it into the NCP server here.
+
+[00:01:28]
+We're gonna just use all the same job tools, which is nice.
+>> Brian Holt: Call this streamable.js or something like that.
+>> Brian Holt: So again, we could have written this, but it's an Express server. We could use Fast5, you could use anything you want. We're gonna use random UUID. Like as long as it's a unique identifier, which node crypto is more than apt to provide for us.
+
+[00:02:07]
+MCP server, this is exactly the same. Streamable HTTP transport, this works in kind of a transparent way for us. Initialized request, you have to kind of handle that explicitly. Create your MCP server, we're gonna use their same job space tools that we were just using. And then, again, we could have written all this.
+
+[00:02:32]
+This just wasn't terribly interesting for me to have you write all of this. But you're gonna grab the session ID from the headers, MCP session ID. I'm just doing this in a local object. I'm storing all the sessions locally because I'm not going to scale this up to multiple servers.
+
+[00:02:51]
+But if you were gonna scale it to multiple servers, you just toss it at Redis and pull it back out of Redis, right?. Here we're just throwing it in an object and pulling that back out. And just initializing a session. If you've ever written auth code, this should look really similar, that's because it's essentially just that.
+
+[00:03:12]
+And a big thing that I have disabled here, which you should not disable in production, is DNS rebinding protection. This is like a big attack vector of like, okay, I have this client over here and it has a bunch of sensitive information in its context. And then I'm gonna have this other client, like sniff a packet or something like that, catch that session ID and just resend that same session ID.
+
+[00:03:40]
+If you don't have this, it's going to let them essentially hijack the session, which could be bad or it could matter, right? But that's what this protects against. Why am I turning it off? For fun. No, I'm just kidding. It's because the DNS inspector, right? You have to turn this off for the DNS inspector to work.
+
+[00:03:58]
+We're gonna use the NCP inspector here in just a second, and this won't work unless you turn off that MCP inspector. On close, once you're done with everything, you just say, delete this out of here, you close the session. Otherwise, this is a session handler for. So they're gonna call basically, what is this?
+
+[00:04:21]
+MCP, yeah, right here. So, if it calls a get on MCP, it's basically creating a new session, which is what you're doing here.
+>> Brian Holt: Yeah, basically that's it.
+>> Brian Holt: Does that make sense? It's all just session management, and then on top of that it's just MCP.
+>> Brian Holt: So I didn't really mess too much with it.
+
+[00:04:56]
+I'm sure Claude can handle remote MCP, but I didn't mess around too much with it. We're just going to do with the MCP inspector because I wanted to show you how to do that.
+>> Brian Holt: So now that we've done that, let's go to our server here. So I'm in my MCP and I'm gonna say node.
+
+[00:05:22]
+Actually what I'm going to do is I'm going to copy the command up here. Is this one,
+>> Brian Holt: Yep.
+>> Brian Holt: So I’m gonna say, npx @modelcontextprotocol/inspector. Really cool tool for making MCP servers.. So it's going to ask if you want to do that. You're going to say yes.
+
+[00:06:02]
+
+>> Brian Holt: So I'm showing this for streamable HTTP, but it does work with SSCs. It works with standard IO. It's this cool webpage that allows you to mess around with. This was already installed for me. But you're probably going to have to put in local host MCP here as well.
+
+[00:06:24]
+And then we have to get that running as well. So I’m gonna create here as well, node streamable as well, streamable.
+>> Brian Holt: So, you should see something like this.
+>> Brian Holt: Okay? And then now you should be able to click Connect. If it says connected here, then it's working, otherwise it might give you some sort of error.
+
+[00:06:59]
+You can choose what kind of transport. We're doing this over streamable HTTP. That's why we have it there. But if you're doing standard IO, you would tell it there and then you would tell how to run your MCP server locally. It does have this big ugly auth token, that's so that no one on your local network hijacks your session, right?
+
+[00:07:18]
+Because again, it's running arbitrary code on your computer that could be very damaging, right? So there is some extra layers of security here. So you can see the history here of this is what it called, this is what it got back. You can see the tools that are available.
+
+[00:07:34]
+So list tools. This will tell you that it creates bugs. Create feature requests. We have, this doesn't have it. Yeah, because we didn't put in the resources of the prompts here, but you would be able to see those here. They're just blacked out because there's nothing there. You can ping says method ping.
+
+[00:07:57]
+I think technically, according to spect, you should respond pong. But we didn't, so who cares? But samplings here, elicitation roots, auth, all that kind of stuff here all exists here. Tools, let's click on Create Bug. You're gonna say, this program is stupid. And description, we should make it less stupid.
+
+[00:08:28]
+
+>> Brian Holt: API key, let's go grab one,
+>> Brian Holt: Run tool and then you'll see this tool call right here. It'll tell you what it did, it'll tell you what the response is, so we got a 201. If we go look at our issue tracker here issues. You can see this program is stupid and we should make it less stupid.
+
+[00:08:54]
+It's official now, so we should make it less stupid. Pretty cool, right? The MCP inspector, I'm sure you can see that if you're developing an MCP server, this can be highly useful in trying to figure out why stuff is working, why it's not working. What's nice about this is we have this running locally so we can actually see all of the output from it as opposed to trying to go dig them out of Claude.
+
+[00:09:18]
+This is a nice client for getting MCP development going.
+
