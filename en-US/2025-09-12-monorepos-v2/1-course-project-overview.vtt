@@ -1,0 +1,442 @@
+WEBVTT
+
+1
+00:00:00.560 --> 00:00:04.800
+&gt;&gt; Mike North: So in this course we're
+going to be working with a small project
+
+2
+00:00:04.800 --> 00:00:06.960
+that is the minimum example, or
+
+3
+00:00:06.960 --> 00:00:12.960
+close to the minimum example of a monorepo
+that has some layering and dependencies.
+
+4
+00:00:12.960 --> 00:00:16.240
+So we're going to start with
+everything being together.
+
+5
+00:00:16.240 --> 00:00:20.218
+It's a simple svelte app
+with a node server and
+
+6
+00:00:20.218 --> 00:00:24.640
+some things that both the server and
+the UI need.
+
+7
+00:00:24.640 --> 00:00:27.360
+And we're going to factor
+it out into a monorepo.
+
+8
+00:00:28.670 --> 00:00:32.928
+We're going to show how we can
+automatically link different
+
+9
+00:00:32.928 --> 00:00:35.190
+packages within the monorepo.
+
+10
+00:00:35.190 --> 00:00:38.110
+So you can just edit whatever
+you need to edit and
+
+11
+00:00:38.110 --> 00:00:40.670
+those changes take effect immediately.
+
+12
+00:00:40.670 --> 00:00:42.750
+You can just still treat this.
+
+13
+00:00:42.750 --> 00:00:47.356
+You get the same benefits of the monolith
+despite it being broken up into
+
+14
+00:00:47.356 --> 00:00:48.750
+a bunch of packages.
+
+15
+00:00:49.870 --> 00:00:54.228
+We're going to,
+towards the end of the course,
+
+16
+00:00:54.228 --> 00:01:01.690
+get to this benefit of dependency aware
+task execution for build lint and testing.
+
+17
+00:01:01.690 --> 00:01:05.170
+What that means is I touch
+a low level dependency.
+
+18
+00:01:05.170 --> 00:01:10.003
+I want to run only those tests that could
+have potentially been affected by my
+
+19
+00:01:10.003 --> 00:01:10.930
+changes.
+
+20
+00:01:10.930 --> 00:01:15.770
+Not just the package that I touched,
+but the package I touched and
+
+21
+00:01:15.770 --> 00:01:18.050
+anything that depends on it.
+
+22
+00:01:18.050 --> 00:01:23.820
+Let's run just those roles or, sorry,
+let's lint just that subset of packages.
+
+23
+00:01:23.820 --> 00:01:26.740
+Or let's test just that
+subset of packages.
+
+24
+00:01:28.340 --> 00:01:32.947
+We're going to explore the idea of
+monorepo packages like sometimes some
+
+25
+00:01:32.947 --> 00:01:37.704
+packages are more coupled than others,
+where you might think of there being
+
+26
+00:01:37.704 --> 00:01:41.939
+some sort of private API between packages,
+where sometimes things
+
+27
+00:01:41.939 --> 00:01:45.900
+are just more intimately entangled
+in some cases than others.
+
+28
+00:01:45.900 --> 00:01:52.452
+And I'll give you some tools where you can
+deliberately create those boundaries and
+
+29
+00:01:52.452 --> 00:01:58.264
+make sure that your TypeScript types
+are correct and helpful in cases where
+
+30
+00:01:58.264 --> 00:02:03.730
+you deliberately want a lot of deep
+private access between packages.
+
+31
+00:02:03.730 --> 00:02:06.531
+And then in other places you can say,
+hey, look,
+
+32
+00:02:06.531 --> 00:02:10.010
+there's this sort of blessed surface for
+the package.
+
+33
+00:02:10.010 --> 00:02:14.490
+In the general case, you should only
+be integrating against these points.
+
+34
+00:02:15.910 --> 00:02:19.830
+We'll also look at automatic
+code documentation as well.
+
+35
+00:02:19.830 --> 00:02:25.819
+How can you have some nice generated docs
+that don't require a human to go in and
+
+36
+00:02:25.819 --> 00:02:31.830
+keep updating things that explain all
+the packages in this monorepo project.
+
+37
+00:02:33.990 --> 00:02:37.635
+They're kept up to date automatically
+because they're derived from code comments
+
+38
+00:02:37.635 --> 00:02:39.030
+and from the types themselves.
+
+39
+00:02:41.360 --> 00:02:44.840
+So these are some of the tools that
+we're going to be exploring today.
+
+40
+00:02:44.840 --> 00:02:48.603
+We'll use pnpm, which is, in my opinion,
+
+41
+00:02:48.603 --> 00:02:54.320
+the package manager that you wanna use for
+TypeScript monorepos.
+
+42
+00:02:54.320 --> 00:02:57.860
+Today we'll be using
+the latest version of Lerna,
+
+43
+00:02:57.860 --> 00:03:02.480
+which, behind the scenes it is
+leaning on NX for a lot of things.
+
+44
+00:03:02.480 --> 00:03:07.563
+So we'll start with lerna and
+then we'll eject out to nx when we have I
+
+45
+00:03:07.563 --> 00:03:13.190
+need to do so, we'll get through
+the package managers and the build tools.
+
+46
+00:03:14.230 --> 00:03:18.988
+We'll use API extractor and
+documenter to create a very deliberately
+
+47
+00:03:18.988 --> 00:03:23.029
+controlled API surface for
+each package in the monorepo.
+
+48
+00:03:23.029 --> 00:03:27.424
+It'll only matter for
+libraries in this case, but we'll get auto
+
+49
+00:03:27.424 --> 00:03:32.292
+generated docs and we'll get what's
+called a declaration file rollup,
+
+50
+00:03:32.292 --> 00:03:36.688
+which is the a single DTS file that
+represents the whole library and
+
+51
+00:03:36.688 --> 00:03:40.300
+you'll be able to tag
+individual methods and fields,
+
+52
+00:03:40.300 --> 00:03:44.779
+anything that's exported as internal or
+alpha or beta maturity and
+
+53
+00:03:44.779 --> 00:03:50.277
+you'll get the right roll up generated
+depending on whether you're using alpha or
+
+54
+00:03:50.277 --> 00:03:54.810
+beta features in this library or
+you're using the stable version.
+
+55
+00:03:56.090 --> 00:04:00.975
+We'll talk a little bit about
+GitHub code owners if you've ever
+
+56
+00:04:00.975 --> 00:04:05.317
+used this before at your root
+repo level you can have a code
+
+57
+00:04:05.317 --> 00:04:09.749
+owners file that governs who is
+automatic to review a pr and
+
+58
+00:04:09.749 --> 00:04:14.011
+we'll talk about how to use
+that in a monorepo context.
+
+59
+00:04:14.011 --> 00:04:18.639
+How can you store this same
+information in individual packages and
+
+60
+00:04:18.639 --> 00:04:21.034
+have that sort of synchronized and
+
+61
+00:04:21.034 --> 00:04:26.670
+pulled up to a root level code owners file
+that is purely kind of a build artifact.
+
+62
+00:04:26.670 --> 00:04:29.679
+Like you don't have to touch it because
+the source of truth lies within
+
+63
+00:04:29.679 --> 00:04:30.350
+each package.
+
+64
+00:04:30.350 --> 00:04:34.602
+And this gives you a lot of control over
+like maybe you have an infrastructure
+
+65
+00:04:34.602 --> 00:04:37.924
+team that's responsible for
+some small set of packages and
+
+66
+00:04:37.924 --> 00:04:42.380
+then you have other people that should
+be reviewing code in other places.
+
+67
+00:04:42.380 --> 00:04:48.055
+Then finally, even if you're
+well experienced with monorepos,
+
+68
+00:04:48.055 --> 00:04:54.236
+I'm going to walk through a couple
+standalone tools that help detect and
+
+69
+00:04:54.236 --> 00:05:02.400
+address common monorepo pitfalls, like the
+quality of each package's package JSON.
+
+70
+00:05:02.400 --> 00:05:03.800
+Are you missing things in there?
+
+71
+00:05:03.800 --> 00:05:06.000
+Does each have a homepage?
+
+72
+00:05:07.360 --> 00:05:12.071
+Are you pointing to the correct place
+in a repository on GitHub where you
+
+73
+00:05:12.071 --> 00:05:16.560
+could see the readme for that package,
+not for the whole monorepo.
+
+74
+00:05:17.680 --> 00:05:23.254
+De duping versions of packages across your
+Monorepo Syncpack is a great tool for
+
+75
+00:05:23.254 --> 00:05:23.840
+that.
+
+76
+00:05:23.840 --> 00:05:29.807
+If you have 16 versions of TypeScript
+across 20 packages in your monorepo,
+
+77
+00:05:29.807 --> 00:05:34.347
+this is what will help alert you
+to that potentially in a quite
+
+78
+00:05:34.347 --> 00:05:37.640
+automated way where you can just use fix.
+
+79
+00:05:37.640 --> 00:05:43.720
+It'll consolidate you onto a version that
+you can use across the entire workspace.
+
+80
+00:05:44.760 --> 00:05:50.204
+We'll also work with a library
+called knip knip, which is great for
+
+81
+00:05:50.204 --> 00:05:54.887
+identifying like needless
+exports from libraries that at
+
+82
+00:05:54.887 --> 00:05:59.950
+least within the monorepo,
+nobody seems to be consuming, and
+
+83
+00:05:59.950 --> 00:06:04.920
+it helps to identify unneeded
+packages in your package JSON,
+
+84
+00:06:04.920 --> 00:06:09.060
+like unneeded dependencies
+in your package JSON.
+
+85
+00:06:09.060 --> 00:06:11.988
+And like, why this is important for
+monorepos, well,
+
+86
+00:06:11.988 --> 00:06:14.853
+we're going to end up with
+a bunch of package jsons, so
+
+87
+00:06:14.853 --> 00:06:19.400
+that work like curating your list of
+dev dependencies and dependencies.
+
+88
+00:06:19.400 --> 00:06:24.516
+It's multiplicative now, and
+these tools help make sure that
+
+89
+00:06:24.516 --> 00:06:29.438
+you're not having to go into
+each package in your project and
+
+90
+00:06:29.438 --> 00:06:34.456
+personally pare it down where you
+can see that there are things
+
+91
+00:06:34.456 --> 00:06:38.920
+that nobody seems to be
+importing within the package.
+

@@ -1,0 +1,141 @@
+[00:00:00]
+>> Mike: We're going to use a tool called Knip Knip to identify exports from our modules that don't appear to be used from within our monorepo and dependencies that we don't appear to be importing from. This is a really useful tool in general for any JavaScript project because ultimately that dependencies list in your package JSON starts to get big.
+
+[00:00:27]
+Your dev dependencies and your dependencies. It's tough to know what of those things is actually still being used. It ends up being hard to garden.
+>> Male: Is this called tree shaking?
+>> Mike: This is not called. Well, it is conceptually similar to tree shaking, what most people mean when they say tree shaking.
+
+[00:00:52]
+It is the concept during a build process of identifying dead code or unused code and eliminating it from the build. So for example, Lodash is a great example. You can consume Lodash as one big library if you want. You can say, I want to install Lodash, but they also let you.
+
+[00:01:23]
+Yeah, there you go. So here are a bunch of NPM packages like you just need Lodash memoize. You can install that as an individual package. And so if you were to use this, what this lets you do is, well, first off, you can install only the modules you need.
+
+[00:01:40]
+Sorry, only the packages you need. But this also shakes away any modules within those packages that you don't happen to be be using. Now, what we're doing is related to that in that we're trying to prune unused things away, like dependencies that are in our package JSON for our various monorepo packages, where we see no evidence those are being used within that respective package.
+
+[00:02:05]
+But we're doing this sort of to benefit install times and build times and just to take away stuff that somebody's factored some code away but they forgot to remove the library. Like, yeah, if you have tree shaking in place, it would take care of that eventually. But like, ultimately it's good to clean it up as well.
+
+[00:02:25]
+So that's what Knip does from the dependency side of things and then unused exports as well. Like you're exporting 12 things from a module, but we can only see three of them being imported from anywhere. And this will help you make sure you're not overexposing your code to the outside world.
+
+[00:02:45]
+We had some interesting conversations about how do you make sure that in a monorepo, how do you make sure you can evolve things that are deep in the dependency graph? And part of that is just being very deliberate about the API surface you expose if you export the whole world people have access to your internals, they start using those things.
+
+[00:03:04]
+Well, yeah, evolving that's gonna be really tricky. And this helps you make sure you're more deliberately exporting things when they're actually being used by something. And it's not just sitting there waiting for somebody to grab onto with that. Let's jump in. So the first thing we'll do is we're gonna install Knip, pnpm install dev dependency, knip.
+
+[00:03:33]
+And I'm in the root of my Monorepo. This is another workspace level tool. So this is most appropriate to store at the workspace level. Now we're going to install knip and to do that we have to run PNPM I D knip. And now that that install is completed, we want to create a config file.
+
+[00:04:07]
+So this is going to be in the root of your project and we're going to call it knip JSON and you'll know you got the right name because there's a little, at least in this VS code icon pack. Apparently they have a cute little icon. All right, workspaces.
+
+[00:04:23]
+You got to tell this tool where things are. We're going to say packages. What we next need to describe is what is the source code for each package? What's the pattern that you could use to find source code versus what's the entry point for each package? Here we'll say entry.
+
+[00:04:51]
+And that's going to be, it's pretty consistent for us, we've got src/index. Well, it's really index or main ts and the reason is in our server and our models packages, Source index is what we're using. Main is what's used in the UI package. Normally you don't care about the entry point for something like a web ui.
+
+[00:05:16]
+But the, the point of what this is trying to do is it's going to start at the entry point and then it's going to walk all of the imports to get an understanding of what are those modules importing. It's doing this to figure out are you actually using all of the things that are in your package?
+
+[00:05:34]
+JSON. Next we need to do the second property, which is project. We're going to say source. Yes. This is all relative to a package, to be clear. So it's gonna be src anything .ts, tsx, svelte. Now you don't really need tsx. It's not in this project, but you get the idea.
+
+[00:06:00]
+Whatever extensions are part of the analysis that should happen here. Okay, we can leave it at that, if you're following in the workspace notes, you'll see there's some other stuff that we'll. But I want to hit the problem that necessitates adding that second field. So let's run pnpm,
+>> Mike: knip, and what's it gonna spit out?
+
+[00:06:27]
+A bunch of stuff. So it's telling us a lot of good information here. We apparently have unused dependencies. Looks like we left some server stuff in our uipackage JSON in the dependencies object. Similarly, in models, here's the express dependency again. I mean, after all, we were just copying and pasting those objects.
+
+[00:06:51]
+We were being kinda sloppy about it. But it's okay. We have a tool now that can help us prune those things away. You get the same thing for dev dependencies. Now important to realize there are some things here that we want to keep which do not get imported by something else.
+
+[00:07:05]
+In fact, these two things are CLIs. This is something that's used for a linting task. These are. Well, these are actually. Sorry, we could get rid of these cause eslint is at the workspace root. Now we don't need the types for these packages cause we're getting rid of the packages.
+
+[00:07:24]
+You should be able to see we're not being asked to eliminate those packages in this server. So this tool even has knowledge over this ambient type information convention like the types packages. It will see that no, you're not directly importing from ypexpress, but it is in use and it's intended to sort of layer on top of the express package.
+
+[00:07:48]
+So let's go around and play whack a mole and address some of these. This is going to be the easiest group for now. So let's go into our UI package.json,
+>> Mike: And get rid of bluntly everything except our models dependency. So that was all server stuff. A YAML parser, a logger, the express HTTP server and CORS.
+
+[00:08:16]
+Get rid of that and let's go into models package.json. Similarly, we don't need any of that. Let's see where we're at. Run that command again. Now we're down to unused dev dependencies. So these two I want to treat differently. We'll go back to our config file here and we're going to add a new top level field called ignore dependencies and it's an array and we can put many package CLI and syncpack in there.
+
+[00:09:02]
+If we run the command again, we'll see we're not being yelled at about those two things anymore. So this is where your dependencies that are tooling or clis or. I don't. Know, some plugin that you use for testing infrastructure. This is a good example. Test coverage. Let's add that that's not something that this tool can see.
+
+[00:09:32]
+It both does not have special awareness of how this plays into our test command, nor can it see an import. We'll ignore that one. Any other ones? TypeScript ESLINT well, that should be pulled up to the top of the repo so it genuinely does not belong in there.
+
+[00:09:53]
+There's coverage V8. Great, all right, let's do some more pruning, get rid of some of this. Sorry, let me make sure I'm on my most recent invocation of the command. There we go. So we took care of a couple of those. Let's go in our models package JSON giving us nice links by the way.
+
+[00:10:16]
+I love this. Click it and it takes you to a row and a column of exactly what you need to eliminate. So we get rid of cors, we get rid of express. We need the node types. This is fine. This we already said we're ignoring the ui. It's not complaining about concurrently.
+
+[00:10:39]
+We don't need in here. Prettier, we don't need in here, tsx we don't need, typescript-eslint Yep, we don't need that either. Really slimming it down. So there, that's what we're left with. This is much more reasonable for just like a very plain typescript library. It's some testing stuff in fact.
+
+[00:11:02]
+In fact, eslint, do we even need that? Nope, I don't think we do. Great. So running it one more time.
+>> Mike: Okay, so we're out of the models section. Now let's clean up our server package JSON So we've got ESLINT JS concurrently, prettier, TypeScript, ESLINT and SAVE and then in our UI this testing library svelte seems important.
+
+[00:11:46]
+I'm going to chalk that one up as let's keep it in here. Let's add it to our ignore list and the tsconfig svelte, let's say that's the same thing where that's being used in our UITS config. Sorry, it's this one. There's a tsconfig NPM scope now that contains very framework specific settings for popular configurations and stuff.
+
+[00:12:27]
+But this is not part of what knip is trying to analyze, so it's not aware of that. Then going back to our UI thing, just these Cores and express things here. Let's see where we're at. Getting much closer. All right, now we've got unresolved imports. Great. It's finding more things.
+
+[00:12:52]
+This is just removing the word models because that's within the same package here. This one doesn't need to be referring to this package. Seeds, models. Great. So we will have taken care of those and that represents the next class of errors. Now we're down to unused exports. So we've got server config.
+
+[00:13:19]
+Now if we look here, this is just like a configuration object that holds a port and a logger and it's for our Express server. Now here's a little bit of a gotcha. Personally, I wish these two families of errors were sorted differently. What it's really telling us here is we've exported this thing twice.
+
+[00:13:39]
+When it says unused export, I want you to remember that's an unused export site. What I'm trying to disambiguate between is server config is a class. It is both exported as the default export of this module and it's exported as a named export here. This is an understandable thing to do.
+
+[00:14:07]
+There are things that use this, in our app.ts, you can see we do import it, but we're importing it as the default export, right? And so it's telling us it's really this that's unused. So I'm going to decide, you know what, I want the named export to be the thing that I preserve here.
+
+[00:14:33]
+So I'm gonna do this. I'll go back to this server config thing and I'll just delete the default export. Let's run this again. Great, and so that went away. So really this is a trap to process these first. Because similarly, here, load data pipedefault. That's saying this thing.
+
+[00:14:59]
+There's a duplicate here. But you're also seeing this line up here which has to do with the duplicate. Similarly, I'm going to bias towards named exports. And where would load data be? Well, we could just say, find references.
+>> Mike: Only in this routes package. And good, we have another thing to fix here.
+
+[00:15:28]
+Load data and server config. So both of these will consume as named exports. Everything lines up, we get rid of the default export. We can run one more time. Great. And we're whittling this down. And we're whittling this down. Now what do I love about this tool? This would have just been incredibly difficult information to track down.
+
+[00:15:50]
+Just think about all of the manual work that you'd go through. Like trying to scan through. You'd like grab each dependency and scan through import paths and you'd have to worry about. You'd have to build this tool to do this job right. Especially in a large monorepo, it would be really, really challenging.
+
+[00:16:09]
+All right, getSeedPacketId. I happen to know I left this in here so that it was here for us to delete it turns out nobody needs this function. Somebody built this and it's just throwaway code. Maybe at some time someone was using it, but we can just entirely get rid of it now.
+
+[00:16:27]
+Nobody was even depending on it. And then these two as well. We have a bunch of formatting things which are for the backs of the seed packet if you click click and turn them over. But we're not displaying light preferences and we're not displaying water needs. And so we can get rid of those as well.
+
+[00:16:44]
+And we should be able to run this and it passes. So in summary, NIP is good for two things. Eliminating things in your dependencies, dev dependencies, peer dependencies of your package JSON that do not appear to be used, and giving you an automated tool that lets you continually scan for these things.
+
+[00:17:05]
+You could incorporate it into your build process as well. Somebody introduces a new dependency, they'd better use it or state that it should explicitly be retained. And then similarly, this makes sure that when you're exporting things, you're doing so deliberately. You're not just saying I needed. You know, maybe it's like I needed to test this thing and so I had to export it or something.
+
+[00:17:27]
+I mean, maybe that's a good reason to export. We'll talk about how you can do that safely later. But this lets you find things that are just simply dead, like dead code. And tree shaking would not have helped with this part, by the way, tree shaking is always done at a module by module level.
+
+[00:17:47]
+So these things here that nobody was using, it would have been very difficult to detect. And this absolutely would have been code that you're sending to production that nothing appears to use. So check this tool out. Try it. I bet you will find some stuff that's just unused in your project.
+
+[00:18:08]
+Monorepo or not, but like Monorepo, especially because of the contracts you have between your monorepo packages. This problem, as bad as it is with one JavaScript or TypeScript project, it is that much worse with the monorepo because you have all of these different relationships between packages.
+

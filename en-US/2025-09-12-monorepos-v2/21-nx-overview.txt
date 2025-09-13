@@ -1,0 +1,88 @@
+[00:00:00]
+>> Mike North: All right, so everything's going well. You're using Lerna. We're able to operate on small portions of our project. We're able to run tests or lint or build only what's changed and what's affected by what's changed. Let's see if we can use sort of the full fat build tool that's underneath this, which is nx.
+
+[00:00:22]
+And we're gonna need to globally install nx. And I'm going to really just sort of give you a little kind of preview or an intro into what this can do. But there's so much depth with this tool and I would encourage you to learn more about it. It's quite powerful.
+
+[00:00:39]
+So you're going to want to install a global version of the tool and you can either do like an NPM install G for global, I use volta. So you could say volta, install nx and this will set up a global version for you. You could use PNPM if you want, but ultimately you just want to have something that lives outside of the project.
+
+[00:01:05]
+Okay, and now you're gonna run pnpm nx init and this is like npx nx init. Basically what we're saying is run this init task, sorry, run the init command using the nx cli, and it's going to create a config file for us. Well, actually this is more of a choose your own adventure thing.
+
+[00:01:30]
+So making this the main thing we're looking at. So which scripts need to be run in order? For example, before building a project, dependent projects must be built. So this is telling us which of these tasks need to be sequenced versus which don't. And I would say sure, let's go with test.
+
+[00:01:53]
+I mean we could test everything if we wanted to in parallel, but I kinda like to see that my low level things pass their tests because otherwise you're gonna have low level tests that fail. And then of course higher level tests fail because something was broken at a lower level.
+
+[00:02:11]
+So let's say that there's. That I'm not going to worry about these three and linting. I feel like linting can happen in parallel across my whole project. There's no sense of a build order there necessarily. No, sorry, I'm wrong. For linting to work properly, we need declaration files to exist for projects that we depend on.
+
+[00:02:35]
+So there is some sequencing there. Let's leave it unchecked for now and let's see what happens. Okay, which scripts are cacheable? This Means they produce the same output given the same input. Build, lint and test are usually falling into this category and the others are not. So I'm gonna say test yes, lint and build yes, check yes and format.
+
+[00:03:03]
+Sure, we can say format yes, the rest no. And here's the mental model I want you to use. You have a code base and then you run a task and there's some combination of standard out and standard error that task produces. And there may be files that it produces.
+
+[00:03:24]
+And if you could say, running that task over and over and over would have exactly the same result. It's going to make the same files, it's gonna have the same standard out. You should check these boxes. DEV is different because there's another thing that happens there and that's like I'm engaging with a UI or I'm making requests and log lines are coming out.
+
+[00:03:46]
+I don't want that to be cached, I want that to be live data. That's happening. Because what's gonna happen when we complete this? I want you to imagine. Cause this is in essence what's happening. When you run test and you haven't changed your code at all. Instead of running your test, NX will just spit out the same test results that it already knows it should have based on the fact that you already ran them and you haven't touched anything.
+
+[00:04:16]
+It will appear like the command is running instantly. When you understand that that's how this is working, apply that mental model to which of these things you should be taking off the test UI and the watch thing. These are more ongoing things. Coverage is fair. This generates a code coverage report.
+
+[00:04:37]
+It's going to be the same code coverage. If I don't add a test, the code coverage report should look exactly the same. So let's leave it at those. Does the test script create any outputs? If not, leave blank. Otherwise provide a path relative to the project root. It does not.
+
+[00:04:56]
+The test coverage task does. Yes, this does. Does the lint script create outputs? It does not. There's no report it's creating, just standard out. Dist and well, we're going to find where this is and we'll edit in the config file. I'm not sure how this is going to behave if I add comma separated things here, but it's the dist folder and it's the ts build info files.
+
+[00:05:29]
+Does the check script create any outputs? No, it does not. Does the format script? No, it does not. Okay, now it's going and doing its thing, installing a Bunch of dependencies. Do we want remote caching? I'm gonna say yes. Now, eventually NX will charge you for remote build caching.
+
+[00:05:49]
+They give you a generous free amount. So it's worth checking out and in my opinion, it's worth paying for fast builds or something you're really chasing. It's really just to store. Not necessarily like it's storing the console output or the files that are created and a hash of the inputs.
+
+[00:06:14]
+And that means that if you build something on your machine and then I build something on my machine and the inputs are exactly the same, I get to benefit from your pre existing build result. That is work that is already done. It does not need to be done on my machine.
+
+[00:06:31]
+If we're really honest about those builds being cacheable, it is only as good as your judgment around whether builds are truly cacheable or not. I'm using an M4 MacBook, somebody else might be using an X86 processor and there's some native dependency that we both need and maybe that's going to screw things up.
+
+[00:06:51]
+But like for CI machines where you can routinely rely on them being like we're running this in Docker, it is going to be the same thing no matter what. No hardware access, no direct access to hardware. So it's like going to be very, very predictable.
+>> Student: Actually it touches on, I was gonna ask, would you trust the caching enough for if you had a test suite that was running before a deploy?
+
+[00:07:18]
+Is this reliable enough that you would consider caching that or would you after it's been run on local machines, before the main deploy actually run it?
+>> Mike North: I would trust this, I'm putting my, remember where I work, we gotta make sure that we're actually running tests right before deploy for sure.
+
+[00:07:43]
+But if you were saying, well, the PR builds like validating code in those PR branches, knowing that ultimately before things are deployed, we're running the pipeline on the main branch anyway. I would totally put something like this in place and especially upstream of that for developer builds, keeping that nice and productive.
+
+[00:08:05]
+Basically the closer to authoring you get, the more I'm willing to tolerate using a cached build. And it also depends on the task, if it's linting, I'm much more okay with that. But if we're saying the build output, like the actual compiled output of the typescript, I would want that to be created fresh, you know?
+
+[00:08:32]
+Does that make sense?
+>> Student: Yeah, I think just anytime you're caching things, I've Run into stale caches enough that totally. I'm skeptical, but it seems like a cool idea.
+>> Mike North: It's a cool idea and I think it's a no-brainer for some kinds of tasks. Like, would I be fine with prettier being cached?
+
+[00:08:49]
+Absolutely. Like single quotes, double quotes. I mean, I'm sure you could. Someone can find a significant security vulnerability that occurred cuz someone used double quotes or they should have used single quotes. Generally is not going to matter. All right, which plugins would you like to add? And it's giving me an opportunity to check things off.
+
+[00:09:13]
+NX is pretty good at inferring what already exists in your project and setting up plugins for itself so that it can engage with with these kinds of things. Really, and what are these plugins for? Think of them as replacements for your NPM tasks. Where it knows how to invoke vite.
+
+[00:09:34]
+It allows you in an NX config file instead of passing arguments to the vite cli, you can have configuration that you check in. And it's a little bit more maintainable that way because you're not trying to look at 12 flags that you're passing to the CLI in some shell script somewhere.
+
+[00:09:53]
+All right, we're gonna install those. Do you want to start using NX in your package JSON scripts? I want to say no to this. If I were to say yes, what it'll do is it will reach into my package JSON, grab the existing scripts, move them into an NX task that is effectively like their shell out task, right, just like run this command, and then it would replace everything in the package JSON with an NX based invocation of that task.
+
+[00:10:26]
+In fact, we could do it both ways. Let's try it this way. And then we can reset and try it the other way if we want. But I would rather show you one off how this is going to work.
+

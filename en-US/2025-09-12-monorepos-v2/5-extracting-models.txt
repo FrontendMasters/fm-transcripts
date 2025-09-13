@@ -1,0 +1,99 @@
+[00:00:00]
+>> Mike North: We want to identify kind of the lowest level concept that we can start to tease out first. Now, if we weren't able to successfully do this, we could manage, but it involves a little bit of creation of temporary packages to solve some problems. If you start refactoring in the middle, the ideal place to start is your lowest level modules that many things depend on, but they don't depend on much of anything else.
+
+[00:00:26]
+So if you can identify that grouping, that's a great place to start in our project, that is Models. So if we look at the import statements for models, well, here's there's little entanglement within models, and over here we've got no dependencies. So just look at the import statements.
+
+[00:00:45]
+That's really what you want to pay attention to. So this is a good candidate for us to factor out. We should be able to bring this out into its own package and and then introduce a dependency between the UI package and the Models package. And we should be able to sort of come back up for error, run our build lint test and see that it all works.
+
+[00:01:07]
+But we now have multiple packages in our monorepo. So let's get started. So the first thing we're gonna do is we want to make some directories. So we're gonna say mkdir -p packages/models/source and that's gonna be our source code. We're going to create a tests folder as well for the tests, because if you look closely, we have a test folder and conveniently we have models and server and little trivial test in each.
+
+[00:01:46]
+So it's pretty clear what we'll need to move out. But this is the part I'm making easy here that you'll have to work pretty hard for leading into a monorepo conversion if this is what you're doing. So let's move the relevant files into the new package and you could just drag and drop if you want.
+
+[00:02:01]
+I'm going to do it in the cli, but we'll open the relevant things so that we can see stuff disappear. So we're gonna say mv packages/ui/source/models/*. So everything in the Source Models folder goes to Packages, Models, source enter. Great, we'll do something similar. But here we're going to say tests.
+
+[00:02:29]
+Basically just replace source with tests. We saw some files disappear. These are now empty folders. We can go ahead and delete them. If we look at our new Models folder that we created here, we can see that we've successfully moved the code over. Now, I got an interesting question during the break about Git renaming.
+
+[00:02:58]
+You can see that here. I haven't staged anything yet. I'm gonna explain what Git sees right now just so you all are, cuz preserving that Git history is important, I want you all to understand this. We haven't staged anything. So Git's seeing two things. It is seeing that files that were tracked up until this point have disappeared.
+
+[00:03:21]
+They have been deleted. It also sees that there are some files that are untracked. When Git sees a new file that is not tracked yet, it doesn't really have any data about this file yet. It hasn't. There's no checksum on it. There are no git blobs for this file in your git folder.
+
+[00:03:42]
+It's the moment when you say, I want to stage these changes. That's where we see the R that represents the rename here. So don't panic if you see untracked, just do git add and stage them. And that's really where you're gonna see, is this being regarded as a rename or is this being regarded as a deletion and removal?
+
+[00:04:03]
+We need one more file in our source folder, index ts. And what we're going to do here is say, export from seed packet collection and seed packet model, Seed packet collection model and seed packet model. Just so we don't have to mess with this later, make sure to add the JS extension to the end of this.
+
+[00:04:30]
+Because we're using Node Next modules in this project, we're not getting a warning about it yet because there is no package JSON, there's no tsconfig, there's no basis for checking these files yet. But if we do this and hit save, we'll be done with it and we don't have to come back here.
+
+[00:04:46]
+Now let me talk a little bit more about index ts. Like, why are we creating this? The way we're structuring this file is preparing us for a world where when you're importing from this library, you can do something like import something from seeds models. This is a nice way to have a deliberately crafted entry point for this library as opposed to something like this.
+
+[00:05:20]
+Like if from the outside you're doing this, you're kind of exposing all of the guts of your library and it becomes a little bit difficult for you to create things. Or like, maybe you have files in here that are kind of just a means to an end. They export things because internally you need to be able to, like, work with, I don't know, some little conversion function or whatever it is.
+
+[00:05:42]
+But like, you don't want your users to be grabbing that. So by saying we have a deliberately created entry point here and we have these explicit exports. You could expose everything, you could expose just a couple things, tou could rename things as you're exporting them. This gives you.
+
+[00:06:02]
+It's almost like a little adapter between the way your modules are really named and the way symbols are exported in your source code and the carefully curated public API surface, if you want to think about that, for people who use this library that we're about to build here.
+
+[00:06:23]
+So that's why I favor monorepo packages or libraries in general that have one entry point instead of exposing their whole path structure to the outside world. Sorry. There is one path thing we need to fix that's in this tests file. And this just has to do with like there was an extra layer of depth in our folder structure in the original thing.
+
+[00:06:54]
+And so just delete one of the /.., and this will, when we do our build, this will work. We'll come back and make sure that it works. Cool, all right, we can save this. We can save this, save everything. Close it. But this isn't a package yet because it doesn't have a package JSON.
+
+[00:07:14]
+Let's change that. This is going to start really simple name seeds models again. Leaning into that NPM scope idea. Private. True. We'd be missing this. This is just don't publish to NPM. We're talking about package registry. We'll make this 002. I'm just picking different numbers. So if we see them pop up, we kind of know that it's real instead of 000.
+
+[00:07:45]
+And then type module. All right, we're gonna save that. Let's look at our tests. All right, still not working. Because we have not built anything and we're missing some entry points here, some specifications for users of this library. Where is the entry point for running the JavaScript? Where is the entry point for the types?
+
+[00:08:18]
+Next we're gonna wanna add some basic dependencies. I'm going to. I'm gonna be real dirty about this. I'm just going to start with the dependencies and dev dependencies that were in the UI package. And I'm just gonna grab all of them. And I wanna just paste that and trim away anything that looks like it's kind of UI-ish, like it's svelte or it's CSS.
+
+[00:08:47]
+We're going to get rid of that. So this is svelte, this is TailWind, Jestdom. Seems like it's UI testing and that's a svelte thing. Here's a svelte thing. These feel like they're related to Node and Express. This is vitest. We're still going to use vitest. All right, get rid of auto prefixer.
+
+[00:09:13]
+We will get to a point where we'll identify anything here that's extraneous. So don't sweat being perfect about this. So JS DOM and Post CSS, we can get rid of that. This is a svelte thing. This is SaSS. Just anything that looks like svelte or CSS vite, we don't need that because we're going to just be using the TypeScript compiler build.
+
+[00:09:39]
+Great. These dependencies, I happen to know we need all of these. This is to read the file, this is to log. This is the web server and this is the CORS middleware that applies the right headers. So our ui, our browser is willing to acknowledge the HTTP response from our backend.
+
+[00:09:58]
+So the running theme, we touched a package JSON. We must pnpmi and let's look at our folder structure here. Great, so we have a node modules here. Look at these. Symbolic link. Symbolic link. Symbolic link. So what's happening here is, yes, each package has a Node modules folder and you could reach into each one of those and you could say, absolutely, we have Express here.
+
+[00:10:34]
+But this is really pointing to a centralized location on disk. These are not one copy of Express per package in your monorepo or one copy of eslint or whatever. It is so very important ultimately in here. This is the source of truth. Yeah, these are not symbolic links here.
+
+[00:10:56]
+This is PNPM saying, you know, this was actually needed in the workspace. Everything else just references it. And you may notice, like, this is a package name and a version specifier. And so this is how you could end up with, you know, multiple scanning through. If I can see one, like, you know, multiple versions of a single package.
+
+[00:11:21]
+Here we go. Estree. We've got 107 and 108 for YPES estree. So it's totally possible to have those both Nice flat structure, which, by the way, NPM would not create for you. NPM would treat it as like node modules with inner node modules. And it's kind of difficult to look through that and grasp how much weight is there really here.
+
+[00:11:47]
+Okay, so great. So let's enter that project that, Sorry, the package we just created packages, models and be disappointed. Why there's no build task here, we're gonna need to add one in a sec. So here are the scripts we're going to add. This is again in our models package JSON folder.
+
+[00:12:26]
+Okay, so we need a test script. Actually, the easy way to do this, let's go back to our UI package JSON and let's grab the lint. All the lint and test stuff. I still intend to use VITest. It's a nice, fast library that uses native ES modules. I still intend to use Eslint.
+
+[00:12:53]
+So this is common stuff. So let's bring those over. Let's also create a build script, and that's gonna be tsc -p for project. Now, this file doesn't exist yet. We don't have a tsconfig yet, but we will. We can also add a dev script and we're gonna do this.
+
+[00:13:29]
+Tsc -p, same config file. And we'll say watch preserve, watch output. My favorite flag. I can't believe this is not the default. I just hate cli commands that eat the logs from your previous thing you were working on. If there are six type checking errors and you're getting ready to fix a bunch of them and then you hit save and it's like you lose track of what was I looking at?
+
+[00:14:11]
+Where was my scroll position? This just continues to append to standard out rather than cleaning everything and giving you a fresh view. Maybe that's a matter of taste. So we've got build, we've got dev, we've got lint. Great.
+
