@@ -1,0 +1,134 @@
+[00:00:00]
+>> Mike: Next, let's get linting working across our project. So the current state of the world is we have this ESLint config, but it is within the UI package. We haven't touched this since we moved things around and if we went into the ui, lint still works. Doesn't still work?
+
+[00:00:27]
+Interesting, I need to add my vite config to my TS config here. You know what? This will get shaken out as we make progress here. I can explain what's going on though. Our current setup, this has to do with TypeScript and linting more than monorepos. But what we have going on here is we're saying I'm using eslint and I have some type aware linting rules.
+
+[00:00:58]
+These are linting rules that are alerting the developer to problems that detection of those problems, involves using type information itself, right? And the way you set this up is you have to enable the project service and you have to point to a tsconfig file or tsconfig root directory.
+
+[00:01:28]
+Right? Now that's going to be this file here. Let's see, we've got the postcss config stuff? Kind of expected that we would not see these files here. Maybe. You know what? We're going to keep pushing forward and let's see if this still shakes out when we move things around.
+
+[00:01:55]
+But I'll tell you that the thing I immediately look for here is based on these error messages, if you've left this file out, if it's not being type checked, it's not part of your config. You either have to do something like this, right? And we could put a bunch of things in here, like, Right, you could build up an array and say these are just things that won't get linted for me.
+
+[00:02:28]
+Or you have to be referring to a TypeScript project that includes type checking on those files. Otherwise TypeScript does not know or ESLint doesn't know what to do with them because it's ultimately producing kind of like the AST that represents the code that will be executed and an equivalent data structure that represents the types on that code.
+
+[00:02:51]
+If there's no types, it can't do its job. Let's do some refactoring and see if we end up fixing this as part of that process. First, let's hoist some of our dependencies up to the workspace level that relate to linting. What's that going to be? Certainly typescript eslint is going to be one of them.
+
+[00:03:14]
+We'll have eslint. There it is. We'll grab that too. I think that might be it. Just these two. Maybe TypeScript itself. We'll grab that. These three lines and we're going to bring those up to our root level package JSON as dev dependencies. Save. We touched a package JSON.
+
+[00:03:45]
+We must pnpmi. Did I save it? Yep, great. Okay, now we should be able to do. Sorry. We need to move the lint config up to the root of our project. So we're gonna move that up. And whenever I do this, I think we might be in good shape here.
+
+[00:04:17]
+But I do want to check that paths look correct. Interesting. It can't find this module. Let me try restarting my language server just to see if that's real. You know what? That's legit. I think we forgot to bring that over. Let's check our UI package JSON. There it is.
+
+[00:04:41]
+Helpful tooling. Making sure that we do all the things we need to do, pnpmi. Great. Looks like that was successful and goes away. Fantastic. I want to change this from dir name to process CWD and we need types node for that to work. So let's install that at the workspace level because for sure the ESLINT config is being evaluated at in a node context.
+
+[00:05:37]
+This is interesting. Save, check in package.json, make sure everything looks right. Seems good. No, it didn't add the types node. That's really strange. Let's try something else. We can grab it and bring it in and then just run the install process. Okay, something about, I guess looking up with the latest version of @types/node, it's a little weird, but.
+
+[00:06:30]
+So now we've got types/node. We go back to this file. There we go. We've got process current working directory and because this is a script that we should be running at the workspace level, this will always be the root of the project. Here's pnpm lint, all right. We got some errors.
+
+[00:07:02]
+This represents us having some legitimate things that we need to catch. So we can start with first, this invalid template literal thing. Restrict template literal expressions. That's what it's called. We're going to go down into rules. Here it is. I already had that in there. Well, let's look at a couple other of these.
+
+[00:07:39]
+This to me screams an import's not resolving. And there it is. Now, for the first time, we're catching that some of these imports aren't resolving. The reason why this wasn't being detected before is we've been doing a lot of PNPM builds, which, remember. Just looks at the source folder.
+
+[00:08:03]
+And this is why it's useful to have that check command so that you're also type checking against your tests. But this just needs to be like. See all the red over here? And it's just going to go away once we resolve this svelte or seeds and models. Great.
+
+[00:08:20]
+So there's that file we can run again. Oops. And we should end up with just two errors left. These two tailwind config. So the svelte config, the tailwind config and the vite config. One more. That should be fine. What do we got here? Okay, so now I'm seeing a role, just verbalizing my debugging steps here.
+
+[00:08:57]
+I know I have a role in my tsconfig. Sorry, in my eslint configuration that allows numbers. We ran lint at the beginning of the project and it for sure passed. We all saw that. So that tells me I need to look at paths here. Look relative to the root of the project, we're looking for source and tests.
+
+[00:09:22]
+So here we go. We're going to add to both of these places packages anything source and tests. And you should see some of those things allowed. There we go. So now we're down to a set of errors that all are similar in nature. And they're saying there's a parsing error here.
+
+[00:09:47]
+I'm not included in a tsconfig or something like that. So two places this could happen. One is a TS config is not covering these things, but another would be just making sure that you have some representation of these files here. So at a high level, I want you to think about this as either the tsconfig contained, the tsconfig referred to files which are neither ignored nor described in terms of how they can be linted, or your linting files that your tsconfig doesn't cover.
+
+[00:10:26]
+So let's see what we can do about that, I think. Sorry, I'm just going to check my notes real quick here. Packages ui. All right, let's just double check the tsconfig one more time. UI tsconfig, there it is. Okay, and, Try that, now, that shouldn't matter. This can go away because this file is not present anymore.
+
+[00:11:23]
+But there's the svelte config, there's the vite config. What if we add these to our root TS config? That would be the other thing to experiment with. So this would be saying packages. Or we could do that and let's see if this happens. If this works, what that tells me is eslint's only looking at that root TS config, and it's not sort of cascading into each project there.
+
+[00:11:53]
+It works. So basically, just through debugging this, I think we can make an assumption. Now, although the TypeScript compiler is fine with the include array being added onto, if you will, in the UI package, it's still going to be including source and test because of what it's extending from eslint.
+
+[00:12:20]
+It appears does not work that way. And we're having to say in our config when we're saying, I'm pointing to this folder, that's where you can find the tsconfig that's going to be used for linting. That's where it wants to be able to find everything that is being asked to lint, and linting passes.
+
+[00:12:42]
+Now, just to convince ourselves that it's actually working, we can have a lint error of some sort and let's make sure that it ends up being picked up. Like, what would we do? We could do this. So that should be a lint error. No confusing, void expression save.
+
+[00:13:19]
+And we see the errors pop up. Great. Now we have eslint working across our workspace. And this is the advisable way to do it, by the way, like having one lint task that works everywhere, it's just going to be a lot more efficient than having linting happen in each monorepo package.
+
+[00:13:40]
+If you look at what the lint team says in their documentation, once you start getting to Even something like 10 packages, especially if the linting is happening in parallel, you don't want to have an ESLint file in each package at that point. It's just a lot for it to parse and just has to do with the way it's implemented.
+
+[00:14:03]
+But this scales up much better having one eslint MTS at your root and have this be the central place where all of your. Where everything's happening. And of course you get the added benefit of saying, well, just like we want one place for TypeScript compiler strictness settings, we want one place to look where we can state across the entire monorepo.
+
+[00:14:26]
+Here are the rules. And yes, you might have deviation between different packages, where let's say you're incrementally tightening things up, like applying a new rule and getting everything fixed in one package at a time and rolling that out. Well, you can still do that in this file. You can have as many of these objects as you want.
+
+[00:14:45]
+And this would be another great place to have per package configuration. But at least there's one place to look and you're not opening up a dozen files to figure out what the heck is going on. Next up, let's get that jump to definition working. Just to refresh what this problem is in any place where.
+
+[00:15:07]
+Yeah, this will work in any place where we're importing something from either the UI or the server package and we're importing from seeds models. If we command click, we end up going to these declaration files. There's a very simple fix for this, and that is in your tsconfig build, you want not just declaration true but declaration map true.
+
+[00:15:32]
+Think of these as the source maps for declaration files. So this one's super easy. If we build across the whole project, it'll result in a new build output. Sorry, I'm in the UI folder running the build command in the UI package only. I'm gonna get out of here and I wanna run build across the whole monorepo at which point there.
+
+[00:15:58]
+That's what I was looking for. These declaration map files, which you can see, all right, like here is the declaration file, and this is the source that it comes from, or the sources. And so as a result, now if we go back to that formatting ts and command click, we're now in TypeScript source, right?
+
+[00:16:21]
+So very important declaration map. True. There's really no downside to building those anywhere you care about declarations. Any library should have these declaration maps in place. Even if it's in your Node Modules folder, it's still valuable to be able to. If we're here and we're going into svelte, it's nice to be able to jump into something that's more readable here.
+
+[00:16:52]
+In this case, we're benefiting from source maps with JSDOC types, but it's the original source code with the comments, and it allows you to spelunk into your dependencies without having to walk back up and be like, I'm in a dist folder. Let me get into the original source code.
+
+[00:17:11]
+Yes.
+>> Male: If you were publishing something to NPM for that property, would you then have to include your TypeScript in the dist, or would the jump to just jump to the JavaScript code?
+>> Mike: That's a good, good question. When I publish TypeScript libraries, I will typically leave my source code in the library for that reason.
+
+[00:17:37]
+So, like when, if I were to publish models, models, you would see something that looks exactly like this. You'd see a dist folder, and that's part of the tarball that ends up going up to npm. But I'll absolutely leave my source folder in there, and I'll even leave the tests.
+
+[00:17:57]
+It's more text, but there's still a lot of value in somebody being able to go in and understand exactly what's going on, especially if you want to look into a concept like creating a patch. So all the popular JavaScript package managers, NPM, Yarn, and PNPM, they support this concept of like a patch command, which lets you really reach into a Node Modules folder, make a little adjustment, and then you create a git diff effectively, like a git patch that represents that adjustment having been made.
+
+[00:18:40]
+And then when you install that package again, your patch, which is checked into git along with your project, that's applied if you've ever run into a problem where some dependency has a bug. I run into this all the time where somebody has a very old way of representing types they're using in their ambient type information, both the declare keyword and the export keyword at one time.
+
+[00:19:07]
+The typescript compiler was okay with that, and it is not anymore. You can just go in and you can change those files and you create a patch. You don't have to fork the library and publish it to NPM and then pull it down. Still good to open a PR and to see if you can help fix it for other people too.
+
+[00:19:28]
+That's just a good ecosystem citizen thing to do. But the idea that you can make that adjustment and check it in as a git patch, it's pretty powerful and you do it once and then it's persisted with your source code, it's in git. That's a good reason to include the source code in your library.
+
+[00:19:50]
+If somebody ever needed to do that with something I'd published, well, they would have the ingredients necessary. They'd be able to go in there, into their Node Modules folder and npm, install from within that node modules and use my build script to. They could adjust the source code and then they could run a build on what is to them a dependency.
+
+[00:20:19]
+And then they'll get both the source code changes and the dist and they can check that in as sort of a patch with their repo, which is pretty cool. And in the monorepos world, you can do that in a way where that patch is applied for any package in your monorepo that uses the same version of that dependency.
+
+[00:20:43]
+So if you had to patch React or you had to patch something else, like you can do it once and then everywhere it ends up being used.
+

@@ -1,0 +1,93 @@
+[00:00:00]
+>> Mike North: Next, we're going to apply a TypeScript compiler feature called TypeScript Project References, which is related to composite projects. And this will improve the performance of our TypeScript builds. Now, in this workshop project, the builds are fast, there's just not much code here. But this will make a huge difference in a monorepo of significant size.
+
+[00:00:23]
+And it's really easy to set up. So the first thing we need to do is think about. We need to think a little bit about a dependency graph and we need to understand what's depending on what. So we will need to, in the Models folder in the TSCONFIG build JSON, because this is really a build feature, we're going to have to go into the compiler options and say composite true.
+
+[00:00:54]
+What we're doing here is we're enabling this project to be compiled in a way where you can have a piece of build information for this package, or really for like TypeScript would regard this as a project like a TS config refers to some collection of source code. Anyway, this project is going to have a build file that can be stitched together with other pieces of build information to allow rebuilds to happen more incrementally.
+
+[00:01:27]
+And just remember what our baseline is. Yes, we are sharing some code, right, we're benefiting from some consolidated compile stuff. Like there is one dist folder for the models package, and anyone using the models package points to that dist folder. But the downside here is anytime we touch anything in a package, that whole package is being rebuilt.
+
+[00:01:52]
+So this composite project and project references in these TSBUILD info files, they allow even more incremental compiling at the module level rather than at the package level. Again, your project gets big enough, you will notice a big difference here. In fact, if you're not using this and you have a sizable monorepo, this is absolutely the first thing you should invest in.
+
+[00:02:16]
+So composite true, in fact, we're gonna add this to all the package jsons of everything in our monorepo. Sorry, the tsconfig build jsons, not the package jsons. So there's the server and we'll add it to the ui. And just because of how vite works, this tsconfig is what's used for build.
+
+[00:02:38]
+And so we're going to. We'll add it here. Great, now we need to establish references. These have to do with edges on your dependency graph, and I want you to think about them as going hand in hand with something like this. If you have a workspace dependency, you should also be establishing a project reference to go along with that.
+
+[00:03:06]
+Now your build won't fail if you're missing this project reference, but this is what you need in order to get that kind of speed up factor. Here's what it looks like you're going to have as a top level property of the TS configs you're using to build. And again we're in the UI one, so there's no build here, but that's what it's for.
+
+[00:03:29]
+And we're going to create a references array with one item in it and it's the path to build JSON. This file doesn't exist yet, but it will in a moment. So this is gonna be sort of our build, our incremental build artifact, if you will. I'm going to copy this because I'll need something very similar in the server package or tsconfig Build JSON and it's top level property.
+
+[00:04:05]
+Too many commas turns out same relative path models. Tsconfig build JSON. Now I just ran PNPM builds and it built everything. Here's our models, our server and our ui. And we get these files now and you can see just there's a lot of information here about which declaration files are used and what your dependencies are and what version of everything is being used.
+
+[00:04:46]
+This effectively is what it means to have these proxy references. Now, unless we're working with something of substantial size, we're not going to see a speed up factor here. But trust me, it's there and you will know it's working for you when you apply this to a large project.
+
+[00:05:02]
+And you can see especially that incremental rebuild time is faster and the incremental build time, sorry, the way incremental compilation affects the performance of your language server, that's also going to be important. That's affected by this. And so that's where you're gonna hover over things. Or in those cases where your language server's lagging behind a little bit and you're seeing the red squiggles and it's still figuring out that you installed this thing, it really tightens that up significantly.
+
+[00:05:35]
+
+>> Student 1: So the idea here is when we edit the server, it's not reevaluating anything in models, right, it's just using cache.
+>> Mike North: Yet, sorry, let me, I'm gonna do a little experiment here. We're not going to commit this because I typically don't commit these build info files. But I want to see if we can spot what changes that might be a good way to look at this models perfect.
+
+[00:06:16]
+All right, so I just made a fairly trivial change and let's look at the build and, all right, so first off, you can see like two things happened. One is you can see server was affected. There's something happened here and something happened in model. So there's a sense that server's like exposed to this change.
+
+[00:06:40]
+Gosh, we're not gonna make any change sense out of this. All right, you're gonna have to take my word for it. The difference in terms of what's happening here is in this build info file is more of a sense that this one module changed and we're preserving all of the compiled results of whatever can be preserved within this package, as opposed to rebuilding this entire package from scratch.
+
+[00:07:07]
+Every time you hit the save button and just think about what's happening when we run our dev script, we're like, anytime we change something and we hit save, what's happening is that whole package is being rebuilt from scratch. There's no state that's being preserved between builds. This represents state being preserved between builds and an opportunity to reuse some of the state that can be safely reused given the scope of the change that you made when you hit save.
+
+[00:07:39]
+And so it's really like slimming down to closer to the minimum amount of work that's necessary in order to create an updated build output.
+>> Student 1: If you didn't add that reference, what would the behavior be in the original tsconfig to the models?
+>> Student 2: It would rebuild the whole thing.
+
+[00:07:59]
+
+>> Mike North: It would rebuild the whole project. You'd end up with something new. So the contents of the dist folder are going to be the same in either case. But the difference is what is the work required in order to get there before I added project references. It's similar to compiling it for the first time.
+
+[00:08:19]
+It's as if you have nothing in your dist folder. It's just building everything from scratch. You can think of this as almost having an intermediate result where certain files that I didn't touch. And it's not really by file because obviously this is changing too. But like certain parts of the package that were left unperturbed, we can reuse the build output from the last build as sort of an advanced starting point for creating that new build.
+
+[00:08:48]
+So the increment of work that's required to get the same build output is significantly smaller. Does that make sense?
+>> Student 1: Yeah.
+>> Mike North: It's more like an edit to the build, as opposed to throwing away and recreating.
+>> Student 1: I think my confusion came from aren't you already importing a built dist of models into the server?
+
+[00:09:12]
+They're already separated and that's already built. So I'm just struggling to understand where the savings come from.
+>> Mike North: That's a great point. Remember when we're saying we're importing when we're in load data and we're saying, I've got the seed packet collection model from here, I want you to think of this more as like instructions of where to look when compiling.
+
+[00:09:39]
+There's nothing here in terms of preserving work. And so, ultimately this is just directions for finding the thing that we're interested in. Like, where can I find this thing? If you remember when we were messing with, with this folder here, remember when we were messing with these and when I took them away, it couldn't find the module, the dependency link was broken.
+
+[00:10:08]
+It's because all this is, all the import statements are. It's really just instructions for finding something that exists in a Node Modules folder somewhere now, so that's one thing. Another thing is what is the work required to produce an updated dist folder based on changes to source code?
+
+[00:10:34]
+What we just did here by adding tsproject references, it's the difference between deleting that dist folder, starting completely fresh with no knowledge of previous builds, and doing the exact same amount of work to recompile build models as we did to build it the very first time. So that was our starting point.
+
+[00:10:53]
+And now we're more at the point where, well, we have a lot of bits of compiled data for other things that might be in that package and some portion of that we can reuse that represents work that is already done and that reduces the, the amount of new work that we have to do.
+
+[00:11:16]
+And the amount of new work we have to do is much more closely related to the scope of the change, which is like it's still always at the file level. So you're not recompiling a function within the file, you're creating a new compiled output for that module. But it's sort of like incremental compile at the module level instead of at the package level.
+
+[00:11:40]
+And the bigger your packages are, and the more of them there are in your monorepo, the more this is going to make a difference for you. One last thing, Git, Ignore these. As you can see, they are just junk. Those are files for programs to understand. Don't commit these bedtime.
+
+[00:12:06]
+It'll just always change all the time.
+
