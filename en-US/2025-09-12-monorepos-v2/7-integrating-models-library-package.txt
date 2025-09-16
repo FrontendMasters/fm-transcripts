@@ -1,0 +1,129 @@
+[00:00:00]
+>> Mike North: We need to now thread models into the UI code base. So if we look, we got some problems. See these red squiggles happening? These files aren't in the UI package anymore. And we need some way of stating that a dependency exists where the UI package needs this new models package that we created.
+
+[00:00:22]
+So we're gonna go ahead and take care of that. And we'll do this by, by going to the UI packages, package.json. And we're gonna go into dependencies. And here, we'll name our monorepo dependency that we depend on, seeds/models. And the specifier here is going to be something interesting.
+
+[00:00:49]
+This is a PNPM specific construct. So what we're saying here is this is a package coming from the workspace and I will tolerate any version of that package. What's going to happen is we will say when PNPM needs to resolve this dependency, it will first bias towards identifying whether the local package meets this version specifier.
+
+[00:01:21]
+In this case we'll take anything. So that will always be met. But you could also put a number here and what that would mean. Somebody in class was talking about how sometimes people do have monorepos with versioned inter monorepo dependencies. You could put something like that there and you would pull down, you'd go to NPM and you'd grab the appropriate version of the package here.
+
+[00:01:46]
+But I advise go with this. This is where you get a lot of benefits from the monorepo. We have a question from chat.
+>> Speaker 2: Why add types and modules explicitly? Currently our code works in the same way.
+>> Mike North: Interesting, so if you go up to, Well, let's explore that idea.
+
+[00:02:09]
+I'm going to get the UIPackage working, then I'm going to remove those two entries from the package JSON of the models folder and let's see if things still work. I would be surprised if they do. It's possible, but let's see what that would mean is something is inferring that that declaration file is the entry point for my package.
+
+[00:02:36]
+Because if we go back to the models package JSON, there's no information in here except in these places. What's the entry point of this library? Is it main js? Is it disk/source index.js? So typically you have to specify this. I would assume it's kind of dangerous to have a convention like that.
+
+[00:03:02]
+Like what if you had a main and an index, this kind of bold assumption to make that if you just name something a particular way. But let's poke at that and we'll experiment and See if in fact these are necessary components, as far as I know, they are absolutely necessary.
+
+[00:03:21]
+Did you have a question?
+>> Speaker 3: Yeah, so we're pointing to a local directory with that workspace string, basically, right?
+>> Mike North: Yes. You're saying two things. One, this dependency can be found inside this PNPM workspace. And I am willing to work with any version that you have for me.
+
+[00:03:49]
+But what that happens to mean is because there's this part of the resolution algorithm where you first try to see if this requirement, which will accept anything, that versioning requirement, can be met within the local workspace. And of course it will, because you'll accept anything, then you'll end up linking to that workspace copy of that monorepo dependency.
+
+[00:04:16]
+
+>> Speaker 3: And so this is a pnpm specific feature?
+>> Mike North: This is. Other package managers have similar concepts here, but this index here is a PNPM construct.
+>> Speaker 3: And is it crawling kind of the directory structure, looking for other package.json files to know where to find that dependency?
+>> Mike North: It does, but yes, it does as part of pnpmi.
+
+[00:04:43]
+But remember, it kind of already knows. It's like crawling a very small set of things. Right? It's crawling the folder that we've set, our packages are in, and it's looking at each package and seeing like, where is this? And if you look, if you're adventurous and you want to spelunk through here, like as part of setting up that package, there's some internal state that PNPM has where it already knows, like, here's the folder.
+
+[00:05:17]
+This is exactly where it has already crawled that. It has already crawled that. So what's happening is as it evaluates each of the packages that it finds in that PackageStar folder, it's creating this projects object. And then when it comes time to perform that resolution algorithm, it like absolutely knows what it has to work with in the latest state it has about this monorepo.
+
+[00:05:43]
+So yeah, the crawling is happening, but it's happening more ahead of time than you think. The state is already established and it's just sort of reading from that state. All right, well, let's see if this works. We touched a package JSON, therefore we pnpmi. Okay, so something interesting happened here.
+
+[00:06:14]
+We can see it's got three workspace projects. This is counting the root of the workspace, cuz there exists a package.json there as well. Let's take a look at what ended up happening here. First off, we're gonna need to update this import. That's the first thing that we're going to need to do here.
+
+[00:06:35]
+So this is going to come from Seeds models. Look, that resolved nicely. Let's run the build and let's see if there are other places where this needs to be updated. We want to run it in. Let's just get out of our packages here up to the root of the project PNPM build.
+
+[00:07:00]
+So this is building everything. Note that it's building models before it builds the ui. This is not an accident. It understands there's a dependency between those. It understands that we have to have things in that dist folder of the models package in order for the UI compile to have a chance of working.
+
+[00:07:20]
+This looks like it worked, but remember, there's this separate type checking thing that Svelte has to do and that's really where we're going to surface more useful feedback here we get an error. I suspected we would. Okay, we're building ui. We've got this formatting thing. I'm going to run it again just so that I can see the full line.
+
+[00:07:45]
+That's what's screwing with me here. Hey, there we go. Real file names. So we've got our formatting.ts. All right, so we're importing stuff that was from SeedPacketModel. This needs to come from. I'm going to leave it on my clipboard because I'm going to use it over and over.
+
+[00:07:59]
+Seeds models seed packet back. This is coming from Seeds models seed packetstate. This is going to come from Seeds models. And now this is actually a an additional import from the same place because it's not two separate modules, one for the collection, one for the model. It's all being exported through that index TS at the root of our library now.
+
+[00:08:37]
+And I know this needs type here. This is just type information. I'm leaving it as a little Easter egg for us to find when we re enable linting and getting it working across our monorepo. Let's try building again or checking again, rather. All right, couple more, seed-packet.state. Maybe we didn't save our file.
+
+[00:08:59]
+No, we're getting it already. We need that type just encouraging us. This helps with tree shaking where we're trying to eliminate dead code like unused dependencies as we're building for production. If you sort of force yourself to say, look, if we're just importing the interface, we import it this way.
+
+[00:09:22]
+That lets build tools kind of walk through just the import statements and say, look, at runtime there is no typescript. We can just avoid including this package entirely because we're only using it for type information. In this case, then Our load data function, this is in our server.
+
+[00:09:43]
+And again, same deal, seeds, models and there we go, check once more and the build passes. So to loop back to that question about types, I'm going to go back to our models package JSON. What happens if we get rid of these? Save. I'm going to. Just to keep ourselves honest here, I want to blow away the previous build.
+
+[00:10:27]
+Look, now, the UI package can't resolve this. What it's saying is it can't find the module. But really what it's saying is like, sorry, a more specific statement here. It's like, yeah, the module's there, but I have no idea. Well, sorry, the dependency is there, but it can't find whatever we're trying to import here.
+
+[00:10:55]
+Like where is the specific JavaScript file or the DTS file to get types from? It can't find that. So if we put it back, oops, wrong package JSON, if we go back to the models package JSON and we add it again and hit save and then build, we can see that everything goes back and we can type check and we can build again.
+
+[00:11:20]
+So that's the purpose of those two fields. This one is for type checking. This one is for actually executing code at runtime. Like what's the entry point for the JavaScript itself? But they both. Are you as the library author specifying what is the entry point for this package?
+
+[00:11:41]
+
+>> Speaker 2: So is it kind of like without it, it'd be like saying, hey, go to Frontend Masters, it's in this building. And you're like, yeah, okay, frontend Masters exists in this building, but where.
+>> Mike North: Yeah, it'd be like saying go to frontend Masters and take the course. You're like, I appear to have a front end master's and there are many courses, but what do you mean which one?
+
+[00:12:02]
+There's a bunch of stuff in here. Where do I enter? And especially if you're like, this is almost like. Remember when you're saying I want to import something like this, this is a package. These are exported symbols that come from somewhere in that package. But without a module bridging that gap.
+
+[00:12:25]
+When you say there's almost an implicit something here, I think of it kind of like this. There's kind of something implicit there, but what exactly do you mean? Sorry, it is not implicit, but you're saying, I want something from this path, but it needs to know, it needs to resolve.
+
+[00:12:50]
+Once it says, all right, there's a dependency here for sure, but within that I've got a folder in nodemodules for this thing. But what specifically without that types field and without this module field, that's where attempting to type check or attempting to run. In the case of those enums where there's actual JavaScript in the compiled output, those will fail.
+
+[00:13:17]
+
+>> Speaker 2: Have you run into TypeScript LSP performance issues in large monorepos and as the mono repo grows, what are some best practices to keep the LSP footprint lower?
+>> Mike North: I have some tips which we're going to touch on and that is the idea of using project references which creates these tsbuild info files.
+
+[00:13:42]
+It allows type checking both in terms of the language server doing its job and build. It allows those to be done in a much more incremental way where TypeScript has more keen awareness of these were these specific modules that you touched in the project. When you rebuild, it has a lot more information that it can reuse instead of recompiling every package from scratch.
+
+[00:14:08]
+So that's one thing that helps here. But bluntly, the TypeScript compiler is really complicated. It is a heavyweight project and this is part of why the TypeScript team is in the middle of a go rewrite where they're building both the compiler and probably the guts of the language server.
+
+[00:14:30]
+That is the main thing people will use. They're trying to use a language that lets them accomplish all of the analysis that they need to do in a much more efficient way that is more suitable for large typescript monorepos. It is a real problem. You know this if you work on something big for work, type checking slows down when there's a lot of weight, especially at stripe.
+
+[00:15:06]
+Our dashboard project is in a monorepo with a lot of typescript and it's like 3.7 million lines of code or even more now. It's challenging. So we would use SWC for the build, but that doesn't really help with the language server. So we're always just trying to tune it up more, use these project references, etc.
+
+[00:15:31]
+But the go, you should take the GO rewrite as an indicator that there's kind of a ceiling in terms of like the compiler doing its job and being written in TypeScript itself. There's a limit to how performant it can get, and in particular it's not just the speed, but it's a memory issue as well.
+
+[00:15:53]
+So if your type checking is running slowly, just run a little top or an htop and check out how much state is being stored and how much memory it's consuming. And it is not trivial, gigabytes. This is like why you need to have a lot of ram. Even if you're trying to run things like do your build elsewhere, if your language server is running locally, it's a big.
+
+[00:16:22]
+It's a lot of computer.
+

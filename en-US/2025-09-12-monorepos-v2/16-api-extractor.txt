@@ -1,0 +1,99 @@
+[00:00:00]
+>> Mike North: Next, we're going to look at two nice Microsoft projects that I find really useful in Monorepos, API Extractor and API Documenter. And they're kind of meant to work together, and we'll see how in this next section. So first we're going to install API Extractor. The purpose of this project is kind of twofold, but all centrally related to the same thing.
+
+[00:00:27]
+It will analyze your project and specifically it'll analyze your declaration files in your build output and it will create a rollup of those declaration files. What this means is you're going to get one DTS file that contains everything that you're potentially exporting. It will give you an API report for that file.
+
+[00:00:52]
+It's a markdown file. And I would encourage you to commit this one to Git because it makes spotting changes to the API to the public API of your library super easy to see. Because this is mainly a library tool, we're going to be focusing on the Models package, but you would use this anywhere you have a library shaped monorepo package.
+
+[00:01:17]
+Let's jump in, let's enter the Models folder Packages Models. And we're gonna install API Extractor. PNPM i dev dependency Microsoft/api-extractor. Great. This is a nice tool that gives you the starting point configuration file with a easy command. Api-extractor init and we're gonna see that in models. What just popped up this thing?
+
+[00:02:03]
+The api-extractor.json file. If you hate these red squiggles. The red squiggles are because technically comments are not allowed in JSON. In fact, a lot of tooling will be unhappy, if you add comments to your package JSON a lot of tooling will be super mad about that. There's something you can do in your settings file.
+
+[00:02:35]
+Interesting, I guess I already have it here. You know what, I just need to pull this up to the root level of my workspace. I had a .vscode folder that was there at the beginning of the workshop. And now in order to be honored, it needs to be.
+
+[00:02:56]
+Wow, get me out of here. It needs to be at the workspace root, good God. Great, there's VS code. And maybe if I open this up again. Removed it. Saved. Added it saved. Apparently that's what VS Code took to make the complaints go away. All right, we need to make a couple little edits here, but let me tell you about what you're setting up in this config file.
+
+[00:03:42]
+First off, you're configuring the particulars of the rollups. Actually this might be useful in this outline. So they've got an API report object, a doc model project, like a, sorry, top level property, and then we've got a DTS rollup property. So we're gonna go to DTS rollup and we're gonna see that there are a couple paths here.
+
+[00:04:11]
+There's an untrimmed file path, there's a alpha trimmed file path, a beta trimmed file path. And so what's gonna happen here is if we went to our seed packet model and we said, all right, this is exported here, I can add JSDOC tags like alpha or beta or internal, and that will determine which of these rollup files the types for this end up in which, if any, like if it's internal, well, untrimmed file path, that's the only one it'll show up in.
+
+[00:04:52]
+But if I say it's beta, well, it'll go in both the alpha and the beta, and of course in the untrimmed path. And then if you're saying it's public, well, it also goes in the public file path. So you can think of these as sort of being more and more restrictive the more mature the release is, if you will, untrimmed being the least mature, then alpha, then beta, then public.
+
+[00:05:15]
+And if you're using these JSDOC tags, basically you're just stripping more and more away until you eventually get to the stuff you're really confident in and that people should be free to use. So that's why we have a bunch of different files here. They will have different contents.
+
+[00:05:35]
+Where do I find this most useful? In the world of monorepos, you don't have to use these for alpha releases or beta releases. I will often use untrimmed if I want to export things and then I want the ability to import them in tests. So that's saying I've exported this thing, but don't take that as an invitation to use it.
+
+[00:05:58]
+I just need to be able to unit test it and it needs to be available outside the module. In order for me to do that, I will point in a tsconfig file how we can do paths. I do something like this. Something something something dot. Something like that, right?
+
+[00:06:35]
+Like I would say I'm opting in to use the untrimmed types. And if you wanted to do alpha or beta, you could do that as well. Now, in a monorepo, where I think this really sings is when you have a Couple packages. Let's say you have a pair of packages and they're very intimately connected, but you still have reasons for wanting to keep them separate.
+
+[00:07:02]
+Say one's more of a library shaped thing and the other's a CLI shaped thing. And you're really not ready to expose everything the CLI needs to engage with in terms of how. The contract it has with this library. Like, maybe you're making your way towards making some of these public API things, but this is a great way to say, all right, well, there's like a special level of entanglement that happens here and you can accomplish that by overriding and saying, I'm not looking at the public declaration file.
+
+[00:07:38]
+When I get types for this library, I'm looking for the untrimmed one or the beta one or whatever it is. And that lets you have control over kind of the encapsulation, or at least the encapsulation that type checking helps steer you towards rather than saying, look, it's all or nothing.
+
+[00:07:57]
+You're either exporting it, then you can unit test it, but also everybody else can use it or don't export it at all. And good luck. All right, so let's go through that process and let's see this in action. So I want to add a comma here just so I can uncomment some more lines.
+
+[00:08:16]
+So we've got the untrimmed file path. Great. And I actually tend to want to name this a little bit differently. I think it's a little bit of a foot gun to say if I look in the dist folder and I see like seeds, models, dts, it's not scary enough.
+
+[00:08:36]
+So I want to add the word untrimmed to this. I want the default thing, you see there, to be something that is maximally safe. All right, and let's uncomment the alpha trimmed file path. And this adds dash alpha at the end, which seems fine to me. The beta trimmed file path will have that too.
+
+[00:08:58]
+And it adds -beta. And then finally there is a public trimmed file path. And I'm going to remove public from this. Again, this has to do with my own convention here. Like if you don't have a specifier, if it's just the name of the package dts, I want that to be the safest thing to use, not the untrimmed thing.
+
+[00:09:22]
+We can get rid of that trailing comma, cuz that's all we're gonna do here. We need to find another symbol in here and it is this up at the top main entry point, file path. There it is. This is going to be in your dist folder and it is where.
+
+[00:09:48]
+It's sort of like where this tool is going to begin as it understands the types that you're exporting from your library. So we're not. Our convention is dist is where we're putting that. All right, lastly, there are some options lower down in here, and we've got one here that's called extractor Message reporting.
+
+[00:10:13]
+There's a section here. And what is this for these? You can think of as linting for these special JSDoc comments and their meaning. So what I want to do here is add something and it is aemissing release. Sorry, we need a comma here. Aemissing release tag, colon, log level warning.
+
+[00:10:45]
+There are a whole bunch of different rules that you can enable here. There's a link in the course notes that you can click to see the full set of things available. What this specific rule is going to do for us is it will print a warning to the console.
+
+[00:11:00]
+So this won't cause the command to fail, but it'll let us know if we're exporting things. And we have not specified. Is this public, Is this beta, Is this, is this alpha or is this internal? I like this because it's sort of, at least in the warning level, it's nagging code authors, to be specific, like, don't make me guess should this be exposed or not.
+
+[00:11:23]
+You have four things you can choose from. Go ahead and specify one, right? And we're starting, except for the one I just added here. There are none of these. I'm gonna leave this as a beta, just for us to find later. So we're gonna get some warnings. Final thing we have to do is we got to create an etc folder in our models package and it's going to put a bunch of stuff in here.
+
+[00:11:55]
+Here we go. It's time to run the API extractor. Run local verbose. We'll talk a little bit about other options that aren't local. You all know what verbose is. Look, a bunch of warnings, aerelease tag. So we could go through each of these and figure out. We'll just address a couple of them.
+
+[00:12:27]
+This we're going to export. We need this, it's public. This, it's public. And we'll make this one. We're just gonna do some random stuff here just to show the differences here. Interesting. So that's date, time, distance. Okay, distance is part of the packages API, but it's missing a release tab.
+
+[00:13:00]
+Okay, it led me to. I guess I added a new line with that comment and I make this a beta. Okay, so this is a different rule. It's saying TS doc escape greater than the greater than characters should be escaped using a backslash to avoid confusion with HTML.
+
+[00:13:24]
+Really? Did I? Yep, so this is because you can in some places in JS docs put an image tag or something. Great. I think we've done enough here. The rest are aemissing release tags. Another interesting thing that I like to use in this library. I think it's a different role.
+
+[00:13:58]
+This API extractor can help you make sure that if you were to export a function, you're also exporting the types that are used for that function's arguments and return values. This is useful because I'm sure we've all run into this situation where you want to create a variable to hold the parameters of what you're eventually going to pass to the function, and you're left trying to tease out from the function signature.
+
+[00:14:25]
+What's this? First parameter type. It ends up being difficult to create a type annotation that's like this is the exact type of what this function expects to be passed. What API Extractor can do is say you've exported a thing like a class or function or whatever it is, and it has as part of its signature some types.
+
+[00:14:51]
+You should also export those types directly as well, because they're part of your beta API surface.
+
