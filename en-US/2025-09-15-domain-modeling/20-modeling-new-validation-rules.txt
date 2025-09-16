@@ -1,0 +1,122 @@
+[00:00:00]
+>> Mike North: So, let's look at the rules we have and then I want us to discuss how we might implement additional rules here. So we have don't put your plant out of bounds, don't plant plants on top of other plants. We've got an interesting parametric rule here. And I say that because unlike these first two, it takes arguments.
+
+[00:00:27]
+And so what we're saying, this one's a little weird, but planting beds can never be more than 80% full. And so we can see that one in action. If we go and just try to copy, copy, copy, copy, and eventually it's going to say you've crossed the threshold.
+
+[00:00:44]
+This is one that we should probably remove. It's just sort of an example of something we could do. Like this doesn't make sense in the context of if I'm putting my gardener hat on, like I absolutely want to plant plant things everywhere in the raised bed that I'm allowed.
+
+[00:00:58]
+Then we could restrict plants in zones. We have specific plant. Like here we're looking at sunlight requirements where each zone has a sun level. And in this case we're saying, well, tomatoes for some reason are the only thing. There's a special case rule for tomatoes and sun. Then here is an adjacency based rule.
+
+[00:01:26]
+What we're looking for here is if I can scan through real quick, you can pass in a array of plant incompatibilities and a reason. If we look how this is wired up, just going to have to grab the usage of this in the garden page. So tomatoes and potatoes can't be planted next to each other for some reason.
+
+[00:02:05]
+If we were to drag. Do we have a potato here? Nightshade, I don't see it, but let's just change it. Let's say carrots, And I should be prevented from putting this here. Tomatoes and carrots should not be planted together. Great. We have a flexible framework here. Let's model some constraints.
+
+[00:02:42]
+I'm going to shift into my gardener mode. Given what we already have, which is in bounds, not on top of each other. That's the very basics that is adhering to what it means to be things on a grid. We've got adjacency, we've got characteristics of the bed versus plant needs.
+
+[00:03:19]
+So if we put our gardener hat on, what are some other rules that we may want to think about here?
+>> Speaker 2: I mean, realistically, let's say I know nothing and probably, probably know next to nothing about gardening. I would ask you, the gardener, considering that these are what we've talked about so far, right?
+
+[00:03:38]
+Like These are the things you don't do. Just ask a simple question, like when you're planting what you know, which plants don't you want to plant next to each other? And why? Are there any other circumstances where you wouldn't plant a given plant that you haven't listed? It's a little general, I think, but I.
+
+[00:03:56]
+I don't. Without getting the answer to that, I don't know how to suss out any more specifics.
+>> Mike North: No, I think that's. That's a great way to start here. So in this commit here, we're already modeling this concept of something called companion and antagonist plants. Sorry, I'm trying to arrange something very specifically here.
+
+[00:04:22]
+These are these little circles that are showing up. I'm trying to get a more interesting one. That's a great one there. And I wanna drop garlic in and mess everything up. So these indicators, like the little red semicircle, this is where we can say, like, there's something about one plant that hurts the other.
+
+[00:04:46]
+And right now all we're doing is we're lighting up indicators. But you could imagine, like, a strict mode here where we could say, look, clearly we already have this data. Like, we have these indicators. Maybe we just prevent. Maybe it's just like an invalid placement to drop anything where you're creating a problem.
+
+[00:05:06]
+Like this garlic literally does. It ruins things around it. Whereas these are kind of companion effects. Now, granted, we're talking about blocking actions, but you could imagine a validation rule that's shaped a little bit differently that says, all right, there is a more optimal way to arrange this garden.
+
+[00:05:32]
+You have inadvertently defeated all of the beneficial effects from plant placement. But that might fit more into an optimization concept. For now, let's go with where this conversation led. We clearly have plant interactions that are harmful, and those are clearly, like, evaluated, you know, as. As we move things around, like you can see on the corner on the side.
+
+[00:06:02]
+So let's. Rather than just sort of like lighting this up, let's reject the placement of the plant. If that happens, we can build a rule for that. So let's jump in. So what we'll do is we're gonna create a new ValidationRule in this sort of namespace for them, and eventually we'll end up adding it here.
+
+[00:06:28]
+So we'll go back to this point here. We'll add it right on top, and we'll call this prevent antagonist plant adjacency. And this is a ValidationRule that operates on the same plant item. And It's just telling us we need to return the appropriate thing. So first, let's return the object.
+
+[00:07:18]
+The name. We'll just call it something like that. This might be in a tooltip, so I don't want to get too long. And we can start out with, like, sorry, fat arrow. We can start out with saying, we're going to always reject this thing. Now, what we need to return is something called a validation result.
+
+[00:07:55]
+And this just is a type that kind of Represents this returning an error rather than throwing it. It's just. Is it valid? What's the reason? So let's just see if something gets thrown and we'll add a comma, we'll wire this rule up. That's fine. I'm gonna go back to garden page.
+
+[00:08:34]
+And just like that, prevent antagonist plant adjacency. And what this should do is basically like anything we try to do, we should see. No, because I said so. Zooming out. I said so. All right, so we see that clearly we're falling down the path of like, this is invalid.
+
+[00:08:54]
+Now, let's worry about making a real determination of whether this should be allowed or not. So what we can do in terms of finding this information, it happens to be on the workspace because it kind of makes sense from a domain modeling standpoint to say, like, this is just like known information about plants.
+
+[00:09:25]
+Right? It's not like this one garlic plant. Like one of seven should really not be placed next to tomato plant number six. This is really on a category by category basis. Like, garlics and tomatoes should not be together. And so this almost at the same level as seed packets.
+
+[00:09:48]
+And the information about seeds and the way tomatoes grow and the way tomatoes work, it doesn't have to do with positioning on the grid. Now there's something that's derived from it, but in terms of the interactions between plants, we might model it that way and just say category A and category B are helpful or harmful.
+
+[00:10:10]
+Here's how that works. Let's explore how this is modeled. We've got an indicator and there's an ID for it, just so we can keep track of when they're presented in the ui. We can go look up information to display about. Is this harmful? Is this helpful? We've got an interaction effect, and this is an item type like tomatoes or basil.
+
+[00:10:40]
+And then the nature of the effect, which is beneficial, harmful, or neutral, and then a description to present in a tooltip. These are directional effects. If you have things that are mutually beneficial, they just have one in either direction. These can stack up and they can be used to drive this UI that we get here.
+
+[00:11:02]
+Where in this case, lettuce is good for tomatoes, tomatoes are good for lettuce, and we have that bidirectional beneficial effect. Each of these green boxes is one of those effects. So let's use that and evaluate whether the placement will result in effects being felt. Great, so we've got our indicators and yeah, that's great.
+
+[00:11:35]
+We'll extract that out, destructure it. And we also want to, for the current placement, we want to kind of look at neighbors. And so I'm going to just borrow a pattern from down here and say which one would be a good one. Incompatible plants. This seems, this seems like a good place to start.
+
+[00:12:07]
+In fact, what we could do. This is a little bit of a cheat. How do we regard plant one and plant two here? Yep, they're already based on plant categories. So all we would need to do is kind of leverage this already existing rule and we can, in fact, I wanna structure this differently now because we have plant validation roles incompatible plants.
+
+[00:12:48]
+We can then say indicators, dot map and we can just generate a bunch of rules that are sort of stemming from this incompatible plants function that already exists. Yeah. This will be fairly simple. So prevent antagonist plant adjacency. We'll go over here. Great. That type checks. Now what we want is let's assume there are other things that already detect to see, is this an invalid placement or not?
+
+[00:13:39]
+We've got a target X and Y. And let's just start by seeing is there a plant to my left that I'm an antagonist with? Or let's start with an even more basic concept like is there anything in my raised bed that I shouldn't be planted near? We can begin there and we need some more things off of context, like the target zone, the target X and Y.
+
+[00:14:21]
+And then we can kind of cycle through the indicators and see if like there's anything else in the zone that might like the plant that's attempting to be placed, which is going to be one more thing. We need the item. Right. Something that I don't want to be near.
+
+[00:14:43]
+And we'll type this appropriately in a second. Okay, effect has a target item type id. So for now we're going to be selfish and we'll say like, if there's anything that affects me badly, let's make sure that I'm not planted there. So if the effect is equal to item category, relevant indicators, push effect or something like that.
+
+[00:15:42]
+And we'll say is valid is based on whether we found any relevant indicators. So we're saying like some number of indicators poorly affect this plant and we need to scope this actually within the bed. So rather than just pushing, we need to look through the target zone placements and see if any of these placements in the bed.
+
+[00:16:53]
+Actually, like, without adding this condition here, we're just going to say like, in this world, do there exist negative indicators that affect me? And so now we're saying like, in the target zone, are there plants? Okay, so just to add some comments, like for all indicators, for each effect of the indicator, if it affects the plant being dragged, that's the right arrangement.
+
+[00:17:53]
+And the plant. And the plant. Like creating the negative effect hurts me. Consider it to be relevant as a blocker for placement. And one last thing we have to throw into this. So if effect nature is harmful and if the effect is harmful and the item being placed.
+
+[00:18:40]
+Yeah, and sorry, not the item being placed, the thing we already found to exist in the bed is something that creates that effect is valid. We have our condition flipped. We're saying it's only valid if there are indicators are relevant indicators that are greater than zero. Let's log real quick.
+
+[00:19:21]
+One more thing we could do here is log indicator or log each effect. So we should at least see a bunch of stuff cycle through here. Okay, Plant onions, garlic. Plant broccoli, beneficial. And let's log the item being placed as well just so we can see all that information real clear.
+
+[00:20:29]
+And I just want to focus in like the one, the antagonist one here. There it is. Broccoli, beneficial. Peas, all right, so this is if target item type ID is piece, we'll log there. And this should be item. I think it's item id, not item category. That would explain it.
+
+[00:21:26]
+All right, one more try with feeling. Broccoli moves over here. Fine. Garlic moves up here, peas. One indicator negatively affects sugar snap peas. So now we have this like nice database of or nice representation of like, which plants don't get along with each other. And you could imagine how we could do it in the other direction as well, where like if you're a plant and you introduce negative indicators into the bed that you're being placed into, then you could have this flag as well.
+
+[00:22:07]
+But part of the value here is this idea of bothering to formalize something like validation logic into its own data structure. So that you could imagine if we have 30 rules that stack up for some reason, say we get into modeling irrigation and sunlight and things like that, you're able to very effectively unit test these things and pass that context object in and make sure that each piece of logic is modular and they all stack up and it doesn't become a big monolithic part of your code base.
+
+[00:22:47]
+That's a bunch of these essential constraints that matter to your user.
+

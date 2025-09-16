@@ -1,0 +1,57 @@
+[00:00:00]
+>> Mike North: Next, let's check out a branch where we have a lot of our raised bed layout app already built that for us. So go ahead and check out the branch called DDD dash client dash validation. If you have your server running in the background, make sure you kill it and restart it.
+
+[00:00:19]
+Then you should be able to start it back up. NPM run dev, and you should see a bunch of stuff starting up. Great. So if you go to your localhost5173 garden, you should see something that looks like this. So here we have a bunch of our plants categorized a little bit differently.
+
+[00:00:49]
+We can see some of the data is threaded through. There's a lot of placeholder data that we could add to if we wanted to. And you can grab these tiles and you can drag them into the raised beds and place them. What you may notice is that some types of actions are not allowed.
+
+[00:01:07]
+For example, we see placement is out of bounds. If we try to put this tomato here, we can see we get a validation failure, not just an error message, but this is a completion of a validation task of some sort. Similarly, I think this bed doesn't have enough sunlight for tomatoes.
+
+[00:01:30]
+So I want to show you how we've set up some business validation rules. This is sort of the constraint part of how we think about these bounded contexts, right? We've got our entities, we've got our value objects, the relationships and the important constraints. So in this branch, what you're going to want to take a look at is something called the workspace controller.
+
+[00:01:55]
+And this is ultimately where kind of the brains of plant placement in the garden beds happen. So if you want to look at what kinds of things we have in here, we've got validate item move, validate item removal, validate item placement. And these are sort of like this is the interface that the rest of the app engages with as it relates to this workspace controller class.
+
+[00:02:24]
+Now, looking near the bottom of this class, you'll see something that's interesting and that is plant validation rules. And so here we've got something called checkBoundaries, right? And if we look, we've got the target zone. Remember in the UI we're thinking about workspace zone item, and we've got the plant item.
+
+[00:02:50]
+And we're first getting the planting distance in feet or the number. And I would argue here we could change this even to size because our plant has a size on it. This is where we were doing that. We have a normalized version of size that uses math seal to round the planting distance up to the nearest whole foot make sure we're at least at one cell by one cell.
+
+[00:03:18]
+Then we really just look at the lower left corner of where the plant tile is. That's the target X and Y. So in the case of this tomato plant, you see the little coordinate system on the left and the bottom of the raised beds. So all we have to do is say this bottom left cell of the four cells it would occupy.
+
+[00:03:48]
+If we take that coordinate and walk upwards and we exceed the height of the bed, or if we walked rightwards and we exceed the width of the bed, this is out of bounds. And that's this logic here. Target X, target Y plus size. So if we were to make this more interesting and maybe these tiles aren't squares, this is where we would go and change that.
+
+[00:04:12]
+Now, what we do here is this is kind of the concept of returning an error rather than throwing an error. So a lot of programming languages, like Golang is a good example that follows this. Returning errors as values. There's something very important about articulating things this way. In this case, there's a difference between I threw while attempting to perform a validation versus I successfully performed a validation and it failed.
+
+[00:04:49]
+So this in and of itself is an important part of how you might model a validation task. There's like, I completed and this is allowed, or I completed, but this is disallowed. And then there's like, I exploded, or you attempted to. You attempted to place me in a garden bed that, as far as I know, doesn't exist.
+
+[00:05:13]
+So a good mental model I use here, because we already have to deal with this HTTP requests, right? There's a difference between an HTTP request that's like, am I allowed to place this here? Would you ever say you're going to say like a 400 bad request if it's sort of like not enough sunlight for the plan, you want to say, yes, we successfully completed the validation operation.
+
+[00:05:38]
+Respond 200 and the answer is no, you can't place them the plant there. Does that make sense? What this lets us do is we can also add more information to the validation failure, which then bubbles up into the UI and eventually it's presented in that little red thing that you saw.
+
+[00:06:02]
+So we've got a couple rules here. We've got check boundaries where you can't place an item outside of the zone's boundaries. We've got no overlaps. And this gets more interesting because we kind of have to. As we go through, we get the target zone, we look through all of the placements of the zone and in case we're moving an item within a raised bed, we wanna ignore that, right?
+
+[00:06:31]
+Like if we're over here and we're saying, I just want to move this spinach over by two, we're going to treat the original location of the move as vacant, because it's also a valid operation to just drop it right where it was, and that shouldn't be considered an overlap.
+
+[00:06:52]
+Then we've got the logic where we're going through and we're checking to see if there exists. If the placement of all of the placements in the zone is not ourselves, right? Like, if we're dealing with a tile in the bed that is not the thing being moved and dropped, then we're going to examine its size and see if the width and height of these two things overlap with each other.
+
+[00:07:25]
+And what that might look like is this. Well, sorry, I already can't drag that over here, but I shouldn't be able to do this. This overlaps with Big Boy Tomato. Okay, so we have a nice little rule framework here. We've got a context object, and context has on it a lot of the information that we would need.
+
+[00:07:53]
+Like, where is this coming from? What's the operation type? Is this an addition, a removal? Is it moving within a zone or moving across zones? And then we've got access ultimately to the whole workspace in case we needed to go and grab sort of the root node of this whole diagram that we have in front of us.
+
