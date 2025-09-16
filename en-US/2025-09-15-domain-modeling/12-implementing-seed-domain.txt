@@ -1,0 +1,158 @@
+[00:00:00]
+>> Mike North: So this is what we're trying to do now. If you notice in our example app we've got, we've got quite a few seeds coming through here. And this is because we're actually reading that file and passing some of the most basic possible data through. And now we can start to.
+
+[00:00:20]
+But you know, you see there's like netwait, I have no idea, maybe that's a string we can search for and put something meaningful there in the future. And we're going to try to fill in some of this information that's on the back here. Days to harvest is an interesting one.
+
+[00:00:37]
+That's another time related thing that came up. I don't know, let's say for the purpose of this, that's our starting point. We're going to build that version of the software, we'll show it to our user and let's see what they think about that. Great. So we're going to build this and we're going to have to touch a couple different places.
+
+[00:01:01]
+Well, first off there's a seed packets service. Remember these are our domain services. You're going to find that this thing has some methods and it mostly deals with just seed packet, all of the request response stuff above this part of our server. And while we may end up making sure data threads through properly, we're not going to be hopefully spending too much time there.
+
+[00:01:25]
+So we need to touch a couple methods in there, parse seed packet so that as we read this data file we can grab pieces of data that are interesting that are not quite represented on this model yet. And we also may want to take a look at get all seed packets, although I think things should just sort of pass through.
+
+[00:01:44]
+But this is the list where when we're like our UI is requesting all the seed packets to generate those components. This is what it's hitting. In our types package we have request and response shapes and this is the API route that handles the actual incoming requests and then delegates the fetching of the list of seed packets to that domain service.
+
+[00:02:13]
+Again, a nice separation between request response responsibilities and the core thing that is dealing with the seed packet domain. We also have a couple UI components which we'll come back to this. Let's start with the back-end and trickle it up. But there are two UI components where we can thread through some of the data once we incorporate it into the model and see that it's coming through in the HTTP response.
+
+[00:02:50]
+So let's begin, and don't overlook this point. So we have a generic packet concept that the UI understands, but it has a metadata object that lets us add additional information. And this is a good example of like, the API contract looks very different potentially than the way we're going to articulate our data model.
+
+[00:03:16]
+We may have a rich seed packet class in our backend, but our UI looks at things a little bit differently. So we're going to show how we can adapt between those two contracts without letting any of that request response stuff bleed into our server side data model, which is the, you know, it's the thing that should be like the most clear representation of this concept.
+
+[00:03:45]
+Great. So where we're going to start is loading. Sorry, we're going to start with the model. Let's begin diving into the implementation by extending the seed packet model. And here's where we're going to look in our types package. Remember, this is where we have our value objects and our entities and the resources which are the request response shapes.
+
+[00:04:12]
+Let's look at entities and seed packet metadata. I want to show you how this is threaded through. We've got a generic packet type which just has a name, a description, a category, and then this thing called a presentation, which if we look at it, it's like a path to an icon and an accent color of some sort.
+
+[00:04:39]
+If we look at our UI like the accent color is sort of the background behind the icon and it varies from plant to plant. This is a GPT estimated color that represents the plant. And so we have accent colors there. But there's not much here. It's just purely.
+
+[00:05:03]
+This could be like a packet of snacks or something. Like, there's nothing plant ish about this yet. But we have a function here which takes in a metadata schema as an argument and it creates a new type with that metadata schema on it. So if we look at the seed packet type, you can see we're doing exactly that.
+
+[00:05:31]
+We're creating a packet type and we have this metadata schema that's being sort of tacked onto it. This is our seed packet. And so all that's left for us to do is to enrich this. So we already have a quantity here and we can start to add on, add on other things.
+
+[00:05:49]
+So we want just to refresh my memory here. Days to harvest. We want days to harvest. And that's usually by the way, the time from planting the seed to when you expect to get something to eat. Well, the best time to get something to eat, I guess you can eat small plants, but usually not worth the work.
+
+[00:06:14]
+So great. In this case, we're already saying days. We could make it time to harvest, but we just want days to harvest here or even int.
+>> Male: Because that would be an integer.
+>> Mike North: Great. Anything else has to be greater than zero. Great. I'm not even going to say less than 365.
+
+[00:06:47]
+You can grow a fig tree and it takes 10 years before you're going to actually get figs for the first time. But negative time is not a thing. If you find a seed that you can harvest in negative time, let me know. That seems like solving world hunger kind of discovery.
+
+[00:07:08]
+Now this is squirrely. Like, I don't know, do an empty seed packet, does that belong in our collection? We'll leave that problem for another day. But like you could say one is the minimum here so that you actually hit a validation error. And potentially you could use that to drive business logic and say we're removing the seed packet from the collection as soon as you mutate this entity and say, okay, quantity zero.
+
+[00:07:35]
+Now it's like, well, something else has to happen. We're actually removing the record. Let's look back at the back of our packet here. Let's pick one of these instructions. How about the SO instructions? Because I do recall on the back of our seed packet, we had seed dec.
+
+[00:08:02]
+Depth an eighth of an inch, plant spacing 24 inches apart. That seems pretty important. So those are planting instructions, you could think of them that way. Also we might find some date something here. So let's see if we can fish in our raw data model that represents that YAML file and dig up something interesting there.
+
+[00:08:26]
+I do want to add one more thing. I want to add planting distance. And I'm doing this because I know where we're going. I know we're going to aim for this like gardening thing gardening app where you can drag plants onto grid. And I know that we're going to want to know what the size of those plants are so that we can sort of plan for, for that.
+
+[00:09:02]
+And we're going to want to have planting distance as part of that. Especially if as we were talking about, like a plant probably derives from a seed. You want to have information on this that is very useful in terms of modeling a plant. Just checking packet real carefully, make sure we don't duplicate our work.
+
+[00:09:29]
+So we have a category, let's call that like we had a plant family in our drawing here. So we've already got quantity. Let's say like category kind of meets this need. At least for the API contract we'll get that expiration date and name. Name is already on packet as well as category.
+
+[00:09:51]
+So like this and this kind of get what we want and then expires at, we can add that here. And because this is an API contract, I'm going to make this a string because we can't send date objects over the wire as it is. Great, so that's done.
+
+[00:10:19]
+Now let's turn our eye towards the server and that is where we're going to build the real entity here. So we're going to go into server source entities and we already have a seed packet here. And there's already kind of a starting point of some sort. We have a basic representation of a plant.
+
+[00:10:42]
+Many plants come from a single seed packet. So this is just part of our starting point modeling. Not all of this needs to be exposed through our API. This can be a richer model. We've already got a name, a description, a quantity here. Now remember, this is going to be like metadata quantity.
+
+[00:11:01]
+When we're dealing with that serialized shape that, that we pass back to the UI category, that's going to be on the top level because it's part of category here, right? It's got the presentation and this is like, take it from me, this is a one to one mapping.
+
+[00:11:21]
+It's the icon, it's the accent color and then planting distance. So it's fine to represent all of this that way. We need one more thing, an expiration date. I think we can always come back here if we need more and we'll just make this like a standardized timestamp.
+
+[00:11:53]
+Easiest, easiest way to go about doing this. In fact, we don't even need this. It will infer based on string that it should make it a text field. I think we should be good here. But let's see, SQLiteconstraint. That might have been at the top of my buffer there.
+
+[00:12:21]
+Nope, it's at the bottom. So what's going on here? Insert into. And then it's got the SQL insert statement with these parameters and says not null constraint. Failed, seed packets expires at. So somewhere we're trying to create a seed packet, but we've just added this expiresat field and it appears that by default this is not a nullable field.
+
+[00:12:47]
+Now, we could make it one and the error should go away, but I kind of want every seed packet to have an expiration date. So let's not make it nullable and let's fix this error by having that field get populated with data as we loaded from a file.
+
+[00:13:07]
+We'll leave this at smallest level so we can kind of see it when it gets fixed. So where we're gonna go next is the seed service, seed packetservice. At a high level, two things are happening here. We've got a function called parse seedpacket and it takes in a repository.
+
+[00:13:36]
+Remember, that's the same concept we were dealing with before, but apparently I am provided a repository when this function is called. And then it's got this thing called raw seed packet info. And this is the monster type with everything that's in that YAML file. This is a very, very, very detailed seed packet type.
+
+[00:14:03]
+And the point, we'll sort of fish around, cuz we have nice little typeaheads in TypeScript for the data we need. Or we'll look at the YAML file to figure out where to go and fish for it. But what we have to return is the seed packet entity. So this function represents getting one seed as raw information from that YAML file and then returning a persistent record, it looks like.
+
+[00:14:30]
+So this is creation of the packet. Interesting. I bet that the persistence happens outside of this because the packets are ending up in the database. This must be how it works. So we've got repo create and then a bunch of the existing things, and we need an expires at.
+
+[00:14:58]
+Let's look at our YAML file, see if we can spot a good place for an expiration date. Actually, we're riffing a little bit here, so I'm not sure that we're going to find one. We can always just fake it. Spread mature size viability in years. Let's use that.
+
+[00:15:27]
+Let's say I bought an enormous number of seeds in February of 2024 and we'll use seed packet info viability in years. We'll do new date and then let's see. It's possibly undef.
+>> Mike North: Comma, great. Sorry, just needed that formatting to work out. So we've got a date, we're passing in year, a month index, and then a day, right?
+
+[00:16:30]
+And we're gonna forget about the time. In fact, you could probably forget about the day too. Now we're dealing with this. So unexpected constant nullishness on the left hand side of a double question mark operator.
+>> Male: I think you need to enclose the coalescing operator and yeah.
+>> Female: I'm not sure that question marks too.
+
+[00:16:58]
+
+>> Mike North: I see. Great. So we've got 2024 plus the viability in years. And let's scroll to the bottom and look, no more SQLite constraint there. So we're already getting the category, the quantity, let's just double-check. PlantingDistance, is that already calculated? Yep, it is. So really we had to add expiresAt.
+
+[00:17:27]
+Now let's look at what's going over the wire and see if that data looks like what we need. So just open up good old dev tools network tab search for the packets request. So here's your response and I'm just scanning through. We've got category, Big Boy Tomato, presentation, metadata, all right?
+
+[00:17:53]
+There's our quantity and our planting distance. So those are already wired up somehow. We're gonna have to look at that. But I don't see any sort of expires at coming through. And this is where I would want to see it. Remember, like metadata is the place for any plant specific things to be trickling through.
+
+[00:18:12]
+To do this, we're going to have to get out of our domain service and get into the route handler because that is where we convert between our internal representation and the ultimate HTTP response that we're returning, which looks like this here we're going to have to say expires at is packet expires that and if we hit save packets there it is a timestamp that comes through.
+
+[00:18:53]
+Now we can go and thread it through to our seed packet component, like in the back. So we're gonna close a bunch of these files. Seed packet back is what this is called because we're sharing types like that YPES package. All this information is kind of trickling through and although it's not shown in the tooltip here because it gets truncated.
+
+[00:19:26]
+Wait, I expected that to kind of come through. What is this type? You know, I want to bump the TypeScript server just to the language server just to make sure we're getting the latest types after that change. That's interesting. We got rebuild the types package, okay, no worries.
+
+[00:20:01]
+So I'm going to just put this server in the background. It'll NPM run build so that we get the right types in the dist folder, and then we're going to bring that server back into the foreground. And I think we should get something more here. No, this is in the entities dist.
+
+[00:20:38]
+All right, let's try one more thing.
+>> Mike North: We're gonna blow away this disk folder just for good measure,
+>> Mike North: Build this package directly, see if there are any errors. All right, what is in your dist folder types? Entities, seed packet and seed packet metadata. There we go. Quantity, plane, distance, days to harvest.
+
+[00:21:18]
+All right, let's make sure that all percolated through the way it should. Maybe things are still warming up. Like maybe it's svelte. So for people following along live, I figured out what the problem was. It had to do with our the audible. We called to try to fix the import paths earlier.
+
+[00:21:57]
+What was going on here is we in our tsconfig had changed or had set rootdir to dot. We'd said the root directory of this project is effectively the root folder of this package. Then we ran a build. What happens when we do that is you're going to see in this folder here, if we, I think refresh.
+
+[00:22:32]
+Did I save that? I didn't save it. We're going to see a source folder pop up here. So what happened was we had two versions of the build output for this package, one in the root level of the dist folder, and that one had only quantity in that metadata object.
+
+[00:22:49]
+That's why we were seeing just that one option in the type ahead. Meanwhile, we had the real changes we just made inside the source folder. So if you just set this to source, save and then remove dist and build again, you should end up with a nice dist folder that just has everything in the root here and we should be back in action.
+
